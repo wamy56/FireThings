@@ -33,6 +33,32 @@ class AuthService {
     await _auth.signOut();
   }
 
+  /// Re-authenticate user with password (required before account deletion)
+  Future<void> reauthenticate(String password) async {
+    try {
+      final user = currentUser;
+      if (user == null || user.email == null) {
+        throw FirebaseAuthException(code: 'user-not-found', message: 'No user signed in.');
+      }
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
+  /// Delete the current user's Firebase account
+  Future<void> deleteAccount() async {
+    try {
+      await currentUser?.delete();
+    } on FirebaseAuthException catch (e) {
+      throw _handleAuthException(e);
+    }
+  }
+
   /// Register new user (optional - for creating engineer accounts)
   Future<UserCredential> register({
     required String email,
@@ -78,6 +104,8 @@ class AuthService {
         return 'Password is too weak. Use at least 6 characters.';
       case 'user-disabled':
         return 'This account has been disabled.';
+      case 'requires-recent-login':
+        return 'Please re-enter your password to continue.';
       case 'too-many-requests':
         return 'Too many attempts. Please try again later.';
       case 'network-request-failed':

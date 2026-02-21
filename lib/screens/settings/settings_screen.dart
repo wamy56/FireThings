@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/auth_service.dart';
+import '../../services/branding_service.dart';
 import '../../services/database_helper.dart';
+import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/responsive_scaffold.dart';
 import '../../utils/icon_map.dart';
@@ -315,6 +317,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 12),
+
+          // Delete Account Button
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              onPressed: () => _showDeleteAccountDialog(context, authService),
+              icon: Icon(AppIcons.danger),
+              label: const Text('Delete Account'),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                foregroundColor: Colors.red,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -460,6 +477,84 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (confirm == true) {
       await authService.signOut();
+    }
+  }
+
+  Future<void> _showDeleteAccountDialog(
+    BuildContext context,
+    AuthService authService,
+  ) async {
+    // Step 1: Confirmation
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Delete Account',
+      message: 'This will permanently delete your account and all associated data, including jobsheets, invoices, customers, sites, and templates.\n\nThis action cannot be undone.',
+      confirmLabel: 'Continue',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm != true || !context.mounted) return;
+
+    // Step 2: Password prompt
+    final passwordController = TextEditingController();
+    final password = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Please enter your password to confirm account deletion.'),
+            const SizedBox(height: 16),
+            PasswordTextField(
+              controller: passwordController,
+              label: 'Password',
+              hint: 'Enter your password',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(passwordController.text),
+            child: const Text(
+              'Delete Account',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (password == null || password.isEmpty || !context.mounted) return;
+
+    // Step 3: Deletion sequence with loading overlay
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(child: AdaptiveLoadingIndicator()),
+      ),
+    );
+
+    try {
+      await authService.reauthenticate(password);
+      await DatabaseHelper.instance.deleteAllData();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      await BrandingService.removeLogo();
+      await authService.deleteAccount();
+      // Auth state change will redirect to login screen
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // dismiss loading
+        context.showErrorToast(e.toString());
+      }
     }
   }
 
