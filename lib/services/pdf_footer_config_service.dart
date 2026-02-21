@@ -1,0 +1,56 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/pdf_footer_config.dart';
+import '../models/pdf_header_config.dart';
+
+class PdfFooterConfigService {
+  static const _configKey = 'pdf_footer_config_v1';
+  static const _migratedKey = 'pdf_footer_config_migrated';
+
+  // Old keys from JobsheetSettingsService
+  static const _oldFooterLine1 = 'jobsheet_footer_line1';
+  static const _oldFooterLine2 = 'jobsheet_footer_line2';
+
+  static Future<PdfFooterConfig> getConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Attempt migration from old settings if not done yet
+    if (prefs.getBool(_migratedKey) != true) {
+      await _migrateFromOldSettings(prefs);
+    }
+
+    final jsonString = prefs.getString(_configKey);
+    if (jsonString != null) {
+      return PdfFooterConfig.fromJsonString(jsonString);
+    }
+    return PdfFooterConfig.defaults();
+  }
+
+  static Future<void> saveConfig(PdfFooterConfig config) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_configKey, config.toJsonString());
+  }
+
+  static Future<void> _migrateFromOldSettings(SharedPreferences prefs) async {
+    final line1 = prefs.getString(_oldFooterLine1) ?? '';
+    final line2 = prefs.getString(_oldFooterLine2) ?? '';
+
+    final hasOldData = line1.isNotEmpty || line2.isNotEmpty;
+
+    if (hasOldData) {
+      final leftLines = <HeaderTextLine>[];
+      if (line1.isNotEmpty) {
+        leftLines.add(HeaderTextLine(key: 'custom', value: line1, fontSize: 7));
+      }
+      if (line2.isNotEmpty) {
+        leftLines.add(HeaderTextLine(key: 'custom', value: line2, fontSize: 7));
+      }
+      final config = PdfFooterConfig(
+        leftLines: leftLines,
+        centreLines: [],
+      );
+      await prefs.setString(_configKey, config.toJsonString());
+    }
+
+    await prefs.setBool(_migratedKey, true);
+  }
+}

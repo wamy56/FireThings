@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:iconsax.io)",
+      "WebFetch(domain:app.iconsax.io)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:pub.dev)",
+      "WebFetch(domain:glenthemes.github.io)",
+      "Bash(flutter analyze:*)",
+      "Bash(find:*)",
+      "Bash(flutter pub run:*)"
+    ]
+  }
+}

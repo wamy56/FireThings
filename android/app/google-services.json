@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "218966840739",
+    "project_id": "firethings-51e00",
+    "storage_bucket": "firethings-51e00.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:218966840739:android:376a4c3850b9e4ee7b3616",
+        "android_client_info": {
+          "package_name": "com.firethings.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9C9NhIr7iDPV_1UoTNSzQGEkhy9g2PwE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

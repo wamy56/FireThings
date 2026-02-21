@@ -1,0 +1,975 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
+import '../models/models.dart';
+
+/// Database helper to manage SQLite database operations
+class DatabaseHelper {
+  // Singleton pattern - only one instance of DatabaseHelper
+  static final DatabaseHelper instance = DatabaseHelper._init();
+  static Database? _database;
+
+  DatabaseHelper._init();
+
+  /// Get database instance (create if doesn't exist)
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDB('jobsheets.db');
+    return _database!;
+  }
+
+  /// Initialize database
+  Future<Database> _initDB(String filePath) async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, filePath);
+
+    return await openDatabase(
+      path,
+      version: 10,
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
+    );
+  }
+
+  /// Upgrade database for new versions
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createInvoicesTable(db);
+    }
+    if (oldVersion < 3) {
+      await _createSavedCustomersTable(db);
+    }
+    if (oldVersion < 4) {
+      await _createCustomTemplatesTable(db);
+      await _createFilledTemplatesTable(db);
+    }
+    if (oldVersion < 5) {
+      // Recreate invoices table to fix column name issues
+      await db.execute('DROP TABLE IF EXISTS invoices');
+      await _createInvoicesTable(db);
+    }
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE jobsheets ADD COLUMN fieldLabels TEXT');
+    }
+    if (oldVersion < 7) {
+      await db.execute("ALTER TABLE jobsheets ADD COLUMN status TEXT DEFAULT 'completed'");
+    }
+    if (oldVersion < 8) {
+      await _createJobTemplatesTable(db);
+    }
+    if (oldVersion < 9) {
+      await db.execute('ALTER TABLE job_templates ADD COLUMN sectionLayout TEXT');
+      await db.execute('ALTER TABLE jobsheets ADD COLUMN sectionLayout TEXT');
+    }
+    if (oldVersion < 10) {
+      await _createSavedSitesTable(db);
+    }
+  }
+
+  /// Create database tables
+  Future<void> _createDB(Database db, int version) async {
+    const idType = 'TEXT PRIMARY KEY';
+    const textType = 'TEXT NOT NULL';
+    const textTypeNullable = 'TEXT';
+
+    await db.execute('''
+      CREATE TABLE jobsheets (
+        id $idType,
+        engineerId $textType,
+        engineerName $textType,
+        date $textType,
+        customerName $textType,
+        siteAddress $textType,
+        jobNumber $textType,
+        systemCategory $textTypeNullable,
+        templateType $textType,
+        formData $textType,
+        fieldLabels $textTypeNullable,
+        status $textType DEFAULT 'draft',
+        engineerSignature $textTypeNullable,
+        customerSignature $textTypeNullable,
+        customerSignatureName $textTypeNullable,
+        notes $textTypeNullable,
+        defects $textTypeNullable,
+        createdAt $textType,
+        sectionLayout $textTypeNullable
+      )
+    ''');
+
+    await _createInvoicesTable(db);
+    await _createSavedCustomersTable(db);
+    await _createCustomTemplatesTable(db);
+    await _createFilledTemplatesTable(db);
+    await _createJobTemplatesTable(db);
+    await _createSavedSitesTable(db);
+
+    debugPrint('Database tables created successfully');
+  }
+
+  /// Create job_templates table for custom JobTemplate objects
+  Future<void> _createJobTemplatesTable(Database db) async {
+    const idType = 'TEXT PRIMARY KEY';
+    const textType = 'TEXT NOT NULL';
+    const textTypeNullable = 'TEXT';
+
+    await db.execute('''
+      CREATE TABLE job_templates (
+        id $idType,
+        name $textType,
+        description $textType,
+        fields $textType,
+        isShared INTEGER NOT NULL DEFAULT 0,
+        creatorId $textTypeNullable,
+        createdAt $textTypeNullable,
+        sectionLayout $textTypeNullable
+      )
+    ''');
+
+    debugPrint('Job templates table created successfully');
+  }
+
+  /// Create saved_customers table
+  Future<void> _createSavedCustomersTable(Database db) async {
+    const idType = 'TEXT PRIMARY KEY';
+    const textType = 'TEXT NOT NULL';
+    const textTypeNullable = 'TEXT';
+
+    await db.execute('''
+      CREATE TABLE saved_customers (
+        id $idType,
+        engineerId $textType,
+        customerName $textType,
+        customerAddress $textType,
+        email $textTypeNullable,
+        notes $textTypeNullable,
+        createdAt $textType
+      )
+    ''');
+
+    debugPrint('Saved customers table created successfully');
+  }
+
+  /// Create invoices table
+  Future<void> _createInvoicesTable(Database db) async {
+    const idType = 'TEXT PRIMARY KEY';
+    const textType = 'TEXT NOT NULL';
+    const textTypeNullable = 'TEXT';
+
+    await db.execute('''
+      CREATE TABLE invoices (
+        id $idType,
+        invoiceNumber $textType,
+        engineerId $textType,
+        engineerName $textType,
+        customerName $textType,
+        customerAddress $textType,
+        date $textType,
+        dueDate $textType,
+        items $textType,
+        notes $textTypeNullable,
+        includeVat INTEGER NOT NULL DEFAULT 0,
+        status $textType,
+        createdAt $textType
+      )
+    ''');
+
+    debugPrint('Invoices table created successfully');
+  }
+
+  /// Insert a jobsheet
+  Future<Jobsheet> insertJobsheet(Jobsheet jobsheet) async {
+    final db = await database;
+
+    await db.insert(
+      'jobsheets',
+      jobsheet.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    debugPrint('Jobsheet inserted: ${jobsheet.id}');
+    return jobsheet;
+  }
+
+  /// Get all jobsheets
+  Future<List<Jobsheet>> getAllJobsheets() async {
+    final db = await database;
+
+    final result = await db.query('jobsheets', orderBy: 'date DESC');
+
+    return result.map((json) => Jobsheet.fromJson(json)).toList();
+  }
+
+  /// Get jobsheets by engineer ID
+  Future<List<Jobsheet>> getJobsheetsByEngineerId(String engineerId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'jobsheets',
+      where: 'engineerId = ?',
+      whereArgs: [engineerId],
+      orderBy: 'createdAt DESC',
+    );
+
+    return result.map((json) => Jobsheet.fromJson(json)).toList();
+  }
+
+  /// Get draft jobsheets by engineer ID
+  Future<List<Jobsheet>> getDraftJobsheetsByEngineerId(String engineerId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'jobsheets',
+      where: 'engineerId = ? AND status = ?',
+      whereArgs: [engineerId, 'draft'],
+      orderBy: 'createdAt DESC',
+    );
+
+    return result.map((json) => Jobsheet.fromJson(json)).toList();
+  }
+
+  /// Get a single jobsheet by ID
+  Future<Jobsheet?> getJobsheetById(String id) async {
+    final db = await database;
+
+    final result = await db.query(
+      'jobsheets',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (result.isEmpty) return null;
+
+    return Jobsheet.fromJson(result.first);
+  }
+
+  /// Update a jobsheet
+  Future<int> updateJobsheet(Jobsheet jobsheet) async {
+    final db = await database;
+
+    return await db.update(
+      'jobsheets',
+      jobsheet.toJson(),
+      where: 'id = ?',
+      whereArgs: [jobsheet.id],
+    );
+  }
+
+  /// Delete a jobsheet
+  Future<int> deleteJobsheet(String id) async {
+    final db = await database;
+
+    return await db.delete('jobsheets', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Search jobsheets by customer name or job number
+  Future<List<Jobsheet>> searchJobsheets(String query) async {
+    final db = await database;
+
+    final result = await db.query(
+      'jobsheets',
+      where: 'customerName LIKE ? OR jobNumber LIKE ?',
+      whereArgs: ['%$query%', '%$query%'],
+      orderBy: 'date DESC',
+    );
+
+    return result.map((json) => Jobsheet.fromJson(json)).toList();
+  }
+
+  /// Get jobsheets count
+  Future<int> getJobsheetsCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) FROM jobsheets');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  /// Get jobsheets by date range
+  Future<List<Jobsheet>> getJobsheetsByDateRange({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final db = await database;
+
+    final result = await db.query(
+      'jobsheets',
+      where: 'date BETWEEN ? AND ?',
+      whereArgs: [startDate.toIso8601String(), endDate.toIso8601String()],
+      orderBy: 'date DESC',
+    );
+
+    return result.map((json) => Jobsheet.fromJson(json)).toList();
+  }
+
+  /// Delete all jobsheets (for testing/reset)
+  Future<int> deleteAllJobsheets() async {
+    final db = await database;
+    return await db.delete('jobsheets');
+  }
+
+  // ==================== INVOICE METHODS ====================
+
+  /// Insert an invoice
+  Future<Invoice> insertInvoice(Invoice invoice) async {
+    final db = await database;
+
+    final json = invoice.toJson();
+    // Convert items list to JSON string for storage
+    json['items'] = jsonEncode(json['items']);
+    // Convert bool to int for SQLite
+    json['includeVat'] = json['includeVat'] == true ? 1 : 0;
+
+    await db.insert(
+      'invoices',
+      json,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    debugPrint('Invoice inserted: ${invoice.id}');
+    return invoice;
+  }
+
+  /// Get all invoices
+  Future<List<Invoice>> getAllInvoices() async {
+    final db = await database;
+
+    final result = await db.query('invoices', orderBy: 'createdAt DESC');
+
+    return result.map((json) => _parseInvoiceJson(json)).toList();
+  }
+
+  /// Get invoices by engineer ID
+  Future<List<Invoice>> getInvoicesByEngineerId(String engineerId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'invoices',
+      where: 'engineerId = ?',
+      whereArgs: [engineerId],
+      orderBy: 'createdAt DESC',
+    );
+
+    return result.map((json) => _parseInvoiceJson(json)).toList();
+  }
+
+  /// Get outstanding (sent but not paid) invoices by engineer ID
+  Future<List<Invoice>> getOutstandingInvoicesByEngineerId(String engineerId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'invoices',
+      where: 'engineerId = ? AND status = ?',
+      whereArgs: [engineerId, 'sent'],
+      orderBy: 'createdAt DESC',
+    );
+
+    return result.map((json) => _parseInvoiceJson(json)).toList();
+  }
+
+  /// Get draft invoices by engineer ID
+  Future<List<Invoice>> getDraftInvoicesByEngineerId(String engineerId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'invoices',
+      where: 'engineerId = ? AND status = ?',
+      whereArgs: [engineerId, 'draft'],
+      orderBy: 'createdAt DESC',
+    );
+
+    return result.map((json) => _parseInvoiceJson(json)).toList();
+  }
+
+  /// Get a single invoice by ID
+  Future<Invoice?> getInvoiceById(String id) async {
+    final db = await database;
+
+    final result = await db.query(
+      'invoices',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (result.isEmpty) return null;
+
+    return _parseInvoiceJson(result.first);
+  }
+
+  /// Update an invoice
+  Future<int> updateInvoice(Invoice invoice) async {
+    final db = await database;
+
+    final json = invoice.toJson();
+    json['items'] = jsonEncode(json['items']);
+    // Convert bool to int for SQLite
+    json['includeVat'] = json['includeVat'] == true ? 1 : 0;
+
+    return await db.update(
+      'invoices',
+      json,
+      where: 'id = ?',
+      whereArgs: [invoice.id],
+    );
+  }
+
+  /// Delete an invoice
+  Future<int> deleteInvoice(String id) async {
+    final db = await database;
+
+    return await db.delete('invoices', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Get next invoice number
+  Future<String> getNextInvoiceNumber() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) FROM invoices');
+    final count = (Sqflite.firstIntValue(result) ?? 0) + 1;
+    final year = DateTime.now().year;
+    return 'INV-$year-${count.toString().padLeft(4, '0')}';
+  }
+
+  /// Parse invoice JSON from database (handles items string conversion)
+  Invoice _parseInvoiceJson(Map<String, dynamic> json) {
+    final mutableJson = Map<String, dynamic>.from(json);
+
+    // Parse items from string back to list
+    if (mutableJson['items'] is String) {
+      final itemsStr = mutableJson['items'] as String;
+      // Parse the string representation of list back to actual list
+      final itemsList = _parseItemsString(itemsStr);
+      mutableJson['items'] = itemsList;
+    }
+
+    // Convert int to bool for includeVat
+    if (mutableJson['includeVat'] is int) {
+      mutableJson['includeVat'] = mutableJson['includeVat'] == 1;
+    }
+
+    return Invoice.fromJson(mutableJson);
+  }
+
+  /// Parse items string back to list of maps
+  List<Map<String, dynamic>> _parseItemsString(String itemsStr) {
+    // Handle empty or invalid strings
+    if (itemsStr.isEmpty || itemsStr == '[]') return [];
+
+    try {
+      // Use dart:convert for proper JSON parsing
+      final List<dynamic> parsed =
+          (itemsStr.startsWith('['))
+              ? _parseJsonList(itemsStr)
+              : [];
+      return parsed.cast<Map<String, dynamic>>();
+    } catch (e) {
+      debugPrint('Error parsing items: $e');
+      return [];
+    }
+  }
+
+  /// Simple JSON list parser
+  List<dynamic> _parseJsonList(String jsonStr) {
+    return jsonDecode(jsonStr) as List<dynamic>;
+  }
+
+  // ==================== SAVED CUSTOMERS METHODS ====================
+
+  /// Insert a saved customer
+  Future<SavedCustomer> insertSavedCustomer(SavedCustomer customer) async {
+    final db = await database;
+
+    await db.insert(
+      'saved_customers',
+      customer.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    debugPrint('Saved customer inserted: ${customer.id}');
+    return customer;
+  }
+
+  /// Get all saved customers for an engineer
+  Future<List<SavedCustomer>> getSavedCustomersByEngineerId(String engineerId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'saved_customers',
+      where: 'engineerId = ?',
+      whereArgs: [engineerId],
+      orderBy: 'customerName ASC',
+    );
+
+    return result.map((json) => SavedCustomer.fromJson(json)).toList();
+  }
+
+  /// Get a single saved customer by ID
+  Future<SavedCustomer?> getSavedCustomerById(String id) async {
+    final db = await database;
+
+    final result = await db.query(
+      'saved_customers',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (result.isEmpty) return null;
+
+    return SavedCustomer.fromJson(result.first);
+  }
+
+  /// Update a saved customer
+  Future<int> updateSavedCustomer(SavedCustomer customer) async {
+    final db = await database;
+
+    return await db.update(
+      'saved_customers',
+      customer.toJson(),
+      where: 'id = ?',
+      whereArgs: [customer.id],
+    );
+  }
+
+  /// Delete a saved customer
+  Future<int> deleteSavedCustomer(String id) async {
+    final db = await database;
+
+    return await db.delete('saved_customers', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Search saved customers by name
+  Future<List<SavedCustomer>> searchSavedCustomers(String engineerId, String query) async {
+    final db = await database;
+
+    final result = await db.query(
+      'saved_customers',
+      where: 'engineerId = ? AND customerName LIKE ?',
+      whereArgs: [engineerId, '%$query%'],
+      orderBy: 'customerName ASC',
+    );
+
+    return result.map((json) => SavedCustomer.fromJson(json)).toList();
+  }
+
+  // ==================== CUSTOM TEMPLATES METHODS ====================
+
+  /// Create custom_templates table
+  Future<void> _createCustomTemplatesTable(Database db) async {
+    const idType = 'TEXT PRIMARY KEY';
+    const textType = 'TEXT NOT NULL';
+    const textTypeNullable = 'TEXT';
+
+    await db.execute('''
+      CREATE TABLE custom_templates (
+        id $idType,
+        name $textType,
+        description $textTypeNullable,
+        category $textType,
+        pdfPath $textType,
+        isBundled INTEGER NOT NULL DEFAULT 0,
+        fields $textType,
+        pageCount INTEGER NOT NULL DEFAULT 1,
+        createdAt $textType,
+        updatedAt $textTypeNullable
+      )
+    ''');
+
+    debugPrint('Custom templates table created successfully');
+  }
+
+  /// Create filled_templates table
+  Future<void> _createFilledTemplatesTable(Database db) async {
+    const idType = 'TEXT PRIMARY KEY';
+    const textType = 'TEXT NOT NULL';
+    const textTypeNullable = 'TEXT';
+
+    await db.execute('''
+      CREATE TABLE filled_templates (
+        id $idType,
+        templateId $textType,
+        engineerId $textType,
+        engineerName $textType,
+        jobReference $textTypeNullable,
+        fieldValues $textType,
+        createdAt $textType,
+        completedAt $textTypeNullable,
+        isComplete INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    debugPrint('Filled templates table created successfully');
+  }
+
+  /// Insert a custom PDF form template
+  Future<PdfFormTemplate> insertPdfFormTemplate(PdfFormTemplate template) async {
+    final db = await database;
+
+    final json = template.toJson();
+    json['isBundled'] = json['isBundled'] == true ? 1 : 0;
+
+    await db.insert(
+      'custom_templates',
+      json,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    debugPrint('PDF form template inserted: ${template.id}');
+    return template;
+  }
+
+  /// Get all custom PDF form templates
+  Future<List<PdfFormTemplate>> getAllPdfFormTemplates() async {
+    final db = await database;
+
+    final result = await db.query('custom_templates', orderBy: 'name ASC');
+
+    return result.map((json) => _parsePdfFormTemplateJson(json)).toList();
+  }
+
+  /// Get a single PDF form template by ID
+  Future<PdfFormTemplate?> getPdfFormTemplateById(String id) async {
+    final db = await database;
+
+    final result = await db.query(
+      'custom_templates',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (result.isEmpty) return null;
+
+    return _parsePdfFormTemplateJson(result.first);
+  }
+
+  /// Update a PDF form template
+  Future<int> updatePdfFormTemplate(PdfFormTemplate template) async {
+    final db = await database;
+
+    final json = template.toJson();
+    json['isBundled'] = json['isBundled'] == true ? 1 : 0;
+
+    return await db.update(
+      'custom_templates',
+      json,
+      where: 'id = ?',
+      whereArgs: [template.id],
+    );
+  }
+
+  /// Delete a PDF form template
+  Future<int> deletePdfFormTemplate(String id) async {
+    final db = await database;
+
+    return await db.delete('custom_templates', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Parse PDF form template JSON from database
+  PdfFormTemplate _parsePdfFormTemplateJson(Map<String, dynamic> json) {
+    final mutableJson = Map<String, dynamic>.from(json);
+
+    // Convert int to bool for isBundled
+    if (mutableJson['isBundled'] is int) {
+      mutableJson['isBundled'] = mutableJson['isBundled'] == 1;
+    }
+
+    return PdfFormTemplate.fromJson(mutableJson);
+  }
+
+  // ==================== FILLED PDF FORMS METHODS ====================
+
+  /// Insert a filled PDF form
+  Future<FilledPdfForm> insertFilledPdfForm(FilledPdfForm filled) async {
+    final db = await database;
+
+    await db.insert(
+      'filled_templates',
+      filled.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    debugPrint('Filled PDF form inserted: ${filled.id}');
+    return filled;
+  }
+
+  /// Get all filled PDF forms for an engineer
+  Future<List<FilledPdfForm>> getFilledPdfFormsByEngineerId(String engineerId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'filled_templates',
+      where: 'engineerId = ?',
+      whereArgs: [engineerId],
+      orderBy: 'createdAt DESC',
+    );
+
+    return result.map((json) => FilledPdfForm.fromJson(json)).toList();
+  }
+
+  /// Get a single filled PDF form by ID
+  Future<FilledPdfForm?> getFilledPdfFormById(String id) async {
+    final db = await database;
+
+    final result = await db.query(
+      'filled_templates',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (result.isEmpty) return null;
+
+    return FilledPdfForm.fromJson(result.first);
+  }
+
+  /// Update a filled PDF form
+  Future<int> updateFilledPdfForm(FilledPdfForm filled) async {
+    final db = await database;
+
+    return await db.update(
+      'filled_templates',
+      filled.toJson(),
+      where: 'id = ?',
+      whereArgs: [filled.id],
+    );
+  }
+
+  /// Delete a filled PDF form
+  Future<int> deleteFilledPdfForm(String id) async {
+    final db = await database;
+
+    return await db.delete('filled_templates', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Get filled PDF forms by template ID
+  Future<List<FilledPdfForm>> getFilledPdfFormsByTemplateId(String templateId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'filled_templates',
+      where: 'templateId = ?',
+      whereArgs: [templateId],
+      orderBy: 'createdAt DESC',
+    );
+
+    return result.map((json) => FilledPdfForm.fromJson(json)).toList();
+  }
+
+  // ==================== JOB TEMPLATES METHODS ====================
+
+  /// Insert a job template
+  Future<JobTemplate> insertJobTemplate(JobTemplate template) async {
+    final db = await database;
+
+    final json = template.toJson();
+    // Convert fields list to JSON string for storage
+    json['fields'] = jsonEncode(json['fields']);
+    // Convert bool to int for SQLite
+    json['isShared'] = json['isShared'] == true ? 1 : 0;
+    // Convert sectionLayout map to JSON string for storage
+    if (json['sectionLayout'] != null) {
+      json['sectionLayout'] = jsonEncode(json['sectionLayout']);
+    }
+
+    await db.insert(
+      'job_templates',
+      json,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    debugPrint('Job template inserted: ${template.id}');
+    return template;
+  }
+
+  /// Get all job templates
+  Future<List<JobTemplate>> getAllJobTemplates() async {
+    final db = await database;
+
+    final result = await db.query('job_templates', orderBy: 'name ASC');
+
+    return result.map((json) => _parseJobTemplateJson(json)).toList();
+  }
+
+  /// Get a single job template by ID
+  Future<JobTemplate?> getJobTemplateById(String id) async {
+    final db = await database;
+
+    final result = await db.query(
+      'job_templates',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (result.isEmpty) return null;
+
+    return _parseJobTemplateJson(result.first);
+  }
+
+  /// Update a job template
+  Future<int> updateJobTemplate(JobTemplate template) async {
+    final db = await database;
+
+    final json = template.toJson();
+    json['fields'] = jsonEncode(json['fields']);
+    json['isShared'] = json['isShared'] == true ? 1 : 0;
+    if (json['sectionLayout'] != null) {
+      json['sectionLayout'] = jsonEncode(json['sectionLayout']);
+    }
+
+    return await db.update(
+      'job_templates',
+      json,
+      where: 'id = ?',
+      whereArgs: [template.id],
+    );
+  }
+
+  /// Delete a job template
+  Future<int> deleteJobTemplate(String id) async {
+    final db = await database;
+
+    return await db.delete('job_templates', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Parse job template JSON from database
+  JobTemplate _parseJobTemplateJson(Map<String, dynamic> json) {
+    final mutableJson = Map<String, dynamic>.from(json);
+
+    // Parse fields from string back to list
+    if (mutableJson['fields'] is String) {
+      final fieldsStr = mutableJson['fields'] as String;
+      mutableJson['fields'] = jsonDecode(fieldsStr) as List<dynamic>;
+    }
+
+    // Convert int to bool for isShared
+    if (mutableJson['isShared'] is int) {
+      mutableJson['isShared'] = mutableJson['isShared'] == 1;
+    }
+
+    // Parse sectionLayout from string back to map
+    if (mutableJson['sectionLayout'] is String) {
+      final layoutStr = mutableJson['sectionLayout'] as String;
+      if (layoutStr.isNotEmpty) {
+        mutableJson['sectionLayout'] = jsonDecode(layoutStr) as Map<String, dynamic>;
+      } else {
+        mutableJson['sectionLayout'] = null;
+      }
+    }
+
+    return JobTemplate.fromJson(mutableJson);
+  }
+
+  // ==================== SAVED SITES METHODS ====================
+
+  /// Create saved_sites table
+  Future<void> _createSavedSitesTable(Database db) async {
+    const idType = 'TEXT PRIMARY KEY';
+    const textType = 'TEXT NOT NULL';
+    const textTypeNullable = 'TEXT';
+
+    await db.execute('''
+      CREATE TABLE saved_sites (
+        id $idType,
+        engineerId $textType,
+        siteName $textType,
+        address $textType,
+        notes $textTypeNullable,
+        createdAt $textType
+      )
+    ''');
+
+    debugPrint('Saved sites table created successfully');
+  }
+
+  /// Insert a saved site
+  Future<SavedSite> insertSavedSite(SavedSite site) async {
+    final db = await database;
+
+    await db.insert(
+      'saved_sites',
+      site.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    debugPrint('Saved site inserted: ${site.id}');
+    return site;
+  }
+
+  /// Get all saved sites for an engineer
+  Future<List<SavedSite>> getSavedSitesByEngineerId(String engineerId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'saved_sites',
+      where: 'engineerId = ?',
+      whereArgs: [engineerId],
+      orderBy: 'siteName ASC',
+    );
+
+    return result.map((json) => SavedSite.fromJson(json)).toList();
+  }
+
+  /// Delete a saved site
+  Future<int> deleteSavedSite(String id) async {
+    final db = await database;
+
+    return await db.delete('saved_sites', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // ==================== BULK DELETE METHODS ====================
+
+  /// Delete all invoices
+  Future<int> deleteAllInvoices() async {
+    final db = await database;
+    return await db.delete('invoices');
+  }
+
+  /// Delete all saved customers
+  Future<int> deleteAllSavedCustomers() async {
+    final db = await database;
+    return await db.delete('saved_customers');
+  }
+
+  /// Delete all saved sites
+  Future<int> deleteAllSavedSites() async {
+    final db = await database;
+    return await db.delete('saved_sites');
+  }
+
+  /// Delete all job templates
+  Future<int> deleteAllJobTemplates() async {
+    final db = await database;
+    return await db.delete('job_templates');
+  }
+
+  /// Delete all PDF form templates
+  Future<int> deleteAllPdfFormTemplates() async {
+    final db = await database;
+    return await db.delete('custom_templates');
+  }
+
+  /// Delete all filled PDF forms
+  Future<int> deleteAllFilledPdfForms() async {
+    final db = await database;
+    return await db.delete('filled_templates');
+  }
+
+  /// Delete all local data across all tables
+  Future<void> deleteAllData() async {
+    await deleteAllJobsheets();
+    await deleteAllInvoices();
+    await deleteAllSavedCustomers();
+    await deleteAllSavedSites();
+    await deleteAllJobTemplates();
+    await deleteAllPdfFormTemplates();
+    await deleteAllFilledPdfForms();
+  }
+
+  /// Close database connection
+  Future<void> close() async {
+    final db = await database;
+    await db.close();
+  }
+}
