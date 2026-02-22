@@ -24,9 +24,7 @@ workflows:
       - build/ios/ipa/*.ipa
     publishing:
       app_store_connect:
-        api_key: Encrypted(...)
-        key_id: K2M9YD6L8W
-        issuer_id: 74d5a101-8ffa-4f01-b6e9-dac1b7984629
+        auth: integration
         submit_to_testflight: true
         beta_groups:
           - Internal Testers
