@@ -10,7 +10,7 @@ workflows:
         - app_store_credentials  # Add in Codemagic UI: APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_PRIVATE_KEY
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.firethings.app  # Update with your actual bundle ID
+        bundle_identifier: AltStore - com.A4592CQ55K.com.rileytestut.AltStore  # Update with your actual bundle ID
     scripts:
       - name: Install dependencies
         script: flutter pub get
