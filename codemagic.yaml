@@ -22,7 +22,7 @@ workflows:
       - name: Set up code signing
         script: xcode-project use-profiles
       - name: Build iOS
-        script: flutter build ipa --release --export-options-plist=/Users/builder/export_options.plist
+        script: flutter build ipa --release --build-number=$BUILD_NUMBER --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
@@ -42,6 +42,6 @@ workflows:
       - name: Install dependencies
         script: flutter pub get
       - name: Build APK
-        script: flutter build apk --release
+        script: flutter build apk --release --build-number=$BUILD_NUMBER
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
