@@ -138,16 +138,12 @@ class AdaptiveRefreshIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (PlatformUtils.isApple) {
-      return CustomScrollView(
-        physics: const BouncingScrollPhysics(
-          parent: AlwaysScrollableScrollPhysics(),
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        child: ScrollConfiguration(
+          behavior: const CupertinoScrollBehavior(),
+          child: child,
         ),
-        slivers: [
-          CupertinoSliverRefreshControl(
-            onRefresh: onRefresh,
-          ),
-          SliverToBoxAdapter(child: child),
-        ],
       );
     }
 
