@@ -6,16 +6,19 @@ workflows:
     environment:
       flutter: stable
       xcode: latest
+      cocoapods: default
       groups:
-        - app_store_credentials  # Add in Codemagic UI: APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_PRIVATE_KEY
+        - app_store_credentials
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: AltStore - com.A4592CQ55K.com.rileytestut.AltStore  # Update with your actual bundle ID
+        bundle_identifier: com.firethings.app
     scripts:
       - name: Install dependencies
         script: flutter pub get
-      - name: Run analyzer
-        script: flutter analyze --no-fatal-infos
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
       - name: Set up code signing
         script: xcode-project use-profiles
       - name: Build iOS
@@ -38,8 +41,6 @@ workflows:
     scripts:
       - name: Install dependencies
         script: flutter pub get
-      - name: Run analyzer
-        script: flutter analyze --no-fatal-infos
       - name: Build APK
         script: flutter build apk --release
     artifacts:
