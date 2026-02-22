@@ -32,8 +32,12 @@
 		<string>This app needs access to the microphone to measure sound levels for fire alarm testing.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>FireThings uses location to stamp GPS coordinates on photos</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>FireThings uses location to stamp GPS coordinates on timestamped photos during fieldwork</string>
 		<key>NSPhotoLibraryAddUsageDescription</key>
 		<string>FireThings saves timestamped photos to your gallery</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Access your photo library to select company logos and images for PDF forms and jobsheets</string>
 		<key>NSCameraUsageDescription</key>
 		<string>FireThings uses the camera to take timestamped photos</string>
 		<key>UISupportedInterfaceOrientations</key>
