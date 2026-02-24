@@ -233,7 +233,12 @@ class _PhotoLoggerScreenState extends State<PhotoLoggerScreen> {
     final cameraStatus = await Permission.camera.request();
     if (!cameraStatus.isGranted) {
       if (mounted) {
-        context.showWarningToast('Camera permission is required');
+        if (cameraStatus.isPermanentlyDenied) {
+          context.showWarningToast('Please enable camera in Settings');
+          await openAppSettings();
+        } else {
+          context.showWarningToast('Camera permission is required');
+        }
       }
       return;
     }

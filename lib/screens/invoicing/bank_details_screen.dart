@@ -6,6 +6,7 @@ import '../../widgets/premium_toast.dart';
 import '../../widgets/animated_save_button.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class BankDetailsScreen extends StatefulWidget {
   const BankDetailsScreen({super.key});
@@ -89,7 +90,8 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
       ),
       body: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
-          : SingleChildScrollView(
+          : KeyboardDismissWrapper(
+              child: SingleChildScrollView(
               padding: const EdgeInsets.all(AppTheme.screenPadding),
               child: Form(
                 key: _formKey,
@@ -129,6 +131,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         labelText: 'Bank Name',
                         prefixIcon: Icon(AppIcons.bank),
                       ),
+                      textInputAction: TextInputAction.done,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -137,6 +140,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         labelText: 'Account Name',
                         prefixIcon: Icon(AppIcons.user),
                       ),
+                      textInputAction: TextInputAction.done,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -147,6 +151,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         prefixIcon: Icon(AppIcons.tag),
                       ),
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.done,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -156,6 +161,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         prefixIcon: Icon(AppIcons.tag),
                       ),
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.done,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -166,6 +172,8 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         alignLabelWithHint: true,
                       ),
                       maxLines: 3,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
                     ),
                     const SizedBox(height: 32),
                     AnimatedSaveButton(
@@ -175,6 +183,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     ),
                   ],
                 ),
+              ),
               ),
             ),
     );

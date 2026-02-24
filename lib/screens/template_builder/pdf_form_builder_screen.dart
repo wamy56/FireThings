@@ -13,6 +13,7 @@ import '../../utils/adaptive_widgets.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
+import '../common/pdf_preview_screen.dart';
 import '../../widgets/premium_dialog.dart';
 
 class PdfFormBuilderScreen extends StatefulWidget {
@@ -129,6 +130,7 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
+                    textInputAction: TextInputAction.done,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -220,6 +222,7 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
             ? Icon(AppIcons.danger, color: Colors.red, size: 12)
             : null,
       ),
+      textInputAction: TextInputAction.done,
       validator: field.required
           ? (v) => v?.isEmpty == true ? 'Required' : null
           : null,
@@ -236,6 +239,8 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
         alignLabelWithHint: true,
       ),
       maxLines: 4,
+      keyboardType: TextInputType.multiline,
+      textInputAction: TextInputAction.newline,
       validator: field.required
           ? (v) => v?.isEmpty == true ? 'Required' : null
           : null,
@@ -560,9 +565,16 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
         jobReference: _jobReferenceController.text,
       );
 
-      await TemplatePdfService.previewPdf(
-        pdfBytes,
-        '${widget.template.name}_${_jobReferenceController.text}.pdf',
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PdfPreviewScreen(
+            pdfBytes: pdfBytes,
+            title: widget.template.name,
+            fileName: '${widget.template.name}_${_jobReferenceController.text}.pdf',
+          ),
+        ),
       );
     } catch (e) {
       _showError('Error generating PDF: $e');

@@ -817,6 +817,7 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
                   labelText: 'Field Label *',
                   hintText: 'e.g., Panel Make/Model',
                 ),
+                textInputAction: TextInputAction.done,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Label is required';
@@ -853,6 +854,8 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
                     hintText: 'Option 1\nOption 2\nOption 3',
                   ),
                   maxLines: 5,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Please provide at least one option';

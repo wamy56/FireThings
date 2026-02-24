@@ -13,6 +13,7 @@ import '../../services/template_pdf_service.dart';
 import '../../utils/pdf_form_templates.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../common/pdf_preview_screen.dart';
 import '../../utils/theme.dart';
 import '../../widgets/widgets.dart';
 
@@ -182,7 +183,8 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
           ),
         ],
       ),
-      body: Form(
+      body: KeyboardDismissWrapper(
+        child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -254,6 +256,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
             const SizedBox(height: 16),
           ],
         ),
+      ),
       ),
     );
   }
@@ -718,9 +721,16 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
         fieldValues: fieldValues,
       );
 
-      await TemplatePdfService.previewPdf(
-        pdfBytes,
-        'IQ_Minor_Works_Certificate_${_jobNumberController.text}.pdf',
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PdfPreviewScreen(
+            pdfBytes: pdfBytes,
+            title: 'Minor Works Certificate',
+            fileName: 'IQ_Minor_Works_Certificate_${_jobNumberController.text}.pdf',
+          ),
+        ),
       );
     } catch (e) {
       if (mounted) {

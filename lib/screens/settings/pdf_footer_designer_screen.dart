@@ -329,6 +329,7 @@ class _PdfFooterDesignerScreenState extends State<PdfFooterDesignerScreen>
                 border: OutlineInputBorder(),
                 isDense: true,
               ),
+              textInputAction: TextInputAction.done,
               onChanged: (val) {
                 final updated = List<HeaderTextLine>.from(lines);
                 updated[index] = updated[index].copyWith(value: val);

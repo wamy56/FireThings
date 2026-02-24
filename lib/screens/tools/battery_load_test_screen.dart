@@ -3,6 +3,7 @@ import '../../widgets/premium_dialog.dart';
 import 'package:flutter/services.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/adaptive_app_bar.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class BatteryLoadTestScreen extends StatefulWidget {
   const BatteryLoadTestScreen({super.key});
@@ -98,7 +99,8 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: KeyboardDismissWrapper(
+        child: SingleChildScrollView(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -115,6 +117,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -184,6 +187,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 helperText: 'e.g., 7Ah, 12Ah, 17Ah',
               ),
               keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],
@@ -215,6 +219,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 helperText: 'Total quiescent current',
               ),
               keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],
@@ -238,6 +243,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 helperText: 'Total current during alarm',
               ),
               keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],

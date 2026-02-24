@@ -4,6 +4,7 @@ import '../../utils/icon_map.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -60,7 +61,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AdaptiveNavigationBar(
         title: 'Profile Settings',
       ),
-      body: SingleChildScrollView(
+      body: KeyboardDismissWrapper(
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -145,6 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -386,6 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     TextFormField(
                       controller: _currentPasswordController,
                       obscureText: _obscureCurrentPassword,
+                      textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
                         labelText: 'Current Password',
                         border: const OutlineInputBorder(),
@@ -416,6 +420,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     TextFormField(
                       controller: _newPasswordController,
                       obscureText: _obscureNewPassword,
+                      textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
                         labelText: 'New Password',
                         border: const OutlineInputBorder(),
@@ -448,6 +453,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     TextFormField(
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirmPassword,
+                      textInputAction: TextInputAction.done,
                       decoration: InputDecoration(
                         labelText: 'Confirm New Password',
                         border: const OutlineInputBorder(),

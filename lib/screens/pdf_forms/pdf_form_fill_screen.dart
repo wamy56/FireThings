@@ -13,6 +13,7 @@ import '../../services/template_pdf_service.dart';
 import '../../utils/pdf_form_templates.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../common/pdf_preview_screen.dart';
 import '../../utils/theme.dart';
 import '../../widgets/widgets.dart';
 
@@ -190,7 +191,8 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
           ),
         ],
       ),
-      body: Form(
+      body: KeyboardDismissWrapper(
+        child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -262,6 +264,7 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
             const SizedBox(height: 16),
           ],
         ),
+      ),
       ),
     );
   }
@@ -795,9 +798,16 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
         fieldValues: fieldValues,
       );
 
-      await TemplatePdfService.previewPdf(
-        pdfBytes,
-        'IQ_Modification_Certificate_${_jobNoController.text}.pdf',
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PdfPreviewScreen(
+            pdfBytes: pdfBytes,
+            title: 'Modification Certificate',
+            fileName: 'IQ_Modification_Certificate_${_jobNoController.text}.pdf',
+          ),
+        ),
       );
     } catch (e) {
       if (mounted) {

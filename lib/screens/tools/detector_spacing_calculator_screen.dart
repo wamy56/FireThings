@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 // ─── Data Model ─────────────────────────────────────────────────────────────
 
@@ -233,7 +234,8 @@ class _DetectorSpacingCalculatorScreenState
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: KeyboardDismissWrapper(
+        child: SingleChildScrollView(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -259,6 +261,7 @@ class _DetectorSpacingCalculatorScreenState
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -328,6 +331,7 @@ class _DetectorSpacingCalculatorScreenState
                 suffixText: 'm',
               ),
               keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],
@@ -350,6 +354,7 @@ class _DetectorSpacingCalculatorScreenState
                 suffixText: 'm',
               ),
               keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],
@@ -372,6 +377,7 @@ class _DetectorSpacingCalculatorScreenState
                 suffixText: 'm',
               ),
               keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],

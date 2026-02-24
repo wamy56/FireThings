@@ -138,7 +138,8 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
               ),
           ],
         ),
-        body: Form(
+        body: KeyboardDismissWrapper(
+          child: Form(
           key: _formKey,
           child: ListView(
             padding: const EdgeInsets.all(16),
@@ -270,6 +271,7 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
               const SizedBox(height: 16),
             ],
           ),
+        ),
         ),
       ),
     );

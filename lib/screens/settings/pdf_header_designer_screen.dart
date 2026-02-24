@@ -548,6 +548,7 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),
+              textInputAction: TextInputAction.done,
               onChanged: (val) {
                 final updated = List<HeaderTextLine>.from(lines);
                 updated[index] = updated[index].copyWith(value: val);

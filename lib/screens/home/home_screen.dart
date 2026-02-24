@@ -332,15 +332,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildStatsRow() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       children: [
         // Jobs card
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: AppTheme.surfaceWhite,
+              color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
               borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-              boxShadow: AppTheme.cardShadow,
+              boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -397,9 +398,9 @@ class _HomeScreenState extends State<HomeScreen> {
         Expanded(
           child: Container(
             decoration: BoxDecoration(
-              color: AppTheme.surfaceWhite,
+              color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
               borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-              boxShadow: AppTheme.cardShadow,
+              boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
             ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
@@ -503,11 +504,12 @@ class _HomeScreenState extends State<HomeScreen> {
     Color color,
     VoidCallback onTap,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceWhite,
+        color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: AppTheme.cardShadow,
+        boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
       ),
       child: Material(
         color: Colors.transparent,

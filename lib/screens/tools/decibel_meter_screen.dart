@@ -66,7 +66,12 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
       });
     }
 
-    if (!status.isGranted) {
+    if (status.isPermanentlyDenied) {
+      if (mounted) {
+        context.showWarningToast('Please enable microphone in Settings');
+        await openAppSettings();
+      }
+    } else if (!status.isGranted) {
       if (mounted) {
         context.showWarningToast('Microphone permission is required for the decibel meter');
       }

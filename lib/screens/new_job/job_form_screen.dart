@@ -128,7 +128,8 @@ class _JobFormScreenState extends State<JobFormScreen> {
           ),
         ],
       ),
-      body: Form(
+      body: KeyboardDismissWrapper(
+        child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -175,6 +176,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
             const SizedBox(height: 16),
           ],
         ),
+      ),
       ),
     );
   }

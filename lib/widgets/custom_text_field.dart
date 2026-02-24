@@ -230,13 +230,16 @@ class _CustomTextFieldState extends State<CustomTextField>
         controller: widget.controller,
         focusNode: _focusNode,
         initialValue: widget.initialValue,
-        keyboardType: widget.keyboardType,
+        keyboardType: widget.maxLines > 1 && widget.keyboardType == TextInputType.text
+            ? TextInputType.multiline
+            : widget.keyboardType,
         obscureText: widget.obscureText,
         enabled: widget.enabled,
         maxLines: widget.maxLines,
         maxLength: widget.maxLength,
         readOnly: widget.readOnly,
-        textInputAction: widget.textInputAction,
+        textInputAction: widget.textInputAction ??
+            (widget.maxLines == 1 ? TextInputAction.done : TextInputAction.newline),
         onFieldSubmitted: widget.onSubmitted,
         decoration: InputDecoration(
           labelText: widget.label,

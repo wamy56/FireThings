@@ -9,6 +9,7 @@ import '../../services/template_pdf_service.dart';
 import '../../utils/pdf_form_templates.dart';
 import '../../widgets/widgets.dart';
 import '../../utils/theme.dart';
+import '../common/pdf_preview_screen.dart';
 import '../pdf_forms/pdf_form_fill_screen.dart';
 import '../pdf_forms/minor_works_form_fill_screen.dart';
 import 'edit_jobsheet_screen.dart';
@@ -534,14 +535,31 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             template: pdfTemplate,
             fieldValues: _jobsheet.formData,
           );
-          await TemplatePdfService.previewPdf(
-            pdfBytes,
-            '${_jobsheet.templateType.replaceAll(' ', '_')}_${_jobsheet.jobNumber}.pdf',
+          if (!context.mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PdfPreviewScreen(
+                pdfBytes: pdfBytes,
+                title: _jobsheet.templateType,
+                fileName: '${_jobsheet.templateType.replaceAll(' ', '_')}_${_jobsheet.jobNumber}.pdf',
+              ),
+            ),
           );
         }
       } else {
         final pdfBytes = await PDFService.generateJobsheetPDF(_jobsheet);
-        await PDFService.printPDF(pdfBytes);
+        if (!context.mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PdfPreviewScreen(
+              pdfBytes: pdfBytes,
+              title: 'Jobsheet',
+              fileName: 'jobsheet_${_jobsheet.jobNumber}.pdf',
+            ),
+          ),
+        );
       }
     } catch (e) {
       if (!context.mounted) return;

@@ -147,11 +147,12 @@ class _NewJobScreenState extends State<NewJobScreen> {
     IconData icon,
     Color color,
   ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceWhite,
+        color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: AppTheme.cardShadow,
+        boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
       ),
       child: Material(
         color: Colors.transparent,
@@ -207,11 +208,12 @@ class _NewJobScreenState extends State<NewJobScreen> {
   }
 
   Widget _buildIQModificationCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceWhite,
+        color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: AppTheme.cardShadow,
+        boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
       ),
       child: Material(
         color: Colors.transparent,
@@ -281,11 +283,12 @@ class _NewJobScreenState extends State<NewJobScreen> {
   }
 
   Widget _buildIQMinorWorksCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceWhite,
+        color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: AppTheme.cardShadow,
+        boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
       ),
       child: Material(
         color: Colors.transparent,
@@ -355,11 +358,12 @@ class _NewJobScreenState extends State<NewJobScreen> {
   }
 
   Widget _buildCustomTemplateCard(BuildContext context, JobTemplate template) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceWhite,
+        color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: AppTheme.cardShadow,
+        boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
       ),
       child: Material(
         color: Colors.transparent,
@@ -464,11 +468,12 @@ class _NewJobScreenState extends State<NewJobScreen> {
   }
 
   Widget _buildCreateTemplateCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: AppTheme.surfaceWhite,
+        color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: AppTheme.cardShadow,
+        boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
         border: Border.all(
           color: AppTheme.dividerColor,
           width: 1,
@@ -495,11 +500,11 @@ class _NewJobScreenState extends State<NewJobScreen> {
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.grey.withValues(alpha: 0.1),
+                    color: isDark ? AppTheme.darkSurfaceElevated : Colors.grey.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppTheme.dividerColor, width: 2),
+                    border: Border.all(color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor, width: 2),
                   ),
-                  child: Icon(AppIcons.add, color: AppTheme.darkGrey, size: 32),
+                  child: Icon(AppIcons.add, color: isDark ? AppTheme.darkTextSecondary : AppTheme.darkGrey, size: 32),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -550,7 +555,7 @@ class _NewJobScreenState extends State<NewJobScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppTheme.lightGrey,
+                color: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkDivider : AppTheme.lightGrey,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -639,22 +644,23 @@ class _NewJobScreenState extends State<NewJobScreen> {
   }
 
   Widget _buildInfoChip(String label, IconData icon) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppTheme.primaryLight,
+        color: isDark ? AppTheme.darkSurfaceElevated : AppTheme.primaryLight,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: AppTheme.darkGrey),
+          Icon(icon, size: 14, color: isDark ? AppTheme.darkTextSecondary : AppTheme.darkGrey),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
               fontSize: 12,
-              color: AppTheme.darkGrey,
+              color: isDark ? AppTheme.darkTextSecondary : AppTheme.darkGrey,
               fontWeight: FontWeight.w600,
             ),
           ),

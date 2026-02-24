@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
 import '../../utils/icon_map.dart';
+import '../../utils/theme.dart';
 import '../../services/database_helper.dart';
 import '../../services/invoice_pdf_service.dart';
 import '../../services/email_service.dart';
@@ -13,6 +14,8 @@ import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
+import '../common/pdf_preview_screen.dart';
 
 class InvoiceScreen extends StatefulWidget {
   final Invoice? existingInvoice;
@@ -177,7 +180,8 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       ),
       body: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
-          : Form(
+          : KeyboardDismissWrapper(
+              child: Form(
               key: _formKey,
               child: ListView(
                 padding: const EdgeInsets.all(16),
@@ -215,6 +219,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 ],
               ),
             ),
+            ),
     );
   }
 
@@ -246,6 +251,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(AppIcons.user),
               ),
+              textInputAction: TextInputAction.done,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your name';
@@ -281,6 +287,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(AppIcons.tag),
               ),
+              textInputAction: TextInputAction.done,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Required';
@@ -300,6 +307,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     Function(DateTime) onChanged,
   ) {
     final dateFormat = DateFormat('dd/MM/yyyy');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,7 +316,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: isDark ? AppTheme.darkTextSecondary : Colors.grey[600],
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -328,14 +336,14 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
+              border: Border.all(color: isDark ? AppTheme.darkDivider : Colors.grey[300]!),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(dateFormat.format(date)),
-                Icon(AppIcons.calendar, size: 18, color: Colors.grey[600]),
+                Icon(AppIcons.calendar, size: 18, color: isDark ? AppTheme.darkTextSecondary : Colors.grey[600]),
               ],
             ),
           ),
@@ -382,6 +390,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(AppIcons.building),
               ),
+              textInputAction: TextInputAction.done,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter customer name';
@@ -398,6 +407,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 prefixIcon: Icon(AppIcons.sms),
               ),
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -408,6 +418,8 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 prefixIcon: Icon(AppIcons.location),
               ),
               maxLines: 2,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter customer address';
@@ -542,13 +554,14 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
   Widget _buildItemRow(int index) {
     final controllers = _itemControllers[index];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey[50],
+        color: isDark ? AppTheme.darkSurfaceElevated : Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey[200]!),
+        border: Border.all(color: isDark ? AppTheme.darkDivider : Colors.grey[200]!),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -565,6 +578,8 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
                 ),
               ),
               const SizedBox(width: 8),
@@ -589,6 +604,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.done,
                   textAlign: TextAlign.center,
                 ),
               ),
@@ -605,6 +621,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
+                  textInputAction: TextInputAction.done,
                 ),
               ),
             ],
@@ -793,6 +810,8 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 border: OutlineInputBorder(),
               ),
               maxLines: 3,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
             ),
           ],
         ),
@@ -942,25 +961,15 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       setState(() => _isLoading = false);
 
       if (mounted) {
-        showAdaptiveActionSheet(
-          context: context,
-          title: 'Invoice PDF',
-          message: 'What would you like to do with the PDF?',
-          options: [
-            ActionSheetOption(
-              label: 'Print',
-              icon: AppIcons.printer,
-              onTap: () => InvoicePDFService.printPDF(pdfBytes),
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PdfPreviewScreen(
+              pdfBytes: pdfBytes,
+              title: 'Invoice ${invoice.invoiceNumber}',
+              fileName: 'Invoice_${invoice.invoiceNumber}.pdf',
             ),
-            ActionSheetOption(
-              label: 'Share',
-              icon: AppIcons.share,
-              onTap: () => InvoicePDFService.sharePDF(
-                pdfBytes,
-                'Invoice_${invoice.invoiceNumber}.pdf',
-              ),
-            ),
-          ],
+          ),
         );
       }
     } catch (e) {

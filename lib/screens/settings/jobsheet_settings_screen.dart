@@ -5,6 +5,7 @@ import '../../widgets/premium_toast.dart';
 import '../../widgets/animated_save_button.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class JobsheetSettingsScreen extends StatefulWidget {
   const JobsheetSettingsScreen({super.key});
@@ -77,7 +78,8 @@ class _JobsheetSettingsScreenState extends State<JobsheetSettingsScreen> {
       appBar: AdaptiveNavigationBar(title: 'PDF Footer Settings'),
       body: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
-          : SingleChildScrollView(
+          : KeyboardDismissWrapper(
+              child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Form(
                 key: _formKey,
@@ -145,6 +147,7 @@ class _JobsheetSettingsScreenState extends State<JobsheetSettingsScreen> {
                   ],
                 ),
               ),
+              ),
             ),
     );
   }
@@ -167,6 +170,7 @@ class _JobsheetSettingsScreenState extends State<JobsheetSettingsScreen> {
           vertical: 16,
         ),
       ),
+      textInputAction: TextInputAction.done,
     );
   }
 }
