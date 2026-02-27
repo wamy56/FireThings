@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import '../../widgets/premium_dialog.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:noise_meter/noise_meter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/icon_map.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../widgets/premium_toast.dart';
@@ -36,6 +38,12 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
   bool _fastMode = true;
   DateTime? _lastUiUpdate;
 
+  // Calibration
+  static const String _calibrationPrefKey = 'decibel_meter_calibration_offset';
+  static const double _defaultIosOffset = -25.0;
+  double _calibrationOffset = 0.0;
+  bool _showCalibration = false;
+
   // Data for averaging
   final List<double> _readings = [];
   DateTime? _startTime;
@@ -48,6 +56,7 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     )..repeat();
+    _loadCalibration();
     _requestPermission();
   }
 
@@ -56,6 +65,31 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
     _noiseSubscription?.cancel();
     _pulseController.dispose();
     super.dispose();
+  }
+
+  double get _defaultOffset => Platform.isIOS ? _defaultIosOffset : 0.0;
+
+  Future<void> _loadCalibration() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getDouble(_calibrationPrefKey);
+    if (mounted) {
+      setState(() {
+        _calibrationOffset = saved ?? _defaultOffset;
+      });
+    }
+  }
+
+  Future<void> _saveCalibration(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_calibrationPrefKey, value);
+  }
+
+  void _resetCalibrationToDefault() {
+    final defaultVal = _defaultOffset;
+    setState(() {
+      _calibrationOffset = defaultVal;
+    });
+    _saveCalibration(defaultVal);
   }
 
   Future<void> _requestPermission() async {
@@ -92,7 +126,7 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
     try {
       _noiseSubscription = _noiseMeter?.noise.listen((NoiseReading reading) {
         if (mounted) {
-          final double db = reading.meanDecibel.clamp(0.0, 120.0);
+          final double db = (reading.meanDecibel + _calibrationOffset).clamp(0.0, 120.0);
 
           // Always accumulate readings for accurate stats
           _readings.add(db);
@@ -246,6 +280,8 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
           _buildControls(),
           const SizedBox(height: 12),
           _buildRefreshToggle(),
+          const SizedBox(height: 16),
+          _buildCalibrationPanel(),
           const SizedBox(height: 24),
           _buildStatistics(),
           const SizedBox(height: 24),
@@ -385,6 +421,107 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
     return Text(
       label,
       style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
+    );
+  }
+
+  Widget _buildCalibrationPanel() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isAtDefault = (_calibrationOffset - _defaultOffset).abs() < 0.01;
+    final offsetLabel = _calibrationOffset >= 0
+        ? '+${_calibrationOffset.toStringAsFixed(1)}'
+        : _calibrationOffset.toStringAsFixed(1);
+
+    return Card(
+      elevation: 2,
+      child: Column(
+        children: [
+          // Tap-to-expand header
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => setState(() => _showCalibration = !_showCalibration),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(AppIcons.slider, size: 20, color: isDark ? Colors.white70 : Colors.grey.shade700),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Calibration',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      '$offsetLabel dB',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.blue),
+                    ),
+                  ),
+                  const Spacer(),
+                  AnimatedRotation(
+                    turns: _showCalibration ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(AppIcons.arrowDown, size: 18, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Expandable body
+          AnimatedCrossFade(
+            firstChild: const SizedBox.shrink(),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Adjust if readings seem too high or low compared to a known reference.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  const SizedBox(height: 12),
+                  Slider(
+                    value: _calibrationOffset,
+                    min: -40.0,
+                    max: 10.0,
+                    divisions: 100,
+                    label: '$offsetLabel dB',
+                    onChanged: (value) {
+                      setState(() => _calibrationOffset = value);
+                    },
+                    onChangeEnd: (value) => _saveCalibration(value),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('-40 dB', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+                        Text('+10 dB', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: isAtDefault ? null : _resetCalibrationToDefault,
+                      icon: Icon(AppIcons.refresh, size: 16),
+                      label: Text('Reset to default (${_defaultOffset >= 0 ? '+${_defaultOffset.toStringAsFixed(0)}' : _defaultOffset.toStringAsFixed(0)} dB)'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            crossFadeState: _showCalibration ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
+      ),
     );
   }
 
@@ -660,6 +797,45 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                       '• Hardware clipping prevents higher measurements\n'
                       '• Budget phones may cap at 85-90 dB\n'
                       '• High-end phones may reach 100-110 dB',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  border: Border.all(color: Colors.blue.shade300),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          AppIcons.slider,
+                          color: Colors.blue.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Calibration',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade900,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '• iOS devices apply automatic gain control (AGC) which inflates quiet readings by ~25 dB\n'
+                      '• A default offset of -25 dB is applied on iOS to compensate\n'
+                      '• Use the Calibration panel to fine-tune if needed\n'
+                      '• Android devices default to 0 dB offset',
                       style: TextStyle(fontSize: 12),
                     ),
                   ],

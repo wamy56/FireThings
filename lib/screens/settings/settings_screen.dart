@@ -15,6 +15,7 @@ import '../saved_sites/saved_sites_screen.dart';
 import '../saved_customers/saved_customers_screen.dart';
 import '../debug/debug_screen.dart';
 import 'profile_screen.dart';
+import 'manage_permissions_screen.dart';
 import 'pdf_header_designer_screen.dart';
 import 'pdf_footer_designer_screen.dart';
 import 'pdf_colour_scheme_screen.dart';
@@ -255,6 +256,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             header: 'App',
             isApple: isApple,
             tiles: [
+              _SettingsTileData(
+                title: 'Permissions',
+                subtitle: 'Manage app permissions',
+                icon: AppIcons.shield,
+                onTap: () => Navigator.push(
+                  context,
+                  adaptivePageRoute(
+                      builder: (_) => const ManagePermissionsScreen()),
+                ),
+              ),
               _SettingsTileData(
                 title: 'About',
                 subtitle: _appVersion.isEmpty ? 'Version ...' : _appVersion,

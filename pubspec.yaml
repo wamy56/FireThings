@@ -35,7 +35,10 @@ dependencies:
   noise_meter: ^5.1.0
   permission_handler: ^12.0.1
   geolocator: ^13.0.2
+  geocoding: ^3.0.0
   gal: ^2.3.0
+  camera: ^0.11.0+2
+  ffmpeg_kit_flutter_min: ^6.0.3
 
 # Notifications & Background Tasks
   flutter_local_notifications: ^18.0.1

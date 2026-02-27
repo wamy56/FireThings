@@ -101,6 +101,13 @@ class _JobsHubScreenState extends State<JobsHubScreen> {
                           isDark,
                           cardColor,
                           shadow,
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              adaptivePageRoute(builder: (_) => const HistoryScreen()),
+                            );
+                            _loadData();
+                          },
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -113,6 +120,13 @@ class _JobsHubScreenState extends State<JobsHubScreen> {
                           isDark,
                           cardColor,
                           shadow,
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              adaptivePageRoute(builder: (_) => const JobsheetDraftsScreen()),
+                            );
+                            _loadData();
+                          },
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -125,6 +139,13 @@ class _JobsHubScreenState extends State<JobsHubScreen> {
                           isDark,
                           cardColor,
                           shadow,
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              adaptivePageRoute(builder: (_) => const HistoryScreen()),
+                            );
+                            _loadData();
+                          },
                         ),
                       ),
                     ],
@@ -309,34 +330,44 @@ class _JobsHubScreenState extends State<JobsHubScreen> {
     Color color,
     bool isDark,
     Color cardColor,
-    List<BoxShadow> shadow,
-  ) {
+    List<BoxShadow> shadow, {
+    VoidCallback? onTap,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
         boxShadow: shadow,
       ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            child: Column(
+              children: [
+                Icon(icon, color: color, size: 22),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }

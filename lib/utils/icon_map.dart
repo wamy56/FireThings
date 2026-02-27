@@ -100,6 +100,11 @@ class AppIcons {
   static const IconData ruler = IconsaxPlusLinear.ruler;
   static const IconData scanner = IconsaxPlusLinear.scanner;
   static const IconData camera = IconsaxPlusLinear.camera;
+  static const IconData video = IconsaxPlusLinear.video;
+  static const IconData record = IconsaxPlusLinear.record;
+  static const IconData stop = IconsaxPlusLinear.stop;
+  static const IconData flashSlash = IconsaxPlusLinear.flash_slash;
+  static const IconData rotateRight = IconsaxPlusLinear.rotate_right;
 
   // ============================================
   // UI / Navigation

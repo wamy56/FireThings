@@ -18,7 +18,7 @@ import '../tools/decibel_meter_screen.dart';
 import '../tools/battery_load_test_screen.dart';
 import '../tools/bs5839_reference_screen.dart';
 import '../tools/detector_spacing_calculator_screen.dart';
-import '../tools/photo_logger_screen.dart';
+import '../tools/timestamp_camera/timestamp_camera_screen.dart';
 import '../new_job/jobsheet_drafts_screen.dart';
 import '../history/history_screen.dart';
 import '../invoicing/invoice_list_screen.dart';
@@ -212,10 +212,10 @@ class _HomeScreenState extends State<HomeScreen> {
           adaptivePageRoute(builder: (_) => const DetectorSpacingCalculatorScreen()),
         );
       }),
-      _buildActionButton('Photo Logger', AppIcons.camera, Colors.deepOrange, () {
+      _buildActionButton('Timestamp Camera', AppIcons.camera, Colors.deepOrange, () {
         Navigator.push(
           context,
-          adaptivePageRoute(builder: (_) => const PhotoLoggerScreen()),
+          adaptivePageRoute(builder: (_) => const TimestampCameraScreen()),
         );
       }),
     ];

@@ -47,6 +47,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   bool _includeVat = false;
   bool _isLoading = false;
   bool _isSaved = false;
+  InvoiceStatus _status = InvoiceStatus.draft;
   String? _invoiceId;
   PaymentDetails _paymentDetails = PaymentDetails(
     bankName: '',
@@ -127,6 +128,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     _includeVat = invoice.includeVat;
     _notesController.text = invoice.notes ?? '';
     _isSaved = true;
+    _status = invoice.status;
 
     // Populate item controllers from existing items
     _itemControllers.clear();
@@ -166,7 +168,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AdaptiveNavigationBar(
-        title: widget.existingInvoice != null ? 'Edit Invoice' : 'Create Invoice',
+        title: widget.existingInvoice != null
+            ? 'Edit Invoice'
+            : 'Create Invoice',
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -182,43 +186,44 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           ? const Center(child: AdaptiveLoadingIndicator())
           : KeyboardDismissWrapper(
               child: Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (widget.existingInvoice?.status == InvoiceStatus.sent) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _markAsPaid,
-                        icon: Icon(AppIcons.tickCircle),
-                        label: const Text('Mark as Paid'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (widget.existingInvoice?.status ==
+                        InvoiceStatus.sent) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _markAsPaid,
+                          icon: Icon(AppIcons.tickCircle),
+                          label: const Text('Mark as Paid'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
+                    ],
+                    _buildInvoiceHeader(),
+                    const SizedBox(height: 20),
+                    _buildCustomerSection(),
+                    const SizedBox(height: 20),
+                    _buildItemsSection(),
+                    const SizedBox(height: 20),
+                    _buildVatSection(),
+                    const SizedBox(height: 12),
+                    _buildTotalsSection(),
+                    const SizedBox(height: 20),
+                    _buildNotesSection(),
+                    const SizedBox(height: 24),
+                    _buildActionButtons(),
+                    const SizedBox(height: 24),
                   ],
-                  _buildInvoiceHeader(),
-                  const SizedBox(height: 20),
-                  _buildCustomerSection(),
-                  const SizedBox(height: 20),
-                  _buildItemsSection(),
-                  const SizedBox(height: 20),
-                  _buildVatSection(),
-                  const SizedBox(height: 12),
-                  _buildTotalsSection(),
-                  const SizedBox(height: 20),
-                  _buildNotesSection(),
-                  const SizedBox(height: 24),
-                  _buildActionButtons(),
-                  const SizedBox(height: 24),
-                ],
+                ),
               ),
-            ),
             ),
     );
   }
@@ -336,14 +341,20 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
             decoration: BoxDecoration(
-              border: Border.all(color: isDark ? AppTheme.darkDivider : Colors.grey[300]!),
+              border: Border.all(
+                color: isDark ? AppTheme.darkDivider : Colors.grey[300]!,
+              ),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(dateFormat.format(date)),
-                Icon(AppIcons.calendar, size: 18, color: isDark ? AppTheme.darkTextSecondary : Colors.grey[600]),
+                Icon(
+                  AppIcons.calendar,
+                  size: 18,
+                  color: isDark ? AppTheme.darkTextSecondary : Colors.grey[600],
+                ),
               ],
             ),
           ),
@@ -448,43 +459,45 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       context: context,
       child: Builder(
         builder: (context) => AlertDialog(
-        title: const Text('Select Customer'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _savedCustomers.length,
-            itemBuilder: (context, index) {
-              final customer = _savedCustomers[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  child: Text(customer.customerName[0].toUpperCase()),
-                ),
-                title: Text(customer.customerName),
-                subtitle: Text(
-                  customer.customerAddress,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                onTap: () {
-                  setState(() {
-                    _customerNameController.text = customer.customerName;
-                    _customerAddressController.text = customer.customerAddress;
-                    _customerEmailController.text = customer.email ?? '';
-                  });
-                  Navigator.pop(context);
-                },
-              );
-            },
+          title: const Text('Select Customer'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _savedCustomers.length,
+              itemBuilder: (context, index) {
+                final customer = _savedCustomers[index];
+                return ListTile(
+                  leading: CircleAvatar(
+                    child: Text(customer.customerName[0].toUpperCase()),
+                  ),
+                  title: Text(customer.customerName),
+                  subtitle: Text(
+                    customer.customerAddress,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () {
+                    setState(() {
+                      _customerNameController.text = customer.customerName;
+                      _customerAddressController.text =
+                          customer.customerAddress;
+                      _customerEmailController.text = customer.email ?? '';
+                    });
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      )),
+      ),
     );
   }
 
@@ -561,7 +574,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       decoration: BoxDecoration(
         color: isDark ? AppTheme.darkSurfaceElevated : Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: isDark ? AppTheme.darkDivider : Colors.grey[200]!),
+        border: Border.all(
+          color: isDark ? AppTheme.darkDivider : Colors.grey[200]!,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -570,16 +585,29 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: TextFormField(
-                  controller: controllers.description,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    hintText: 'Enter item description...',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  keyboardType: TextInputType.multiline,
-                  textInputAction: TextInputAction.newline,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Item ${index + 1}',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: controllers.description,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                        hintText: 'Enter item description...',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
@@ -606,6 +634,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                   keyboardType: TextInputType.number,
                   textInputAction: TextInputAction.done,
                   textAlign: TextAlign.center,
+                  onChanged: (_) => setState(() {}),
                 ),
               ),
               const SizedBox(width: 12),
@@ -622,6 +651,33 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     decimal: true,
                   ),
                   textInputAction: TextInputAction.done,
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Builder(
+                  builder: (_) {
+                    final qty =
+                        int.tryParse(controllers.quantity.text.trim()) ?? 0;
+                    final price =
+                        double.tryParse(controllers.unitPrice.text.trim()) ??
+                        0.0;
+                    final lineTotal = qty * price;
+                    if (lineTotal <= 0) return const SizedBox.shrink();
+                    final formatted = NumberFormat.currency(
+                      symbol: '\u00A3',
+                      decimalDigits: 2,
+                    ).format(lineTotal);
+                    return Text(
+                      formatted,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                      textAlign: TextAlign.right,
+                    );
+                  },
                 ),
               ),
             ],
@@ -658,7 +714,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               child: ElevatedButton.icon(
                 onPressed: _addItemRow,
                 icon: Icon(AppIcons.add, size: 18),
-                label: const Text('Add Item'),
+                label: const Text('+ Add Another Item'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
@@ -716,7 +772,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   bool _validateForAction() {
     if (!_formKey.currentState!.validate()) return false;
     if (!_hasValidItems()) {
-      context.showWarningToast('Please add at least one item with description and price');
+      context.showWarningToast(
+        'Please add at least one item with description and price',
+      );
       return false;
     }
     return true;
@@ -851,7 +909,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            onPressed: _showEmailDialog,
+            onPressed: _sendViaEmail,
             icon: Icon(AppIcons.sms),
             label: const Text('Send via Email'),
             style: ElevatedButton.styleFrom(
@@ -915,7 +973,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       items: _items,
       notes: _notesController.text.isEmpty ? null : _notesController.text,
       includeVat: _includeVat,
-      status: InvoiceStatus.draft,
+      status: _status,
       createdAt: DateTime.now(),
     );
   }
@@ -980,54 +1038,16 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     }
   }
 
-  void _showEmailDialog() {
+  void _sendViaEmail() {
     if (!_validateForAction()) return;
 
-    final emailController = TextEditingController();
+    final email = _customerEmailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      context.showErrorToast('Please enter a customer email address first');
+      return;
+    }
 
-    showPremiumDialog(
-      context: context,
-      child: Builder(
-        builder: (context) => AlertDialog(
-        title: const Text('Send Invoice'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Enter the recipient email address:'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailController,
-              decoration: InputDecoration(
-                labelText: 'Email Address',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(AppIcons.sms),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              if (emailController.text.isEmpty ||
-                  !emailController.text.contains('@')) {
-                context.showErrorToast('Please enter a valid email address');
-                return;
-              }
-
-              Navigator.pop(context);
-              await _sendEmail(emailController.text);
-            },
-            icon: Icon(AppIcons.send),
-            label: const Text('Send'),
-          ),
-        ],
-      )),
-    );
+    _sendEmail(email);
   }
 
   Future<void> _sendEmail(String email) async {
@@ -1053,10 +1073,14 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       await PaymentSettingsService.saveEngineerName(invoice.engineerName);
 
       // Update invoice status to sent
-      if (_isSaved) {
-        final updatedInvoice = invoice.copyWith(status: InvoiceStatus.sent);
-        await _dbHelper.updateInvoice(updatedInvoice);
+      if (!_isSaved) {
+        await _dbHelper.insertInvoice(invoice);
+        _invoiceId = invoice.id;
+        _isSaved = true;
       }
+      final updatedInvoice = invoice.copyWith(status: InvoiceStatus.sent);
+      await _dbHelper.updateInvoice(updatedInvoice);
+      setState(() => _status = InvoiceStatus.sent);
 
       setState(() => _isLoading = false);
 
