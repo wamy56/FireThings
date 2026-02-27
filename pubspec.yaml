@@ -38,7 +38,7 @@ dependencies:
   geocoding: ^3.0.0
   gal: ^2.3.0
   camera: ^0.11.0+2
-  ffmpeg_kit_flutter_min: ^6.0.3
+  ffmpeg_kit_flutter_new_min: ^3.1.0
 
 # Notifications & Background Tasks
   flutter_local_notifications: ^18.0.1

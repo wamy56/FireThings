@@ -11,7 +11,8 @@
       "Bash(find:*)",
       "Bash(flutter pub run:*)",
       "Bash(head:)",
-      "Bash(find /c/Users/Chris/Documents/test_app/android -name \"GeneratedPluginRegistrant.java\" 2>/dev/null | head -1 | xargs cat 2>/dev/null1)"
+      "Bash(find /c/Users/Chris/Documents/test_app/android -name \"GeneratedPluginRegistrant.java\" 2>/dev/null | head -1 | xargs cat 2>/dev/null1)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }
