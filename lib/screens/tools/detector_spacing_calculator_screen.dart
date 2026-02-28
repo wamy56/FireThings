@@ -236,6 +236,7 @@ class _DetectorSpacingCalculatorScreenState
       ),
       body: KeyboardDismissWrapper(
         child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -330,7 +331,7 @@ class _DetectorSpacingCalculatorScreenState
                 border: const OutlineInputBorder(),
                 suffixText: 'm',
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
@@ -353,7 +354,7 @@ class _DetectorSpacingCalculatorScreenState
                 border: const OutlineInputBorder(),
                 suffixText: 'm',
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
@@ -376,7 +377,7 @@ class _DetectorSpacingCalculatorScreenState
                 border: const OutlineInputBorder(),
                 suffixText: 'm',
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),

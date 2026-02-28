@@ -11,6 +11,7 @@ import '../../widgets/animated_save_button.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class PdfHeaderDesignerScreen extends StatefulWidget {
   const PdfHeaderDesignerScreen({super.key});
@@ -131,7 +132,7 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
           ),
         ],
       ),
-      body: _isLoading
+      body: KeyboardDismissWrapper(child: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
           : Column(
               children: [
@@ -157,7 +158,7 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
                   ),
                 ),
               ],
-            ),
+            )),
     );
   }
 

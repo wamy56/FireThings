@@ -109,7 +109,8 @@ class TimestampCameraService {
     await prefs.setString('${_prefix}resolution', settings.resolution);
   }
 
-  /// Watermark a photo with overlay text. Returns the watermarked PNG bytes.
+  /// Watermark a photo with overlay text in a compact bottom-right block.
+  /// Returns the watermarked PNG bytes.
   Future<Uint8List> watermarkPhoto(
     Uint8List imageBytes,
     List<String> overlayLines,
@@ -128,26 +129,48 @@ class TimestampCameraService {
     canvas.drawImage(image, Offset.zero, Paint());
 
     if (overlayLines.isNotEmpty) {
-      final fontSize = imgHeight * 0.022;
+      final fontSize = imgHeight * 0.020;
       final lineHeight = fontSize * 1.5;
-      final padding = imgWidth * 0.02;
-      final barHeight = (overlayLines.length * lineHeight) + (padding * 2);
+      final margin = imgWidth * 0.03;
+      final padding = fontSize * 0.6;
 
-      // Semi-transparent bar at bottom
-      canvas.drawRect(
-        Rect.fromLTWH(0, imgHeight - barHeight, imgWidth, barHeight),
-        Paint()..color = Colors.black.withValues(alpha: 0.6),
+      // Build paragraphs and measure max width
+      final paragraphs = <ui.Paragraph>[];
+      double maxLineWidth = 0;
+
+      for (final line in overlayLines) {
+        final paragraph = _buildParagraph(line, fontSize, imgWidth * 0.6);
+        paragraphs.add(paragraph);
+        if (paragraph.longestLine > maxLineWidth) {
+          maxLineWidth = paragraph.longestLine;
+        }
+      }
+
+      final blockWidth = maxLineWidth + (padding * 2);
+      final blockHeight = (overlayLines.length * lineHeight) + (padding * 2);
+
+      // Compact rounded rect in bottom-right corner
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            imgWidth - blockWidth - margin,
+            imgHeight - blockHeight - margin,
+            blockWidth,
+            blockHeight,
+          ),
+          const Radius.circular(12),
+        ),
+        Paint()..color = Colors.black.withValues(alpha: 0.55),
       );
 
-      // Draw each line
-      for (var i = 0; i < overlayLines.length; i++) {
-        final y = imgHeight - barHeight + padding + (i * lineHeight);
-        final paragraph = _buildParagraph(
-          overlayLines[i],
-          fontSize,
-          imgWidth - (padding * 2),
-        );
-        canvas.drawParagraph(paragraph, Offset(padding, y));
+      // Draw each line right-aligned within the block
+      for (var i = 0; i < paragraphs.length; i++) {
+        final paragraph = paragraphs[i];
+        final lineWidth = paragraph.longestLine;
+        final x = imgWidth - margin - padding - lineWidth;
+        final y =
+            imgHeight - blockHeight - margin + padding + (i * lineHeight);
+        canvas.drawParagraph(paragraph, Offset(x, y));
       }
     }
 
@@ -166,7 +189,7 @@ class TimestampCameraService {
   ui.Paragraph _buildParagraph(String text, double fontSize, double maxWidth) {
     final builder = ui.ParagraphBuilder(
       ui.ParagraphStyle(
-        textAlign: TextAlign.left,
+        textAlign: TextAlign.right,
         fontSize: fontSize,
         fontWeight: FontWeight.bold,
       ),
@@ -184,6 +207,7 @@ class TimestampCameraService {
   }
 
   /// Build FFmpeg drawtext filter string for video overlay burn-in.
+  /// Text is right-aligned in the bottom-right corner.
   String buildFfmpegDrawtextFilter(List<String> overlayLines, int videoHeight) {
     if (overlayLines.isEmpty) return '';
 
@@ -206,7 +230,7 @@ class TimestampCameraService {
         "drawtext=text='$escapedText'"
         ':fontsize=$fontSize'
         ':fontcolor=white'
-        ':x=20'
+        ':x=w-tw-20'
         ':y=$yOffset'
         ':box=1'
         ':boxcolor=black@0.6'

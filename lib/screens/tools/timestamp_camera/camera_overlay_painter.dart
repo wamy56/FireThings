@@ -2,8 +2,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 /// CustomPainter that renders overlay text on top of the live camera preview.
-/// Draws a semi-transparent black bar at the bottom with white bold text
-/// for each enabled overlay element.
+/// Draws a compact rounded-rect block in the bottom-right corner with
+/// right-aligned white bold text for each enabled overlay element.
 class CameraOverlayPainter extends CustomPainter {
   final List<String> overlayLines;
 
@@ -13,40 +13,56 @@ class CameraOverlayPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (overlayLines.isEmpty) return;
 
-    final fontSize = size.height * 0.028;
+    final fontSize = size.height * 0.024;
     final lineHeight = fontSize * 1.5;
-    final horizontalPadding = size.width * 0.03;
-    final verticalPadding = fontSize * 0.8;
-    final barHeight = (overlayLines.length * lineHeight) + (verticalPadding * 2);
+    final margin = size.width * 0.03;
+    final padding = fontSize * 0.6;
 
-    // Semi-transparent bar at bottom
-    final barRect = Rect.fromLTWH(
-      0,
-      size.height - barHeight,
-      size.width,
-      barHeight,
+    // Build paragraphs and measure max width
+    final paragraphs = <ui.Paragraph>[];
+    double maxLineWidth = 0;
+
+    for (final line in overlayLines) {
+      final paragraph = _buildParagraph(line, fontSize, size.width * 0.6);
+      paragraphs.add(paragraph);
+      if (paragraph.longestLine > maxLineWidth) {
+        maxLineWidth = paragraph.longestLine;
+      }
+    }
+
+    final blockWidth = maxLineWidth + (padding * 2);
+    final blockHeight = (overlayLines.length * lineHeight) + (padding * 2);
+
+    // Compact rounded rect in bottom-right corner
+    final blockRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        size.width - blockWidth - margin,
+        size.height - blockHeight - margin,
+        blockWidth,
+        blockHeight,
+      ),
+      const Radius.circular(8),
     );
-    canvas.drawRect(
-      barRect,
+
+    canvas.drawRRect(
+      blockRect,
       Paint()..color = Colors.black.withValues(alpha: 0.55),
     );
 
-    // Draw each text line
-    for (var i = 0; i < overlayLines.length; i++) {
-      final y = size.height - barHeight + verticalPadding + (i * lineHeight);
-      final paragraph = _buildParagraph(
-        overlayLines[i],
-        fontSize,
-        size.width - (horizontalPadding * 2),
-      );
-      canvas.drawParagraph(paragraph, Offset(horizontalPadding, y));
+    // Draw each text line right-aligned within the block
+    for (var i = 0; i < paragraphs.length; i++) {
+      final paragraph = paragraphs[i];
+      final lineWidth = paragraph.longestLine;
+      final x = size.width - margin - padding - lineWidth;
+      final y = size.height - blockHeight - margin + padding + (i * lineHeight);
+      canvas.drawParagraph(paragraph, Offset(x, y));
     }
   }
 
   ui.Paragraph _buildParagraph(String text, double fontSize, double maxWidth) {
     final builder = ui.ParagraphBuilder(
       ui.ParagraphStyle(
-        textAlign: TextAlign.left,
+        textAlign: TextAlign.right,
         fontSize: fontSize,
         fontWeight: FontWeight.bold,
       ),

@@ -9,6 +9,7 @@ import '../../widgets/empty_state.dart';
 import '../../widgets/premium_card.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class DipSwitchCalculatorScreen extends StatefulWidget {
   const DipSwitchCalculatorScreen({super.key});
@@ -166,7 +167,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
             TextField(
               controller: controller,
               autofocus: true,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Address',
                 hintText: 'e.g., 25',
@@ -243,7 +244,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
           ),
         ],
       ),
-      body: _showFavorites ? _buildFavoritesView() : _buildCalculatorView(),
+      body: KeyboardDismissWrapper(child: _showFavorites ? _buildFavoritesView() : _buildCalculatorView()),
     );
   }
 
@@ -252,6 +253,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
       children: [
         Expanded(
           child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.all(AppTheme.screenPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

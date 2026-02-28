@@ -188,6 +188,8 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               child: Form(
                 key: _formKey,
                 child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.all(16),
                   children: [
                     if (widget.existingInvoice?.status ==
@@ -631,7 +633,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     labelText: 'Quantity',
                     border: OutlineInputBorder(),
                   ),
-                  keyboardType: TextInputType.number,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   textInputAction: TextInputAction.done,
                   textAlign: TextAlign.center,
                   onChanged: (_) => setState(() {}),

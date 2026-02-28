@@ -80,6 +80,7 @@ class _JobsheetSettingsScreenState extends State<JobsheetSettingsScreen> {
           ? const Center(child: AdaptiveLoadingIndicator())
           : KeyboardDismissWrapper(
               child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.all(16),
               child: Form(
                 key: _formKey,

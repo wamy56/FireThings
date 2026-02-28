@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:noise_meter/noise_meter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:audio_session/audio_session.dart';
 import '../../utils/icon_map.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../widgets/premium_toast.dart';
@@ -69,19 +70,13 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
 
   double get _defaultOffset => Platform.isIOS ? _defaultIosOffset : 0.0;
 
-  /// Non-linear AGC correction for iOS. AGC inflates quiet sounds more than
-  /// loud ones, so we apply a piecewise curve that corrects aggressively at
-  /// low dB and tapers off towards loud levels.
-  double _applyIosAgcCorrection(double rawDb) {
-    if (rawDb <= 40) {
-      return rawDb * 0.5; // 0→0, 40→20
-    } else if (rawDb <= 70) {
-      return 20 + (rawDb - 40) * 0.8; // 40→20, 70→44
-    } else if (rawDb <= 90) {
-      return 44 + (rawDb - 70) * 0.95; // 70→44, 90→63
-    } else {
-      return 63 + (rawDb - 90) * 1.0; // 90→63, 120→93
-    }
+  Future<void> _configureAudioSession() async {
+    if (!Platform.isIOS) return;
+    final session = await AudioSession.instance;
+    await session.configure(AudioSessionConfiguration(
+      avAudioSessionCategory: AVAudioSessionCategory.record,
+      avAudioSessionMode: AVAudioSessionMode.measurement,
+    ));
   }
 
   Future<void> _loadCalibration() async {
@@ -138,20 +133,17 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
     }
   }
 
-  void _startRecording() {
+  Future<void> _startRecording() async {
     if (!_hasPermission) {
       _requestPermission();
       return;
     }
 
     try {
+      await _configureAudioSession();
       _noiseSubscription = _noiseMeter?.noise.listen((NoiseReading reading) {
         if (mounted) {
-          double raw = reading.meanDecibel;
-          if (Platform.isIOS) {
-            raw = _applyIosAgcCorrection(raw);
-          }
-          final double db = (raw + _calibrationOffset).clamp(0.0, 120.0);
+          final double db = (reading.meanDecibel + _calibrationOffset).clamp(0.0, 120.0);
 
           // Always accumulate readings for accurate stats
           _readings.add(db);
@@ -506,9 +498,7 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    Platform.isIOS
-                        ? 'iOS AGC is auto-corrected with a non-linear curve. Use this slider to fine-tune.'
-                        : 'Adjust if readings seem too high or low compared to a known reference.',
+                    'Adjust if readings seem too high or low compared to a known reference.',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 12),
@@ -820,7 +810,6 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                     const SizedBox(height: 8),
                     const Text(
                       '• Most phones max out at 90-100 dB\n'
-                      '• Automatic Gain Control (AGC) limits readings\n'
                       '• Hardware clipping prevents higher measurements\n'
                       '• Budget phones may cap at 85-90 dB\n'
                       '• High-end phones may reach 100-110 dB',
@@ -859,9 +848,8 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      '• iOS applies automatic gain control (AGC) which inflates quiet sounds more than loud ones\n'
-                      '• A non-linear correction curve is applied automatically on iOS to compensate\n'
-                      '• Use the Calibration slider to fine-tune on top of the curve\n'
+                      '• iOS measurement mode disables AGC for accurate readings\n'
+                      '• Use the Calibration slider to fine-tune if needed\n'
                       '• Android devices default to 0 dB offset',
                       style: TextStyle(fontSize: 12),
                     ),

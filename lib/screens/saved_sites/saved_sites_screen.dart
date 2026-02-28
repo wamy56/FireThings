@@ -195,7 +195,7 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AdaptiveNavigationBar(title: 'Saved Sites'),
-      body: Column(
+      body: KeyboardDismissWrapper(child: Column(
         children: [
           // Search bar
           Padding(
@@ -266,7 +266,7 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
                   ),
           ),
         ],
-      ),
+      )),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddSiteDialog,
         child: const Icon(AppIcons.add),

@@ -13,6 +13,7 @@ import '../../utils/adaptive_widgets.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../common/pdf_preview_screen.dart';
 import '../../widgets/premium_dialog.dart';
 
@@ -114,7 +115,7 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: KeyboardDismissWrapper(child: Column(
         children: [
           // Job reference header
           Container(
@@ -146,6 +147,7 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
             child: Form(
               key: _formKey,
               child: ListView.builder(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.all(16),
                 itemCount: _currentPageFields.length,
                 itemBuilder: (context, index) {
@@ -187,7 +189,7 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
               ),
             ),
         ],
-      ),
+      )),
     );
   }
 

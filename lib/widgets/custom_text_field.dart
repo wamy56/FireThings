@@ -232,7 +232,9 @@ class _CustomTextFieldState extends State<CustomTextField>
         initialValue: widget.initialValue,
         keyboardType: widget.maxLines > 1 && widget.keyboardType == TextInputType.text
             ? TextInputType.multiline
-            : widget.keyboardType,
+            : widget.keyboardType == TextInputType.number
+                ? const TextInputType.numberWithOptions(decimal: true)
+                : widget.keyboardType,
         obscureText: widget.obscureText,
         enabled: widget.enabled,
         maxLines: widget.maxLines,

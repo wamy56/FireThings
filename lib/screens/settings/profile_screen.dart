@@ -63,6 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       body: KeyboardDismissWrapper(
         child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

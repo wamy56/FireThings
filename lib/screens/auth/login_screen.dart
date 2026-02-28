@@ -5,6 +5,7 @@ import '../../utils/theme.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/background_decoration.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -280,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen>
 
     return Scaffold(
       backgroundColor: isDark ? AppTheme.darkBackground : Colors.grey[100],
-      body: Stack(
+      body: KeyboardDismissWrapper(child: Stack(
         children: [
           // Subtle gradient overlay
           Positioned.fill(
@@ -303,6 +304,7 @@ class _LoginScreenState extends State<LoginScreen>
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.all(24.0),
                 child: Form(
               key: _formKey,
@@ -615,7 +617,7 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         ),
         ],
-      ),
+      )),
     );
   }
 }

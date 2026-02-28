@@ -101,6 +101,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
       ),
       body: KeyboardDismissWrapper(
         child: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
         child: Form(
@@ -186,7 +187,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 suffixText: 'Ah',
                 helperText: 'e.g., 7Ah, 12Ah, 17Ah',
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
@@ -218,7 +219,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 suffixText: 'A',
                 helperText: 'Total quiescent current',
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
@@ -242,7 +243,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 suffixText: 'A',
                 helperText: 'Total current during alarm',
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.done,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),

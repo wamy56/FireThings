@@ -14,6 +14,8 @@ import '../../../services/timestamp_camera_service.dart';
 import 'camera_overlay_painter.dart';
 import 'camera_controls_widget.dart';
 import 'camera_settings_panel.dart';
+import 'focus_indicator_widget.dart';
+import 'lens_selector_widget.dart';
 import 'video_processing_screen.dart';
 
 /// Full-screen timestamp camera with live overlay preview, photo capture,
@@ -39,6 +41,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   FlashMode _flashMode = FlashMode.auto;
   bool _isRecording = false;
   bool _isProcessing = false;
+  bool _isFlipping = false;
   DateTime? _recordingStart;
   Duration _recordingDuration = Duration.zero;
   Timer? _recordingTimer;
@@ -56,6 +59,10 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   double _currentZoom = 1.0;
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
+
+  // Focus
+  Offset? _focusPoint;
+  bool _showFocusIndicator = false;
 
   bool get _isMobile =>
       !kIsWeb &&
@@ -231,9 +238,11 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   // ─── Camera Controls ──────────────────────────────────────────────
 
   Future<void> _flipCamera() async {
-    if (_cameras.length < 2 || _isRecording) return;
+    if (_cameras.length < 2 || _isRecording || _isFlipping) return;
+    setState(() => _isFlipping = true);
     _currentCameraIndex = (_currentCameraIndex + 1) % _cameras.length;
     await _setupController(_cameras[_currentCameraIndex]);
+    if (mounted) setState(() => _isFlipping = false);
   }
 
   Future<void> _cycleFlash() async {
@@ -411,8 +420,19 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         fit: StackFit.expand,
         children: [
           // Camera preview
-          if (_isCameraInitialized && _controller != null)
-            _buildCameraPreview()
+          if (_isFlipping)
+            const Center(
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
+          else if (_isCameraInitialized && _controller != null)
+            AnimatedOpacity(
+              opacity: 1.0,
+              duration: const Duration(milliseconds: 300),
+              child: _buildCameraPreview(),
+            )
           else if (_cameraError != null)
             _buildErrorView()
           else
@@ -431,9 +451,19 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           // Top bar
           _buildTopBar(),
 
-          // Zoom slider (right side)
+          // Lens selector (above bottom controls)
           if (_isCameraInitialized && _maxZoom > _minZoom)
-            _buildZoomSlider(),
+            Positioned(
+              bottom: 140,
+              left: 0,
+              right: 0,
+              child: LensSelectorWidget(
+                currentZoom: _currentZoom,
+                minZoom: _minZoom,
+                maxZoom: _maxZoom,
+                onZoomChanged: _setZoom,
+              ),
+            ),
 
           // Processing overlay
           if (_isProcessing)
@@ -482,18 +512,65 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     return Center(
       child: AspectRatio(
         aspectRatio: 1 / controller.value.aspectRatio,
-        child: GestureDetector(
-          onScaleUpdate: (details) {
-            if (details.pointerCount == 2) {
-              final newZoom = (_currentZoom * details.scale)
-                  .clamp(_minZoom, _maxZoom);
-              _setZoom(newZoom);
-            }
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return Stack(
+              children: [
+                GestureDetector(
+                  onTapDown: (details) => _handleTapToFocus(
+                    details.localPosition,
+                    constraints,
+                  ),
+                  onScaleUpdate: (details) {
+                    if (details.pointerCount == 2) {
+                      final newZoom = (_currentZoom * details.scale)
+                          .clamp(_minZoom, _maxZoom);
+                      _setZoom(newZoom);
+                    }
+                  },
+                  child: CameraPreview(controller),
+                ),
+                if (_showFocusIndicator && _focusPoint != null)
+                  FocusIndicator(
+                    position: _focusPoint!,
+                    onAnimationComplete: () {
+                      if (mounted) {
+                        setState(() => _showFocusIndicator = false);
+                      }
+                    },
+                  ),
+              ],
+            );
           },
-          child: CameraPreview(controller),
         ),
       ),
     );
+  }
+
+  Future<void> _handleTapToFocus(
+    Offset localPosition,
+    BoxConstraints constraints,
+  ) async {
+    final controller = _controller;
+    if (controller == null) return;
+
+    setState(() {
+      _focusPoint = localPosition;
+      _showFocusIndicator = true;
+    });
+
+    // Convert to normalised 0–1 coordinates
+    final x = localPosition.dx / constraints.maxWidth;
+    final y = localPosition.dy / constraints.maxHeight;
+    final point = Offset(x.clamp(0.0, 1.0), y.clamp(0.0, 1.0));
+
+    try {
+      await controller.setFocusPoint(point);
+      await controller.setExposurePoint(point);
+      await controller.setFocusMode(FocusMode.auto);
+    } catch (_) {
+      // Some devices/cameras don't support focus point
+    }
   }
 
   Widget _buildTopBar() {
@@ -513,7 +590,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.black.withValues(alpha: 0.6),
+              Colors.black.withValues(alpha: 0.4),
               Colors.transparent,
             ],
           ),
@@ -574,25 +651,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
               onPressed: _isRecording ? null : _openSettings,
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildZoomSlider() {
-    return Positioned(
-      right: 16,
-      top: MediaQuery.of(context).size.height * 0.25,
-      bottom: MediaQuery.of(context).size.height * 0.35,
-      child: RotatedBox(
-        quarterTurns: 3,
-        child: Slider(
-          value: _currentZoom,
-          min: _minZoom,
-          max: _maxZoom,
-          activeColor: Colors.white,
-          inactiveColor: Colors.white.withValues(alpha: 0.3),
-          onChanged: _setZoom,
         ),
       ),
     );

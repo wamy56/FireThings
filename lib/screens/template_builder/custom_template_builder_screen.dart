@@ -84,7 +84,7 @@ class _CustomTemplateBuilderScreenState
           TextButton(onPressed: _saveTemplate, child: const Text('Save')),
         ],
       ),
-      body: Form(
+      body: KeyboardDismissWrapper(child: Form(
         key: _formKey,
         child: Column(
           children: [
@@ -166,7 +166,7 @@ class _CustomTemplateBuilderScreenState
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 

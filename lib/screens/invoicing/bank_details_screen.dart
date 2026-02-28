@@ -92,6 +92,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
           ? const Center(child: AdaptiveLoadingIndicator())
           : KeyboardDismissWrapper(
               child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.all(AppTheme.screenPadding),
               child: Form(
                 key: _formKey,
@@ -150,7 +151,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         hintText: 'XX-XX-XX',
                         prefixIcon: Icon(AppIcons.tag),
                       ),
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       textInputAction: TextInputAction.done,
                     ),
                     const SizedBox(height: 16),
@@ -160,7 +161,7 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                         labelText: 'Account Number',
                         prefixIcon: Icon(AppIcons.tag),
                       ),
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       textInputAction: TextInputAction.done,
                     ),
                     const SizedBox(height: 16),

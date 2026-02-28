@@ -8,6 +8,7 @@ import '../../widgets/animated_save_button.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class PdfFooterDesignerScreen extends StatefulWidget {
   const PdfFooterDesignerScreen({super.key});
@@ -73,7 +74,7 @@ class _PdfFooterDesignerScreenState extends State<PdfFooterDesignerScreen>
           ),
         ],
       ),
-      body: _isLoading
+      body: KeyboardDismissWrapper(child: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
           : Column(
               children: [
@@ -97,7 +98,7 @@ class _PdfFooterDesignerScreenState extends State<PdfFooterDesignerScreen>
                   ),
                 ),
               ],
-            ),
+            )),
     );
   }
 

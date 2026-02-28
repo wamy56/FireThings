@@ -187,6 +187,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
         child: Form(
         key: _formKey,
         child: ListView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(16),
           children: [
             // Job Information Section

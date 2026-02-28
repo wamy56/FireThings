@@ -12,6 +12,7 @@ import 'pdf_form_builder_screen.dart';
 import '../../widgets/premium_toast.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class PdfFormsScreen extends StatefulWidget {
   const PdfFormsScreen({super.key});
@@ -74,7 +75,7 @@ class _PdfFormsScreenState extends State<PdfFormsScreen>
           ],
         ),
       ),
-      body: _isLoading
+      body: KeyboardDismissWrapper(child: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
           : TabBarView(
               controller: _tabController,
@@ -82,7 +83,7 @@ class _PdfFormsScreenState extends State<PdfFormsScreen>
                 _buildTemplateList(_bundledTemplates, isBundled: true),
                 _buildTemplateList(_userTemplates, isBundled: false),
               ],
-            ),
+            )),
       floatingActionButton: FloatingActionButton(
         onPressed: _uploadTemplate,
         tooltip: 'Upload Template',

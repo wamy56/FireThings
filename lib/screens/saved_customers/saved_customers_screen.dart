@@ -8,6 +8,7 @@ import '../../utils/animate_helpers.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_dialog.dart';
 
 class SavedCustomersScreen extends StatefulWidget {
@@ -56,14 +57,14 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
       appBar: AdaptiveNavigationBar(
         title: 'Saved Customers',
       ),
-      body: _isLoading
+      body: KeyboardDismissWrapper(child: _isLoading
           ? const Padding(
               padding: EdgeInsets.all(16),
               child: SkeletonList(itemCount: 5, showLeading: true),
             )
           : _customers.isEmpty
               ? _buildEmptyState()
-              : _buildCustomerList(),
+              : _buildCustomerList()),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCustomerDialog(),
         child: const Icon(AppIcons.add),

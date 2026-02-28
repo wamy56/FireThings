@@ -33,7 +33,7 @@ class CameraControlsWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      color: Colors.black.withValues(alpha: 0.6),
+      color: Colors.black.withValues(alpha: 0.3),
       child: SafeArea(
         top: false,
         child: Column(
@@ -53,7 +53,7 @@ class CameraControlsWidget extends StatelessWidget {
                 _buildCircleButton(
                   icon: _flashIcon(),
                   onTap: isRecording ? null : onCycleFlash,
-                  size: 44,
+                  size: 48,
                 ),
                 // Shutter button
                 _buildShutterButton(),
@@ -61,7 +61,7 @@ class CameraControlsWidget extends StatelessWidget {
                 _buildCircleButton(
                   icon: AppIcons.rotateRight,
                   onTap: (canFlip && !isRecording) ? onFlipCamera : null,
-                  size: 44,
+                  size: 48,
                 ),
               ],
             ),
@@ -74,7 +74,7 @@ class CameraControlsWidget extends StatelessWidget {
   Widget _buildModeToggle(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
       ),
       padding: const EdgeInsets.all(3),
