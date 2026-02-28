@@ -106,14 +106,21 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     if (_controller == null || !_isCameraInitialized) return;
 
     if (state == AppLifecycleState.inactive) {
-      // Stop recording if app goes to background
-      if (_isRecording) {
-        _stopRecording();
-      }
-      _controller?.dispose();
-      setState(() => _isCameraInitialized = false);
+      _handleInactive();
+      return;
     } else if (state == AppLifecycleState.resumed) {
       _initCamera();
+    }
+  }
+
+  Future<void> _handleInactive() async {
+    // Await recording stop before disposing to avoid race condition
+    if (_isRecording) {
+      await _stopRecording();
+    }
+    _controller?.dispose();
+    if (mounted) {
+      setState(() => _isCameraInitialized = false);
     }
   }
 
@@ -516,11 +523,13 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
             // Back button
             IconButton(
               icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () {
+              onPressed: () async {
                 if (_isRecording) {
-                  _stopRecording();
+                  await _stopRecording();
                 }
-                Navigator.of(context).pop();
+                if (mounted) {
+                  Navigator.of(context).pop();
+                }
               },
             ),
             const Spacer(),

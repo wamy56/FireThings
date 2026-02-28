@@ -40,7 +40,7 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
 
   // Calibration
   static const String _calibrationPrefKey = 'decibel_meter_calibration_offset';
-  static const double _defaultIosOffset = -25.0;
+  static const double _defaultIosOffset = 0.0;
   double _calibrationOffset = 0.0;
   bool _showCalibration = false;
 
@@ -69,12 +69,33 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
 
   double get _defaultOffset => Platform.isIOS ? _defaultIosOffset : 0.0;
 
+  /// Non-linear AGC correction for iOS. AGC inflates quiet sounds more than
+  /// loud ones, so we apply a piecewise curve that corrects aggressively at
+  /// low dB and tapers off towards loud levels.
+  double _applyIosAgcCorrection(double rawDb) {
+    if (rawDb <= 40) {
+      return rawDb * 0.5; // 0→0, 40→20
+    } else if (rawDb <= 70) {
+      return 20 + (rawDb - 40) * 0.8; // 40→20, 70→44
+    } else if (rawDb <= 90) {
+      return 44 + (rawDb - 70) * 0.95; // 70→44, 90→63
+    } else {
+      return 63 + (rawDb - 90) * 1.0; // 90→63, 120→93
+    }
+  }
+
   Future<void> _loadCalibration() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = prefs.getDouble(_calibrationPrefKey);
     if (mounted) {
       setState(() {
-        _calibrationOffset = saved ?? _defaultOffset;
+        // Migrate legacy -25 dB flat offset to the new curve-based default
+        if (saved != null && saved == -25.0 && Platform.isIOS) {
+          _calibrationOffset = _defaultOffset;
+          _saveCalibration(_defaultOffset);
+        } else {
+          _calibrationOffset = saved ?? _defaultOffset;
+        }
       });
     }
   }
@@ -126,7 +147,11 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
     try {
       _noiseSubscription = _noiseMeter?.noise.listen((NoiseReading reading) {
         if (mounted) {
-          final double db = (reading.meanDecibel + _calibrationOffset).clamp(0.0, 120.0);
+          double raw = reading.meanDecibel;
+          if (Platform.isIOS) {
+            raw = _applyIosAgcCorrection(raw);
+          }
+          final double db = (raw + _calibrationOffset).clamp(0.0, 120.0);
 
           // Always accumulate readings for accurate stats
           _readings.add(db);
@@ -481,7 +506,9 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Adjust if readings seem too high or low compared to a known reference.',
+                    Platform.isIOS
+                        ? 'iOS AGC is auto-corrected with a non-linear curve. Use this slider to fine-tune.'
+                        : 'Adjust if readings seem too high or low compared to a known reference.',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 12),
@@ -832,9 +859,9 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                     ),
                     const SizedBox(height: 8),
                     const Text(
-                      '• iOS devices apply automatic gain control (AGC) which inflates quiet readings by ~25 dB\n'
-                      '• A default offset of -25 dB is applied on iOS to compensate\n'
-                      '• Use the Calibration panel to fine-tune if needed\n'
+                      '• iOS applies automatic gain control (AGC) which inflates quiet sounds more than loud ones\n'
+                      '• A non-linear correction curve is applied automatically on iOS to compensate\n'
+                      '• Use the Calibration slider to fine-tune on top of the curve\n'
                       '• Android devices default to 0 dB offset',
                       style: TextStyle(fontSize: 12),
                     ),

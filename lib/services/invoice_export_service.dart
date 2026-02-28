@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
@@ -68,8 +69,9 @@ class InvoiceExportService {
   /// [endYear] is the tax year end-year to export.
   static Future<void> exportAndShare(
     List<Invoice> invoices,
-    int endYear,
-  ) async {
+    int endYear, {
+    Rect? sharePositionOrigin,
+  }) async {
     final filtered = getInvoicesForTaxYear(invoices, endYear);
     final csv = generateCsv(filtered);
     final dir = await getTemporaryDirectory();
@@ -82,6 +84,7 @@ class InvoiceExportService {
     await Share.shareXFiles(
       [XFile(file.path)],
       subject: 'Paid Invoices ${endYear - 1}/$endYear',
+      sharePositionOrigin: sharePositionOrigin,
     );
   }
 

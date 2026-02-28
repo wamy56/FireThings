@@ -144,10 +144,6 @@ Future<Uint8List> _buildOverlayPdf(TemplateOverlayPdfData data) async {
     if (value == null) continue;
 
     final fontSize = field.fontSize ?? 10.0;
-    final sf.PdfFont textFont = sf.PdfStandardFont(
-      sf.PdfFontFamily.helvetica,
-      fontSize,
-    );
 
     switch (field.type) {
       case FormFieldDefinitionType.text:
@@ -160,7 +156,7 @@ Future<Uint8List> _buildOverlayPdf(TemplateOverlayPdfData data) async {
           y: y,
           width: width,
           height: height,
-          font: textFont,
+          fontSize: fontSize,
         );
         break;
 
@@ -182,7 +178,7 @@ Future<Uint8List> _buildOverlayPdf(TemplateOverlayPdfData data) async {
           y: y,
           width: width,
           height: height,
-          font: textFont,
+          fontSize: fontSize,
         );
         break;
 
@@ -217,7 +213,7 @@ Future<Uint8List> _buildOverlayPdf(TemplateOverlayPdfData data) async {
           y: y,
           width: width,
           height: height,
-          font: textFont,
+          fontSize: fontSize,
         );
         break;
 
@@ -605,8 +601,20 @@ void _drawTextOverlay({
   required double y,
   required double width,
   required double height,
-  required sf.PdfFont font,
+  required double fontSize,
 }) {
+  const double minSize = 6.0;
+  double currentSize = fontSize;
+  sf.PdfFont font = sf.PdfStandardFont(sf.PdfFontFamily.helvetica, currentSize);
+
+  // Auto-shrink: reduce font size until text fits within bounds
+  while (currentSize > minSize) {
+    final measured = font.measureString(text, layoutArea: Size(width, height));
+    if (measured.width <= width && measured.height <= height) break;
+    currentSize -= 0.5;
+    font = sf.PdfStandardFont(sf.PdfFontFamily.helvetica, currentSize);
+  }
+
   final sf.PdfGraphics graphics = page.graphics;
   final sf.PdfBrush brush = sf.PdfSolidBrush(sf.PdfColor(0, 0, 0));
 

@@ -32,6 +32,7 @@ class InvoiceListScreen extends StatefulWidget {
 class _InvoiceListScreenState extends State<InvoiceListScreen> {
   final _dbHelper = DatabaseHelper.instance;
   final _authService = AuthService();
+  final _exportButtonKey = GlobalKey();
 
   List<Invoice> _invoices = [];
   bool _isLoading = true;
@@ -90,6 +91,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                   padding: const EdgeInsets.only(right: 8),
                   child: Center(
                     child: OutlinedButton(
+                      key: _exportButtonKey,
                       onPressed: _isExporting ? null : _exportInvoices,
                       child: _isExporting
                           ? const SizedBox(
@@ -354,9 +356,19 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       selectedYear = picked;
     }
 
+    // Compute the button rect for iPad share popover anchoring.
+    final box = _exportButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    final shareOrigin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+
     setState(() => _isExporting = true);
     try {
-      await InvoiceExportService.exportAndShare(_invoices, selectedYear);
+      await InvoiceExportService.exportAndShare(
+        _invoices,
+        selectedYear,
+        sharePositionOrigin: shareOrigin,
+      );
     } catch (e) {
       if (mounted) {
         context.showErrorToast('Export failed: $e');

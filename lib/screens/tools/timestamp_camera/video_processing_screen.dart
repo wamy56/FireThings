@@ -6,10 +6,10 @@ import '../../../utils/theme.dart';
 import '../../../widgets/premium_toast.dart';
 
 // Conditional import: FFmpeg is only available on mobile
-import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit.dart';
-import 'package:ffmpeg_kit_flutter_new_min/ffmpeg_kit_config.dart';
-import 'package:ffmpeg_kit_flutter_new_min/return_code.dart';
-import 'package:ffmpeg_kit_flutter_new_min/statistics.dart';
+import 'package:ffmpeg_kit_flutter_new_video/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new_video/ffmpeg_kit_config.dart';
+import 'package:ffmpeg_kit_flutter_new_video/return_code.dart';
+import 'package:ffmpeg_kit_flutter_new_video/statistics.dart';
 
 /// Screen shown after video recording stops. Runs FFmpeg to burn overlays
 /// into video frames, shows progress, then saves to gallery.

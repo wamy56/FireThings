@@ -8,6 +8,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/background_decoration.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../new_job/new_job_screen.dart';
 import '../new_job/jobsheet_drafts_screen.dart';
@@ -82,7 +83,10 @@ class _JobsHubScreenState extends State<JobsHubScreen> {
     final shadow = isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow;
 
     return Scaffold(
-      body: _isLoading
+      body: Stack(
+        children: [
+          const BackgroundDecoration(),
+          _isLoading
           ? _buildSkeleton(isDark)
           : AdaptiveRefreshIndicator(
               onRefresh: _loadData,
@@ -285,6 +289,8 @@ class _JobsHubScreenState extends State<JobsHubScreen> {
                 ],
               ),
             ),
+        ],
+      ),
     );
   }
 

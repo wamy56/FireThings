@@ -7,6 +7,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/background_decoration.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../tools/invoice_screen.dart';
 import '../saved_customers/saved_customers_screen.dart';
@@ -74,7 +75,10 @@ class _InvoicingHubScreenState extends State<InvoicingHubScreen> {
     final shadow = isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow;
 
     return Scaffold(
-      body: _isLoading
+      body: Stack(
+        children: [
+          const BackgroundDecoration(),
+          _isLoading
           ? _buildSkeleton()
           : AdaptiveRefreshIndicator(
               onRefresh: _loadData,
@@ -343,6 +347,8 @@ class _InvoicingHubScreenState extends State<InvoicingHubScreen> {
                 ],
               ),
             ),
+        ],
+      ),
     );
   }
 

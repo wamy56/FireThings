@@ -199,10 +199,8 @@ class TimestampCameraService {
           bottomPadding -
           ((lineCount - i) * lineSpacing);
 
-      // Escape special characters for FFmpeg
-      final escapedText = overlayLines[i]
-          .replaceAll(':', r'\:')
-          .replaceAll("'", r"\'");
+      // Escape special characters for FFmpeg drawtext
+      final escapedText = _escapeForFfmpegDrawtext(overlayLines[i]);
 
       filters.add(
         "drawtext=text='$escapedText'"
@@ -217,5 +215,17 @@ class TimestampCameraService {
     }
 
     return filters.join(',');
+  }
+
+  /// Escape all characters that are special in FFmpeg's drawtext filter.
+  String _escapeForFfmpegDrawtext(String text) {
+    return text
+        .replaceAll(r'\', r'\\')
+        .replaceAll("'", r"\'")
+        .replaceAll('%', r'%%')
+        .replaceAll(':', r'\:')
+        .replaceAll('[', r'\[')
+        .replaceAll(']', r'\]')
+        .replaceAll(';', r'\;');
   }
 }

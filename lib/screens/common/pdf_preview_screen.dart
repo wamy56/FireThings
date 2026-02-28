@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/adaptive_app_bar.dart';
 
@@ -35,15 +36,7 @@ class PdfPreviewScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: PdfPreview(
-        build: (_) => pdfBytes,
-        canChangeOrientation: false,
-        canChangePageFormat: false,
-        canDebug: false,
-        allowPrinting: false,
-        allowSharing: false,
-        pdfFileName: fileName,
-      ),
+      body: SfPdfViewer.memory(pdfBytes),
     );
   }
 }
