@@ -132,7 +132,6 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
       settings: settings,
       recordingStartTime: widget.recordingStartTime!,
       durationMs: widget.totalDurationMs,
-      videoHeight: 1080, // Best guess for fallback
     );
 
     if (fallbackFilter.isEmpty) {

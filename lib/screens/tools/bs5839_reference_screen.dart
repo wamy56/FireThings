@@ -41,9 +41,12 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
   static const List<String> _categories = [
     'System Categories',
     'Detectors',
+    'Detector Siting',
     'Sounders',
     'Call Points',
     'Cables & Wiring',
+    'Ancillary Equipment',
+    'Void Detection',
     'Testing & Maintenance',
     'Fire Detection Zones',
     'False Alarm Management',
@@ -293,6 +296,95 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
       ],
     ),
 
+    // ── Detector Siting ──
+    ReferenceCard(
+      title: 'Detector Siting Restrictions',
+      category: 'Detector Siting',
+      icon: AppIcons.location,
+      summary:
+          'Minimum distances from walls, vents, lights, and heat sources when positioning detectors.',
+      items: [
+        ReferenceItem(
+          heading: 'Distance from walls',
+          content:
+              'Detectors should be mounted at least 500mm from any wall or vertical surface. This avoids dead air pockets at the wall-ceiling junction where smoke may not reach the detector.',
+        ),
+        ReferenceItem(
+          heading: 'Distance from air vents / HVAC diffusers',
+          content:
+              'Minimum 600mm from air conditioning outlets, HVAC diffusers, or ventilation grilles. Some specifications recommend 1m. Airflow can dilute or deflect smoke away from detectors.',
+        ),
+        ReferenceItem(
+          heading: 'Distance from luminaires / lights',
+          content:
+              'Minimum 500mm from light fittings. Heat from luminaires can affect heat detectors, and some lighting can cause convection currents that disrupt smoke patterns.',
+        ),
+        ReferenceItem(
+          heading: 'Heat sources and other exclusions',
+          content:
+              'Do not mount directly above radiators, cookers, boilers, or other heat sources.\nAvoid areas subject to condensation.\nAvoid dead air spaces within 150mm of the wall-ceiling junction in rooms with ceiling beams.\nPitched ceilings: detector(s) within 600mm of the apex if slope > 1:12.',
+        ),
+      ],
+    ),
+    ReferenceCard(
+      title: 'Effect of Beams & Obstructions',
+      category: 'Detector Siting',
+      icon: AppIcons.ruler,
+      summary:
+          'How exposed beams, partitions, and racking affect detector spacing requirements.',
+      items: [
+        ReferenceItem(
+          heading: 'Beams > 150mm deep',
+          content:
+              'Treat each bay between beams as a separate room for detector spacing purposes. Each bay requires its own detector(s) based on standard spacing rules.',
+        ),
+        ReferenceItem(
+          heading: 'Beams > 10% of ceiling height',
+          content:
+              'Where beam depth exceeds 10% of the floor-to-ceiling height, detectors are required in each bay formed by the beams.',
+        ),
+        ReferenceItem(
+          heading: 'Beams < 150mm deep',
+          content:
+              'Beams less than 150mm deep can generally be ignored for detector spacing calculations. Smoke will travel over these shallow obstructions.',
+        ),
+        ReferenceItem(
+          heading: 'Partitions and racking',
+          content:
+              'Partitions or racking greater than 75% of ceiling height may impede smoke travel — additional detection may be needed.\nOpen-plan offices with partitions: consider the smoke travel path and whether partitions create enclosed pockets.',
+        ),
+      ],
+    ),
+    ReferenceCard(
+      title: 'Detector Type Selection Guide',
+      category: 'Detector Siting',
+      icon: AppIcons.category,
+      summary:
+          'Quick reference for choosing the right detector type for each environment.',
+      items: [
+        ReferenceItem(
+          heading: 'Optical smoke detectors',
+          content:
+              'Best for: clean offices, bedrooms, corridors, hotel rooms, communal areas.\nMost common general-purpose detector. Detects visible smoke particles from smouldering fires.',
+        ),
+        ReferenceItem(
+          heading: 'Heat detectors',
+          content:
+              'Fixed temperature (typically 57°C or 90°C): kitchens (use 90°C min), areas with steam/vapour.\nRate-of-rise: boiler rooms, plant rooms — detects rapid temperature increase.\nGeneral: dusty/dirty environments where smoke detectors would false alarm.',
+        ),
+        ReferenceItem(
+          heading: 'Beam and aspirating detectors',
+          content:
+              'Beam detectors: high ceilings >10.5m, warehouses, atriums.\nAspirating (e.g. VESDA): server rooms, clean rooms, heritage buildings, voids where sampling pipes are easier to route. Highest sensitivity available.',
+        ),
+        ReferenceItem(
+          heading: 'Multi-sensor and specialist',
+          content:
+              'Multi-sensor (smoke + heat combined): best general-purpose choice for reducing false alarms. Analyses multiple inputs before triggering.\nCO + heat multi: car parks, areas with exhaust fumes.\nAlways check manufacturer guidance for specific environmental suitability.',
+        ),
+      ],
+    ),
+
     // ── Sounders ──
     ReferenceCard(
       title: 'Minimum Sound Levels',
@@ -349,6 +441,35 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
           heading: 'Voice alarm systems',
           content:
               'Where voice alarm (VA) is used, speech intelligibility must be verified. Minimum speech transmission index (STI) of 0.5 is generally expected. VA messages should be clear, pre-recorded, and approved by the building operator.',
+        ),
+      ],
+    ),
+    ReferenceCard(
+      title: 'Visual Alarm Devices (VADs)',
+      category: 'Sounders',
+      icon: AppIcons.flash,
+      summary:
+          'EN 54-23 visual alarm devices — when required, coverage categories, and installation guidance.',
+      items: [
+        ReferenceItem(
+          heading: 'When VADs are required',
+          content:
+              'Where ambient noise exceeds 90 dB(A) and sounders alone cannot achieve required levels.\nWhere hearing-impaired occupants are present or expected.\nIn areas where audible warnings may not be perceived (ear protection zones, noisy machinery areas).',
+        ),
+        ReferenceItem(
+          heading: 'Flash rate and colour',
+          content:
+              'Flash rate: between 0.5 Hz and 2 Hz (EN 54-23).\nColour: red or white. Red is more visible; white is more commonly installed.\nMust not cause discomfort or trigger photosensitive conditions at the specified flash rate.',
+        ),
+        ReferenceItem(
+          heading: 'Coverage categories (EN 54-23)',
+          content:
+              'W — Wall-mounted: coverage expressed as a volume from the wall outward.\nC — Ceiling-mounted: coverage expressed as a volume below the ceiling.\nO — Open (free-standing): coverage in all directions.\nManufacturer specifies the coverage volume for each category and mounting height.',
+        ),
+        ReferenceItem(
+          heading: 'Installation considerations',
+          content:
+              'Power consumption is higher than sounders — factor into PSU and battery calculations.\nMay require larger cable sizes on long runs.\nPosition so the flash is visible from all occupiable points in the coverage area.\nVADs should activate simultaneously with audible alarm devices.',
         ),
       ],
     ),
@@ -531,6 +652,126 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
       ],
     ),
 
+    // ── Ancillary Equipment ──
+    ReferenceCard(
+      title: 'Fire Door Holders & Releases',
+      category: 'Ancillary Equipment',
+      icon: AppIcons.lock,
+      summary:
+          'Electromagnetic door holders and release mechanisms connected to the fire alarm system.',
+      items: [
+        ReferenceItem(
+          heading: 'Purpose and operation',
+          content:
+              'Electromagnetic door holders keep fire doors open for convenience and release them automatically on fire alarm activation. Doors close under their own closer force when the electromagnet de-energises (fail-safe).',
+        ),
+        ReferenceItem(
+          heading: 'Connection to fire alarm',
+          content:
+              'Must be connected to the fire alarm system via a cause-and-effect matrix. Typically release on activation of detectors in the local zone or adjacent zones. BS 7273-4 specifies the actuation requirements.',
+        ),
+        ReferenceItem(
+          heading: 'Rating and positioning',
+          content:
+              'Door holder must have a holding force that exceeds the door closer force.\nPosition as high as practical on the door or frame for maximum holding leverage.\nSwing-free holders allow doors to be moved but return them to the held-open position.',
+        ),
+        ReferenceItem(
+          heading: 'Testing requirements',
+          content:
+              'Weekly: visual check that holders are energised and doors are held open.\nQuarterly: functional test — trigger alarm and confirm doors release and close fully.\nCheck door closer is adjusted correctly and door latches properly on release.',
+        ),
+      ],
+    ),
+    ReferenceCard(
+      title: 'Interface Devices & Cause and Effect',
+      category: 'Ancillary Equipment',
+      icon: AppIcons.settingOutline,
+      summary:
+          'Interfaces between the fire alarm and other building systems — AOVs, dampers, lifts, HVAC.',
+      items: [
+        ReferenceItem(
+          heading: 'AOVs (Automatic Opening Vents)',
+          content:
+              'Open on detector activation in the relevant zone to allow smoke venting.\nTypically roof-mounted or high-level window actuators.\nMust be tested as part of quarterly fire alarm inspection.',
+        ),
+        ReferenceItem(
+          heading: 'Fire dampers and gas/oil shutoff',
+          content:
+              'Fire dampers: close to prevent smoke spread through ductwork.\nGas/oil shutoff valves: close on alarm to remove fuel sources.\nBoth must be documented in the cause-and-effect matrix.',
+        ),
+        ReferenceItem(
+          heading: 'Lift recall and stairwell pressurisation',
+          content:
+              'Lifts: recall to ground floor, doors open, then disable for normal use. Fire-fighting lift remains operational.\nStairwell pressurisation: activate on alarm to keep escape stairs clear of smoke.\nHVAC: disable on alarm to prevent distributing smoke through the building.',
+        ),
+        ReferenceItem(
+          heading: 'Cause-and-effect matrix',
+          content:
+              'Document which input device (detector/zone) triggers which output (sounder, door release, AOV, damper, lift recall, etc.).\nEssential for commissioning and ongoing maintenance.\nMust be kept up to date and available at the fire alarm panel.',
+        ),
+      ],
+    ),
+    ReferenceCard(
+      title: 'Power Supply Requirements',
+      category: 'Ancillary Equipment',
+      icon: AppIcons.flash,
+      summary:
+          'Mains supply, battery standby, charging, and PSU requirements for fire alarm systems.',
+      items: [
+        ReferenceItem(
+          heading: 'Primary (mains) supply',
+          content:
+              'Permanent mains connection — not via a switched socket or plug.\nDedicated circuit with fuse or MCB labelled "FIRE ALARM — DO NOT SWITCH OFF".\nCable from mains intake must be fire-resistant if it passes through a fire risk area.',
+        ),
+        ReferenceItem(
+          heading: 'Secondary (battery) supply',
+          content:
+              'Sealed lead-acid batteries (maintenance-free).\nStandby duration: 24 hours normal operation + 30 minutes in full alarm.\nUnmonitored premises (no ARC): 72 hours standby + 30 minutes alarm.',
+        ),
+        ReferenceItem(
+          heading: 'Charging and replacement',
+          content:
+              'Charger must bring batteries to 80% capacity within 24 hours of a full discharge.\nReplace batteries every 4 years as standard, or sooner if they fail a load test.\nBattery condition should be checked at every quarterly service.',
+        ),
+        ReferenceItem(
+          heading: 'PSU sizing',
+          content:
+              'Total quiescent current (all devices in standby) × 24 hours + total alarm current × 0.5 hours.\nAdd margin for future expansion (typically 20–25%).\nFactor in higher-draw devices: VADs, door holders, sounder-beacons.',
+        ),
+      ],
+    ),
+
+    // ── Void Detection ──
+    ReferenceCard(
+      title: 'Void & Ceiling Space Detection',
+      category: 'Void Detection',
+      icon: AppIcons.grid,
+      summary:
+          'When detection is required in ceiling voids, floor voids, and other concealed spaces.',
+      items: [
+        ReferenceItem(
+          heading: 'Voids > 800mm deep',
+          content:
+              'Generally require detection. Treat as a separate room/compartment for detector spacing. The void may accumulate smoke from cables, equipment, or fire spread from below.',
+        ),
+        ReferenceItem(
+          heading: 'Voids 200mm–800mm deep',
+          content:
+              'Detection is needed if combustible material is present (e.g. timber joists, plastic pipes) or if cables are routed through the void. Risk assessment determines the requirement.',
+        ),
+        ReferenceItem(
+          heading: 'Voids < 200mm deep',
+          content:
+              'Generally exempt from detection requirements. Insufficient depth for significant smoke accumulation.',
+        ),
+        ReferenceItem(
+          heading: 'Void barriers and access',
+          content:
+              'Void barriers at compartment walls must maintain fire resistance — fire can spread unseen through voids.\nAccess panels are required for maintenance of void detectors.\nAspirating detection is often preferred in voids as sampling pipes are easier to route than point detectors.',
+        ),
+      ],
+    ),
+
     // ── Testing & Maintenance ──
     ReferenceCard(
       title: 'Weekly Testing',
@@ -630,6 +871,35 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
           heading: 'As-installed verification',
           content:
               'Check system against as-installed drawings. Note any additions, removals, or changes since last inspection. Verify zone plans are current and displayed at the panel. Issue a certificate of inspection/service.',
+        ),
+      ],
+    ),
+    ReferenceCard(
+      title: 'Logbook Requirements',
+      category: 'Testing & Maintenance',
+      icon: AppIcons.note,
+      summary:
+          'Fire alarm log book requirements — what to record, retention periods, and inspection obligations.',
+      items: [
+        ReferenceItem(
+          heading: 'Requirement',
+          content:
+              'A fire alarm log book must be kept on the premises at all times. It should be stored near the fire alarm panel and be readily available for inspection by the fire authority, insurers, or the responsible person.',
+        ),
+        ReferenceItem(
+          heading: 'What to record',
+          content:
+              'All fire alarm events: genuine alarms, false alarms, faults, pre-alarms.\nAll tests: weekly call point tests, quarterly detector tests, annual service.\nAll maintenance: repairs, device replacements, software changes.\nAll modifications: additions, removals, or changes to the system.\nFor weekly tests: date, time, device tested, result, name of tester.',
+        ),
+        ReferenceItem(
+          heading: 'Retention period',
+          content:
+              'Retain records for a minimum of 3 years. Some fire risk assessments require 6 years.\nRecords should be available for audit by the fire authority at any time.\nBS 5839-1 Clause 44 specifies the minimum record-keeping requirements.',
+        ),
+        ReferenceItem(
+          heading: 'Electronic log books',
+          content:
+              'Electronic records are acceptable provided they can be accessed on-site, are backed up, and can be printed if required for inspection. Must contain the same information as a paper log book.',
         ),
       ],
     ),
@@ -958,12 +1228,18 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
         return Colors.indigo;
       case 'Detectors':
         return Colors.blue;
+      case 'Detector Siting':
+        return Colors.blue.shade700;
       case 'Sounders':
         return Colors.purple;
       case 'Call Points':
         return Colors.red;
       case 'Cables & Wiring':
         return Colors.orange;
+      case 'Ancillary Equipment':
+        return Colors.brown;
+      case 'Void Detection':
+        return Colors.blueGrey;
       case 'Testing & Maintenance':
         return Colors.green;
       case 'Fire Detection Zones':
@@ -1001,10 +1277,13 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
               SizedBox(height: 8),
               Text('\u2022 System Categories (L1\u2013L5, M, P1, P2)'),
               Text('\u2022 Detectors (spacing & coverage)'),
-              Text('\u2022 Sounders (dB levels & placement)'),
+              Text('\u2022 Detector Siting (restrictions & type selection)'),
+              Text('\u2022 Sounders (dB levels, placement & VADs)'),
               Text('\u2022 Call Points (positioning rules)'),
               Text('\u2022 Cables & Wiring (types & segregation)'),
-              Text('\u2022 Testing & Maintenance (intervals)'),
+              Text('\u2022 Ancillary Equipment (door holders, interfaces, PSU)'),
+              Text('\u2022 Void Detection (ceiling & floor voids)'),
+              Text('\u2022 Testing & Maintenance (intervals & logbook)'),
               Text('\u2022 Fire Detection Zones (size limits)'),
               Text('\u2022 False Alarm Management'),
               SizedBox(height: 12),

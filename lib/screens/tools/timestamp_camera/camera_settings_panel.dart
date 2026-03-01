@@ -135,6 +135,19 @@ class _CameraSettingsPanelState extends State<CameraSettingsPanel> {
               const Divider(),
               const SizedBox(height: 12),
 
+              // Overlay position picker
+              Text(
+                'Overlay Position',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              _buildPositionPicker(isDark),
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 12),
+
               // Resolution dropdown
               Text(
                 'Resolution',
@@ -159,6 +172,85 @@ class _CameraSettingsPanelState extends State<CameraSettingsPanel> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPositionPicker(bool isDark) {
+    const positions = [
+      [OverlayPosition.topLeft, OverlayPosition.topRight],
+      [OverlayPosition.bottomLeft, OverlayPosition.bottomRight],
+    ];
+    const labels = {
+      OverlayPosition.topLeft: 'TL',
+      OverlayPosition.topRight: 'TR',
+      OverlayPosition.bottomLeft: 'BL',
+      OverlayPosition.bottomRight: 'BR',
+    };
+
+    return Center(
+      child: Container(
+        width: 120,
+        height: 80,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
+          ),
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
+        ),
+        child: Column(
+          children: [
+            for (final row in positions)
+              Expanded(
+                child: Row(
+                  children: [
+                    for (final pos in row)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _update(
+                            _settings.copyWith(position: pos),
+                          ),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Center(
+                              child: Container(
+                                width: 24,
+                                height: 24,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _settings.position == pos
+                                      ? AppTheme.accentOrange
+                                      : isDark
+                                          ? Colors.grey.shade700
+                                          : Colors.grey.shade300,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    labels[pos]!,
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: _settings.position == pos
+                                          ? Colors.white
+                                          : isDark
+                                              ? Colors.grey.shade400
+                                              : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 

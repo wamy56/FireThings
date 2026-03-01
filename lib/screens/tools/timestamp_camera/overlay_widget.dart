@@ -68,13 +68,17 @@ class _OverlayWidgetState extends State<OverlayWidget> {
         a.showCoords == b.showCoords &&
         a.showAddress == b.showAddress &&
         a.showNote == b.showNote &&
-        a.customNote == b.customNote;
+        a.customNote == b.customNote &&
+        a.position == b.position;
   }
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
-      painter: CameraOverlayPainter(overlayLines: _overlayLines),
+      painter: CameraOverlayPainter(
+        overlayLines: _overlayLines,
+        position: widget.settings.position,
+      ),
     );
   }
 }

@@ -1,13 +1,18 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import '../../../services/timestamp_camera_service.dart';
 
 /// CustomPainter that renders overlay text on top of the live camera preview.
-/// Draws a compact rounded-rect block in the bottom-right corner with
-/// right-aligned white bold text for each enabled overlay element.
+/// Draws a compact rounded-rect block at the selected corner position with
+/// aligned white bold text for each enabled overlay element.
 class CameraOverlayPainter extends CustomPainter {
   final List<String> overlayLines;
+  final OverlayPosition position;
 
-  CameraOverlayPainter({required this.overlayLines});
+  CameraOverlayPainter({
+    required this.overlayLines,
+    this.position = OverlayPosition.bottomLeft,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -18,12 +23,20 @@ class CameraOverlayPainter extends CustomPainter {
     final margin = size.width * 0.03;
     final padding = fontSize * 0.6;
 
+    final isLeft = position == OverlayPosition.bottomLeft ||
+        position == OverlayPosition.topLeft;
+    final isTop = position == OverlayPosition.topLeft ||
+        position == OverlayPosition.topRight;
+
+    final textAlign = isLeft ? TextAlign.left : TextAlign.right;
+
     // Build paragraphs and measure max width
     final paragraphs = <ui.Paragraph>[];
     double maxLineWidth = 0;
 
     for (final line in overlayLines) {
-      final paragraph = _buildParagraph(line, fontSize, size.width * 0.6);
+      final paragraph =
+          _buildParagraph(line, fontSize, size.width * 0.6, textAlign);
       paragraphs.add(paragraph);
       if (paragraph.longestLine > maxLineWidth) {
         maxLineWidth = paragraph.longestLine;
@@ -33,14 +46,26 @@ class CameraOverlayPainter extends CustomPainter {
     final blockWidth = maxLineWidth + (padding * 2);
     final blockHeight = (overlayLines.length * lineHeight) + (padding * 2);
 
-    // Compact rounded rect in bottom-right corner
+    // Safe margins to avoid overlapping camera controls / status bar
+    // Bottom: ~22% clears lens selector (bottom: 140) + controls
+    // Top: ~12% clears status bar area
+    final safeBottomMargin = size.height * 0.22;
+    final safeTopMargin = size.height * 0.12;
+
+    // Compute block X
+    final blockX = isLeft ? margin : size.width - blockWidth - margin;
+
+    // Compute block Y
+    final double blockY;
+    if (isTop) {
+      blockY = safeTopMargin;
+    } else {
+      blockY = size.height - blockHeight - safeBottomMargin;
+    }
+
+    // Compact rounded rect
     final blockRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        size.width - blockWidth - margin,
-        size.height - blockHeight - margin,
-        blockWidth,
-        blockHeight,
-      ),
+      Rect.fromLTWH(blockX, blockY, blockWidth, blockHeight),
       const Radius.circular(8),
     );
 
@@ -49,20 +74,30 @@ class CameraOverlayPainter extends CustomPainter {
       Paint()..color = Colors.black.withValues(alpha: 0.55),
     );
 
-    // Draw each text line right-aligned within the block
+    // Draw each text line aligned within the block
     for (var i = 0; i < paragraphs.length; i++) {
       final paragraph = paragraphs[i];
       final lineWidth = paragraph.longestLine;
-      final x = size.width - margin - padding - lineWidth;
-      final y = size.height - blockHeight - margin + padding + (i * lineHeight);
+      final double x;
+      if (isLeft) {
+        x = blockX + padding;
+      } else {
+        x = blockX + blockWidth - padding - lineWidth;
+      }
+      final y = blockY + padding + (i * lineHeight);
       canvas.drawParagraph(paragraph, Offset(x, y));
     }
   }
 
-  ui.Paragraph _buildParagraph(String text, double fontSize, double maxWidth) {
+  ui.Paragraph _buildParagraph(
+    String text,
+    double fontSize,
+    double maxWidth,
+    TextAlign align,
+  ) {
     final builder = ui.ParagraphBuilder(
       ui.ParagraphStyle(
-        textAlign: TextAlign.right,
+        textAlign: align,
         fontSize: fontSize,
         fontWeight: FontWeight.bold,
       ),
@@ -88,6 +123,7 @@ class CameraOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CameraOverlayPainter oldDelegate) {
+    if (oldDelegate.position != position) return true;
     if (oldDelegate.overlayLines.length != overlayLines.length) return true;
     for (var i = 0; i < overlayLines.length; i++) {
       if (oldDelegate.overlayLines[i] != overlayLines[i]) return true;

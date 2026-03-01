@@ -5,11 +5,7 @@ import '../../services/database_helper.dart';
 import '../../services/auth_service.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
-import '../../widgets/skeleton_loader.dart';
-import '../../widgets/premium_toast.dart';
-import '../../widgets/adaptive_app_bar.dart';
-import '../../widgets/keyboard_dismiss_wrapper.dart';
-import '../../widgets/premium_dialog.dart';
+import '../../widgets/widgets.dart';
 
 class SavedCustomersScreen extends StatefulWidget {
   const SavedCustomersScreen({super.key});
@@ -180,7 +176,6 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
     final addressController = TextEditingController(text: customer?.customerAddress ?? '');
     final emailController = TextEditingController(text: customer?.email ?? '');
     final notesController = TextEditingController(text: customer?.notes ?? '');
-    final formKey = GlobalKey<FormState>();
 
     showPremiumDialog(
       context: context,
@@ -188,59 +183,39 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
         builder: (context) => AlertDialog(
         title: Text(customer != null ? 'Edit Customer' : 'Add Customer'),
         content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Customer Name',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(AppIcons.building),
-                  ),
-                  textInputAction: TextInputAction.done,
-                  validator: (v) => v?.isEmpty == true ? 'Required' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Address',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(AppIcons.location),
-                  ),
-                  maxLines: 2,
-                  keyboardType: TextInputType.multiline,
-                  textInputAction: TextInputAction.newline,
-                  validator: (v) => v?.isEmpty == true ? 'Required' : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email (Optional)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(AppIcons.sms),
-                  ),
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.done,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes (Optional)',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(AppIcons.note),
-                  ),
-                  maxLines: 2,
-                  keyboardType: TextInputType.multiline,
-                  textInputAction: TextInputAction.newline,
-                ),
-              ],
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CustomTextField(
+                controller: nameController,
+                label: 'Customer Name *',
+                hint: 'e.g., ABC Fire Ltd',
+                prefixIcon: const Icon(AppIcons.building),
+              ),
+              const SizedBox(height: 16),
+              CustomTextField(
+                controller: addressController,
+                label: 'Address *',
+                hint: 'Full address',
+                maxLines: 2,
+                prefixIcon: const Icon(AppIcons.location),
+              ),
+              const SizedBox(height: 16),
+              CustomTextField(
+                controller: emailController,
+                label: 'Email',
+                hint: 'Optional',
+                prefixIcon: const Icon(AppIcons.sms),
+              ),
+              const SizedBox(height: 16),
+              CustomTextField(
+                controller: notesController,
+                label: 'Notes',
+                hint: 'Optional notes',
+                maxLines: 2,
+                prefixIcon: const Icon(AppIcons.note),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -250,39 +225,43 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                final user = _authService.currentUser;
-                if (user == null) return;
+              if (nameController.text.trim().isEmpty ||
+                  addressController.text.trim().isEmpty) {
+                showValidationBanner(context: context, message: 'Customer name and address are required');
+                return;
+              }
 
-                final newCustomer = SavedCustomer(
-                  id: customer?.id ?? const Uuid().v4(),
-                  engineerId: user.uid,
-                  customerName: nameController.text,
-                  customerAddress: addressController.text,
-                  email: emailController.text.isEmpty ? null : emailController.text,
-                  notes: notesController.text.isEmpty ? null : notesController.text,
-                  createdAt: customer?.createdAt ?? DateTime.now(),
-                );
+              final user = _authService.currentUser;
+              if (user == null) return;
 
-                // Capture navigator before async gap
-                final navigator = Navigator.of(context);
+              final newCustomer = SavedCustomer(
+                id: customer?.id ?? const Uuid().v4(),
+                engineerId: user.uid,
+                customerName: nameController.text.trim(),
+                customerAddress: addressController.text.trim(),
+                email: emailController.text.trim().isEmpty ? null : emailController.text.trim(),
+                notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+                createdAt: customer?.createdAt ?? DateTime.now(),
+              );
 
-                try {
-                  if (customer != null) {
-                    await _dbHelper.updateSavedCustomer(newCustomer);
-                  } else {
-                    await _dbHelper.insertSavedCustomer(newCustomer);
-                  }
+              // Capture navigator before async gap
+              final navigator = Navigator.of(context);
 
-                  if (mounted) {
-                    navigator.pop();
-                    _loadCustomers();
-                    this.context.showSuccessToast(customer != null ? 'Customer updated' : 'Customer added');
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    this.context.showErrorToast('Error: $e');
-                  }
+              try {
+                if (customer != null) {
+                  await _dbHelper.updateSavedCustomer(newCustomer);
+                } else {
+                  await _dbHelper.insertSavedCustomer(newCustomer);
+                }
+
+                if (mounted) {
+                  navigator.pop();
+                  _loadCustomers();
+                  this.context.showSuccessToast(customer != null ? 'Customer updated' : 'Customer added');
+                }
+              } catch (e) {
+                if (mounted) {
+                  this.context.showErrorToast('Error: $e');
                 }
               }
             },

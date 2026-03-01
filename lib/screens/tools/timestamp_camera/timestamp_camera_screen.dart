@@ -257,7 +257,11 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       );
 
       final watermarked =
-          await TimestampCameraService.instance.watermarkPhoto(bytes, lines);
+          await TimestampCameraService.instance.watermarkPhoto(
+        bytes,
+        lines,
+        position: _overlaySettings.position,
+      );
 
       await Gal.putImageBytes(
         watermarked,
@@ -323,14 +327,11 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       );
 
       if (_isMobile && lines.isNotEmpty) {
-        final videoHeight =
-            _controller!.value.previewSize?.height.toInt() ?? 1080;
         final filter = TimestampCameraService.instance
             .buildDynamicFfmpegFilter(
           settings: _overlaySettings,
           recordingStartTime: recordingStartTime ?? DateTime.now(),
           durationMs: durationMs,
-          videoHeight: videoHeight,
           coords: _locationService.currentCoords,
           address: _locationService.currentAddress,
         );
