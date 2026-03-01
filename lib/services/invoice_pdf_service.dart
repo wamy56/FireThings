@@ -269,7 +269,7 @@ pw.Widget _buildItemsTable(Invoice invoice, PdfColor primaryColor) {
       ...invoice.items.map((item) => pw.TableRow(
             children: [
               _buildTableCell(item.description),
-              _buildTableCell(item.quantity.toString(), center: true),
+              _buildTableCell(item.quantity == item.quantity.truncateToDouble() ? item.quantity.toInt().toString() : item.quantity.toString(), center: true),
               _buildTableCell(currencyFormat.format(item.unitPrice), right: true),
               _buildTableCell(currencyFormat.format(item.total), right: true),
             ],

@@ -135,7 +135,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     for (final item in _items) {
       final controllers = _ItemControllers();
       controllers.description.text = item.description;
-      controllers.quantity.text = item.quantity.toString();
+      controllers.quantity.text = item.quantity == item.quantity.truncateToDouble()
+          ? item.quantity.toInt().toString()
+          : item.quantity.toString();
       controllers.unitPrice.text = item.unitPrice.toStringAsFixed(2);
       _itemControllers.add(controllers);
     }
@@ -663,7 +665,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 child: Builder(
                   builder: (_) {
                     final qty =
-                        int.tryParse(controllers.quantity.text.trim()) ?? 0;
+                        double.tryParse(controllers.quantity.text.trim()) ?? 0;
                     final price =
                         double.tryParse(controllers.unitPrice.text.trim()) ??
                         0.0;
@@ -754,7 +756,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     for (final controllers in _itemControllers) {
       final quantityText = controllers.quantity.text.trim();
       final unitPriceText = controllers.unitPrice.text.trim();
-      final quantity = int.tryParse(quantityText) ?? 0;
+      final quantity = double.tryParse(quantityText) ?? 0;
       final unitPrice = double.tryParse(unitPriceText) ?? 0.0;
       subtotal += quantity * unitPrice;
     }
@@ -947,7 +949,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       // Skip empty rows
       if (description.isEmpty && unitPriceText.isEmpty) continue;
 
-      final quantity = int.tryParse(quantityText) ?? 1;
+      final quantity = double.tryParse(quantityText) ?? 1;
       final unitPrice = double.tryParse(unitPriceText) ?? 0.0;
 
       if (description.isNotEmpty && unitPrice > 0) {

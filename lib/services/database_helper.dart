@@ -426,7 +426,7 @@ class DatabaseHelper {
     final db = await database;
     final result = await db.rawQuery('SELECT COUNT(*) FROM invoices');
     final count = (Sqflite.firstIntValue(result) ?? 0) + 1;
-    return 'Invoice ${count.toString().padLeft(4, '0')}';
+    return count.toString();
   }
 
   /// Parse invoice JSON from database (handles items string conversion)

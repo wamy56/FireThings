@@ -91,6 +91,11 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
         await picker.pickImage(source: source!, maxWidth: 512, maxHeight: 512);
     if (picked == null) return;
 
+    // Evict old cached image before overwriting the file
+    if (_logoPath != null) {
+      imageCache.evict(FileImage(File(_logoPath!)));
+    }
+
     await BrandingService.saveLogo(picked.path);
     final newPath = await BrandingService.getLogoPath();
     setState(() => _logoPath = newPath);
@@ -111,6 +116,11 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
     );
 
     if (confirm != true) return;
+
+    // Evict cached image before removing
+    if (_logoPath != null) {
+      imageCache.evict(FileImage(File(_logoPath!)));
+    }
 
     await BrandingService.removeLogo();
     setState(() => _logoPath = null);

@@ -55,6 +55,8 @@ class _CalcResult {
   final int rows;
   final double gridSpacingX;
   final double gridSpacingY;
+  final double wallOffsetX;
+  final double wallOffsetY;
   final double coveragePerDetector;
   final double roomArea;
   final List<String> notes;
@@ -65,6 +67,8 @@ class _CalcResult {
     required this.rows,
     required this.gridSpacingX,
     required this.gridSpacingY,
+    required this.wallOffsetX,
+    required this.wallOffsetY,
     required this.coveragePerDetector,
     required this.roomArea,
     required this.notes,
@@ -119,6 +123,8 @@ class _DetectorSpacingCalculatorScreenState
     int rows;
     double spacingX;
     double spacingY;
+    double wallOffX;
+    double wallOffY;
 
     if (_roomType == RoomType.corridor) {
       // Corridor: single row centred in width
@@ -128,7 +134,8 @@ class _DetectorSpacingCalculatorScreenState
       if (height > spec.maxCeiling) {
         final excess = height - spec.maxCeiling;
         final reduction = excess * 0.5;
-        final adjusted = max(corridorSpacing * 0.5, corridorSpacing - reduction);
+        final adjusted =
+            max(corridorSpacing * 0.5, corridorSpacing - reduction);
         notes.add(
           'Ceiling height (${height.toStringAsFixed(1)}m) exceeds maximum '
           '(${spec.maxCeiling}m) for ${spec.label}. Spacing reduced from '
@@ -137,10 +144,13 @@ class _DetectorSpacingCalculatorScreenState
         corridorSpacing = adjusted;
       }
 
+      // Even distribution: wall offset = L/(2*cols), spacing = L/cols
       cols = max(1, (length / corridorSpacing).ceil());
       rows = 1;
-      spacingX = cols > 1 ? length / cols : length;
-      spacingY = width / 2;
+      wallOffX = length / (2 * cols);
+      spacingX = cols > 1 ? length / cols : 0;
+      wallOffY = width / 2;
+      spacingY = 0;
 
       if (width > 2.0) {
         notes.add(
@@ -149,34 +159,70 @@ class _DetectorSpacingCalculatorScreenState
         );
       }
     } else {
-      // Open area
-      var gridSpacing = spec.radius * sqrt2;
+      // Open area — minimum-detector search
+      var R = spec.radius;
 
-      // Height adjustment
+      // Height adjustment (reduces effective radius)
       if (height > spec.maxCeiling) {
         final excess = height - spec.maxCeiling;
         final reduction = excess * 0.5;
-        final adjusted = max(gridSpacing * 0.5, gridSpacing - reduction);
+        final oldR = R;
+        R = max(R * 0.5, R - reduction);
         notes.add(
           'Ceiling height (${height.toStringAsFixed(1)}m) exceeds maximum '
-          '(${spec.maxCeiling}m) for ${spec.label}. Spacing reduced from '
-          '${gridSpacing.toStringAsFixed(1)}m to ${adjusted.toStringAsFixed(1)}m.',
+          '(${spec.maxCeiling}m) for ${spec.label}. Effective radius reduced from '
+          '${oldR.toStringAsFixed(1)}m to ${R.toStringAsFixed(1)}m.',
         );
-        gridSpacing = adjusted;
       }
 
-      // Wall offset 0.5m each side
-      final effectiveLength = max(0.0, length - 1.0);
-      final effectiveWidth = max(0.0, width - 1.0);
+      // Very small rooms: 1 detector centered
+      if (length < 1.0 || width < 1.0) {
+        cols = 1;
+        rows = 1;
+      } else {
+        // Search for minimum cols × rows where worst-case corner distance ≤ R
+        // Worst-case: √((L/(2*cols))² + (W/(2*rows))²) ≤ R
+        int bestTotal = 999999;
+        int bestCols = 1;
+        int bestRows = 1;
 
-      cols = max(1, (effectiveLength / gridSpacing).ceil());
-      rows = max(1, (effectiveWidth / gridSpacing).ceil());
+        final maxCols = length.ceil();
+        for (int c = 1; c <= maxCols; c++) {
+          final halfCellX = length / (2 * c);
+          if (halfCellX > R) continue; // can't cover even in X
+          if (halfCellX < 0.5) break; // BS 5839-1 min wall offset
 
-      spacingX = cols > 1 ? effectiveLength / (cols - 1) : 0;
-      spacingY = rows > 1 ? effectiveWidth / (rows - 1) : 0;
+          final remainingR = sqrt(R * R - halfCellX * halfCellX);
+          var minRows = max(1, (width / (2 * remainingR)).ceil());
+
+          // Enforce min 0.5m wall offset in Y
+          if (width / (2 * minRows) < 0.5) {
+            minRows = max(minRows, (width / 1.0).ceil()); // w/(2*rows)>=0.5 → rows<=w
+          }
+
+          final total = c * minRows;
+          if (total < bestTotal) {
+            bestTotal = total;
+            bestCols = c;
+            bestRows = minRows;
+          }
+        }
+
+        cols = bestCols;
+        rows = bestRows;
+
+        // "Show both" — check if fewer detectors would work within 5% tolerance
+        _checkAlternative(length, width, R, cols, rows, notes);
+      }
+
+      wallOffX = length / (2 * cols);
+      wallOffY = width / (2 * rows);
+      spacingX = cols > 1 ? length / cols : 0;
+      spacingY = rows > 1 ? width / rows : 0;
 
       notes.add(
-        'Wall offset of 0.5m applied on each side per BS 5839-1.',
+        'Wall offset: ${wallOffX.toStringAsFixed(2)}m (L) × ${wallOffY.toStringAsFixed(2)}m (W), '
+        'calculated automatically per BS 5839-1 (minimum 0.5m).',
       );
     }
 
@@ -191,6 +237,8 @@ class _DetectorSpacingCalculatorScreenState
         rows: rows,
         gridSpacingX: spacingX,
         gridSpacingY: spacingY,
+        wallOffsetX: wallOffX,
+        wallOffsetY: wallOffY,
         coveragePerDetector: coverage,
         roomArea: area,
         notes: notes,
@@ -206,6 +254,47 @@ class _DetectorSpacingCalculatorScreenState
         );
       }
     });
+  }
+
+  /// Check if one fewer column or row would cover with ≤5% overshoot
+  void _checkAlternative(
+    double length,
+    double width,
+    double R,
+    int cols,
+    int rows,
+    List<String> notes,
+  ) {
+    // Try cols-1
+    if (cols > 1) {
+      final altCols = cols - 1;
+      final halfX = length / (2 * altCols);
+      final halfY = width / (2 * rows);
+      final cornerDist = sqrt(halfX * halfX + halfY * halfY);
+      final overshoot = cornerDist - R;
+      if (overshoot > 0 && overshoot <= R * 0.05) {
+        final altTotal = altCols * rows;
+        notes.add(
+          'Could use $altTotal detectors (corners ${overshoot.toStringAsFixed(2)}m '
+          'outside coverage — engineer\'s discretion).',
+        );
+      }
+    }
+    // Try rows-1
+    if (rows > 1) {
+      final altRows = rows - 1;
+      final halfX = length / (2 * cols);
+      final halfY = width / (2 * altRows);
+      final cornerDist = sqrt(halfX * halfX + halfY * halfY);
+      final overshoot = cornerDist - R;
+      if (overshoot > 0 && overshoot <= R * 0.05) {
+        final altTotal = cols * altRows;
+        notes.add(
+          'Could use $altTotal detectors (corners ${overshoot.toStringAsFixed(2)}m '
+          'outside coverage — engineer\'s discretion).',
+        );
+      }
+    }
   }
 
   void _reset() {
@@ -512,14 +601,30 @@ class _DetectorSpacingCalculatorScreenState
             const SizedBox(height: 8),
             if (_roomType == RoomType.openArea) ...[
               _buildSummaryRow(
+                'Wall Offset (L \u00d7 W)',
+                '${r.wallOffsetX.toStringAsFixed(2)}m \u00d7 ${r.wallOffsetY.toStringAsFixed(2)}m',
+              ),
+              const SizedBox(height: 8),
+              _buildSummaryRow(
                 'Spacing (L \u00d7 W)',
-                '${r.gridSpacingX.toStringAsFixed(1)}m \u00d7 ${r.gridSpacingY.toStringAsFixed(1)}m',
+                r.columns > 1 || r.rows > 1
+                    ? '${r.gridSpacingX > 0 ? "${r.gridSpacingX.toStringAsFixed(1)}m" : "centered"}'
+                      ' \u00d7 '
+                      '${r.gridSpacingY > 0 ? "${r.gridSpacingY.toStringAsFixed(1)}m" : "centered"}'
+                    : 'centered',
               ),
               const SizedBox(height: 8),
             ] else ...[
               _buildSummaryRow(
+                'Wall Offset',
+                '${r.wallOffsetX.toStringAsFixed(2)}m',
+              ),
+              const SizedBox(height: 8),
+              _buildSummaryRow(
                 'Spacing Along Corridor',
-                '${r.gridSpacingX.toStringAsFixed(1)}m',
+                r.gridSpacingX > 0
+                    ? '${r.gridSpacingX.toStringAsFixed(1)}m'
+                    : 'centered',
               ),
               const SizedBox(height: 8),
             ],
@@ -574,28 +679,43 @@ class _DetectorSpacingCalculatorScreenState
             Center(
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  const marginLeft = 44.0;
+                  const marginBottom = 44.0;
                   final maxWidth = constraints.maxWidth - 32;
-                  const maxHeight = 220.0;
+                  const maxHeight = 280.0;
+
+                  // Room area fits inside margins
+                  final roomMaxW = maxWidth - marginLeft;
+                  final roomMaxH = maxHeight - marginBottom;
                   final aspect = length / width;
-                  double drawWidth;
-                  double drawHeight;
-                  if (aspect > maxWidth / maxHeight) {
-                    drawWidth = maxWidth;
-                    drawHeight = maxWidth / aspect;
+                  double roomW;
+                  double roomH;
+                  if (aspect > roomMaxW / roomMaxH) {
+                    roomW = roomMaxW;
+                    roomH = roomMaxW / aspect;
                   } else {
-                    drawHeight = maxHeight;
-                    drawWidth = maxHeight * aspect;
+                    roomH = roomMaxH;
+                    roomW = roomMaxH * aspect;
                   }
 
+                  final totalW = marginLeft + roomW;
+                  final totalH = roomH + marginBottom;
+
                   return CustomPaint(
-                    size: Size(drawWidth, drawHeight),
+                    size: Size(totalW, totalH),
                     painter: _DetectorGridPainter(
                       columns: r.columns,
                       rows: r.rows,
                       roomLength: length,
                       roomWidth: width,
+                      wallOffsetX: r.wallOffsetX,
+                      wallOffsetY: r.wallOffsetY,
+                      gridSpacingX: r.gridSpacingX,
+                      gridSpacingY: r.gridSpacingY,
                       isCorridor: _roomType == RoomType.corridor,
                       brightness: Theme.of(context).brightness,
+                      marginLeft: marginLeft,
+                      marginBottom: marginBottom,
                     ),
                   );
                 },
@@ -619,9 +739,10 @@ class _DetectorSpacingCalculatorScreenState
 
   Widget _buildNotesCard() {
     final r = _result!;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
       elevation: 2,
-      color: Colors.orange.shade50,
+      color: isDark ? Colors.orange.shade900.withValues(alpha: 0.3) : Colors.orange.shade50,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -629,13 +750,13 @@ class _DetectorSpacingCalculatorScreenState
           children: [
             Row(
               children: [
-                Icon(AppIcons.warning, color: Colors.orange.shade700),
+                Icon(AppIcons.warning, color: isDark ? Colors.orange.shade300 : Colors.orange.shade700),
                 const SizedBox(width: 8),
                 Text(
                   'Notes',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange.shade900,
+                    color: isDark ? Colors.orange.shade200 : Colors.orange.shade900,
                   ),
                 ),
               ],
@@ -695,8 +816,9 @@ class _DetectorSpacingCalculatorScreenState
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  '\u2022 Grid spacing = radius \u00d7 \u221a2 for open areas\n'
-                  '\u2022 0.5m wall offset applied on all sides\n'
+                  '\u2022 No ceiling point may be further than R from the nearest detector\n'
+                  '\u2022 Wall offset calculated automatically (minimum 0.5m per BS 5839-1)\n'
+                  '\u2022 Algorithm finds minimum detectors for full coverage\n'
                   '\u2022 Spacing reduced for ceilings above max height\n'
                   '\u2022 Corridors \u2264 2m wide use single-row spacing',
                 ),
@@ -733,21 +855,37 @@ class _DetectorGridPainter extends CustomPainter {
   final int rows;
   final double roomLength;
   final double roomWidth;
+  final double wallOffsetX;
+  final double wallOffsetY;
+  final double gridSpacingX;
+  final double gridSpacingY;
   final bool isCorridor;
   final Brightness brightness;
+  final double marginLeft;
+  final double marginBottom;
 
   _DetectorGridPainter({
     required this.columns,
     required this.rows,
     required this.roomLength,
     required this.roomWidth,
+    required this.wallOffsetX,
+    required this.wallOffsetY,
+    required this.gridSpacingX,
+    required this.gridSpacingY,
     required this.isCorridor,
     required this.brightness,
+    required this.marginLeft,
+    required this.marginBottom,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     final isDark = brightness == Brightness.dark;
+
+    final roomW = size.width - marginLeft;
+    final roomH = size.height - marginBottom;
+    final roomOrigin = Offset(marginLeft, 0);
 
     // Room outline
     final roomPaint = Paint()
@@ -755,7 +893,7 @@ class _DetectorGridPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
 
-    final roomRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final roomRect = Rect.fromLTWH(roomOrigin.dx, roomOrigin.dy, roomW, roomH);
     canvas.drawRect(roomRect, roomPaint);
 
     // Room fill
@@ -764,30 +902,38 @@ class _DetectorGridPainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     canvas.drawRect(roomRect, fillPaint);
 
+    // Pixel offsets from actual wall offsets
+    final pxOffX = (wallOffsetX / roomLength) * roomW;
+    final pxOffY = (wallOffsetY / roomWidth) * roomH;
+
     // Wall offset zone (for open area)
     if (!isCorridor) {
-      final offsetX = (0.5 / roomLength) * size.width;
-      final offsetY = (0.5 / roomWidth) * size.height;
       final offsetPaint = Paint()
         ..color = isDark ? Colors.orange.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.08)
         ..style = PaintingStyle.fill;
 
       // Top strip
-      canvas.drawRect(Rect.fromLTWH(0, 0, size.width, offsetY), offsetPaint);
+      canvas.drawRect(
+        Rect.fromLTWH(roomOrigin.dx, roomOrigin.dy, roomW, pxOffY),
+        offsetPaint,
+      );
       // Bottom strip
       canvas.drawRect(
-        Rect.fromLTWH(0, size.height - offsetY, size.width, offsetY),
+        Rect.fromLTWH(roomOrigin.dx, roomOrigin.dy + roomH - pxOffY, roomW, pxOffY),
         offsetPaint,
       );
       // Left strip
       canvas.drawRect(
-        Rect.fromLTWH(0, offsetY, offsetX, size.height - 2 * offsetY),
+        Rect.fromLTWH(roomOrigin.dx, roomOrigin.dy + pxOffY, pxOffX, roomH - 2 * pxOffY),
         offsetPaint,
       );
       // Right strip
       canvas.drawRect(
         Rect.fromLTWH(
-          size.width - offsetX, offsetY, offsetX, size.height - 2 * offsetY,
+          roomOrigin.dx + roomW - pxOffX,
+          roomOrigin.dy + pxOffY,
+          pxOffX,
+          roomH - 2 * pxOffY,
         ),
         offsetPaint,
       );
@@ -798,38 +944,158 @@ class _DetectorGridPainter extends CustomPainter {
       ..color = Colors.indigo
       ..style = PaintingStyle.fill;
 
-    final dotRadius = min(8.0, min(size.width, size.height) / 12);
+    final dotRadius = min(8.0, min(roomW, roomH) / 12);
+
+    final List<Offset> detectorPositions = [];
 
     if (isCorridor) {
-      // Single row centred vertically
-      final y = size.height / 2;
+      final y = roomOrigin.dy + roomH / 2;
       for (int c = 0; c < columns; c++) {
-        final x = columns > 1
-            ? (c / (columns - 1)) * size.width
-            : size.width / 2;
-        // Clamp to keep dots inside
-        final cx = x.clamp(dotRadius, size.width - dotRadius);
+        final x = roomOrigin.dx + pxOffX + (columns > 1 ? c * (gridSpacingX / roomLength) * roomW : (roomW / 2 - pxOffX));
+        final cx = x.clamp(roomOrigin.dx + dotRadius, roomOrigin.dx + roomW - dotRadius);
+        detectorPositions.add(Offset(cx, y));
         canvas.drawCircle(Offset(cx, y), dotRadius, dotPaint);
       }
     } else {
-      // Grid: offset from walls
-      final offsetX = (0.5 / roomLength) * size.width;
-      final offsetY = (0.5 / roomWidth) * size.height;
-      final availableW = size.width - 2 * offsetX;
-      final availableH = size.height - 2 * offsetY;
-
       for (int r = 0; r < rows; r++) {
         for (int c = 0; c < columns; c++) {
           final x = columns > 1
-              ? offsetX + (c / (columns - 1)) * availableW
-              : size.width / 2;
+              ? roomOrigin.dx + pxOffX + c * (gridSpacingX / roomLength) * roomW
+              : roomOrigin.dx + roomW / 2;
           final y = rows > 1
-              ? offsetY + (r / (rows - 1)) * availableH
-              : size.height / 2;
+              ? roomOrigin.dy + pxOffY + r * (gridSpacingY / roomWidth) * roomH
+              : roomOrigin.dy + roomH / 2;
+          detectorPositions.add(Offset(x, y));
           canvas.drawCircle(Offset(x, y), dotRadius, dotPaint);
         }
       }
     }
+
+    // ─── Dimension Annotations ─────────────────────────────────────────
+    final dimColor = isDark ? Colors.white70 : Colors.grey.shade700;
+    final dimPaint = Paint()
+      ..color = dimColor
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+
+    const tickLen = 4.0;
+    const dimGap = 6.0; // gap between room edge and dim line
+
+    // ── Bottom annotations (X-axis) ──
+    if (!isCorridor) {
+      // Wall-to-detector X
+      final firstDetX = roomOrigin.dx + pxOffX;
+      final dimY = roomOrigin.dy + roomH + dimGap + 8;
+
+      _drawHorizontalDim(
+        canvas, dimPaint, dimColor,
+        roomOrigin.dx, firstDetX, dimY, tickLen,
+        '${wallOffsetX.toStringAsFixed(2)}m',
+      );
+
+      // Detector-to-detector X
+      if (columns > 1) {
+        final secondDetX = roomOrigin.dx + pxOffX + (gridSpacingX / roomLength) * roomW;
+        final dimY2 = dimY + 18;
+        _drawHorizontalDim(
+          canvas, dimPaint, dimColor,
+          firstDetX, secondDetX, dimY2, tickLen,
+          '${gridSpacingX.toStringAsFixed(2)}m',
+        );
+      }
+    } else {
+      // Corridor: wall-to-detector X
+      final firstDetX = roomOrigin.dx + pxOffX;
+      final dimY = roomOrigin.dy + roomH + dimGap + 8;
+
+      _drawHorizontalDim(
+        canvas, dimPaint, dimColor,
+        roomOrigin.dx, firstDetX, dimY, tickLen,
+        '${wallOffsetX.toStringAsFixed(2)}m',
+      );
+
+      if (columns > 1) {
+        final secondDetX = roomOrigin.dx + pxOffX + (gridSpacingX / roomLength) * roomW;
+        final dimY2 = dimY + 18;
+        _drawHorizontalDim(
+          canvas, dimPaint, dimColor,
+          firstDetX, secondDetX, dimY2, tickLen,
+          '${gridSpacingX.toStringAsFixed(2)}m',
+        );
+      }
+    }
+
+    // ── Left annotations (Y-axis, open area only) ──
+    if (!isCorridor) {
+      final firstDetY = roomOrigin.dy + pxOffY;
+      final dimX = roomOrigin.dx - dimGap - 8;
+
+      _drawVerticalDim(
+        canvas, dimPaint, dimColor,
+        roomOrigin.dy, firstDetY, dimX, tickLen,
+        '${wallOffsetY.toStringAsFixed(2)}m',
+      );
+
+      if (rows > 1) {
+        final secondDetY = roomOrigin.dy + pxOffY + (gridSpacingY / roomWidth) * roomH;
+        final dimX2 = dimX - 18;
+        _drawVerticalDim(
+          canvas, dimPaint, dimColor,
+          firstDetY, secondDetY, dimX2, tickLen,
+          '${gridSpacingY.toStringAsFixed(2)}m',
+        );
+      }
+    }
+  }
+
+  void _drawHorizontalDim(
+    Canvas canvas, Paint linePaint, Color textColor,
+    double x1, double x2, double y, double tickLen, String label,
+  ) {
+    // Horizontal line
+    canvas.drawLine(Offset(x1, y), Offset(x2, y), linePaint);
+    // Left tick
+    canvas.drawLine(Offset(x1, y - tickLen), Offset(x1, y + tickLen), linePaint);
+    // Right tick
+    canvas.drawLine(Offset(x2, y - tickLen), Offset(x2, y + tickLen), linePaint);
+
+    // Label
+    final tp = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(fontSize: 10, color: textColor),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final midX = (x1 + x2) / 2 - tp.width / 2;
+    tp.paint(canvas, Offset(midX, y - tp.height - 2));
+  }
+
+  void _drawVerticalDim(
+    Canvas canvas, Paint linePaint, Color textColor,
+    double y1, double y2, double x, double tickLen, String label,
+  ) {
+    // Vertical line
+    canvas.drawLine(Offset(x, y1), Offset(x, y2), linePaint);
+    // Top tick
+    canvas.drawLine(Offset(x - tickLen, y1), Offset(x + tickLen, y1), linePaint);
+    // Bottom tick
+    canvas.drawLine(Offset(x - tickLen, y2), Offset(x + tickLen, y2), linePaint);
+
+    // Label (rotated)
+    final tp = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(fontSize: 10, color: textColor),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final midY = (y1 + y2) / 2;
+    canvas.save();
+    canvas.translate(x - 2, midY + tp.width / 2);
+    canvas.rotate(-pi / 2);
+    tp.paint(canvas, Offset.zero);
+    canvas.restore();
   }
 
   @override
@@ -838,6 +1104,10 @@ class _DetectorGridPainter extends CustomPainter {
         rows != oldDelegate.rows ||
         roomLength != oldDelegate.roomLength ||
         roomWidth != oldDelegate.roomWidth ||
+        wallOffsetX != oldDelegate.wallOffsetX ||
+        wallOffsetY != oldDelegate.wallOffsetY ||
+        gridSpacingX != oldDelegate.gridSpacingX ||
+        gridSpacingY != oldDelegate.gridSpacingY ||
         isCorridor != oldDelegate.isCorridor ||
         brightness != oldDelegate.brightness;
   }

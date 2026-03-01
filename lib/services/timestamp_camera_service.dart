@@ -1,6 +1,6 @@
-import 'dart:ui' as ui;
+import 'dart:isolate';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
@@ -53,23 +53,17 @@ class OverlaySettings {
     final lines = <String>[];
     final now = dateTime ?? DateTime.now();
 
-    // Line 1: Date + Time
     final datePart = showDate ? DateFormat('dd/MM/yyyy').format(now) : '';
     final timePart = showTime ? DateFormat('HH:mm:ss').format(now) : '';
     final dateTimeLine = '$datePart  $timePart'.trim();
     if (dateTimeLine.isNotEmpty) lines.add(dateTimeLine);
 
-    // Line 2: GPS coordinates
     if (showCoords && coords != null && coords.isNotEmpty) {
       lines.add(coords);
     }
-
-    // Line 3: Address
     if (showAddress && address != null && address.isNotEmpty) {
       lines.add(address);
     }
-
-    // Line 4: Custom note
     if (showNote && customNote.isNotEmpty) {
       lines.add(customNote);
     }
@@ -78,7 +72,7 @@ class OverlaySettings {
   }
 }
 
-/// Service for persisting overlay settings and watermarking photos.
+/// Service for persisting overlay settings and watermarking photos/videos.
 class TimestampCameraService {
   TimestampCameraService._();
   static final TimestampCameraService instance = TimestampCameraService._();
@@ -109,122 +103,172 @@ class TimestampCameraService {
     await prefs.setString('${_prefix}resolution', settings.resolution);
   }
 
-  /// Watermark a photo with overlay text in a compact bottom-right block.
-  /// Returns the watermarked PNG bytes.
+  /// Watermark a photo with overlay text off the main thread.
+  /// Uses the `image` package inside [Isolate.run] for zero UI jank.
+  /// Returns JPEG bytes.
   Future<Uint8List> watermarkPhoto(
     Uint8List imageBytes,
     List<String> overlayLines,
   ) async {
-    final codec = await ui.instantiateImageCodec(imageBytes);
-    final frame = await codec.getNextFrame();
-    final image = frame.image;
+    if (overlayLines.isEmpty) return imageBytes;
 
-    final imgWidth = image.width.toDouble();
-    final imgHeight = image.height.toDouble();
+    return Isolate.run(() {
+      return _watermarkInIsolate(imageBytes, overlayLines);
+    });
+  }
 
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
+  /// Pure function that runs in an isolate — no Flutter imports allowed.
+  static Uint8List _watermarkInIsolate(
+    Uint8List imageBytes,
+    List<String> overlayLines,
+  ) {
+    final image = img.decodeImage(imageBytes);
+    if (image == null) return imageBytes;
 
-    // Draw original image
-    canvas.drawImage(image, Offset.zero, Paint());
+    final imgHeight = image.height;
+    final imgWidth = image.width;
 
-    if (overlayLines.isNotEmpty) {
-      final fontSize = imgHeight * 0.020;
-      final lineHeight = fontSize * 1.5;
-      final margin = imgWidth * 0.03;
-      final padding = fontSize * 0.6;
+    // Use arial48 (largest built-in font). For very high-res photos we
+    // accept the fixed size — it's readable at 1080p+ and avoids the
+    // complexity of TTF rendering in an isolate.
+    final font = img.arial48;
+    final lineHeight = (font.lineHeight * 1.3).round();
+    final margin = (imgWidth * 0.03).round();
+    final padding = (font.lineHeight * 0.5).round();
 
-      // Build paragraphs and measure max width
-      final paragraphs = <ui.Paragraph>[];
-      double maxLineWidth = 0;
-
-      for (final line in overlayLines) {
-        final paragraph = _buildParagraph(line, fontSize, imgWidth * 0.6);
-        paragraphs.add(paragraph);
-        if (paragraph.longestLine > maxLineWidth) {
-          maxLineWidth = paragraph.longestLine;
-        }
-      }
-
-      final blockWidth = maxLineWidth + (padding * 2);
-      final blockHeight = (overlayLines.length * lineHeight) + (padding * 2);
-
-      // Compact rounded rect in bottom-right corner
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            imgWidth - blockWidth - margin,
-            imgHeight - blockHeight - margin,
-            blockWidth,
-            blockHeight,
-          ),
-          const Radius.circular(12),
-        ),
-        Paint()..color = Colors.black.withValues(alpha: 0.55),
-      );
-
-      // Draw each line right-aligned within the block
-      for (var i = 0; i < paragraphs.length; i++) {
-        final paragraph = paragraphs[i];
-        final lineWidth = paragraph.longestLine;
-        final x = imgWidth - margin - padding - lineWidth;
-        final y =
-            imgHeight - blockHeight - margin + padding + (i * lineHeight);
-        canvas.drawParagraph(paragraph, Offset(x, y));
-      }
+    // Measure max line width
+    int maxLineWidth = 0;
+    for (final line in overlayLines) {
+      final w = _measureTextWidth(font, line);
+      if (w > maxLineWidth) maxLineWidth = w;
     }
 
-    final picture = recorder.endRecording();
-    final outputImage = await picture.toImage(image.width, image.height);
-    final byteData = await outputImage.toByteData(
-      format: ui.ImageByteFormat.png,
+    final blockWidth = maxLineWidth + (padding * 2);
+    final blockHeight = (overlayLines.length * lineHeight) + (padding * 2);
+
+    // Draw semi-transparent background rect in bottom-right corner
+    final rectX = imgWidth - blockWidth - margin;
+    final rectY = imgHeight - blockHeight - margin;
+
+    img.fillRect(
+      image,
+      x1: rectX,
+      y1: rectY,
+      x2: rectX + blockWidth,
+      y2: rectY + blockHeight,
+      color: img.ColorRgba8(0, 0, 0, 140),
+      alphaBlend: true,
     );
 
-    image.dispose();
-    outputImage.dispose();
+    // Draw each line right-aligned within the block
+    for (var i = 0; i < overlayLines.length; i++) {
+      final line = overlayLines[i];
+      final lineWidth = _measureTextWidth(font, line);
+      final x = imgWidth - margin - padding - lineWidth;
+      final y = rectY + padding + (i * lineHeight);
 
-    return byteData!.buffer.asUint8List();
+      img.drawString(
+        image,
+        line,
+        font: font,
+        x: x,
+        y: y,
+        color: img.ColorRgba8(255, 255, 255, 255),
+      );
+    }
+
+    return Uint8List.fromList(img.encodeJpg(image, quality: 92));
   }
 
-  ui.Paragraph _buildParagraph(String text, double fontSize, double maxWidth) {
-    final builder = ui.ParagraphBuilder(
-      ui.ParagraphStyle(
-        textAlign: TextAlign.right,
-        fontSize: fontSize,
-        fontWeight: FontWeight.bold,
-      ),
-    )
-      ..pushStyle(ui.TextStyle(
-        color: Colors.white,
-        fontSize: fontSize,
-        fontWeight: FontWeight.bold,
-      ))
-      ..addText(text);
-
-    final paragraph = builder.build();
-    paragraph.layout(ui.ParagraphConstraints(width: maxWidth));
-    return paragraph;
+  /// Measure the pixel width of a text string using the bitmap font.
+  static int _measureTextWidth(img.BitmapFont font, String text) {
+    int width = 0;
+    for (final char in text.codeUnits) {
+      final glyph = font.characters[char];
+      if (glyph != null) {
+        width += glyph.xAdvance;
+      }
+    }
+    return width;
   }
 
-  /// Build FFmpeg drawtext filter string for video overlay burn-in.
-  /// Text is right-aligned in the bottom-right corner.
-  String buildFfmpegDrawtextFilter(List<String> overlayLines, int videoHeight) {
-    if (overlayLines.isEmpty) return '';
+  // ─── FFmpeg Video Overlay ─────────────────────────────────────────
 
+  /// Build a dynamic FFmpeg drawtext filter where the date/time line updates
+  /// per-frame using `%{pts\:localtime\:EPOCH}`.
+  ///
+  /// Static lines (coords, address, note) remain constant.
+  String buildDynamicFfmpegFilter({
+    required OverlaySettings settings,
+    required DateTime recordingStartTime,
+    required int durationMs,
+    required int videoHeight,
+    String? coords,
+    String? address,
+  }) {
     final fontSize = videoHeight ~/ 30;
     final filters = <String>[];
-    final lineCount = overlayLines.length;
+
+    // Collect all lines — date/time is dynamic, rest are static
+    final staticLines = <String>[];
+    bool hasDateTime = false;
+
+    // Date/time line (dynamic)
+    if (settings.showDate || settings.showTime) {
+      hasDateTime = true;
+    }
+
+    // Static lines
+    if (settings.showCoords && coords != null && coords.isNotEmpty) {
+      staticLines.add(coords);
+    }
+    if (settings.showAddress && address != null && address.isNotEmpty) {
+      staticLines.add(address);
+    }
+    if (settings.showNote && settings.customNote.isNotEmpty) {
+      staticLines.add(settings.customNote);
+    }
+
+    final totalLines = (hasDateTime ? 1 : 0) + staticLines.length;
+    if (totalLines == 0) return '';
+
     final bottomPadding = 20;
     final lineSpacing = (fontSize * 1.5).toInt();
+    int lineIndex = 0;
 
-    for (var i = 0; i < lineCount; i++) {
-      // Position from bottom, last line closest to bottom edge
+    // Dynamic date/time line using pts:localtime expansion
+    if (hasDateTime) {
+      final epoch = recordingStartTime.millisecondsSinceEpoch ~/ 1000;
+
+      // Build strftime format based on settings
+      String format = '';
+      if (settings.showDate) format += '%d/%m/%Y';
+      if (settings.showDate && settings.showTime) format += '  ';
+      if (settings.showTime) format += '%H\\:%M\\:%S';
+
       final yOffset = videoHeight -
           bottomPadding -
-          ((lineCount - i) * lineSpacing);
+          ((totalLines - lineIndex) * lineSpacing);
 
-      // Escape special characters for FFmpeg drawtext
-      final escapedText = _escapeForFfmpegDrawtext(overlayLines[i]);
+      filters.add(
+        "drawtext=text='%{pts\\:localtime\\:$epoch\\:$format}'"
+        ':fontsize=$fontSize'
+        ':fontcolor=white'
+        ':x=w-tw-20'
+        ':y=$yOffset'
+        ':box=1'
+        ':boxcolor=black@0.6'
+        ':boxborderw=8',
+      );
+      lineIndex++;
+    }
+
+    // Static lines
+    for (final line in staticLines) {
+      final yOffset = videoHeight -
+          bottomPadding -
+          ((totalLines - lineIndex) * lineSpacing);
+      final escapedText = _escapeForFfmpegDrawtext(line);
 
       filters.add(
         "drawtext=text='$escapedText'"
@@ -236,6 +280,93 @@ class TimestampCameraService {
         ':boxcolor=black@0.6'
         ':boxborderw=8',
       );
+      lineIndex++;
+    }
+
+    return filters.join(',');
+  }
+
+  /// Build a fallback FFmpeg filter using per-second `enable='between(t,N,N+1)'`
+  /// segments. Works with any FFmpeg build that doesn't support `%{pts:localtime}`.
+  String buildFallbackFfmpegFilter({
+    required OverlaySettings settings,
+    required DateTime recordingStartTime,
+    required int durationMs,
+    required int videoHeight,
+    String? coords,
+    String? address,
+  }) {
+    final fontSize = videoHeight ~/ 30;
+    final filters = <String>[];
+    final totalSeconds = (durationMs / 1000).ceil() + 1;
+
+    // Static lines (coords, address, note)
+    final staticLines = <String>[];
+    if (settings.showCoords && coords != null && coords.isNotEmpty) {
+      staticLines.add(coords);
+    }
+    if (settings.showAddress && address != null && address.isNotEmpty) {
+      staticLines.add(address);
+    }
+    if (settings.showNote && settings.customNote.isNotEmpty) {
+      staticLines.add(settings.customNote);
+    }
+
+    final hasDateTime = settings.showDate || settings.showTime;
+    final totalLines = (hasDateTime ? 1 : 0) + staticLines.length;
+    if (totalLines == 0) return '';
+
+    final bottomPadding = 20;
+    final lineSpacing = (fontSize * 1.5).toInt();
+
+    // Generate per-second drawtext for the dynamic date/time line
+    if (hasDateTime) {
+      final yOffset = videoHeight -
+          bottomPadding -
+          (totalLines * lineSpacing);
+
+      for (var s = 0; s < totalSeconds; s++) {
+        final t = recordingStartTime.add(Duration(seconds: s));
+        final datePart =
+            settings.showDate ? DateFormat('dd/MM/yyyy').format(t) : '';
+        final timePart =
+            settings.showTime ? DateFormat('HH:mm:ss').format(t) : '';
+        final text = '$datePart  $timePart'.trim();
+        final escaped = _escapeForFfmpegDrawtext(text);
+
+        filters.add(
+          "drawtext=text='$escaped'"
+          ':fontsize=$fontSize'
+          ':fontcolor=white'
+          ':x=w-tw-20'
+          ':y=$yOffset'
+          ':box=1'
+          ':boxcolor=black@0.6'
+          ':boxborderw=8'
+          ":enable='between(t,$s,${s + 1})'",
+        );
+      }
+    }
+
+    // Static lines (always visible)
+    int lineIndex = hasDateTime ? 1 : 0;
+    for (final line in staticLines) {
+      final yOffset = videoHeight -
+          bottomPadding -
+          ((totalLines - lineIndex) * lineSpacing);
+      final escapedText = _escapeForFfmpegDrawtext(line);
+
+      filters.add(
+        "drawtext=text='$escapedText'"
+        ':fontsize=$fontSize'
+        ':fontcolor=white'
+        ':x=w-tw-20'
+        ':y=$yOffset'
+        ':box=1'
+        ':boxcolor=black@0.6'
+        ':boxborderw=8',
+      );
+      lineIndex++;
     }
 
     return filters.join(',');

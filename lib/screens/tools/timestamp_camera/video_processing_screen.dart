@@ -4,8 +4,8 @@ import 'package:gal/gal.dart';
 import '../../../utils/icon_map.dart';
 import '../../../utils/theme.dart';
 import '../../../widgets/premium_toast.dart';
+import '../../../services/timestamp_camera_service.dart';
 
-// Conditional import: FFmpeg is only available on mobile
 import 'package:ffmpeg_kit_flutter_new_video/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new_video/ffmpeg_kit_config.dart';
 import 'package:ffmpeg_kit_flutter_new_video/return_code.dart';
@@ -17,12 +17,14 @@ class VideoProcessingScreen extends StatefulWidget {
   final String inputPath;
   final String ffmpegFilter;
   final int totalDurationMs;
+  final DateTime? recordingStartTime;
 
   const VideoProcessingScreen({
     super.key,
     required this.inputPath,
     required this.ffmpegFilter,
     required this.totalDurationMs,
+    this.recordingStartTime,
   });
 
   @override
@@ -33,7 +35,9 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
   double _progress = 0.0;
   bool _isProcessing = true;
   bool _failed = false;
+  bool _showActions = false;
   String _statusText = 'Preparing video...';
+  String? _errorDetail;
 
   @override
   void initState() {
@@ -43,14 +47,21 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
 
   Future<void> _processVideo() async {
     if (widget.ffmpegFilter.isEmpty) {
-      // No overlays to burn in — just save raw video
       await _saveToGallery(widget.inputPath);
       return;
     }
 
+    setState(() {
+      _isProcessing = true;
+      _failed = false;
+      _showActions = false;
+      _progress = 0.0;
+      _statusText = 'Processing video...';
+      _errorDetail = null;
+    });
+
     final outputPath = widget.inputPath.replaceAll('.mp4', '_stamped.mp4');
 
-    // Enable statistics callback for progress tracking
     FFmpegKitConfig.enableStatisticsCallback((Statistics statistics) {
       if (widget.totalDurationMs > 0) {
         final time = statistics.getTime();
@@ -72,22 +83,108 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
 
       if (ReturnCode.isSuccess(returnCode)) {
         await _saveToGallery(outputPath);
-        // Clean up temp files
         _deleteFile(widget.inputPath);
         _deleteFile(outputPath);
       } else {
-        debugPrint('FFmpeg failed with code: $returnCode');
-        // Fallback: save raw video
-        setState(() => _failed = true);
-        await _saveToGallery(widget.inputPath);
-        _deleteFile(widget.inputPath);
+        final logs = await session.getAllLogsAsString();
+        _handleFailure('FFmpeg failed with code: $returnCode', logs);
       }
     } catch (e) {
-      debugPrint('FFmpeg error: $e');
-      setState(() => _failed = true);
-      await _saveToGallery(widget.inputPath);
-      _deleteFile(widget.inputPath);
+      _handleFailure('FFmpeg error: $e', null);
     }
+  }
+
+  void _handleFailure(String message, String? logs) {
+    debugPrint(message);
+    if (logs != null) debugPrint(logs);
+    if (mounted) {
+      setState(() {
+        _isProcessing = false;
+        _failed = true;
+        _showActions = true;
+        _statusText = 'Overlay processing failed';
+        _errorDetail = message;
+      });
+    }
+  }
+
+  Future<void> _retryWithFallback() async {
+    if (widget.recordingStartTime == null) {
+      // No start time — can't build fallback filter, just save raw
+      await _saveWithoutOverlay();
+      return;
+    }
+
+    setState(() {
+      _isProcessing = true;
+      _failed = false;
+      _showActions = false;
+      _progress = 0.0;
+      _statusText = 'Retrying with fallback filter...';
+      _errorDetail = null;
+    });
+
+    // Build fallback per-second filter
+    // We need the settings, so we load them fresh
+    final settings = await TimestampCameraService.instance.loadSettings();
+    final fallbackFilter =
+        TimestampCameraService.instance.buildFallbackFfmpegFilter(
+      settings: settings,
+      recordingStartTime: widget.recordingStartTime!,
+      durationMs: widget.totalDurationMs,
+      videoHeight: 1080, // Best guess for fallback
+    );
+
+    if (fallbackFilter.isEmpty) {
+      await _saveWithoutOverlay();
+      return;
+    }
+
+    final outputPath = widget.inputPath.replaceAll('.mp4', '_stamped.mp4');
+
+    final command =
+        '-i "${widget.inputPath}" -vf "$fallbackFilter" -codec:a copy -preset ultrafast -y "$outputPath"';
+
+    try {
+      final session = await FFmpegKit.execute(command);
+      final returnCode = await session.getReturnCode();
+
+      if (ReturnCode.isSuccess(returnCode)) {
+        await _saveToGallery(outputPath);
+        _deleteFile(widget.inputPath);
+        _deleteFile(outputPath);
+      } else {
+        // Fallback also failed — show save without overlay
+        if (mounted) {
+          setState(() {
+            _isProcessing = false;
+            _failed = true;
+            _showActions = true;
+            _statusText = 'Overlay processing failed';
+            _errorDetail = 'Both primary and fallback filters failed';
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProcessing = false;
+          _failed = true;
+          _showActions = true;
+          _statusText = 'Overlay processing failed';
+          _errorDetail = 'Fallback error: $e';
+        });
+      }
+    }
+  }
+
+  Future<void> _saveWithoutOverlay() async {
+    setState(() {
+      _isProcessing = true;
+      _statusText = 'Saving raw video...';
+    });
+    await _saveToGallery(widget.inputPath);
+    _deleteFile(widget.inputPath);
   }
 
   Future<void> _saveToGallery(String path) async {
@@ -102,7 +199,6 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
               : 'Video saved to gallery';
         });
 
-        // Auto-pop after brief delay
         await Future.delayed(const Duration(milliseconds: 800));
         if (mounted) {
           if (_failed) {
@@ -118,7 +214,9 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
         setState(() {
           _isProcessing = false;
           _failed = true;
+          _showActions = true;
           _statusText = 'Failed to save video';
+          _errorDetail = '$e';
         });
         context.showErrorToast('Failed to save video: $e');
       }
@@ -144,16 +242,16 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Animated icon
                 Icon(
-                  _isProcessing ? AppIcons.video : (_failed ? AppIcons.warning : AppIcons.tickCircle),
+                  _isProcessing
+                      ? AppIcons.video
+                      : (_failed ? AppIcons.warning : AppIcons.tickCircle),
                   size: 64,
                   color: _isProcessing
                       ? Colors.white
                       : (_failed ? Colors.orange : Colors.green),
                 ),
                 const SizedBox(height: 32),
-                // Status text
                 Text(
                   _statusText,
                   style: const TextStyle(
@@ -163,6 +261,19 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
+                if (_errorDetail != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _errorDetail!,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 12,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
                 const SizedBox(height: 24),
                 // Progress bar
                 if (_isProcessing) ...[
@@ -189,8 +300,39 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
                     ),
                   ),
                 ],
-                // Close button when done
-                if (!_isProcessing) ...[
+                // Error actions: Retry + Save Without Overlay
+                if (_showActions) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: 240,
+                    child: ElevatedButton.icon(
+                      onPressed: _retryWithFallback,
+                      icon: Icon(AppIcons.refresh),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.accentOrange,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: 240,
+                    child: OutlinedButton.icon(
+                      onPressed: _saveWithoutOverlay,
+                      icon: Icon(AppIcons.save),
+                      label: const Text('Save without overlay'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.3),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                // Done button when complete (non-error)
+                if (!_isProcessing && !_showActions) ...[
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),

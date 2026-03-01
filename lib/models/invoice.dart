@@ -1,7 +1,7 @@
 /// Represents a line item on an invoice
 class InvoiceItem {
   final String description;
-  final int quantity;
+  final double quantity;
   final double unitPrice;
 
   InvoiceItem({
@@ -23,7 +23,7 @@ class InvoiceItem {
   factory InvoiceItem.fromJson(Map<String, dynamic> json) {
     return InvoiceItem(
       description: json['description'] as String,
-      quantity: json['quantity'] as int,
+      quantity: (json['quantity'] as num).toDouble(),
       unitPrice: (json['unitPrice'] as num).toDouble(),
     );
   }

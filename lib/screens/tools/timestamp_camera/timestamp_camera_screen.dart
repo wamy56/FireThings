@@ -11,7 +11,9 @@ import '../../../utils/adaptive_widgets.dart';
 import '../../../widgets/premium_toast.dart';
 import '../../../services/location_service.dart';
 import '../../../services/timestamp_camera_service.dart';
-import 'camera_overlay_painter.dart';
+import 'camera_preview_widget.dart';
+import 'overlay_widget.dart';
+import 'zoom_gesture_layer.dart';
 import 'camera_controls_widget.dart';
 import 'camera_settings_panel.dart';
 import 'focus_indicator_widget.dart';
@@ -44,25 +46,25 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   bool _isFlipping = false;
   DateTime? _recordingStart;
   Duration _recordingDuration = Duration.zero;
-  Timer? _recordingTimer;
 
   // Overlay
   OverlaySettings _overlaySettings = const OverlaySettings();
-  Timer? _clockTimer;
-  List<String> _currentOverlayLines = [];
 
   // Location
   final _locationService = LocationService.instance;
   bool _gpsAvailable = false;
 
-  // Zoom
-  double _currentZoom = 1.0;
+  // Zoom — ValueNotifier so only ValueListenableBuilder consumers rebuild
+  final ValueNotifier<double> _zoomNotifier = ValueNotifier(1.0);
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
 
   // Focus
   Offset? _focusPoint;
   bool _showFocusIndicator = false;
+
+  // Recording duration timer (updates top bar only)
+  Timer? _durationTimer;
 
   bool get _isMobile =>
       !kIsWeb &&
@@ -81,10 +83,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Lock to portrait
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _init();
   }
 
@@ -93,17 +92,15 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     await _requestPermissions();
     await _initCamera();
     _startLocationTracking();
-    _startClockTimer();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
-    _clockTimer?.cancel();
-    _recordingTimer?.cancel();
+    _durationTimer?.cancel();
+    _zoomNotifier.dispose();
     _locationService.stopTracking();
-    // Restore orientation
     SystemChrome.setPreferredOrientations([]);
     super.dispose();
   }
@@ -114,30 +111,22 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
 
     if (state == AppLifecycleState.inactive) {
       _handleInactive();
-      return;
     } else if (state == AppLifecycleState.resumed) {
       _initCamera();
     }
   }
 
   Future<void> _handleInactive() async {
-    // Await recording stop before disposing to avoid race condition
-    if (_isRecording) {
-      await _stopRecording();
-    }
+    if (_isRecording) await _stopRecording();
     _controller?.dispose();
-    if (mounted) {
-      setState(() => _isCameraInitialized = false);
-    }
+    if (mounted) setState(() => _isCameraInitialized = false);
   }
 
   // ─── Permissions ───────────────────────────────────────────────────
 
   Future<void> _requestPermissions() async {
     await Permission.camera.request();
-    if (_isMobile) {
-      await Permission.microphone.request();
-    }
+    if (_isMobile) await Permission.microphone.request();
   }
 
   // ─── Camera Init ───────────────────────────────────────────────────
@@ -149,7 +138,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         setState(() => _cameraError = 'No cameras found on this device');
         return;
       }
-
       await _setupController(_cameras[_currentCameraIndex]);
     } catch (e) {
       setState(() => _cameraError = 'Failed to initialise camera: $e');
@@ -163,7 +151,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     final controller = CameraController(
       camera,
       resolutionPreset,
-      enableAudio: _isMobile, // Audio only on mobile
+      enableAudio: _isMobile,
       imageFormatGroup: ImageFormatGroup.jpeg,
     );
 
@@ -175,9 +163,8 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
 
       _minZoom = await controller.getMinZoomLevel();
       _maxZoom = await controller.getMaxZoomLevel();
-      _currentZoom = _minZoom;
+      _zoomNotifier.value = _minZoom;
 
-      // Dispose previous controller after new one is ready
       await prevController?.dispose();
 
       if (mounted) {
@@ -194,12 +181,12 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   ResolutionPreset _resolutionFromSettings() {
     switch (_overlaySettings.resolution) {
       case 'low':
-        return ResolutionPreset.medium; // ~480p
+        return ResolutionPreset.medium;
       case 'medium':
-        return ResolutionPreset.high; // ~720p
+        return ResolutionPreset.high;
       case 'high':
       default:
-        return ResolutionPreset.veryHigh; // ~1080p
+        return ResolutionPreset.veryHigh;
     }
   }
 
@@ -209,30 +196,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     if (!_isMobile && !_isDesktop) return;
     final ok = await _locationService.startTracking();
     if (mounted) setState(() => _gpsAvailable = ok);
-  }
-
-  // ─── Clock Timer ───────────────────────────────────────────────────
-
-  void _startClockTimer() {
-    _updateOverlayLines();
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      _updateOverlayLines();
-      if (_isRecording && _recordingStart != null) {
-        setState(() {
-          _recordingDuration = DateTime.now().difference(_recordingStart!);
-        });
-      }
-    });
-  }
-
-  void _updateOverlayLines() {
-    if (!mounted) return;
-    setState(() {
-      _currentOverlayLines = _overlaySettings.buildOverlayLines(
-        coords: _locationService.currentCoords,
-        address: _locationService.currentAddress,
-      );
-    });
   }
 
   // ─── Camera Controls ──────────────────────────────────────────────
@@ -256,13 +219,12 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     setState(() {});
   }
 
-  Future<void> _setZoom(double zoom) async {
-    if (_controller == null) return;
-    _currentZoom = zoom.clamp(_minZoom, _maxZoom);
+  void _setZoom(double zoom) {
+    final clamped = zoom.clamp(_minZoom, _maxZoom);
+    _zoomNotifier.value = clamped;
     try {
-      await _controller!.setZoomLevel(_currentZoom);
+      _controller?.setZoomLevel(clamped);
     } catch (_) {}
-    setState(() {});
   }
 
   // ─── Capture ──────────────────────────────────────────────────────
@@ -288,7 +250,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       final bytes = await xFile.readAsBytes();
       final now = DateTime.now();
 
-      // Build overlay lines with exact capture time
       final lines = _overlaySettings.buildOverlayLines(
         coords: _locationService.currentCoords,
         address: _locationService.currentAddress,
@@ -303,18 +264,13 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         name: 'FireThings_${now.millisecondsSinceEpoch}',
       );
 
-      if (mounted) {
-        context.showSuccessToast('Photo saved to gallery');
-      }
+      if (mounted) context.showSuccessToast('Photo saved to gallery');
 
-      // Clean up temp file
       try {
         await File(xFile.path).delete();
       } catch (_) {}
     } catch (e) {
-      if (mounted) {
-        context.showErrorToast('Failed to capture photo: $e');
-      }
+      if (mounted) context.showErrorToast('Failed to capture photo: $e');
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
@@ -330,6 +286,14 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         _recordingStart = DateTime.now();
         _recordingDuration = Duration.zero;
       });
+      // Timer for updating the recording duration display only
+      _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (_isRecording && _recordingStart != null) {
+          setState(() {
+            _recordingDuration = DateTime.now().difference(_recordingStart!);
+          });
+        }
+      });
     } catch (e) {
       if (mounted) context.showErrorToast('Failed to start recording: $e');
     }
@@ -338,9 +302,13 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   Future<void> _stopRecording() async {
     if (_controller == null || !_isRecording) return;
 
+    _durationTimer?.cancel();
+    _durationTimer = null;
+
     try {
       final xFile = await _controller!.stopVideoRecording();
       final durationMs = _recordingDuration.inMilliseconds;
+      final recordingStartTime = _recordingStart;
 
       setState(() {
         _isRecording = false;
@@ -348,17 +316,24 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         _recordingDuration = Duration.zero;
       });
 
-      // Build FFmpeg filter for overlay burn-in
+      // Build overlay lines (static parts for FFmpeg)
       final lines = _overlaySettings.buildOverlayLines(
         coords: _locationService.currentCoords,
         address: _locationService.currentAddress,
       );
 
       if (_isMobile && lines.isNotEmpty) {
-        // Get video height for scaling
-        final videoHeight = _controller!.value.previewSize?.height.toInt() ?? 1080;
+        final videoHeight =
+            _controller!.value.previewSize?.height.toInt() ?? 1080;
         final filter = TimestampCameraService.instance
-            .buildFfmpegDrawtextFilter(lines, videoHeight);
+            .buildDynamicFfmpegFilter(
+          settings: _overlaySettings,
+          recordingStartTime: recordingStartTime ?? DateTime.now(),
+          durationMs: durationMs,
+          videoHeight: videoHeight,
+          coords: _locationService.currentCoords,
+          address: _locationService.currentAddress,
+        );
 
         if (mounted) {
           Navigator.push(
@@ -368,16 +343,14 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
                 inputPath: xFile.path,
                 ffmpegFilter: filter,
                 totalDurationMs: durationMs,
+                recordingStartTime: recordingStartTime,
               ),
             ),
           );
         }
       } else {
-        // Desktop or no overlays: save raw video
         await Gal.putVideo(xFile.path);
-        if (mounted) {
-          context.showSuccessToast('Video saved to gallery');
-        }
+        if (mounted) context.showSuccessToast('Video saved to gallery');
       }
     } catch (e) {
       setState(() {
@@ -386,6 +359,31 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       });
       if (mounted) context.showErrorToast('Failed to save video: $e');
     }
+  }
+
+  // ─── Focus ─────────────────────────────────────────────────────────
+
+  Future<void> _handleTapToFocus(
+    Offset localPosition,
+    BoxConstraints constraints,
+  ) async {
+    final controller = _controller;
+    if (controller == null) return;
+
+    setState(() {
+      _focusPoint = localPosition;
+      _showFocusIndicator = true;
+    });
+
+    final x = localPosition.dx / constraints.maxWidth;
+    final y = localPosition.dy / constraints.maxHeight;
+    final point = Offset(x.clamp(0.0, 1.0), y.clamp(0.0, 1.0));
+
+    try {
+      await controller.setFocusPoint(point);
+      await controller.setExposurePoint(point);
+      await controller.setFocusMode(FocusMode.auto);
+    } catch (_) {}
   }
 
   // ─── Settings ─────────────────────────────────────────────────────
@@ -399,8 +397,13 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         settings: _overlaySettings,
         gpsAvailable: _gpsAvailable,
         onSettingsChanged: (newSettings) {
+          final resolutionChanged =
+              newSettings.resolution != _overlaySettings.resolution;
           setState(() => _overlaySettings = newSettings);
-          _updateOverlayLines();
+          // Re-init camera if resolution changed
+          if (resolutionChanged) {
+            _setupController(_cameras[_currentCameraIndex]);
+          }
         },
       ),
     );
@@ -410,9 +413,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_isUnsupported) {
-      return _buildUnsupportedScreen();
-    }
+    if (_isUnsupported) return _buildUnsupportedScreen();
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -428,22 +429,42 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
               ),
             )
           else if (_isCameraInitialized && _controller != null)
-            AnimatedOpacity(
-              opacity: 1.0,
-              duration: const Duration(milliseconds: 300),
-              child: _buildCameraPreview(),
+            RepaintBoundary(
+              child: CameraPreviewWidget(controller: _controller!),
             )
           else if (_cameraError != null)
             _buildErrorView()
           else
             const Center(child: AdaptiveLoadingIndicator()),
 
-          // Overlay painter
+          // Zoom gesture layer (transparent, on top of preview)
+          if (_isCameraInitialized && _controller != null)
+            Positioned.fill(
+              child: ZoomGestureLayer(
+                controller: _controller!,
+                zoomNotifier: _zoomNotifier,
+                minZoom: _minZoom,
+                maxZoom: _maxZoom,
+                onTapDown: _handleTapToFocus,
+              ),
+            ),
+
+          // Focus indicator
+          if (_showFocusIndicator && _focusPoint != null)
+            FocusIndicator(
+              position: _focusPoint!,
+              onAnimationComplete: () {
+                if (mounted) setState(() => _showFocusIndicator = false);
+              },
+            ),
+
+          // Overlay painter (self-contained timer, behind RepaintBoundary)
           if (_isCameraInitialized)
             Positioned.fill(
-              child: CustomPaint(
-                painter: CameraOverlayPainter(
-                  overlayLines: _currentOverlayLines,
+              child: RepaintBoundary(
+                child: OverlayWidget(
+                  settings: _overlaySettings,
+                  locationService: _locationService,
                 ),
               ),
             ),
@@ -451,17 +472,22 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           // Top bar
           _buildTopBar(),
 
-          // Lens selector (above bottom controls)
+          // Lens selector
           if (_isCameraInitialized && _maxZoom > _minZoom)
             Positioned(
               bottom: 140,
               left: 0,
               right: 0,
-              child: LensSelectorWidget(
-                currentZoom: _currentZoom,
-                minZoom: _minZoom,
-                maxZoom: _maxZoom,
-                onZoomChanged: _setZoom,
+              child: ValueListenableBuilder<double>(
+                valueListenable: _zoomNotifier,
+                builder: (context, zoom, _) {
+                  return LensSelectorWidget(
+                    currentZoom: zoom,
+                    minZoom: _minZoom,
+                    maxZoom: _maxZoom,
+                    onZoomChanged: _setZoom,
+                  );
+                },
               ),
             ),
 
@@ -507,72 +533,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     );
   }
 
-  Widget _buildCameraPreview() {
-    final controller = _controller!;
-    return Center(
-      child: AspectRatio(
-        aspectRatio: 1 / controller.value.aspectRatio,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return Stack(
-              children: [
-                GestureDetector(
-                  onTapDown: (details) => _handleTapToFocus(
-                    details.localPosition,
-                    constraints,
-                  ),
-                  onScaleUpdate: (details) {
-                    if (details.pointerCount == 2) {
-                      final newZoom = (_currentZoom * details.scale)
-                          .clamp(_minZoom, _maxZoom);
-                      _setZoom(newZoom);
-                    }
-                  },
-                  child: CameraPreview(controller),
-                ),
-                if (_showFocusIndicator && _focusPoint != null)
-                  FocusIndicator(
-                    position: _focusPoint!,
-                    onAnimationComplete: () {
-                      if (mounted) {
-                        setState(() => _showFocusIndicator = false);
-                      }
-                    },
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleTapToFocus(
-    Offset localPosition,
-    BoxConstraints constraints,
-  ) async {
-    final controller = _controller;
-    if (controller == null) return;
-
-    setState(() {
-      _focusPoint = localPosition;
-      _showFocusIndicator = true;
-    });
-
-    // Convert to normalised 0–1 coordinates
-    final x = localPosition.dx / constraints.maxWidth;
-    final y = localPosition.dy / constraints.maxHeight;
-    final point = Offset(x.clamp(0.0, 1.0), y.clamp(0.0, 1.0));
-
-    try {
-      await controller.setFocusPoint(point);
-      await controller.setExposurePoint(point);
-      await controller.setFocusMode(FocusMode.auto);
-    } catch (_) {
-      // Some devices/cameras don't support focus point
-    }
-  }
-
   Widget _buildTopBar() {
     return Positioned(
       top: 0,
@@ -597,23 +557,18 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         ),
         child: Row(
           children: [
-            // Back button
             IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              icon: Icon(AppIcons.arrowLeft, color: Colors.white),
               onPressed: () async {
-                if (_isRecording) {
-                  await _stopRecording();
-                }
-                if (mounted) {
-                  Navigator.of(context).pop();
-                }
+                if (_isRecording) await _stopRecording();
+                if (mounted) Navigator.of(context).pop();
               },
             ),
             const Spacer(),
-            // Recording indicator
             if (_isRecording) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.red,
                   borderRadius: BorderRadius.circular(4),
@@ -645,7 +600,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
               const Spacer(),
             ],
             if (!_isRecording) const Spacer(),
-            // Settings button
             IconButton(
               icon: Icon(AppIcons.settingOutline, color: Colors.white),
               onPressed: _isRecording ? null : _openSettings,
