@@ -9,6 +9,7 @@ import '../../widgets/widgets.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../utils/theme.dart';
 import '../saved_sites/site_picker_screen.dart';
+import '../../services/analytics_service.dart';
 import '../signature/signature_screen.dart';
 
 class JobFormScreen extends StatefulWidget {
@@ -471,6 +472,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
     );
 
     if (selected != null) {
+      AnalyticsService.instance.logSiteSelected();
       setState(() {
         _siteAddressController.text = selected.address;
       });
@@ -539,6 +541,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
       } else {
         await _dbHelper.insertJobsheet(jobsheet);
       }
+      AnalyticsService.instance.logJobsheetSavedDraft();
 
       if (mounted) {
         context.showSuccessToast('Draft saved successfully');
@@ -616,6 +619,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
       // Save to database (without signatures yet)
       await _dbHelper.insertJobsheet(jobsheet);
+      AnalyticsService.instance.logJobsheetStarted(widget.template.name);
 
       if (mounted) {
         setState(() => _isLoading = false);

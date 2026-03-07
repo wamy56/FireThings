@@ -2,9 +2,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import '../../services/auth_service.dart';
 import '../../services/branding_service.dart';
 import '../../services/database_helper.dart';
+import '../../services/firestore_sync_service.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/responsive_scaffold.dart';
@@ -13,8 +15,10 @@ import '../../utils/animate_helpers.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../saved_sites/saved_sites_screen.dart';
 import '../saved_customers/saved_customers_screen.dart';
+import '../../services/email_service.dart';
 import '../debug/debug_screen.dart';
 import 'profile_screen.dart';
+import 'privacy_policy_screen.dart';
 import 'manage_permissions_screen.dart';
 import 'pdf_header_designer_screen.dart';
 import 'pdf_footer_designer_screen.dart';
@@ -33,12 +37,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _draftReminders = true;
   bool _overdueReminders = true;
   String _appVersion = '';
+  DateTime? _lastSyncTime;
+  bool _isSyncing = false;
 
   @override
   void initState() {
     super.initState();
     _loadNotificationPrefs();
     _loadAppVersion();
+    _loadLastSyncTime();
+  }
+
+  Future<void> _loadLastSyncTime() async {
+    final time = await FirestoreSyncService.instance.getLastSyncTime();
+    if (mounted) setState(() => _lastSyncTime = time);
+  }
+
+  Future<void> _manualSync() async {
+    final authService = AuthService();
+    final uid = authService.userId;
+    if (uid == null) return;
+
+    setState(() => _isSyncing = true);
+    await FirestoreSyncService.instance.performFullSync(uid);
+    await _loadLastSyncTime();
+    if (mounted) setState(() => _isSyncing = false);
   }
 
   Future<void> _loadAppVersion() async {
@@ -250,6 +273,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ).animateEntrance(delay: const Duration(milliseconds: 320)),
           const SizedBox(height: 24),
 
+          // Cloud Sync Section
+          _buildAdaptiveSection(
+            context,
+            header: 'Cloud Sync',
+            isApple: isApple,
+            tiles: [
+              _SettingsTileData(
+                title: 'Sync Now',
+                subtitle: _isSyncing
+                    ? 'Syncing...'
+                    : _lastSyncTime != null
+                        ? 'Last synced ${DateFormat.yMMMd().add_jm().format(_lastSyncTime!)}'
+                        : 'Never synced',
+                icon: AppIcons.refresh,
+                onTap: _isSyncing ? () {} : () => _manualSync(),
+              ),
+            ],
+          ).animateEntrance(delay: const Duration(milliseconds: 360)),
+          const SizedBox(height: 24),
+
           // App Section
           _buildAdaptiveSection(
             context,
@@ -267,18 +310,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
               _SettingsTileData(
+                title: 'Privacy Policy',
+                subtitle: 'How we handle your data',
+                icon: AppIcons.lock,
+                onTap: () => Navigator.push(
+                  context,
+                  adaptivePageRoute(builder: (_) => const PrivacyPolicyScreen()),
+                ),
+              ),
+              _SettingsTileData(
                 title: 'About',
                 subtitle: _appVersion.isEmpty ? 'Version ...' : _appVersion,
                 icon: AppIcons.infoCircle,
                 onTap: () => _showAboutDialog(context),
               ),
               _SettingsTileData(
-                title: 'Help & Support',
-                subtitle: 'Get help or contact support',
+                title: 'Send Feedback',
+                subtitle: 'Report a bug or suggest a feature',
                 icon: AppIcons.messageQuestion,
-                onTap: () {
-                  context.showInfoToast('Help coming soon');
-                },
+                onTap: () => _sendFeedback(),
               ),
             ],
           ).animateEntrance(delay: const Duration(milliseconds: 400)),
@@ -555,6 +605,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       await authService.reauthenticate(password);
+      await FirestoreSyncService.instance.deleteAllUserData();
       await DatabaseHelper.instance.deleteAllData();
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
@@ -662,6 +713,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       if (!context.mounted) return;
       context.showWarningToast(successMessage);
+    }
+  }
+
+  Future<void> _sendFeedback() async {
+    try {
+      await EmailService.sendFeedback();
+    } catch (e) {
+      if (mounted) {
+        context.showErrorToast(
+          'Could not open email client. Send feedback manually to cscott93@hotmail.co.uk',
+        );
+      }
     }
   }
 

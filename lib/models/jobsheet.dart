@@ -25,6 +25,7 @@ class Jobsheet {
   final DateTime createdAt;
   final JobsheetStatus status;
   final PdfSectionLayoutConfig? sectionLayout;
+  final DateTime? lastModifiedAt;
 
   Jobsheet({
     required this.id,
@@ -46,6 +47,7 @@ class Jobsheet {
     required this.createdAt,
     this.status = JobsheetStatus.draft,
     this.sectionLayout,
+    this.lastModifiedAt,
   });
 
   /// Convert Jobsheet to JSON map (for database storage)
@@ -70,6 +72,7 @@ class Jobsheet {
       'createdAt': createdAt.toIso8601String(),
       'status': status.name,
       'sectionLayout': sectionLayout?.toJsonString(),
+      'lastModifiedAt': lastModifiedAt?.toIso8601String(),
     };
   }
 
@@ -111,6 +114,9 @@ class Jobsheet {
           ? PdfSectionLayoutConfig.fromJsonString(
               json['sectionLayout'] as String)
           : null,
+      lastModifiedAt: json['lastModifiedAt'] != null
+          ? DateTime.tryParse(json['lastModifiedAt'] as String)
+          : null,
     );
   }
 
@@ -135,6 +141,7 @@ class Jobsheet {
     DateTime? createdAt,
     JobsheetStatus? status,
     PdfSectionLayoutConfig? sectionLayout,
+    DateTime? lastModifiedAt,
   }) {
     return Jobsheet(
       id: id ?? this.id,
@@ -157,6 +164,7 @@ class Jobsheet {
       createdAt: createdAt ?? this.createdAt,
       status: status ?? this.status,
       sectionLayout: sectionLayout ?? this.sectionLayout,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
     );
   }
 

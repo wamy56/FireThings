@@ -47,6 +47,7 @@ class Invoice {
   final bool includeVat;
   final InvoiceStatus status;
   final DateTime createdAt;
+  final DateTime? lastModifiedAt;
 
   Invoice({
     required this.id,
@@ -62,6 +63,7 @@ class Invoice {
     this.includeVat = false,
     this.status = InvoiceStatus.draft,
     required this.createdAt,
+    this.lastModifiedAt,
   });
 
   double get subtotal => items.fold(0, (sum, item) => sum + item.total);
@@ -83,6 +85,7 @@ class Invoice {
       'includeVat': includeVat,
       'status': status.name,
       'createdAt': createdAt.toIso8601String(),
+      'lastModifiedAt': lastModifiedAt?.toIso8601String(),
     };
   }
 
@@ -106,6 +109,9 @@ class Invoice {
         orElse: () => InvoiceStatus.draft,
       ),
       createdAt: DateTime.parse(json['createdAt'] as String),
+      lastModifiedAt: json['lastModifiedAt'] != null
+          ? DateTime.tryParse(json['lastModifiedAt'] as String)
+          : null,
     );
   }
 
@@ -123,6 +129,7 @@ class Invoice {
     bool? includeVat,
     InvoiceStatus? status,
     DateTime? createdAt,
+    DateTime? lastModifiedAt,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -138,6 +145,7 @@ class Invoice {
       includeVat: includeVat ?? this.includeVat,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
     );
   }
 }

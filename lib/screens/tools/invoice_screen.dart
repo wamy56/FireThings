@@ -15,6 +15,7 @@ import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/keyboard_dismiss_wrapper.dart';
+import '../../services/analytics_service.dart';
 import '../common/pdf_preview_screen.dart';
 
 class InvoiceScreen extends StatefulWidget {
@@ -482,6 +483,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   onTap: () {
+                    AnalyticsService.instance.logCustomerSelected();
                     setState(() {
                       _customerNameController.text = customer.customerName;
                       _customerAddressController.text =
@@ -540,6 +542,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       );
 
       await _dbHelper.insertSavedCustomer(customer);
+      AnalyticsService.instance.logCustomerSaved('invoice');
 
       setState(() {
         _savedCustomers.add(customer);
@@ -933,6 +936,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     await _dbHelper.updateInvoice(
       widget.existingInvoice!.copyWith(status: InvoiceStatus.paid),
     );
+    AnalyticsService.instance.logInvoiceMarkedPaid();
     if (mounted) {
       context.showSuccessToast('Invoice marked as paid');
       Navigator.pop(context);
@@ -989,9 +993,11 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
     if (_isSaved) {
       await _dbHelper.updateInvoice(invoice);
+      AnalyticsService.instance.logInvoiceSavedDraft();
     } else {
       await _dbHelper.insertInvoice(invoice);
       _invoiceId = invoice.id;
+      AnalyticsService.instance.logInvoiceCreated();
     }
 
     // Save the invoice number and engineer name for next time
@@ -1086,6 +1092,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       }
       final updatedInvoice = invoice.copyWith(status: InvoiceStatus.sent);
       await _dbHelper.updateInvoice(updatedInvoice);
+      AnalyticsService.instance.logInvoiceSent();
       setState(() => _status = InvoiceStatus.sent);
 
       setState(() => _isLoading = false);

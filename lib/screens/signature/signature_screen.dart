@@ -7,6 +7,7 @@ import '../../models/models.dart';
 import '../../services/database_helper.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/widgets.dart';
+import '../../services/analytics_service.dart';
 import '../history/job_detail_screen.dart';
 
 class SignatureScreen extends StatefulWidget {
@@ -201,6 +202,7 @@ class _SignatureScreenState extends State<SignatureScreen> {
 
       // Update in database
       await _dbHelper.updateJobsheet(updatedJobsheet);
+      AnalyticsService.instance.logJobsheetCompleted();
 
       if (mounted) {
         // Navigate to job details screen for overview

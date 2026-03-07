@@ -11,6 +11,7 @@ class JobTemplate {
   final String? creatorId; // Engineer who created this template
   final DateTime? createdAt;
   final PdfSectionLayoutConfig? sectionLayout; // null = default layout
+  final DateTime? lastModifiedAt;
 
   JobTemplate({
     required this.id,
@@ -21,6 +22,7 @@ class JobTemplate {
     this.creatorId,
     this.createdAt,
     this.sectionLayout,
+    this.lastModifiedAt,
   });
 
   /// Convert JobTemplate to JSON map
@@ -34,6 +36,7 @@ class JobTemplate {
       'creatorId': creatorId,
       'createdAt': createdAt?.toIso8601String(),
       if (sectionLayout != null) 'sectionLayout': sectionLayout!.toJson(),
+      'lastModifiedAt': lastModifiedAt?.toIso8601String(),
     };
   }
 
@@ -55,6 +58,9 @@ class JobTemplate {
           ? PdfSectionLayoutConfig.fromJson(
               json['sectionLayout'] as Map<String, dynamic>)
           : null,
+      lastModifiedAt: json['lastModifiedAt'] != null
+          ? DateTime.tryParse(json['lastModifiedAt'] as String)
+          : null,
     );
   }
 
@@ -68,6 +74,7 @@ class JobTemplate {
     String? creatorId,
     DateTime? createdAt,
     PdfSectionLayoutConfig? sectionLayout,
+    DateTime? lastModifiedAt,
   }) {
     return JobTemplate(
       id: id ?? this.id,
@@ -78,6 +85,7 @@ class JobTemplate {
       creatorId: creatorId ?? this.creatorId,
       createdAt: createdAt ?? this.createdAt,
       sectionLayout: sectionLayout ?? this.sectionLayout,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
     );
   }
 

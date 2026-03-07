@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/models.dart';
+import 'firestore_sync_service.dart';
 
 /// Database helper to manage SQLite database operations
 class DatabaseHelper {
@@ -27,7 +28,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 10,
+      version: 11,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -66,6 +67,14 @@ class DatabaseHelper {
     if (oldVersion < 10) {
       await _createSavedSitesTable(db);
     }
+    if (oldVersion < 11) {
+      await db.execute('ALTER TABLE jobsheets ADD COLUMN lastModifiedAt TEXT');
+      await db.execute('ALTER TABLE invoices ADD COLUMN lastModifiedAt TEXT');
+      await db.execute('ALTER TABLE saved_customers ADD COLUMN lastModifiedAt TEXT');
+      await db.execute('ALTER TABLE saved_sites ADD COLUMN lastModifiedAt TEXT');
+      await db.execute('ALTER TABLE job_templates ADD COLUMN lastModifiedAt TEXT');
+      await db.execute('ALTER TABLE filled_templates ADD COLUMN lastModifiedAt TEXT');
+    }
   }
 
   /// Create database tables
@@ -94,7 +103,8 @@ class DatabaseHelper {
         notes $textTypeNullable,
         defects $textTypeNullable,
         createdAt $textType,
-        sectionLayout $textTypeNullable
+        sectionLayout $textTypeNullable,
+        lastModifiedAt $textTypeNullable
       )
     ''');
 
@@ -123,7 +133,8 @@ class DatabaseHelper {
         isShared INTEGER NOT NULL DEFAULT 0,
         creatorId $textTypeNullable,
         createdAt $textTypeNullable,
-        sectionLayout $textTypeNullable
+        sectionLayout $textTypeNullable,
+        lastModifiedAt $textTypeNullable
       )
     ''');
 
@@ -144,7 +155,8 @@ class DatabaseHelper {
         customerAddress $textType,
         email $textTypeNullable,
         notes $textTypeNullable,
-        createdAt $textType
+        createdAt $textType,
+        lastModifiedAt $textTypeNullable
       )
     ''');
 
@@ -171,7 +183,8 @@ class DatabaseHelper {
         notes $textTypeNullable,
         includeVat INTEGER NOT NULL DEFAULT 0,
         status $textType,
-        createdAt $textType
+        createdAt $textType,
+        lastModifiedAt $textTypeNullable
       )
     ''');
 
@@ -181,15 +194,17 @@ class DatabaseHelper {
   /// Insert a jobsheet
   Future<Jobsheet> insertJobsheet(Jobsheet jobsheet) async {
     final db = await database;
+    final stamped = jobsheet.copyWith(lastModifiedAt: DateTime.now());
 
     await db.insert(
       'jobsheets',
-      jobsheet.toJson(),
+      stamped.toJson(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    debugPrint('Jobsheet inserted: ${jobsheet.id}');
-    return jobsheet;
+    debugPrint('Jobsheet inserted: ${stamped.id}');
+    FirestoreSyncService.instance.upsertJobsheet(stamped);
+    return stamped;
   }
 
   /// Get all jobsheets
@@ -248,20 +263,25 @@ class DatabaseHelper {
   /// Update a jobsheet
   Future<int> updateJobsheet(Jobsheet jobsheet) async {
     final db = await database;
+    final stamped = jobsheet.copyWith(lastModifiedAt: DateTime.now());
 
-    return await db.update(
+    final result = await db.update(
       'jobsheets',
-      jobsheet.toJson(),
+      stamped.toJson(),
       where: 'id = ?',
-      whereArgs: [jobsheet.id],
+      whereArgs: [stamped.id],
     );
+    FirestoreSyncService.instance.upsertJobsheet(stamped);
+    return result;
   }
 
   /// Delete a jobsheet
   Future<int> deleteJobsheet(String id) async {
     final db = await database;
 
-    return await db.delete('jobsheets', where: 'id = ?', whereArgs: [id]);
+    final result = await db.delete('jobsheets', where: 'id = ?', whereArgs: [id]);
+    FirestoreSyncService.instance.deleteDocument('jobsheets', id);
+    return result;
   }
 
   /// Search jobsheets by customer name or job number
@@ -313,8 +333,9 @@ class DatabaseHelper {
   /// Insert an invoice
   Future<Invoice> insertInvoice(Invoice invoice) async {
     final db = await database;
+    final stamped = invoice.copyWith(lastModifiedAt: DateTime.now());
 
-    final json = invoice.toJson();
+    final json = stamped.toJson();
     // Convert items list to JSON string for storage
     json['items'] = jsonEncode(json['items']);
     // Convert bool to int for SQLite
@@ -326,8 +347,9 @@ class DatabaseHelper {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    debugPrint('Invoice inserted: ${invoice.id}');
-    return invoice;
+    debugPrint('Invoice inserted: ${stamped.id}');
+    FirestoreSyncService.instance.upsertInvoice(stamped);
+    return stamped;
   }
 
   /// Get all invoices
@@ -400,25 +422,30 @@ class DatabaseHelper {
   /// Update an invoice
   Future<int> updateInvoice(Invoice invoice) async {
     final db = await database;
+    final stamped = invoice.copyWith(lastModifiedAt: DateTime.now());
 
-    final json = invoice.toJson();
+    final json = stamped.toJson();
     json['items'] = jsonEncode(json['items']);
     // Convert bool to int for SQLite
     json['includeVat'] = json['includeVat'] == true ? 1 : 0;
 
-    return await db.update(
+    final result = await db.update(
       'invoices',
       json,
       where: 'id = ?',
-      whereArgs: [invoice.id],
+      whereArgs: [stamped.id],
     );
+    FirestoreSyncService.instance.upsertInvoice(stamped);
+    return result;
   }
 
   /// Delete an invoice
   Future<int> deleteInvoice(String id) async {
     final db = await database;
 
-    return await db.delete('invoices', where: 'id = ?', whereArgs: [id]);
+    final result = await db.delete('invoices', where: 'id = ?', whereArgs: [id]);
+    FirestoreSyncService.instance.deleteDocument('invoices', id);
+    return result;
   }
 
   /// Get next invoice number
@@ -477,15 +504,17 @@ class DatabaseHelper {
   /// Insert a saved customer
   Future<SavedCustomer> insertSavedCustomer(SavedCustomer customer) async {
     final db = await database;
+    final stamped = customer.copyWith(lastModifiedAt: DateTime.now());
 
     await db.insert(
       'saved_customers',
-      customer.toJson(),
+      stamped.toJson(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    debugPrint('Saved customer inserted: ${customer.id}');
-    return customer;
+    debugPrint('Saved customer inserted: ${stamped.id}');
+    FirestoreSyncService.instance.upsertSavedCustomer(stamped);
+    return stamped;
   }
 
   /// Get all saved customers for an engineer
@@ -521,20 +550,25 @@ class DatabaseHelper {
   /// Update a saved customer
   Future<int> updateSavedCustomer(SavedCustomer customer) async {
     final db = await database;
+    final stamped = customer.copyWith(lastModifiedAt: DateTime.now());
 
-    return await db.update(
+    final result = await db.update(
       'saved_customers',
-      customer.toJson(),
+      stamped.toJson(),
       where: 'id = ?',
-      whereArgs: [customer.id],
+      whereArgs: [stamped.id],
     );
+    FirestoreSyncService.instance.upsertSavedCustomer(stamped);
+    return result;
   }
 
   /// Delete a saved customer
   Future<int> deleteSavedCustomer(String id) async {
     final db = await database;
 
-    return await db.delete('saved_customers', where: 'id = ?', whereArgs: [id]);
+    final result = await db.delete('saved_customers', where: 'id = ?', whereArgs: [id]);
+    FirestoreSyncService.instance.deleteDocument('saved_customers', id);
+    return result;
   }
 
   /// Search saved customers by name
@@ -593,7 +627,8 @@ class DatabaseHelper {
         fieldValues $textType,
         createdAt $textType,
         completedAt $textTypeNullable,
-        isComplete INTEGER NOT NULL DEFAULT 0
+        isComplete INTEGER NOT NULL DEFAULT 0,
+        lastModifiedAt $textTypeNullable
       )
     ''');
 
@@ -681,15 +716,17 @@ class DatabaseHelper {
   /// Insert a filled PDF form
   Future<FilledPdfForm> insertFilledPdfForm(FilledPdfForm filled) async {
     final db = await database;
+    final stamped = filled.copyWith(lastModifiedAt: DateTime.now());
 
     await db.insert(
       'filled_templates',
-      filled.toJson(),
+      stamped.toJson(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    debugPrint('Filled PDF form inserted: ${filled.id}');
-    return filled;
+    debugPrint('Filled PDF form inserted: ${stamped.id}');
+    FirestoreSyncService.instance.upsertFilledPdfForm(stamped);
+    return stamped;
   }
 
   /// Get all filled PDF forms for an engineer
@@ -725,20 +762,25 @@ class DatabaseHelper {
   /// Update a filled PDF form
   Future<int> updateFilledPdfForm(FilledPdfForm filled) async {
     final db = await database;
+    final stamped = filled.copyWith(lastModifiedAt: DateTime.now());
 
-    return await db.update(
+    final result = await db.update(
       'filled_templates',
-      filled.toJson(),
+      stamped.toJson(),
       where: 'id = ?',
-      whereArgs: [filled.id],
+      whereArgs: [stamped.id],
     );
+    FirestoreSyncService.instance.upsertFilledPdfForm(stamped);
+    return result;
   }
 
   /// Delete a filled PDF form
   Future<int> deleteFilledPdfForm(String id) async {
     final db = await database;
 
-    return await db.delete('filled_templates', where: 'id = ?', whereArgs: [id]);
+    final result = await db.delete('filled_templates', where: 'id = ?', whereArgs: [id]);
+    FirestoreSyncService.instance.deleteDocument('filled_templates', id);
+    return result;
   }
 
   /// Get filled PDF forms by template ID
@@ -760,8 +802,9 @@ class DatabaseHelper {
   /// Insert a job template
   Future<JobTemplate> insertJobTemplate(JobTemplate template) async {
     final db = await database;
+    final stamped = template.copyWith(lastModifiedAt: DateTime.now());
 
-    final json = template.toJson();
+    final json = stamped.toJson();
     // Convert fields list to JSON string for storage
     json['fields'] = jsonEncode(json['fields']);
     // Convert bool to int for SQLite
@@ -777,8 +820,9 @@ class DatabaseHelper {
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    debugPrint('Job template inserted: ${template.id}');
-    return template;
+    debugPrint('Job template inserted: ${stamped.id}');
+    FirestoreSyncService.instance.upsertJobTemplate(stamped);
+    return stamped;
   }
 
   /// Get all job templates
@@ -809,27 +853,32 @@ class DatabaseHelper {
   /// Update a job template
   Future<int> updateJobTemplate(JobTemplate template) async {
     final db = await database;
+    final stamped = template.copyWith(lastModifiedAt: DateTime.now());
 
-    final json = template.toJson();
+    final json = stamped.toJson();
     json['fields'] = jsonEncode(json['fields']);
     json['isShared'] = json['isShared'] == true ? 1 : 0;
     if (json['sectionLayout'] != null) {
       json['sectionLayout'] = jsonEncode(json['sectionLayout']);
     }
 
-    return await db.update(
+    final result = await db.update(
       'job_templates',
       json,
       where: 'id = ?',
-      whereArgs: [template.id],
+      whereArgs: [stamped.id],
     );
+    FirestoreSyncService.instance.upsertJobTemplate(stamped);
+    return result;
   }
 
   /// Delete a job template
   Future<int> deleteJobTemplate(String id) async {
     final db = await database;
 
-    return await db.delete('job_templates', where: 'id = ?', whereArgs: [id]);
+    final result = await db.delete('job_templates', where: 'id = ?', whereArgs: [id]);
+    FirestoreSyncService.instance.deleteDocument('job_templates', id);
+    return result;
   }
 
   /// Parse job template JSON from database
@@ -875,7 +924,8 @@ class DatabaseHelper {
         siteName $textType,
         address $textType,
         notes $textTypeNullable,
-        createdAt $textType
+        createdAt $textType,
+        lastModifiedAt $textTypeNullable
       )
     ''');
 
@@ -885,15 +935,17 @@ class DatabaseHelper {
   /// Insert a saved site
   Future<SavedSite> insertSavedSite(SavedSite site) async {
     final db = await database;
+    final stamped = site.copyWith(lastModifiedAt: DateTime.now());
 
     await db.insert(
       'saved_sites',
-      site.toJson(),
+      stamped.toJson(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
 
-    debugPrint('Saved site inserted: ${site.id}');
-    return site;
+    debugPrint('Saved site inserted: ${stamped.id}');
+    FirestoreSyncService.instance.upsertSavedSite(stamped);
+    return stamped;
   }
 
   /// Get all saved sites for an engineer
@@ -914,7 +966,9 @@ class DatabaseHelper {
   Future<int> deleteSavedSite(String id) async {
     final db = await database;
 
-    return await db.delete('saved_sites', where: 'id = ?', whereArgs: [id]);
+    final result = await db.delete('saved_sites', where: 'id = ?', whereArgs: [id]);
+    FirestoreSyncService.instance.deleteDocument('saved_sites', id);
+    return result;
   }
 
   // ==================== BULK DELETE METHODS ====================

@@ -6,6 +6,7 @@ class SavedSite {
   final String address;
   final String? notes;
   final DateTime createdAt;
+  final DateTime? lastModifiedAt;
 
   SavedSite({
     required this.id,
@@ -14,6 +15,7 @@ class SavedSite {
     required this.address,
     this.notes,
     required this.createdAt,
+    this.lastModifiedAt,
   });
 
   /// Convert SavedSite to JSON map
@@ -25,6 +27,7 @@ class SavedSite {
       'address': address,
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
+      'lastModifiedAt': lastModifiedAt?.toIso8601String(),
     };
   }
 
@@ -37,6 +40,9 @@ class SavedSite {
       address: json['address'] as String,
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      lastModifiedAt: json['lastModifiedAt'] != null
+          ? DateTime.tryParse(json['lastModifiedAt'] as String)
+          : null,
     );
   }
 
@@ -48,6 +54,7 @@ class SavedSite {
     String? address,
     String? notes,
     DateTime? createdAt,
+    DateTime? lastModifiedAt,
   }) {
     return SavedSite(
       id: id ?? this.id,
@@ -56,6 +63,7 @@ class SavedSite {
       address: address ?? this.address,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
     );
   }
 

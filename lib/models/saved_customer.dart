@@ -7,6 +7,7 @@ class SavedCustomer {
   final String? email;
   final String? notes;
   final DateTime createdAt;
+  final DateTime? lastModifiedAt;
 
   SavedCustomer({
     required this.id,
@@ -16,6 +17,7 @@ class SavedCustomer {
     this.email,
     this.notes,
     required this.createdAt,
+    this.lastModifiedAt,
   });
 
   Map<String, dynamic> toJson() {
@@ -27,6 +29,7 @@ class SavedCustomer {
       'email': email,
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
+      'lastModifiedAt': lastModifiedAt?.toIso8601String(),
     };
   }
 
@@ -39,6 +42,9 @@ class SavedCustomer {
       email: json['email'] as String?,
       notes: json['notes'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      lastModifiedAt: json['lastModifiedAt'] != null
+          ? DateTime.tryParse(json['lastModifiedAt'] as String)
+          : null,
     );
   }
 
@@ -50,6 +56,7 @@ class SavedCustomer {
     String? email,
     String? notes,
     DateTime? createdAt,
+    DateTime? lastModifiedAt,
   }) {
     return SavedCustomer(
       id: id ?? this.id,
@@ -59,6 +66,7 @@ class SavedCustomer {
       email: email ?? this.email,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
+      lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
     );
   }
 }

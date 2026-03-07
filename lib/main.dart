@@ -4,9 +4,13 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:workmanager/workmanager.dart';
 import 'firebase_options.dart';
+import 'services/analytics_service.dart';
 import 'services/auth_service.dart';
+import 'services/remote_config_service.dart';
+import 'services/firestore_sync_service.dart';
 import 'services/template_service.dart';
 import 'services/notification_service.dart';
 import 'screens/auth/login_screen.dart';
@@ -41,6 +45,15 @@ void main() {
     // Initialize Firebase
     await Firebase.initializeApp(
         options: DefaultFirebaseOptions.currentPlatform);
+
+    // Enable Firestore offline persistence
+    FirebaseFirestore.instance.settings = const Settings(
+      persistenceEnabled: true,
+      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+
+    // Initialize Remote Config
+    await RemoteConfigService.instance.initialize();
 
     // Set up Crashlytics error handlers
     FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
@@ -78,6 +91,7 @@ class JobsheetApp extends StatelessWidget {
     return MaterialApp(
       title: 'FireThings',
       debugShowCheckedModeBanner: false,
+      navigatorObservers: [AnalyticsService.instance.observer],
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
@@ -119,6 +133,9 @@ class AuthWrapper extends StatelessWidget {
 
         // Show main screen if logged in, login screen if not
         if (snapshot.hasData) {
+          // Trigger cloud sync in the background
+          final user = snapshot.data!;
+          FirestoreSyncService.instance.performFullSync(user.uid);
           return const MainNavigationScreen();
         } else {
           return const LoginScreen();

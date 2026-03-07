@@ -10,6 +10,7 @@ import '../../utils/pdf_form_templates.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../services/analytics_service.dart';
 import 'job_form_screen.dart';
 import '../pdf_forms/pdf_form_fill_screen.dart';
 import '../pdf_forms/minor_works_form_fill_screen.dart';
@@ -219,6 +220,7 @@ class _NewJobScreenState extends State<NewJobScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
+            AnalyticsService.instance.logTemplateSelected('IQ Modification', 'pdf_cert');
             Navigator.push(
               context,
               adaptivePageRoute(
@@ -294,6 +296,7 @@ class _NewJobScreenState extends State<NewJobScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
+            AnalyticsService.instance.logTemplateSelected('IQ Minor Works', 'pdf_cert');
             Navigator.push(
               context,
               adaptivePageRoute(
@@ -369,6 +372,7 @@ class _NewJobScreenState extends State<NewJobScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
+            AnalyticsService.instance.logTemplateSelected(template.name, 'custom');
             Navigator.push(
               context,
               adaptivePageRoute(
@@ -617,6 +621,7 @@ class _NewJobScreenState extends State<NewJobScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
+                    AnalyticsService.instance.logTemplateSelected(template.name, 'built_in');
                     Navigator.pop(context); // Close the bottom sheet
 
                     // Navigate to job form

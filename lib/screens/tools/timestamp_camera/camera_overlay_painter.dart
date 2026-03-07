@@ -36,24 +36,27 @@ class CameraOverlayPainter extends CustomPainter {
 
     for (final line in overlayLines) {
       final paragraph =
-          _buildParagraph(line, fontSize, size.width * 0.6, textAlign);
+          _buildParagraph(line, fontSize, size.width * 0.55, textAlign);
       paragraphs.add(paragraph);
       if (paragraph.longestLine > maxLineWidth) {
         maxLineWidth = paragraph.longestLine;
       }
     }
 
-    final blockWidth = maxLineWidth + (padding * 2);
+    // Add shadow compensation (shadow offset 1 + blur 3 ≈ 4px overshoot)
+    final shadowCompensation = 4.0;
+    final blockWidth = maxLineWidth + (padding * 2) + shadowCompensation;
     final blockHeight = (overlayLines.length * lineHeight) + (padding * 2);
 
     // Safe margins to avoid overlapping camera controls / status bar
-    // Bottom: ~22% clears lens selector (bottom: 140) + controls
+    // Bottom: ~28% clears mode toggle + shutter + lens selector + safe area
     // Top: ~12% clears status bar area
-    final safeBottomMargin = size.height * 0.22;
+    final safeBottomMargin = size.height * 0.28;
     final safeTopMargin = size.height * 0.12;
 
-    // Compute block X
-    final blockX = isLeft ? margin : size.width - blockWidth - margin;
+    // Compute block X, clamped so block never extends past right edge
+    final rawBlockX = isLeft ? margin : size.width - blockWidth - margin;
+    final blockX = rawBlockX.clamp(margin, size.width - blockWidth - margin);
 
     // Compute block Y
     final double blockY;

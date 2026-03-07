@@ -2,8 +2,64 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_email_sender/flutter_email_sender.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class EmailService {
+  /// Opens the native email client with pre-filled feedback email
+  /// containing device and app info for bug reports / feature requests.
+  static Future<void> sendFeedback() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    final deviceInfo = DeviceInfoPlugin();
+
+    String deviceString;
+    String platformName;
+
+    if (Platform.isAndroid) {
+      final info = await deviceInfo.androidInfo;
+      deviceString = '${info.manufacturer} ${info.model}, Android ${info.version.release} (SDK ${info.version.sdkInt})';
+      platformName = 'android';
+    } else if (Platform.isIOS) {
+      final info = await deviceInfo.iosInfo;
+      deviceString = '${info.utsname.machine}, iOS ${info.systemVersion}';
+      platformName = 'ios';
+    } else if (Platform.isWindows) {
+      final info = await deviceInfo.windowsInfo;
+      deviceString = 'Windows ${info.majorVersion}.${info.minorVersion} (Build ${info.buildNumber})';
+      platformName = 'windows';
+    } else if (Platform.isMacOS) {
+      final info = await deviceInfo.macOsInfo;
+      deviceString = '${info.model}, macOS ${info.majorVersion}.${info.minorVersion}.${info.patchVersion}';
+      platformName = 'macos';
+    } else if (Platform.isLinux) {
+      final info = await deviceInfo.linuxInfo;
+      deviceString = info.prettyName;
+      platformName = 'linux';
+    } else {
+      deviceString = 'Unknown';
+      platformName = Platform.operatingSystem;
+    }
+
+    final body = '''Please describe the issue or feedback below:
+
+
+---
+App: firethings v${packageInfo.version} (${packageInfo.buildNumber})
+Device: $deviceString
+Platform: $platformName
+''';
+
+    final email = Email(
+      body: body,
+      subject: 'FireThings Feedback — v${packageInfo.version}',
+      recipients: ['cscott93@hotmail.co.uk'],
+      isHTML: false,
+    );
+
+    await FlutterEmailSender.send(email);
+  }
+
+
   /// Send an invoice via email with PDF attachment
   /// Opens the default email app with the invoice attached
   static Future<void> sendInvoice({

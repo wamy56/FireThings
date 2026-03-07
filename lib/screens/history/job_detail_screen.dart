@@ -12,6 +12,7 @@ import '../../utils/theme.dart';
 import '../common/pdf_preview_screen.dart';
 import '../pdf_forms/pdf_form_fill_screen.dart';
 import '../pdf_forms/minor_works_form_fill_screen.dart';
+import '../../services/analytics_service.dart';
 import 'edit_jobsheet_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
@@ -525,6 +526,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Future<void> _generatePDF(BuildContext context) async {
+    AnalyticsService.instance.logJobsheetPdfGenerated();
     try {
       context.showInfoToast('Generating PDF...');
 
@@ -568,6 +570,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   }
 
   Future<void> _sharePDF(BuildContext context) async {
+    AnalyticsService.instance.logJobsheetPdfShared();
     try {
       context.showInfoToast('Generating PDF...');
 

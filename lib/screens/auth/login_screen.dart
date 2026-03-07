@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/analytics_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/theme.dart';
@@ -213,6 +214,7 @@ class _LoginScreenState extends State<LoginScreen>
         password: _passwordController.text,
         name: _nameController.text.trim(),
       );
+      AnalyticsService.instance.logSignUp('email');
       // Navigation happens automatically via auth state stream
     } catch (e) {
       if (mounted) {
@@ -261,6 +263,7 @@ class _LoginScreenState extends State<LoginScreen>
         email: _emailController.text,
         password: _passwordController.text,
       );
+      AnalyticsService.instance.logLogin('email');
       // Navigation happens automatically via auth state stream
     } catch (e) {
       // Show error message

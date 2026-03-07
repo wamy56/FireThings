@@ -22,6 +22,8 @@ import '../tools/timestamp_camera/timestamp_camera_screen.dart';
 import '../new_job/jobsheet_drafts_screen.dart';
 import '../history/history_screen.dart';
 import '../invoicing/invoice_list_screen.dart';
+import '../../services/analytics_service.dart';
+import '../../services/remote_config_service.dart';
 import '../../widgets/background_decoration.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -175,50 +177,80 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildQuickActions() {
     final isWide = context.isWide;
+    final analytics = AnalyticsService.instance;
+    final rc = RemoteConfigService.instance;
 
-    final actions = [
-      _buildActionButton('DIP Calculator', AppIcons.toggleOn, Colors.blue, () {
-        Navigator.push(
-          context,
-          adaptivePageRoute(builder: (_) => const DipSwitchCalculatorScreen()),
-        );
-      }),
-      _buildActionButton('Decibel Meter', AppIcons.volumeHigh, Colors.purple, () {
-        Navigator.push(
-          context,
-          adaptivePageRoute(builder: (_) => const DecibelMeterScreen()),
-        );
-      }),
-      _buildActionButton(
-        'Battery Test',
-        AppIcons.batteryCharging,
-        Colors.green,
-        () {
+    final actions = <Widget>[
+      if (rc.dipSwitchCalculatorEnabled)
+        _buildActionButton('DIP Calculator', AppIcons.toggleOn, Colors.blue, () {
+          analytics.logToolOpened('dip_switch_calculator');
           Navigator.push(
             context,
-            adaptivePageRoute(builder: (_) => const BatteryLoadTestScreen()),
+            adaptivePageRoute(builder: (_) => const DipSwitchCalculatorScreen()),
           );
-        },
-      ),
-      _buildActionButton('BS 5839', AppIcons.book, Colors.teal, () {
-        Navigator.push(
-          context,
-          adaptivePageRoute(builder: (_) => const BS5839ReferenceScreen()),
-        );
-      }),
-      _buildActionButton('Detector Spacing', AppIcons.grid, Colors.indigo, () {
-        Navigator.push(
-          context,
-          adaptivePageRoute(builder: (_) => const DetectorSpacingCalculatorScreen()),
-        );
-      }),
-      _buildActionButton('Timestamp Camera', AppIcons.camera, Colors.deepOrange, () {
-        Navigator.push(
-          context,
-          adaptivePageRoute(builder: (_) => const TimestampCameraScreen()),
-        );
-      }),
+        }),
+      if (rc.decibelMeterEnabled)
+        _buildActionButton('Decibel Meter', AppIcons.volumeHigh, Colors.purple, () {
+          analytics.logToolOpened('decibel_meter');
+          Navigator.push(
+            context,
+            adaptivePageRoute(builder: (_) => const DecibelMeterScreen()),
+          );
+        }),
+      if (rc.batteryLoadTesterEnabled)
+        _buildActionButton(
+          'Battery Test',
+          AppIcons.batteryCharging,
+          Colors.green,
+          () {
+            analytics.logToolOpened('battery_load_test');
+            Navigator.push(
+              context,
+              adaptivePageRoute(builder: (_) => const BatteryLoadTestScreen()),
+            );
+          },
+        ),
+      if (rc.bs5839ReferenceEnabled)
+        _buildActionButton('BS 5839', AppIcons.book, Colors.teal, () {
+          analytics.logToolOpened('bs5839_reference');
+          Navigator.push(
+            context,
+            adaptivePageRoute(builder: (_) => const BS5839ReferenceScreen()),
+          );
+        }),
+      if (rc.detectorSpacingEnabled)
+        _buildActionButton('Detector Spacing', AppIcons.grid, Colors.indigo, () {
+          analytics.logToolOpened('detector_spacing_calculator');
+          Navigator.push(
+            context,
+            adaptivePageRoute(builder: (_) => const DetectorSpacingCalculatorScreen()),
+          );
+        }),
+      if (rc.timestampCameraEnabled)
+        _buildActionButton('Timestamp Camera', AppIcons.camera, Colors.deepOrange, () {
+          analytics.logToolOpened('timestamp_camera');
+          Navigator.push(
+            context,
+            adaptivePageRoute(builder: (_) => const TimestampCameraScreen()),
+          );
+        }),
     ];
+
+    if (actions.isEmpty) return const SizedBox.shrink();
+
+    final cols = isWide ? 3 : 2;
+    final rows = <Widget>[];
+    for (var i = 0; i < actions.length; i += cols) {
+      final rowChildren = <Widget>[];
+      for (var j = i; j < i + cols; j++) {
+        if (j > i) rowChildren.add(const SizedBox(width: 12));
+        rowChildren.add(
+          Expanded(child: j < actions.length ? actions[j] : const SizedBox()),
+        );
+      }
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: AppTheme.listItemSpacing));
+      rows.add(Row(children: rowChildren));
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,53 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(height: AppTheme.listItemSpacing),
-        if (isWide) ...[
-          // Wide: 2 rows × 3 columns
-          Row(
-            children: [
-              Expanded(child: actions[0]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[1]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[2]),
-            ],
-          ),
-          const SizedBox(height: AppTheme.listItemSpacing),
-          Row(
-            children: [
-              Expanded(child: actions[3]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[4]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[5]),
-            ],
-          ),
-        ] else ...[
-          // Compact: 3 rows × 2 columns
-          Row(
-            children: [
-              Expanded(child: actions[0]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[1]),
-            ],
-          ),
-          const SizedBox(height: AppTheme.listItemSpacing),
-          Row(
-            children: [
-              Expanded(child: actions[2]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[3]),
-            ],
-          ),
-          const SizedBox(height: AppTheme.listItemSpacing),
-          Row(
-            children: [
-              Expanded(child: actions[4]),
-              const SizedBox(width: 12),
-              Expanded(child: actions[5]),
-            ],
-          ),
-        ],
+        ...rows,
       ],
     );
   }

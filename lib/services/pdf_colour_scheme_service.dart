@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pdf_colour_scheme.dart';
+import 'firestore_sync_service.dart';
 
 class PdfColourSchemeService {
   static const _key = 'pdf_colour_scheme';
@@ -15,6 +16,8 @@ class PdfColourSchemeService {
 
   static Future<void> saveScheme(PdfColourScheme scheme) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, scheme.toJsonString());
+    final jsonString = scheme.toJsonString();
+    await prefs.setString(_key, jsonString);
+    FirestoreSyncService.instance.syncPdfColourScheme(jsonString);
   }
 }

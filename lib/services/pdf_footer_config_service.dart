@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pdf_footer_config.dart';
 import '../models/pdf_header_config.dart';
+import 'firestore_sync_service.dart';
 
 class PdfFooterConfigService {
   static const _configKey = 'pdf_footer_config_v1';
@@ -27,7 +28,9 @@ class PdfFooterConfigService {
 
   static Future<void> saveConfig(PdfFooterConfig config) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_configKey, config.toJsonString());
+    final jsonString = config.toJsonString();
+    await prefs.setString(_configKey, jsonString);
+    FirestoreSyncService.instance.syncPdfFooterConfig(jsonString);
   }
 
   static Future<void> _migrateFromOldSettings(SharedPreferences prefs) async {

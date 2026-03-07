@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
 import '../../services/database_helper.dart';
+import '../../services/analytics_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
@@ -252,6 +253,7 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
                   await _dbHelper.updateSavedCustomer(newCustomer);
                 } else {
                   await _dbHelper.insertSavedCustomer(newCustomer);
+                  AnalyticsService.instance.logCustomerSaved('settings');
                 }
 
                 if (mounted) {

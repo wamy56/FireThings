@@ -213,6 +213,7 @@ class FilledPdfForm {
   final DateTime createdAt;
   final DateTime? completedAt;
   final bool isComplete;
+  final DateTime? lastModifiedAt;
 
   FilledPdfForm({
     required this.id,
@@ -224,6 +225,7 @@ class FilledPdfForm {
     required this.createdAt,
     this.completedAt,
     this.isComplete = false,
+    this.lastModifiedAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -236,6 +238,7 @@ class FilledPdfForm {
     'createdAt': createdAt.toIso8601String(),
     'completedAt': completedAt?.toIso8601String(),
     'isComplete': isComplete ? 1 : 0,
+    'lastModifiedAt': lastModifiedAt?.toIso8601String(),
   };
 
   factory FilledPdfForm.fromJson(Map<String, dynamic> json) {
@@ -259,6 +262,9 @@ class FilledPdfForm {
           ? DateTime.parse(json['completedAt'] as String)
           : null,
       isComplete: json['isComplete'] == 1 || json['isComplete'] == true,
+      lastModifiedAt: json['lastModifiedAt'] != null
+          ? DateTime.tryParse(json['lastModifiedAt'] as String)
+          : null,
     );
   }
 
@@ -272,6 +278,7 @@ class FilledPdfForm {
     DateTime? createdAt,
     DateTime? completedAt,
     bool? isComplete,
+    DateTime? lastModifiedAt,
   }) => FilledPdfForm(
     id: id ?? this.id,
     templateId: templateId ?? this.templateId,
@@ -282,5 +289,6 @@ class FilledPdfForm {
     createdAt: createdAt ?? this.createdAt,
     completedAt: completedAt ?? this.completedAt,
     isComplete: isComplete ?? this.isComplete,
+    lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
   );
 }

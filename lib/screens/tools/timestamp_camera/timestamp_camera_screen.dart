@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:gal/gal.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../utils/icon_map.dart';
 import '../../../utils/adaptive_widgets.dart';
 import '../../../widgets/premium_toast.dart';
+import '../../../services/analytics_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/timestamp_camera_service.dart';
 import 'camera_preview_widget.dart';
@@ -268,6 +270,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         name: 'FireThings_${now.millisecondsSinceEpoch}',
       );
 
+      AnalyticsService.instance.logPhotoCaptured();
       if (mounted) context.showSuccessToast('Photo saved to gallery');
 
       try {
@@ -285,6 +288,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
 
     try {
       await _controller!.startVideoRecording();
+      AnalyticsService.instance.logVideoRecordingStarted();
       setState(() {
         _isRecording = true;
         _recordingStart = DateTime.now();
@@ -311,6 +315,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
 
     try {
       final xFile = await _controller!.stopVideoRecording();
+      AnalyticsService.instance.logVideoRecordingCompleted();
       final durationMs = _recordingDuration.inMilliseconds;
       final recordingStartTime = _recordingStart;
 
@@ -327,6 +332,19 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       );
 
       if (_isMobile && lines.isNotEmpty) {
+        // Extract bundled font to temp file for FFmpeg drawtext
+        String? fontPath;
+        try {
+          final fontData =
+              await rootBundle.load('assets/fonts/Inter-Bold.ttf');
+          final tempDir = await getTemporaryDirectory();
+          final fontFile = File('${tempDir.path}/Inter-Bold.ttf');
+          await fontFile.writeAsBytes(fontData.buffer.asUint8List());
+          fontPath = fontFile.path;
+        } catch (_) {
+          // Font extraction failed — filters will omit fontfile param
+        }
+
         final filter = TimestampCameraService.instance
             .buildDynamicFfmpegFilter(
           settings: _overlaySettings,
@@ -334,6 +352,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           durationMs: durationMs,
           coords: _locationService.currentCoords,
           address: _locationService.currentAddress,
+          fontPath: fontPath,
         );
 
         if (mounted) {
@@ -345,6 +364,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
                 ffmpegFilter: filter,
                 totalDurationMs: durationMs,
                 recordingStartTime: recordingStartTime,
+                fontPath: fontPath,
               ),
             ),
           );

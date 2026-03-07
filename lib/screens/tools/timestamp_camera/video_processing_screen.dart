@@ -18,6 +18,7 @@ class VideoProcessingScreen extends StatefulWidget {
   final String ffmpegFilter;
   final int totalDurationMs;
   final DateTime? recordingStartTime;
+  final String? fontPath;
 
   const VideoProcessingScreen({
     super.key,
@@ -25,6 +26,7 @@ class VideoProcessingScreen extends StatefulWidget {
     required this.ffmpegFilter,
     required this.totalDurationMs,
     this.recordingStartTime,
+    this.fontPath,
   });
 
   @override
@@ -132,6 +134,7 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
       settings: settings,
       recordingStartTime: widget.recordingStartTime!,
       durationMs: widget.totalDurationMs,
+      fontPath: widget.fontPath,
     );
 
     if (fallbackFilter.isEmpty) {

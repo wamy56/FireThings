@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
+import '../../services/analytics_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_helper.dart';
 import '../../widgets/widgets.dart';
@@ -155,6 +156,7 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
       );
 
       await _dbHelper.insertSavedSite(site);
+      AnalyticsService.instance.logSiteSaved();
 
       if (!mounted) return;
       context.showSuccessToast('Site saved successfully');

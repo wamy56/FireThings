@@ -7,6 +7,7 @@ import '../../models/pdf_form_template.dart';
 import '../../models/jobsheet.dart';
 import '../../models/saved_site.dart';
 import '../saved_sites/site_picker_screen.dart';
+import '../../services/analytics_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_helper.dart';
 import '../../services/template_pdf_service.dart';
@@ -79,6 +80,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
   void initState() {
     super.initState();
     _template = widget.template ?? PdfFormTemplates.iqMinorWorksCertificate;
+    AnalyticsService.instance.logPdfFormOpened('minor_works');
 
     _iqRepSignController = SignatureController(
       penStrokeWidth: 2,
@@ -700,6 +702,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
         await _dbHelper.insertJobsheet(jobsheet);
         _isEditingExisting = true;
       }
+      AnalyticsService.instance.logPdfFormSavedDraft('minor_works');
 
       if (mounted) {
         context.showSuccessToast('Draft saved successfully');
@@ -714,6 +717,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
 
   Future<void> _previewPdf() async {
     if (!_validateForm()) return;
+    AnalyticsService.instance.logPdfFormPreviewed('minor_works');
 
     try {
       final fieldValues = _collectFieldValues();

@@ -332,6 +332,29 @@ Three design screens accessible from Settings — changes apply to both jobsheet
 - Overdue invoice reminders (toggle)
 - Background checks via Workmanager at 12-hour intervals
 
+### Cloud Sync
+
+- **Firestore cloud backup** — SQLite remains the primary store; Firestore acts as a cloud backup synced automatically on every create/update/delete
+- **"Sync Now" button** in Settings — triggers a full bidirectional sync on demand
+- **Last sync timestamp** — displayed in Settings so the user knows when data was last synced
+- **Offline-first** — app works fully offline; Firestore SDK queues writes and syncs when connectivity returns
+
+### Send Feedback
+
+- Opens the native email client with a pre-filled subject line, recipient, and device info footer (app version, OS, device model)
+- Recipient: cscott93@hotmail.co.uk
+
+### Privacy Policy
+
+- In-app privacy policy screen accessible from Settings
+- Covers: data collected, purpose, storage location, retention, access rights, user rights (access/export/deletion), third-party services (Firebase Auth, Firestore, Crashlytics, Analytics), and contact info
+
+### Account Deletion
+
+- GDPR-compliant full account deletion from Settings
+- Deletes all Firestore cloud data (7 subcollections batch-deleted), local SQLite data, SharedPreferences, branding assets, and the Firebase Auth account
+- Requires re-authentication before proceeding
+
 ### App Information
 
 - Version and build number (dynamic via `PackageInfo`)
@@ -341,7 +364,7 @@ Three design screens accessible from Settings — changes apply to both jobsheet
 ## Platform & Technical Notes
 
 - **Multi-platform** — Android, iOS, Windows, macOS, Linux, web
-- **Offline-first** — all data stored locally in SQLite; Firebase Auth for identity only
+- **Offline-first** — all data stored locally in SQLite with Firestore cloud sync backup; works fully offline
 - **Dark mode** — full light / dark theme support following system preference
 - **Responsive** — four breakpoints (compact, medium, expanded, large) with adaptive layouts
 - **Adaptive UI** — Cupertino widgets on Apple platforms, Material on Android / desktop
@@ -353,3 +376,41 @@ Three design screens accessible from Settings — changes apply to both jobsheet
 - **Location** — geocoding with throttled GPS tracking
 - **Background tasks** — Workmanager for periodic notification checks
 - **CI / CD** — Codemagic configuration for iOS TestFlight and Android APK workflows
+
+---
+
+## Backend & Infrastructure
+
+### Firebase Crashlytics
+
+- Crash and error reporting via Firebase Crashlytics
+- `runZonedGuarded` wraps the entire app bootstrap to catch async errors
+- `FlutterError.onError` captures Flutter framework errors
+- `PlatformDispatcher.instance.onError` captures platform-level errors
+
+### Firebase Analytics
+
+- 22 custom events tracking feature usage across the app (jobsheet lifecycle, invoice lifecycle, tool opens, PDF forms, photo/video capture, auth)
+- Automatic screen tracking via `FirebaseAnalyticsObserver` in `MaterialApp.navigatorObservers`
+
+### Firebase Remote Config
+
+- 10 server-side feature flags for toggling tools and features without an app update
+- Flags: timestamp camera, decibel meter, DIP switch calculator, detector spacing, battery load tester, BS 5839 reference, invoicing, PDF forms, cloud sync, custom templates
+- All flags default to enabled; controlled from the Firebase Console
+- 12-hour fetch interval in release, 1-minute in debug
+
+### Firestore Cloud Sync
+
+- **Architecture** — SQLite primary, Firestore backup; offline-first with Firestore SDK handling offline queuing
+- **Bidirectional merge** on login — pulls remote changes and pushes local changes
+- **Fire-and-forget sync** on every CRUD operation for near-real-time backup
+- **Conflict resolution** — last-write-wins via `lastModifiedAt` timestamps on all synced models
+- **Synced data** — jobsheets, invoices, saved customers, saved sites, job templates, filled templates, and PDF config (header, footer, colour scheme)
+- **Firestore persistence** enabled with unlimited cache size
+
+### Firestore Security Rules
+
+- Per-user data isolation: all data stored under `users/{uid}/` in Firestore
+- Authentication required for all reads and writes
+- Users can only access their own data (`request.auth.uid == userId`)

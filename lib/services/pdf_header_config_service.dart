@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/pdf_header_config.dart';
+import 'firestore_sync_service.dart';
 
 class PdfHeaderConfigService {
   static const _configKey = 'pdf_header_config_v1';
@@ -28,7 +29,9 @@ class PdfHeaderConfigService {
 
   static Future<void> saveConfig(PdfHeaderConfig config) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_configKey, config.toJsonString());
+    final jsonString = config.toJsonString();
+    await prefs.setString(_configKey, jsonString);
+    FirestoreSyncService.instance.syncPdfHeaderConfig(jsonString);
   }
 
   static Future<void> _migrateFromOldSettings(SharedPreferences prefs) async {

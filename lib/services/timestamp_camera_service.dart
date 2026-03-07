@@ -278,6 +278,7 @@ class TimestampCameraService {
     required int durationMs,
     String? coords,
     String? address,
+    String? fontPath,
   }) {
     final fontSize = _fontSizeForResolution(settings.resolution);
     final xExpr = _ffmpegX(settings.position);
@@ -325,6 +326,7 @@ class TimestampCameraService {
         fontSize: fontSize,
       );
 
+      final fontParam = fontPath != null ? ":fontfile='$fontPath'" : '';
       filters.add(
         "drawtext=text='%{pts\\:localtime\\:$epoch\\:$format}'"
         ':fontsize=$fontSize'
@@ -333,12 +335,14 @@ class TimestampCameraService {
         ':y=$yExpr'
         ':box=1'
         ':boxcolor=black@0.6'
-        ':boxborderw=8',
+        ':boxborderw=8'
+        '$fontParam',
       );
       lineIndex++;
     }
 
     // Static lines
+    final staticFontParam = fontPath != null ? ":fontfile='$fontPath'" : '';
     for (final line in staticLines) {
       final yExpr = _ffmpegY(
         position: settings.position,
@@ -356,7 +360,8 @@ class TimestampCameraService {
         ':y=$yExpr'
         ':box=1'
         ':boxcolor=black@0.6'
-        ':boxborderw=8',
+        ':boxborderw=8'
+        '$staticFontParam',
       );
       lineIndex++;
     }
@@ -372,6 +377,7 @@ class TimestampCameraService {
     required int durationMs,
     String? coords,
     String? address,
+    String? fontPath,
   }) {
     final fontSize = _fontSizeForResolution(settings.resolution);
     final xExpr = _ffmpegX(settings.position);
@@ -395,6 +401,7 @@ class TimestampCameraService {
     if (totalLines == 0) return '';
 
     // Generate per-second drawtext for the dynamic date/time line
+    final fallbackFontParam = fontPath != null ? ":fontfile='$fontPath'" : '';
     if (hasDateTime) {
       final yExpr = _ffmpegY(
         position: settings.position,
@@ -421,6 +428,7 @@ class TimestampCameraService {
           ':box=1'
           ':boxcolor=black@0.6'
           ':boxborderw=8'
+          '$fallbackFontParam'
           ":enable='between(t,$s,${s + 1})'",
         );
       }
@@ -445,7 +453,8 @@ class TimestampCameraService {
         ':y=$yExpr'
         ':box=1'
         ':boxcolor=black@0.6'
-        ':boxborderw=8',
+        ':boxborderw=8'
+        '$fallbackFontParam',
       );
       lineIndex++;
     }
