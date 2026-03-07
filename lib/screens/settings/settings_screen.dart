@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,6 +10,7 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/responsive_scaffold.dart';
 import '../../utils/icon_map.dart';
+import '../../utils/theme.dart';
 import '../../utils/animate_helpers.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../saved_sites/saved_sites_screen.dart';
@@ -402,33 +402,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required bool isApple,
     required List<_SettingsTileData> tiles,
   }) {
-    if (isApple) {
-      return CupertinoListSection.insetGrouped(
-        header: Text(header),
-        children: tiles.map((tile) => CupertinoListTile(
-          leading: Icon(tile.icon, color: tile.destructive ? Colors.red : null),
-          title: Text(
-            tile.title,
-            style: TextStyle(
-              color: tile.destructive ? Colors.red : null,
-            ),
-          ),
-          subtitle: Text(tile.subtitle),
-          trailing: const CupertinoListTileChevron(),
-          onTap: tile.onTap,
-        )).toList(),
-      );
-    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           header,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: Colors.grey,
+            color: isDark ? AppTheme.darkTextSecondary : Colors.grey,
           ),
         ),
         const SizedBox(height: 8),
@@ -450,41 +434,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildAdaptiveNotificationsSection(BuildContext context, {required bool isApple}) {
-    if (isApple) {
-      return CupertinoListSection.insetGrouped(
-        header: const Text('Notifications'),
-        children: [
-          CupertinoListTile(
-            leading: Icon(AppIcons.editNote),
-            title: const Text('Draft reminders'),
-            subtitle: const Text('Remind about idle draft invoices & jobsheets'),
-            trailing: AdaptiveSwitch(
-              value: _draftReminders,
-              onChanged: _setDraftReminders,
-            ),
-          ),
-          CupertinoListTile(
-            leading: Icon(AppIcons.receiptOutline),
-            title: const Text('Overdue invoice reminders'),
-            subtitle: const Text('Remind about unpaid invoices past due date'),
-            trailing: AdaptiveSwitch(
-              value: _overdueReminders,
-              onChanged: _setOverdueReminders,
-            ),
-          ),
-        ],
-      );
-    }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Notifications',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: Colors.grey,
+            color: isDark ? AppTheme.darkTextSecondary : Colors.grey,
           ),
         ),
         const SizedBox(height: 8),

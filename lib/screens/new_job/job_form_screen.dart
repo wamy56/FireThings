@@ -152,51 +152,54 @@ class _JobFormScreenState extends State<JobFormScreen> {
       body: KeyboardDismissWrapper(
         child: Form(
         key: _formKey,
-        child: ListView(
+        child: SingleChildScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(16),
-          children: [
-            // Job Information Section
-            _buildSectionHeader('Job Information', AppIcons.infoCircle),
-            const SizedBox(height: 16),
-            _buildStandardFields(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Job Information Section
+              _buildSectionHeader('Job Information', AppIcons.infoCircle),
+              const SizedBox(height: 16),
+              _buildStandardFields(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // Work Details Section (Dynamic Fields)
-            _buildSectionHeader('Work Details', AppIcons.designtools),
-            const SizedBox(height: 16),
-            _buildDynamicFields(),
+              // Work Details Section (Dynamic Fields)
+              _buildSectionHeader('Work Details', AppIcons.designtools),
+              const SizedBox(height: 16),
+              _buildDynamicFields(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // Additional Notes Section
-            _buildSectionHeader('Additional Notes', AppIcons.note),
-            const SizedBox(height: 16),
-            CustomTextField(
-              controller: _notesController,
-              label: 'Notes',
-              hint: 'Add any additional notes or observations',
-              maxLines: 4,
-            ),
+              // Additional Notes Section
+              _buildSectionHeader('Additional Notes', AppIcons.note),
+              const SizedBox(height: 16),
+              CustomTextField(
+                controller: _notesController,
+                label: 'Notes',
+                hint: 'Add any additional notes or observations',
+                maxLines: 4,
+              ),
 
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // Continue Button
-            CustomButton(
-              text: 'Continue to Signatures',
-              icon: AppIcons.edit,
-              onPressed: _validateAndContinue,
-              isLoading: _isLoading,
-              isFullWidth: true,
-            ),
+              // Continue Button
+              CustomButton(
+                text: 'Continue to Signatures',
+                icon: AppIcons.edit,
+                onPressed: _validateAndContinue,
+                isLoading: _isLoading,
+                isFullWidth: true,
+              ),
 
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
       ),
@@ -617,12 +620,9 @@ class _JobFormScreenState extends State<JobFormScreen> {
   }
 
   Future<void> _validateAndContinue() async {
-    // Hide keyboard
-    FocusScope.of(context).unfocus();
-
     // Validate form (including dynamic fields)
     if (!_formKey.currentState!.validate()) {
-      _scrollToFirstError();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFirstError());
       return;
     }
 

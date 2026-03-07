@@ -152,10 +152,12 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
         body: KeyboardDismissWrapper(
           child: Form(
           key: _formKey,
-          child: ListView(
+          child: SingleChildScrollView(
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.all(16),
-            children: [
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
               // Job Information Section
               _buildSectionHeader('Job Information', AppIcons.infoCircle),
               const SizedBox(height: 16),
@@ -289,6 +291,7 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
               const SizedBox(height: 16),
             ],
           ),
+          ),
         ),
         ),
       ),
@@ -379,7 +382,7 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
 
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate()) {
-      _scrollToFirstError();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFirstError());
       return;
     }
 

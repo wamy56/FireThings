@@ -47,6 +47,8 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   final _invoiceNumberFocus = FocusNode();
   final _customerNameKey = GlobalKey();
   final _customerNameFocus = FocusNode();
+  final _customerEmailKey = GlobalKey();
+  final _customerEmailFocus = FocusNode();
   final _customerAddressKey = GlobalKey();
   final _customerAddressFocus = FocusNode();
   final _itemsSectionKey = GlobalKey();
@@ -172,6 +174,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     _customerAddressController.dispose();
     _notesController.dispose();
     _customerEmailController.dispose();
+    _customerEmailFocus.dispose();
     _engineerNameFocus.dispose();
     _invoiceNumberFocus.dispose();
     _customerNameFocus.dispose();
@@ -205,11 +208,13 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           : KeyboardDismissWrapper(
               child: Form(
                 key: _formKey,
-                child: ListView(
+                child: SingleChildScrollView(
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.all(16),
-                  children: [
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                     if (widget.existingInvoice?.status ==
                         InvoiceStatus.sent) ...[
                       SizedBox(
@@ -242,6 +247,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     _buildActionButtons(),
                     const SizedBox(height: 24),
                   ],
+                ),
                 ),
               ),
             ),
@@ -437,14 +443,25 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             ),
             const SizedBox(height: 12),
             TextFormField(
+              key: _customerEmailKey,
               controller: _customerEmailController,
+              focusNode: _customerEmailFocus,
               decoration: InputDecoration(
-                labelText: 'Customer Email (Optional)',
+                labelText: 'Customer Email *',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(AppIcons.sms),
               ),
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.done,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Please enter customer email';
+                }
+                if (!value.contains('@')) {
+                  return 'Please enter a valid email address';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -807,6 +824,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       (key: _engineerNameKey, focus: _engineerNameFocus, hasError: () => _engineerNameController.text.trim().isEmpty),
       (key: _invoiceNumberKey, focus: _invoiceNumberFocus, hasError: () => _invoiceNumberController.text.trim().isEmpty),
       (key: _customerNameKey, focus: _customerNameFocus, hasError: () => _customerNameController.text.trim().isEmpty),
+      (key: _customerEmailKey, focus: _customerEmailFocus, hasError: () => _customerEmailController.text.trim().isEmpty || !_customerEmailController.text.trim().contains('@')),
       (key: _customerAddressKey, focus: _customerAddressFocus, hasError: () => _customerAddressController.text.trim().isEmpty),
     ];
     for (final field in fields) {
@@ -823,7 +841,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
   bool _validateForAction() {
     if (!_formKey.currentState!.validate()) {
-      _scrollToFirstError();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFirstError());
       return false;
     }
     if (!_hasValidItems()) {
@@ -1103,13 +1121,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   void _sendViaEmail() {
     if (!_validateForAction()) return;
 
-    final email = _customerEmailController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
-      context.showErrorToast('Please enter a customer email address first');
-      return;
-    }
-
-    _sendEmail(email);
+    _sendEmail(_customerEmailController.text.trim());
   }
 
   Future<void> _sendEmail(String email) async {

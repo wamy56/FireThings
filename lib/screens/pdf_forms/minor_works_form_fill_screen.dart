@@ -210,76 +210,79 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
       body: KeyboardDismissWrapper(
         child: Form(
         key: _formKey,
-        child: ListView(
+        child: SingleChildScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(16),
-          children: [
-            // Job Information Section
-            _buildSectionHeader('Job Information', AppIcons.infoCircle),
-            const SizedBox(height: 16),
-            _buildJobInformationSection(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Job Information Section
+              _buildSectionHeader('Job Information', AppIcons.infoCircle),
+              const SizedBox(height: 16),
+              _buildJobInformationSection(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // Visit & System Type Section
-            _buildSectionHeader('Visit & System Type', AppIcons.category),
-            const SizedBox(height: 16),
-            _buildVisitAndSystemTypeSection(),
+              // Visit & System Type Section
+              _buildSectionHeader('Visit & System Type', AppIcons.category),
+              const SizedBox(height: 16),
+              _buildVisitAndSystemTypeSection(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // Work Details Section
-            _buildSectionHeader('Work Details', AppIcons.settingOutline),
-            const SizedBox(height: 16),
-            _buildWorkDetailsSection(),
+              // Work Details Section
+              _buildSectionHeader('Work Details', AppIcons.settingOutline),
+              const SizedBox(height: 16),
+              _buildWorkDetailsSection(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // IQ Fire Representative Section
-            _buildSectionHeader('IQ Fire Representative', AppIcons.user),
-            const SizedBox(height: 16),
-            _buildIqRepSection(),
+              // IQ Fire Representative Section
+              _buildSectionHeader('IQ Fire Representative', AppIcons.user),
+              const SizedBox(height: 16),
+              _buildIqRepSection(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // Client Representative Section
-            _buildSectionHeader('Client Representative', AppIcons.user),
-            const SizedBox(height: 16),
-            _buildClientRepSection(),
+              // Client Representative Section
+              _buildSectionHeader('Client Representative', AppIcons.user),
+              const SizedBox(height: 16),
+              _buildClientRepSection(),
 
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // Action Buttons
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                CustomOutlinedButton(
-                  text: 'Preview PDF',
-                  icon: AppIcons.eye,
-                  onPressed: _previewPdf,
-                  isFullWidth: true,
-                ),
-                const SizedBox(height: 12),
-                CustomButton(
-                  text: 'Generate & Share',
-                  icon: AppIcons.share,
-                  onPressed: _generateAndShare,
-                  isLoading: _isGenerating,
-                  isFullWidth: true,
-                ),
-              ],
-            ),
+              // Action Buttons
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CustomOutlinedButton(
+                    text: 'Preview PDF',
+                    icon: AppIcons.eye,
+                    onPressed: _previewPdf,
+                    isFullWidth: true,
+                  ),
+                  const SizedBox(height: 12),
+                  CustomButton(
+                    text: 'Generate & Share',
+                    icon: AppIcons.share,
+                    onPressed: _generateAndShare,
+                    isLoading: _isGenerating,
+                    isFullWidth: true,
+                  ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
       ),
@@ -719,7 +722,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
 
   bool _validateForm() {
     if (!_formKey.currentState!.validate()) {
-      _scrollToFirstError();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFirstError());
       return false;
     }
 

@@ -221,76 +221,79 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
       body: KeyboardDismissWrapper(
         child: Form(
         key: _formKey,
-        child: ListView(
+        child: SingleChildScrollView(
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.all(16),
-          children: [
-            // Job Information Section
-            _buildSectionHeader('Job Information', AppIcons.infoCircle),
-            const SizedBox(height: 16),
-            _buildJobInformationSection(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Job Information Section
+              _buildSectionHeader('Job Information', AppIcons.infoCircle),
+              const SizedBox(height: 16),
+              _buildJobInformationSection(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // Work Details Section
-            _buildSectionHeader('Work Details', AppIcons.settingOutline),
-            const SizedBox(height: 16),
-            _buildWorkDetailsSection(),
+              // Work Details Section
+              _buildSectionHeader('Work Details', AppIcons.settingOutline),
+              const SizedBox(height: 16),
+              _buildWorkDetailsSection(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // Compliance Checklist Section
-            _buildSectionHeader('Compliance Checklist', AppIcons.clipboard),
-            const SizedBox(height: 16),
-            _buildComplianceSection(),
+              // Compliance Checklist Section
+              _buildSectionHeader('Compliance Checklist', AppIcons.clipboard),
+              const SizedBox(height: 16),
+              _buildComplianceSection(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // Engineer Certification Section
-            _buildSectionHeader('Engineer Certification', AppIcons.user),
-            const SizedBox(height: 16),
-            _buildEngineerCertificationSection(),
+              // Engineer Certification Section
+              _buildSectionHeader('Engineer Certification', AppIcons.user),
+              const SizedBox(height: 16),
+              _buildEngineerCertificationSection(),
 
-            const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 24),
 
-            // Customer Certification Section
-            _buildSectionHeader('Customer Certification', AppIcons.user),
-            const SizedBox(height: 16),
-            _buildCustomerCertificationSection(),
+              // Customer Certification Section
+              _buildSectionHeader('Customer Certification', AppIcons.user),
+              const SizedBox(height: 16),
+              _buildCustomerCertificationSection(),
 
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // Action Buttons
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                CustomOutlinedButton(
-                  text: 'Preview PDF',
-                  icon: AppIcons.eye,
-                  onPressed: _previewPdf,
-                  isFullWidth: true,
-                ),
-                const SizedBox(height: 12),
-                CustomButton(
-                  text: 'Generate & Share',
-                  icon: AppIcons.share,
-                  onPressed: _generateAndShare,
-                  isLoading: _isGenerating,
-                  isFullWidth: true,
-                ),
-              ],
-            ),
+              // Action Buttons
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CustomOutlinedButton(
+                    text: 'Preview PDF',
+                    icon: AppIcons.eye,
+                    onPressed: _previewPdf,
+                    isFullWidth: true,
+                  ),
+                  const SizedBox(height: 12),
+                  CustomButton(
+                    text: 'Generate & Share',
+                    icon: AppIcons.share,
+                    onPressed: _generateAndShare,
+                    isLoading: _isGenerating,
+                    isFullWidth: true,
+                  ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
       ),
@@ -804,7 +807,7 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
 
   bool _validateForm() {
     if (!_formKey.currentState!.validate()) {
-      _scrollToFirstError();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToFirstError());
       return false;
     }
 
