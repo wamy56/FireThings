@@ -40,6 +40,17 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   final _customerEmailController = TextEditingController();
   final _notesController = TextEditingController();
 
+  // Keys and focus nodes for scroll-to-error
+  final _engineerNameKey = GlobalKey();
+  final _engineerNameFocus = FocusNode();
+  final _invoiceNumberKey = GlobalKey();
+  final _invoiceNumberFocus = FocusNode();
+  final _customerNameKey = GlobalKey();
+  final _customerNameFocus = FocusNode();
+  final _customerAddressKey = GlobalKey();
+  final _customerAddressFocus = FocusNode();
+  final _itemsSectionKey = GlobalKey();
+
   // Invoice data
   DateTime _invoiceDate = DateTime.now();
   DateTime _dueDate = DateTime.now();
@@ -161,6 +172,10 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     _customerAddressController.dispose();
     _notesController.dispose();
     _customerEmailController.dispose();
+    _engineerNameFocus.dispose();
+    _invoiceNumberFocus.dispose();
+    _customerNameFocus.dispose();
+    _customerAddressFocus.dispose();
     for (final c in _itemControllers) {
       c.dispose();
     }
@@ -255,7 +270,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             const SizedBox(height: 16),
             // Engineer name - editable
             TextFormField(
+              key: _engineerNameKey,
               controller: _engineerNameController,
+              focusNode: _engineerNameFocus,
               decoration: InputDecoration(
                 labelText: 'From (Your Name)',
                 border: OutlineInputBorder(),
@@ -291,7 +308,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             ),
             const SizedBox(height: 12),
             TextFormField(
+              key: _invoiceNumberKey,
               controller: _invoiceNumberController,
+              focusNode: _invoiceNumberFocus,
               decoration: InputDecoration(
                 labelText: 'Invoice Number',
                 border: OutlineInputBorder(),
@@ -400,7 +419,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             ),
             const SizedBox(height: 16),
             TextFormField(
+              key: _customerNameKey,
               controller: _customerNameController,
+              focusNode: _customerNameFocus,
               decoration: InputDecoration(
                 labelText: 'Customer Name',
                 border: OutlineInputBorder(),
@@ -427,7 +448,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             ),
             const SizedBox(height: 12),
             TextFormField(
+              key: _customerAddressKey,
               controller: _customerAddressController,
+              focusNode: _customerAddressFocus,
               decoration: InputDecoration(
                 labelText: 'Customer Address',
                 border: OutlineInputBorder(),
@@ -698,6 +721,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
   Widget _buildItemsSection() {
     return Card(
+      key: _itemsSectionKey,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -778,9 +802,35 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     return false;
   }
 
+  void _scrollToFirstError() {
+    final fields = [
+      (key: _engineerNameKey, focus: _engineerNameFocus, hasError: () => _engineerNameController.text.trim().isEmpty),
+      (key: _invoiceNumberKey, focus: _invoiceNumberFocus, hasError: () => _invoiceNumberController.text.trim().isEmpty),
+      (key: _customerNameKey, focus: _customerNameFocus, hasError: () => _customerNameController.text.trim().isEmpty),
+      (key: _customerAddressKey, focus: _customerAddressFocus, hasError: () => _customerAddressController.text.trim().isEmpty),
+    ];
+    for (final field in fields) {
+      if (field.hasError()) {
+        final ctx = field.key.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: AppTheme.normalAnimation, curve: AppTheme.defaultCurve, alignment: 0.2)
+              .then((_) => field.focus.requestFocus());
+        }
+        return;
+      }
+    }
+  }
+
   bool _validateForAction() {
-    if (!_formKey.currentState!.validate()) return false;
+    if (!_formKey.currentState!.validate()) {
+      _scrollToFirstError();
+      return false;
+    }
     if (!_hasValidItems()) {
+      final ctx = _itemsSectionKey.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(ctx, duration: AppTheme.normalAnimation, curve: AppTheme.defaultCurve, alignment: 0.2);
+      }
       context.showWarningToast(
         'Please add at least one item with description and price',
       );

@@ -116,7 +116,7 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
               padding: const EdgeInsets.all(AppTheme.screenPadding),
               children: [
                 // Invoice preview mockup
-                _buildPreview(isDark),
+                _buildPreview(),
                 const SizedBox(height: 24),
 
                 // Preset schemes
@@ -143,18 +143,18 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
     );
   }
 
-  Widget _buildPreview(bool isDark) {
+  Widget _buildPreview() {
     final primary = _primaryFlutterColor;
     final light = _lightTint(primary);
-    final cardBg = isDark ? AppTheme.darkSurface : Colors.white;
-    final textColor = isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary;
-    final subtleText = isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary;
+    final textColor = AppTheme.textPrimary;
+    final subtleText = AppTheme.textSecondary;
 
     return Container(
       decoration: BoxDecoration(
-        color: cardBg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -218,7 +218,7 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isDark ? AppTheme.darkSurfaceElevated : const Color(0xFFF5F5F5),
+                    color: const Color(0xFFF5F5F5),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(

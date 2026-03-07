@@ -46,6 +46,22 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
   final _iqRepNameController = TextEditingController();
   final _clientRepNameController = TextEditingController();
 
+  // Keys and focus nodes for scroll-to-error
+  final _customerNameKey = GlobalKey();
+  final _customerNameFocus = FocusNode();
+  final _jobNumberKey = GlobalKey();
+  final _jobNumberFocus = FocusNode();
+  final _siteAddressKey = GlobalKey();
+  final _siteAddressFocus = FocusNode();
+  final _descriptionOfWorkKey = GlobalKey();
+  final _descriptionOfWorkFocus = FocusNode();
+  final _iqRepNameKey = GlobalKey();
+  final _iqRepNameFocus = FocusNode();
+  final _clientRepNameKey = GlobalKey();
+  final _clientRepNameFocus = FocusNode();
+  final _iqRepSignKey = GlobalKey();
+  final _clientRepSignKey = GlobalKey();
+
   // Date value
   DateTime _date = DateTime.now();
 
@@ -161,6 +177,12 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
     _clientRepNameController.dispose();
     _iqRepSignController.dispose();
     _clientRepSignController.dispose();
+    _customerNameFocus.dispose();
+    _jobNumberFocus.dispose();
+    _siteAddressFocus.dispose();
+    _descriptionOfWorkFocus.dispose();
+    _iqRepNameFocus.dispose();
+    _clientRepNameFocus.dispose();
     super.dispose();
   }
 
@@ -280,7 +302,9 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
     return Column(
       children: [
         CustomTextField(
+          key: _customerNameKey,
           controller: _customerNameController,
+          focusNode: _customerNameFocus,
           label: 'Customer Name *',
           hint: 'Enter customer name',
           prefixIcon: Icon(AppIcons.building),
@@ -305,7 +329,9 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
         ),
         const SizedBox(height: 16),
         CustomTextField(
+          key: _jobNumberKey,
           controller: _jobNumberController,
+          focusNode: _jobNumberFocus,
           label: 'Job Number *',
           hint: 'Enter job number',
           prefixIcon: Icon(AppIcons.tag),
@@ -314,7 +340,9 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
         ),
         const SizedBox(height: 16),
         CustomTextField(
+          key: _siteAddressKey,
           controller: _siteAddressController,
+          focusNode: _siteAddressFocus,
           label: 'Site Address *',
           hint: 'Enter site address',
           maxLines: 2,
@@ -428,7 +456,9 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
     return Column(
       children: [
         CustomTextField(
+          key: _descriptionOfWorkKey,
           controller: _descriptionOfWorkController,
+          focusNode: _descriptionOfWorkFocus,
           label: 'Description of Work Completed *',
           hint: 'Describe the work performed',
           maxLines: 6,
@@ -450,7 +480,9 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
     return Column(
       children: [
         CustomTextField(
+          key: _iqRepNameKey,
           controller: _iqRepNameController,
+          focusNode: _iqRepNameFocus,
           label: 'Print Name *',
           hint: 'Enter name',
           prefixIcon: Icon(AppIcons.user),
@@ -459,6 +491,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
         ),
         const SizedBox(height: 16),
         _buildSignatureWidget(
+          key: _iqRepSignKey,
           label: 'Signature *',
           controller: _iqRepSignController,
           signatureData: _iqRepSignatureData,
@@ -494,7 +527,9 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
         if (!_clientNotAvailable) ...[
           const SizedBox(height: 16),
           CustomTextField(
+            key: _clientRepNameKey,
             controller: _clientRepNameController,
+            focusNode: _clientRepNameFocus,
             label: 'Print Name *',
             hint: 'Enter client name',
             prefixIcon: Icon(AppIcons.user),
@@ -505,6 +540,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
           ),
           const SizedBox(height: 16),
           _buildSignatureWidget(
+            key: _clientRepSignKey,
             label: 'Signature *',
             controller: _clientRepSignController,
             signatureData: _clientRepSignatureData,
@@ -529,6 +565,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
   }
 
   Widget _buildSignatureWidget({
+    Key? key,
     required String label,
     required SignatureController controller,
     required String? signatureData,
@@ -538,6 +575,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
     final hasSignature = signatureData != null && signatureData.isNotEmpty;
 
     return Column(
+      key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -650,13 +688,43 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
     };
   }
 
+  void _scrollToFirstError() {
+    final fields = [
+      (key: _customerNameKey, focus: _customerNameFocus, hasError: () => _customerNameController.text.trim().isEmpty),
+      (key: _jobNumberKey, focus: _jobNumberFocus, hasError: () => _jobNumberController.text.trim().isEmpty),
+      (key: _siteAddressKey, focus: _siteAddressFocus, hasError: () => _siteAddressController.text.trim().isEmpty),
+      (key: _descriptionOfWorkKey, focus: _descriptionOfWorkFocus, hasError: () => _descriptionOfWorkController.text.trim().isEmpty),
+      (key: _iqRepNameKey, focus: _iqRepNameFocus, hasError: () => _iqRepNameController.text.trim().isEmpty),
+      if (!_clientNotAvailable)
+        (key: _clientRepNameKey, focus: _clientRepNameFocus, hasError: () => _clientRepNameController.text.trim().isEmpty),
+    ];
+    for (final field in fields) {
+      if (field.hasError()) {
+        final ctx = field.key.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: AppTheme.normalAnimation, curve: AppTheme.defaultCurve, alignment: 0.2)
+              .then((_) => field.focus.requestFocus());
+        }
+        return;
+      }
+    }
+  }
+
+  void _scrollToKey(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx, duration: AppTheme.normalAnimation, curve: AppTheme.defaultCurve, alignment: 0.2);
+    }
+  }
+
   bool _validateForm() {
     if (!_formKey.currentState!.validate()) {
-      showValidationBanner(context: context, message: 'Please fill in all required fields');
+      _scrollToFirstError();
       return false;
     }
 
     if (_iqRepSignatureData == null || _iqRepSignatureData!.isEmpty) {
+      _scrollToKey(_iqRepSignKey);
       showValidationBanner(context: context, message: 'Please provide IQ representative signature');
       return false;
     }
@@ -664,6 +732,7 @@ class _MinorWorksFormFillScreenState extends State<MinorWorksFormFillScreen> {
     if (!_clientNotAvailable) {
       if (_clientRepSignatureData == null ||
           _clientRepSignatureData!.isEmpty) {
+        _scrollToKey(_clientRepSignKey);
         showValidationBanner(context: context, message: 'Please provide client signature or mark as not available');
         return false;
       }

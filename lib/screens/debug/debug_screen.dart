@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../../utils/adaptive_widgets.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
@@ -138,6 +139,21 @@ class _DebugScreenState extends State<DebugScreen> {
             isLoading: _isLoading,
             isFullWidth: true,
             backgroundColor: Colors.teal,
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 16),
+          const Text(
+            'Crashlytics',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          CustomButton(
+            text: 'Test Crash',
+            icon: AppIcons.warning,
+            onPressed: () => FirebaseCrashlytics.instance.crash(),
+            isFullWidth: true,
+            backgroundColor: Colors.red,
           ),
         ],
       ),

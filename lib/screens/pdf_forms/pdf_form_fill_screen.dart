@@ -48,6 +48,24 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
   final _customerPositionController = TextEditingController();
   final _systemCategoryController = TextEditingController();
 
+  // Keys and focus nodes for scroll-to-error
+  final _customerNameKey = GlobalKey();
+  final _customerNameFocus = FocusNode();
+  final _siteAddressKey = GlobalKey();
+  final _siteAddressFocus = FocusNode();
+  final _jobNoKey = GlobalKey();
+  final _jobNoFocus = FocusNode();
+  final _extentOfWorkKey = GlobalKey();
+  final _extentOfWorkFocus = FocusNode();
+  final _engineerNameKey = GlobalKey();
+  final _engineerNameFocus = FocusNode();
+  final _engineerPositionKey = GlobalKey();
+  final _engineerPositionFocus = FocusNode();
+  final _customerCertNameKey = GlobalKey();
+  final _customerCertNameFocus = FocusNode();
+  final _engineerSignKey = GlobalKey();
+  final _customerSignKey = GlobalKey();
+
   // Date values
   DateTime _date = DateTime.now();
   DateTime _engineerDate = DateTime.now();
@@ -169,6 +187,13 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
     _systemCategoryController.dispose();
     _engineerSignController.dispose();
     _customerSignController.dispose();
+    _customerNameFocus.dispose();
+    _siteAddressFocus.dispose();
+    _jobNoFocus.dispose();
+    _extentOfWorkFocus.dispose();
+    _engineerNameFocus.dispose();
+    _engineerPositionFocus.dispose();
+    _customerCertNameFocus.dispose();
     super.dispose();
   }
 
@@ -288,7 +313,9 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
     return Column(
       children: [
         CustomTextField(
+          key: _customerNameKey,
           controller: _customerNameController,
+          focusNode: _customerNameFocus,
           label: 'Customer Name *',
           hint: 'Enter customer name',
           prefixIcon: Icon(AppIcons.building),
@@ -317,7 +344,9 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
         ),
         const SizedBox(height: 16),
         CustomTextField(
+          key: _siteAddressKey,
           controller: _siteAddressController,
+          focusNode: _siteAddressFocus,
           label: 'Site Address *',
           hint: 'Enter site address',
           maxLines: 2,
@@ -335,7 +364,9 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
           children: [
             Expanded(
               child: CustomTextField(
+                key: _jobNoKey,
                 controller: _jobNoController,
+                focusNode: _jobNoFocus,
                 label: 'Job No *',
                 hint: 'Enter job number',
                 prefixIcon: Icon(AppIcons.tag),
@@ -369,7 +400,9 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
     return Column(
       children: [
         CustomTextField(
+          key: _extentOfWorkKey,
           controller: _extentOfWorkController,
+          focusNode: _extentOfWorkFocus,
           label: 'Extent of Installation Work *',
           hint: 'Describe the work performed',
           maxLines: 4,
@@ -469,7 +502,9 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
           children: [
             Expanded(
               child: CustomTextField(
+                key: _engineerNameKey,
                 controller: _engineerNameController,
+                focusNode: _engineerNameFocus,
                 label: 'Name (BLOCK LETTERS) *',
                 hint: 'Enter engineer name',
                 prefixIcon: Icon(AppIcons.user),
@@ -480,7 +515,9 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
             const SizedBox(width: 16),
             Expanded(
               child: CustomTextField(
+                key: _engineerPositionKey,
                 controller: _engineerPositionController,
+                focusNode: _engineerPositionFocus,
                 label: 'Position *',
                 hint: 'Enter position',
                 prefixIcon: Icon(AppIcons.clipboard),
@@ -492,6 +529,7 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
         ),
         const SizedBox(height: 16),
         _buildSignatureWidget(
+          key: _engineerSignKey,
           label: 'Engineer Signature *',
           controller: _engineerSignController,
           signatureData: _engineerSignatureData,
@@ -540,6 +578,7 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
     return Column(
       children: [
         _buildSignatureWidget(
+          key: _customerSignKey,
           label: 'Customer Signature *',
           controller: _customerSignController,
           signatureData: _customerSignatureData,
@@ -563,7 +602,9 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
           children: [
             Expanded(
               child: CustomTextField(
+                key: _customerCertNameKey,
                 controller: _customerCertNameController,
+                focusNode: _customerCertNameFocus,
                 label: 'Name *',
                 hint: 'Enter customer name',
                 prefixIcon: Icon(AppIcons.user),
@@ -607,6 +648,7 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
   }
 
   Widget _buildSignatureWidget({
+    Key? key,
     required String label,
     required SignatureController controller,
     required String? signatureData,
@@ -616,6 +658,7 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
     final hasSignature = signatureData != null && signatureData.isNotEmpty;
 
     return Column(
+      key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
@@ -730,18 +773,49 @@ class _PdfFormFillScreenState extends State<PdfFormFillScreen> {
     };
   }
 
+  void _scrollToFirstError() {
+    final fields = [
+      (key: _customerNameKey, focus: _customerNameFocus, hasError: () => _customerNameController.text.trim().isEmpty),
+      (key: _siteAddressKey, focus: _siteAddressFocus, hasError: () => _siteAddressController.text.trim().isEmpty),
+      (key: _jobNoKey, focus: _jobNoFocus, hasError: () => _jobNoController.text.trim().isEmpty),
+      (key: _extentOfWorkKey, focus: _extentOfWorkFocus, hasError: () => _extentOfWorkController.text.trim().isEmpty),
+      (key: _engineerNameKey, focus: _engineerNameFocus, hasError: () => _engineerNameController.text.trim().isEmpty),
+      (key: _engineerPositionKey, focus: _engineerPositionFocus, hasError: () => _engineerPositionController.text.trim().isEmpty),
+      (key: _customerCertNameKey, focus: _customerCertNameFocus, hasError: () => _customerCertNameController.text.trim().isEmpty),
+    ];
+    for (final field in fields) {
+      if (field.hasError()) {
+        final ctx = field.key.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: AppTheme.normalAnimation, curve: AppTheme.defaultCurve, alignment: 0.2)
+              .then((_) => field.focus.requestFocus());
+        }
+        return;
+      }
+    }
+  }
+
+  void _scrollToKey(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx, duration: AppTheme.normalAnimation, curve: AppTheme.defaultCurve, alignment: 0.2);
+    }
+  }
+
   bool _validateForm() {
     if (!_formKey.currentState!.validate()) {
-      context.showErrorToast('Please fill in all required fields');
+      _scrollToFirstError();
       return false;
     }
 
     if (_engineerSignatureData == null || _engineerSignatureData!.isEmpty) {
+      _scrollToKey(_engineerSignKey);
       context.showErrorToast('Please provide engineer signature');
       return false;
     }
 
     if (_customerSignatureData == null || _customerSignatureData!.isEmpty) {
+      _scrollToKey(_customerSignKey);
       context.showErrorToast('Please provide customer signature');
       return false;
     }

@@ -28,6 +28,14 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
   late TextEditingController _systemCategoryController;
   late TextEditingController _notesController;
 
+  // Keys and focus nodes for scroll-to-error
+  final _customerNameKey = GlobalKey();
+  final _customerNameFocus = FocusNode();
+  final _siteAddressKey = GlobalKey();
+  final _siteAddressFocus = FocusNode();
+  final _jobNumberKey = GlobalKey();
+  final _jobNumberFocus = FocusNode();
+
   // Dynamic form data storage
   late Map<String, dynamic> _formData;
   final Map<String, TextEditingController> _textControllers = {};
@@ -87,6 +95,9 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
     _jobNumberController.dispose();
     _systemCategoryController.dispose();
     _notesController.dispose();
+    _customerNameFocus.dispose();
+    _siteAddressFocus.dispose();
+    _jobNumberFocus.dispose();
 
     for (var controller in _textControllers.values) {
       controller.dispose();
@@ -171,7 +182,9 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
 
               // Customer Name
               CustomTextField(
+                key: _customerNameKey,
                 controller: _customerNameController,
+                focusNode: _customerNameFocus,
                 label: 'Customer Name *',
                 hint: 'Enter customer name',
                 prefixIcon: Icon(AppIcons.building),
@@ -186,7 +199,9 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
 
               // Site Address
               CustomTextField(
+                key: _siteAddressKey,
                 controller: _siteAddressController,
+                focusNode: _siteAddressFocus,
                 label: 'Site Address *',
                 hint: 'Enter site address',
                 maxLines: 2,
@@ -202,7 +217,9 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
 
               // Job Number
               CustomTextField(
+                key: _jobNumberKey,
                 controller: _jobNumberController,
+                focusNode: _jobNumberFocus,
                 label: 'Job Number *',
                 hint: 'Enter job number',
                 prefixIcon: Icon(AppIcons.tag),
@@ -342,9 +359,27 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
         .join(' ');
   }
 
+  void _scrollToFirstError() {
+    final fields = [
+      (key: _customerNameKey, focus: _customerNameFocus, hasError: () => _customerNameController.text.trim().isEmpty),
+      (key: _siteAddressKey, focus: _siteAddressFocus, hasError: () => _siteAddressController.text.trim().isEmpty),
+      (key: _jobNumberKey, focus: _jobNumberFocus, hasError: () => _jobNumberController.text.trim().isEmpty),
+    ];
+    for (final field in fields) {
+      if (field.hasError()) {
+        final ctx = field.key.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: AppTheme.normalAnimation, curve: AppTheme.defaultCurve, alignment: 0.2)
+              .then((_) => field.focus.requestFocus());
+        }
+        break;
+      }
+    }
+  }
+
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate()) {
-      showValidationBanner(context: context, message: 'Please fill in all required fields');
+      _scrollToFirstError();
       return;
     }
 

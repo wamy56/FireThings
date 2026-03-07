@@ -111,50 +111,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // Profile Section
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: Theme.of(context).primaryColor,
-                    child: Text(
-                      getInitial(),
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 32,
+                  backgroundColor: Theme.of(context).primaryColor,
+                  child: Text(
+                    getInitial(),
+                    style: const TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user?.displayName ??
+                            user?.email?.split('@')[0] ??
+                            'Engineer',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user?.displayName ??
-                              user?.email?.split('@')[0] ??
-                              'Engineer',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user?.email ?? 'No email',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          user?.email ?? 'No email',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ).animateEntrance(),
           const SizedBox(height: 24),
@@ -434,9 +432,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        ...tiles.map((tile) => Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: ListTile(
+        ...tiles.map((tile) => ListTile(
             leading: Icon(tile.icon, color: tile.destructive ? Colors.red : null),
             title: Text(
               tile.title,
@@ -448,7 +444,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: Text(tile.subtitle),
             trailing: Icon(AppIcons.arrowRight),
             onTap: tile.onTap,
-          ),
         )),
       ],
     );
@@ -493,31 +488,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 8),
-        Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: SwitchListTile(
-            secondary: Icon(AppIcons.editNote),
-            title: const Text(
-              'Draft reminders',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: const Text('Remind about idle draft invoices & jobsheets'),
-            value: _draftReminders,
-            onChanged: _setDraftReminders,
+        SwitchListTile(
+          secondary: Icon(AppIcons.editNote),
+          title: const Text(
+            'Draft reminders',
+            style: TextStyle(fontWeight: FontWeight.w600),
           ),
+          subtitle: const Text('Remind about idle draft invoices & jobsheets'),
+          value: _draftReminders,
+          onChanged: _setDraftReminders,
         ),
-        Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          child: SwitchListTile(
-            secondary: Icon(AppIcons.receiptOutline),
-            title: const Text(
-              'Overdue invoice reminders',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: const Text('Remind about unpaid invoices past due date'),
-            value: _overdueReminders,
-            onChanged: _setOverdueReminders,
+        SwitchListTile(
+          secondary: Icon(AppIcons.receiptOutline),
+          title: const Text(
+            'Overdue invoice reminders',
+            style: TextStyle(fontWeight: FontWeight.w600),
           ),
+          subtitle: const Text('Remind about unpaid invoices past due date'),
+          value: _overdueReminders,
+          onChanged: _setOverdueReminders,
         ),
       ],
     );

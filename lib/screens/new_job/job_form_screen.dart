@@ -35,6 +35,16 @@ class _JobFormScreenState extends State<JobFormScreen> {
   final _notesController = TextEditingController();
   late final TextEditingController _engineerNameController;
 
+  // Keys and focus nodes for scroll-to-error
+  final _customerNameKey = GlobalKey();
+  final _customerNameFocus = FocusNode();
+  final _siteAddressKey = GlobalKey();
+  final _siteAddressFocus = FocusNode();
+  final _jobNumberKey = GlobalKey();
+  final _jobNumberFocus = FocusNode();
+  final Map<String, GlobalKey> _dynamicFieldKeys = {};
+  final Map<String, FocusNode> _dynamicFieldFocusNodes = {};
+
   // Dynamic form data storage
   final Map<String, dynamic> _formData = {};
   final Map<String, TextEditingController> _textControllers = {};
@@ -52,12 +62,16 @@ class _JobFormScreenState extends State<JobFormScreen> {
     _engineerNameController = TextEditingController(
       text: user?.displayName ?? user?.email ?? 'Engineer',
     );
-    // Initialize controllers for text fields
+    // Initialize controllers and keys for text fields
     for (var field in widget.template.fields) {
       if (field.type == FieldType.text ||
           field.type == FieldType.number ||
           field.type == FieldType.multiline) {
         _textControllers[field.id] = TextEditingController();
+      }
+      if (field.required) {
+        _dynamicFieldKeys[field.id] = GlobalKey();
+        _dynamicFieldFocusNodes[field.id] = FocusNode();
       }
       // Initialize with default values
       if (field.defaultValue != null) {
@@ -104,10 +118,16 @@ class _JobFormScreenState extends State<JobFormScreen> {
     _systemCategoryController.dispose();
     _notesController.dispose();
     _engineerNameController.dispose();
+    _customerNameFocus.dispose();
+    _siteAddressFocus.dispose();
+    _jobNumberFocus.dispose();
 
-    // Dispose dynamic controllers
+    // Dispose dynamic controllers and focus nodes
     for (var controller in _textControllers.values) {
       controller.dispose();
+    }
+    for (var focusNode in _dynamicFieldFocusNodes.values) {
+      focusNode.dispose();
     }
 
     super.dispose();
@@ -231,7 +251,9 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
         // Customer Name
         CustomTextField(
+          key: _customerNameKey,
           controller: _customerNameController,
+          focusNode: _customerNameFocus,
           label: 'Customer Name *',
           hint: 'Enter customer name',
           prefixIcon: Icon(AppIcons.building),
@@ -246,7 +268,9 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
         // Site Address with picker
         CustomTextField(
+          key: _siteAddressKey,
           controller: _siteAddressController,
+          focusNode: _siteAddressFocus,
           label: 'Site Address *',
           hint: 'Enter site address',
           maxLines: 2,
@@ -267,7 +291,9 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
         // Job Number
         CustomTextField(
+          key: _jobNumberKey,
           controller: _jobNumberController,
+          focusNode: _jobNumberFocus,
           label: 'Job Number *',
           hint: 'Enter job number',
           prefixIcon: Icon(AppIcons.tag),
@@ -326,9 +352,11 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
   Widget _buildTextField(TemplateField field) {
     return CustomTextField(
+      key: _dynamicFieldKeys[field.id],
       controller: _textControllers[field.id],
+      focusNode: _dynamicFieldFocusNodes[field.id],
       label: field.label + (field.required ? ' *' : ''),
-      prefixIcon: Icon(_getFieldIcon(field)), // Add this line
+      prefixIcon: Icon(_getFieldIcon(field)),
       onChanged: (value) => _formData[field.id] = value,
       validator: field.required
           ? (value) {
@@ -343,7 +371,9 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
   Widget _buildNumberField(TemplateField field) {
     return CustomTextField(
+      key: _dynamicFieldKeys[field.id],
       controller: _textControllers[field.id],
+      focusNode: _dynamicFieldFocusNodes[field.id],
       label: field.label + (field.required ? ' *' : ''),
       keyboardType: TextInputType.number,
       onChanged: (value) => _formData[field.id] = value,
@@ -450,7 +480,9 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
   Widget _buildMultilineField(TemplateField field) {
     return CustomTextField(
+      key: _dynamicFieldKeys[field.id],
       controller: _textControllers[field.id],
+      focusNode: _dynamicFieldFocusNodes[field.id],
       label: field.label + (field.required ? ' *' : ''),
       maxLines: 3,
       onChanged: (value) => _formData[field.id] = value,
@@ -558,29 +590,39 @@ class _JobFormScreenState extends State<JobFormScreen> {
     }
   }
 
+  void _scrollToFirstError() {
+    final fields = [
+      (key: _customerNameKey, focus: _customerNameFocus, hasError: () => _customerNameController.text.trim().isEmpty),
+      (key: _siteAddressKey, focus: _siteAddressFocus, hasError: () => _siteAddressController.text.trim().isEmpty),
+      (key: _jobNumberKey, focus: _jobNumberFocus, hasError: () => _jobNumberController.text.trim().isEmpty),
+      // Dynamic required fields
+      ...widget.template.fields.where((f) => f.required).map((f) {
+        final controller = _textControllers[f.id];
+        final isEmpty = controller != null
+            ? () => controller.text.trim().isEmpty
+            : () => _formData[f.id] == null || _formData[f.id].toString().isEmpty;
+        return (key: _dynamicFieldKeys[f.id]!, focus: _dynamicFieldFocusNodes[f.id]!, hasError: isEmpty);
+      }),
+    ];
+    for (final field in fields) {
+      if (field.hasError()) {
+        final ctx = field.key.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(ctx, duration: AppTheme.normalAnimation, curve: AppTheme.defaultCurve, alignment: 0.2)
+              .then((_) => field.focus.requestFocus());
+        }
+        break;
+      }
+    }
+  }
+
   Future<void> _validateAndContinue() async {
     // Hide keyboard
     FocusScope.of(context).unfocus();
 
-    // Validate standard fields first
-    if (_customerNameController.text.trim().isEmpty) {
-      context.showErrorToast('Customer Name is required');
-      return;
-    }
-
-    if (_siteAddressController.text.trim().isEmpty) {
-      context.showErrorToast('Site Address is required');
-      return;
-    }
-
-    if (_jobNumberController.text.trim().isEmpty) {
-      context.showErrorToast('Job Number is required');
-      return;
-    }
-
     // Validate form (including dynamic fields)
     if (!_formKey.currentState!.validate()) {
-      context.showErrorToast('Please fill in all required fields');
+      _scrollToFirstError();
       return;
     }
 
