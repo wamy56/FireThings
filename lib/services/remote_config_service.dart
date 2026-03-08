@@ -18,6 +18,7 @@ class RemoteConfigService {
     'pdf_forms_enabled': true,
     'cloud_sync_enabled': true,
     'custom_templates_enabled': true,
+    'standards_data_version': '08/03/2026',
   };
 
   Future<void> initialize() async {
@@ -64,4 +65,7 @@ class RemoteConfigService {
 
   bool get customTemplatesEnabled =>
       _remoteConfig.getBool('custom_templates_enabled');
+
+  String get standardsDataVersion =>
+      _remoteConfig.getString('standards_data_version');
 }

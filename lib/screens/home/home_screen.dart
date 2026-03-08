@@ -25,6 +25,7 @@ import '../invoicing/invoice_list_screen.dart';
 import '../../services/analytics_service.dart';
 import '../../services/remote_config_service.dart';
 import '../../widgets/background_decoration.dart';
+import '../../widgets/tools_disclaimer_gate.dart';
 
 class HomeScreen extends StatefulWidget {
   final ValueChanged<int> onTabChanged;
@@ -192,9 +193,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (rc.decibelMeterEnabled)
         _buildActionButton('Decibel Meter', AppIcons.volumeHigh, Colors.purple, () {
           analytics.logToolOpened('decibel_meter');
-          Navigator.push(
+          ToolsDisclaimerGate.navigateToTool(
             context,
-            adaptivePageRoute(builder: (_) => const DecibelMeterScreen()),
+            const DecibelMeterScreen(),
           );
         }),
       if (rc.batteryLoadTesterEnabled)
@@ -204,26 +205,26 @@ class _HomeScreenState extends State<HomeScreen> {
           Colors.green,
           () {
             analytics.logToolOpened('battery_load_test');
-            Navigator.push(
+            ToolsDisclaimerGate.navigateToTool(
               context,
-              adaptivePageRoute(builder: (_) => const BatteryLoadTestScreen()),
+              const BatteryLoadTestScreen(),
             );
           },
         ),
       if (rc.bs5839ReferenceEnabled)
         _buildActionButton('BS 5839', AppIcons.book, Colors.teal, () {
           analytics.logToolOpened('bs5839_reference');
-          Navigator.push(
+          ToolsDisclaimerGate.navigateToTool(
             context,
-            adaptivePageRoute(builder: (_) => const BS5839ReferenceScreen()),
+            const BS5839ReferenceScreen(),
           );
         }),
       if (rc.detectorSpacingEnabled)
         _buildActionButton('Detector Spacing', AppIcons.grid, Colors.indigo, () {
           analytics.logToolOpened('detector_spacing_calculator');
-          Navigator.push(
+          ToolsDisclaimerGate.navigateToTool(
             context,
-            adaptivePageRoute(builder: (_) => const DetectorSpacingCalculatorScreen()),
+            const DetectorSpacingCalculatorScreen(),
           );
         }),
       if (rc.timestampCameraEnabled)

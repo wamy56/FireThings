@@ -24,6 +24,7 @@ import 'pdf_header_designer_screen.dart';
 import 'pdf_footer_designer_screen.dart';
 import 'pdf_colour_scheme_screen.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/tools_disclaimer_gate.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -315,6 +316,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   context,
                   adaptivePageRoute(builder: (_) => const PrivacyPolicyScreen()),
                 ),
+              ),
+              _SettingsTileData(
+                title: 'Tools Disclaimer',
+                subtitle: 'View safety tools disclaimer',
+                icon: AppIcons.warning,
+                onTap: () => ToolsDisclaimerGate.showDisclaimerReadOnly(context),
               ),
               _SettingsTileData(
                 title: 'About',

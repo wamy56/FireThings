@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/adaptive_app_bar.dart';
+import '../../widgets/standard_info_box.dart';
 
 class ReferenceItem {
   final String heading;
@@ -78,12 +79,12 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
       category: 'System Categories',
       icon: AppIcons.shield,
       summary:
-          'Detection in defined areas beyond escape routes — high-risk rooms and areas adjoining escape routes.',
+          'Detection in defined areas beyond escape routes — high-risk rooms (including sleeping rooms) and areas adjoining escape routes.',
       items: [
         ReferenceItem(
           heading: 'Definition',
           content:
-              'Automatic fire detection in all areas covered by L3, plus areas of high fire risk and areas adjoining escape routes (e.g. rooms opening onto corridors or stairways).',
+              'Automatic fire detection in all areas covered by L3, plus areas of high fire risk and areas adjoining escape routes (e.g. rooms opening onto corridors or stairways). BS 5839-1:2025 now explicitly classifies sleeping rooms as high-risk areas under L2.',
         ),
         ReferenceItem(
           heading: 'Where it applies',
@@ -116,12 +117,12 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
       category: 'System Categories',
       icon: AppIcons.shield,
       summary:
-          'Detection within circulation areas forming escape routes connected to rooms.',
+          'Detection within circulation areas forming escape routes, plus detection at the top of lift shafts.',
       items: [
         ReferenceItem(
           heading: 'Definition',
           content:
-              'Automatic fire detection in circulation areas (corridors, hallways) that form part of escape routes. Minimum level for most commercial premises.',
+              'Automatic fire detection in circulation areas (corridors, hallways) that form part of escape routes. BS 5839-1:2025 now also requires detection at the top of lift shafts. Minimum level for most commercial premises.',
         ),
         ReferenceItem(
           heading: 'Where it applies',
@@ -264,6 +265,11 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
           content:
               'Consider rate-of-rise detectors where ambient temperature is stable. Fixed-temperature detectors rated at least 30°C above maximum ambient. In kitchens, minimum 90°C rated heads are common.',
         ),
+        ReferenceItem(
+          heading: 'Sleeping rooms (L2/L3)',
+          content:
+              'BS 5839-1:2025 prohibits the use of heat detectors in rooms where people sleep under L2 or L3 systems. Smoke detectors or multi-sensor detectors must be used instead, as heat detectors respond too slowly to smouldering fires that may endanger sleeping occupants.',
+        ),
       ],
     ),
     ReferenceCard(
@@ -324,6 +330,11 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
           content:
               'Do not mount directly above radiators, cookers, boilers, or other heat sources.\nAvoid areas subject to condensation.\nAvoid dead air spaces within 150mm of the wall-ceiling junction in rooms with ceiling beams.\nPitched ceilings: detector(s) within 600mm of the apex if slope > 1:12.',
         ),
+        ReferenceItem(
+          heading: 'Shadow spots (BS 5839-1:2025)',
+          content:
+              'Account for structural obstructions near ceiling level (beams, ductwork, cable trays) that may block or deflect smoke travel to detectors. Where obstructions create shadow spots, additional detectors or repositioning may be needed to ensure full coverage.',
+        ),
       ],
     ),
     ReferenceCard(
@@ -347,6 +358,11 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
           heading: 'Beams < 150mm deep',
           content:
               'Beams less than 150mm deep can generally be ignored for detector spacing calculations. Smoke will travel over these shallow obstructions.',
+        ),
+        ReferenceItem(
+          heading: 'Closely-spaced beams (BS 5839-1:2025)',
+          content:
+              'Beams spaced less than 1m centre-to-centre are now defined as "closely spaced". Where closely-spaced beams are present, detectors should be mounted on the underside of the beams rather than between them.',
         ),
         ReferenceItem(
           heading: 'Partitions and racking',
@@ -608,12 +624,17 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
         ReferenceItem(
           heading: 'Fire-resistant cables',
           content:
-              'Required for critical circuits — any circuit whose failure would prevent the alarm from operating. Must comply with BS 7629 (category of fire resistance) or BS 8434. Common types: MICC (mineral insulated), FP200, Firetuf, Firecel.',
+              'Required for critical circuits — any circuit whose failure would prevent the alarm from operating. Must comply with BS 7629 (category of fire resistance) or BS 8434, and also BS EN 50575 for CPR (Construction Products Regulation) compliance per BS 5839-1:2025. Common types: MICC (mineral insulated), FP200, Firetuf, Firecel.',
         ),
         ReferenceItem(
           heading: 'Enhanced fire-resistant cables',
           content:
               'Required where the cable must survive fire AND water (e.g. sprinkler activation). Must meet BS 8434-2 Category 2 (fire with water). Typically MICC with LSF oversheath.',
+        ),
+        ReferenceItem(
+          heading: 'Cable colour (BS 5839-1:2025)',
+          content:
+              'All fire alarm cables within a building should be a single common colour to aid identification. Red is the preferred colour for fire alarm cabling.',
         ),
         ReferenceItem(
           heading: 'When fire resistance is required',
@@ -1257,40 +1278,36 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
       child: Builder(
         builder: (context) => AlertDialog(
         title: const Text('BS 5839-1 Quick Reference'),
-        content: const SingleChildScrollView(
+        content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              const StandardInfoBox(toolKey: 'bs5839_reference'),
+              const Text(
                 'Quick reference cards for BS 5839-1 fire detection and alarm system requirements.',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
-              SizedBox(height: 12),
-              Text('How to Use:'),
-              SizedBox(height: 8),
-              Text('1. Search by keyword or browse by category'),
-              Text('2. Tap a category chip to filter cards'),
-              Text('3. Tap a card to expand and see full details'),
-              SizedBox(height: 12),
-              Text('Categories:'),
-              SizedBox(height: 8),
-              Text('\u2022 System Categories (L1\u2013L5, M, P1, P2)'),
-              Text('\u2022 Detectors (spacing & coverage)'),
-              Text('\u2022 Detector Siting (restrictions & type selection)'),
-              Text('\u2022 Sounders (dB levels, placement & VADs)'),
-              Text('\u2022 Call Points (positioning rules)'),
-              Text('\u2022 Cables & Wiring (types & segregation)'),
-              Text('\u2022 Ancillary Equipment (door holders, interfaces, PSU)'),
-              Text('\u2022 Void Detection (ceiling & floor voids)'),
-              Text('\u2022 Testing & Maintenance (intervals & logbook)'),
-              Text('\u2022 Fire Detection Zones (size limits)'),
-              Text('\u2022 False Alarm Management'),
-              SizedBox(height: 12),
-              Text(
-                'This is a quick reference guide. Always refer to the full BS 5839-1 standard for definitive requirements.',
-                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
-              ),
+              const SizedBox(height: 12),
+              const Text('How to Use:'),
+              const SizedBox(height: 8),
+              const Text('1. Search by keyword or browse by category'),
+              const Text('2. Tap a category chip to filter cards'),
+              const Text('3. Tap a card to expand and see full details'),
+              const SizedBox(height: 12),
+              const Text('Categories:'),
+              const SizedBox(height: 8),
+              const Text('\u2022 System Categories (L1\u2013L5, M, P1, P2)'),
+              const Text('\u2022 Detectors (spacing & coverage)'),
+              const Text('\u2022 Detector Siting (restrictions & type selection)'),
+              const Text('\u2022 Sounders (dB levels, placement & VADs)'),
+              const Text('\u2022 Call Points (positioning rules)'),
+              const Text('\u2022 Cables & Wiring (types & segregation)'),
+              const Text('\u2022 Ancillary Equipment (door holders, interfaces, PSU)'),
+              const Text('\u2022 Void Detection (ceiling & floor voids)'),
+              const Text('\u2022 Testing & Maintenance (intervals & logbook)'),
+              const Text('\u2022 Fire Detection Zones (size limits)'),
+              const Text('\u2022 False Alarm Management'),
             ],
           ),
         ),

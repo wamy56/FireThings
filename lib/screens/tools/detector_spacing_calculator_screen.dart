@@ -5,6 +5,7 @@ import '../../utils/icon_map.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/keyboard_dismiss_wrapper.dart';
+import '../../widgets/standard_info_box.dart';
 
 // ─── Data Model ─────────────────────────────────────────────────────────────
 
@@ -823,16 +824,7 @@ class _DetectorSpacingCalculatorScreenState
                   '\u2022 Corridors \u2264 2m wide use single-row spacing',
                 ),
                 const SizedBox(height: 12),
-                Text(
-                  'This calculator provides guidance only. Always refer to '
-                  'BS 5839-1 for the full standard and consult with a fire '
-                  'engineer for complex installations.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
+                const StandardInfoBox(toolKey: 'detector_spacing'),
               ],
             ),
           ),

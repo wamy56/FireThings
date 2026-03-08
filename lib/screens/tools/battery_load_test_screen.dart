@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/keyboard_dismiss_wrapper.dart';
+import '../../widgets/standard_info_box.dart';
 
 class BatteryLoadTestScreen extends StatefulWidget {
   const BatteryLoadTestScreen({super.key});
@@ -44,7 +45,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
     final alarmCurrent = double.parse(_alarmCurrentController.text);
 
     setState(() {
-      // BS 5839-1 Annex D / Annexe E formula
+      // BS 5839-1:2025 Annex E formula
       // Cmin = 1.25 × ((T1 × I1) + D × (I2 × T2))
       const ageingFactor = 1.25;
       const deratingFactor = 1.75; // D — battery inefficiency under alarm load
@@ -508,9 +509,10 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
   }
 
   Widget _buildRecommendations() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
       elevation: 2,
-      color: Colors.orange.shade50,
+      color: isDark ? Colors.orange.shade900.withValues(alpha: 0.3) : Colors.orange.shade50,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -518,13 +520,13 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
           children: [
             Row(
               children: [
-                Icon(AppIcons.lamp, color: Colors.orange.shade700),
+                Icon(AppIcons.lamp, color: isDark ? Colors.orange.shade300 : Colors.orange.shade700),
                 const SizedBox(width: 8),
                 Text(
                   'Recommendations',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange.shade900,
+                    color: isDark ? Colors.orange.shade200 : Colors.orange.shade900,
                   ),
                 ),
               ],
@@ -623,14 +625,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
               const Text('\u2022 Standby: 0.05 - 0.2 A'),
               const Text('\u2022 Alarm: 0.3 - 2.0 A'),
               const SizedBox(height: 12),
-              Text(
-                'Reference: BS 5839-1 Annex D (Annexe E in 2025 edition). The installed battery capacity must be \u2265 Cmin to pass.',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.grey.shade600,
-                ),
-              ),
+              const StandardInfoBox(toolKey: 'battery_load_test'),
             ],
           ),
         ),

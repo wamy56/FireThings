@@ -10,6 +10,7 @@ import '../../utils/icon_map.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
+import '../../widgets/standard_info_box.dart';
 
 class DecibelMeterScreen extends StatefulWidget {
   const DecibelMeterScreen({super.key});
@@ -768,7 +769,9 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
     showPremiumDialog(
       context: context,
       child: Builder(
-        builder: (context) => AlertDialog(
+        builder: (context) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          return AlertDialog(
         title: const Text('About Decibel Meter'),
         content: SingleChildScrollView(
           child: Column(
@@ -780,11 +783,12 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
+              const StandardInfoBox(toolKey: 'decibel_meter'),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  border: Border.all(color: Colors.orange.shade300),
+                  color: isDark ? Colors.orange.shade900.withValues(alpha: 0.3) : Colors.orange.shade50,
+                  border: Border.all(color: isDark ? Colors.orange.shade700 : Colors.orange.shade300),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -794,7 +798,7 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                       children: [
                         Icon(
                           AppIcons.warning,
-                          color: Colors.orange.shade700,
+                          color: isDark ? Colors.orange.shade300 : Colors.orange.shade700,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -802,7 +806,7 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                           'Phone Limitations',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade900,
+                            color: isDark ? Colors.orange.shade200 : Colors.orange.shade900,
                           ),
                         ),
                       ],
@@ -822,8 +826,8 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  border: Border.all(color: Colors.blue.shade300),
+                  color: isDark ? Colors.blue.shade900.withValues(alpha: 0.3) : Colors.blue.shade50,
+                  border: Border.all(color: isDark ? Colors.blue.shade700 : Colors.blue.shade300),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Column(
@@ -833,7 +837,7 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                       children: [
                         Icon(
                           AppIcons.slider,
-                          color: Colors.blue.shade700,
+                          color: isDark ? Colors.blue.shade300 : Colors.blue.shade700,
                           size: 20,
                         ),
                         const SizedBox(width: 8),
@@ -841,7 +845,7 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
                           'Calibration',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade900,
+                            color: isDark ? Colors.blue.shade200 : Colors.blue.shade900,
                           ),
                         ),
                       ],
@@ -859,8 +863,8 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
               const SizedBox(height: 12),
               const Text('Fire Alarm Standards:'),
               const SizedBox(height: 8),
-              const Text('• BS 5839: Minimum 65 dB(A) at bedhead'),
-              const Text('• BS 5839: Maximum 120 dB(A) at 1m'),
+              const Text('• BS 5839-1:2025: Minimum 65 dB(A) at bedhead'),
+              const Text('• BS 5839-1:2025: Maximum 120 dB(A) at 1m'),
               const Text('• Typical range: 75-90 dB(A)'),
               const SizedBox(height: 12),
               const Text(
@@ -893,7 +897,9 @@ class _DecibelMeterScreenState extends State<DecibelMeterScreen>
             child: const Text('Close'),
           ),
         ],
-      )),
+      );
+        },
+      ),
     );
   }
 }
