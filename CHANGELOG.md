@@ -4,6 +4,14 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-11 (Session 15)
+
+### Privacy Policy Markdown Update
+
+- **Updated `privacy_policy.md`**: Created standalone markdown file at project root matching the in-app privacy policy exactly. Previous version was missing ICO registration details (ZC102827), had outdated date (7 March → 10 March 2026), and old Section 9 title ("Contact" → "Data Controller & Contact").
+
+---
+
 ## 2026-03-11 (Session 14)
 
 ### Timestamp Camera — 5 Bug Fixes + Zoom Enhancement
