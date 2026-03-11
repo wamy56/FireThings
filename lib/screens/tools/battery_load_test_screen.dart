@@ -576,6 +576,8 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              const StandardInfoBox(toolKey: 'battery_load_test'),
+              const SizedBox(height: 12),
               const Text(
                 'BS 5839-1 Formula',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -624,8 +626,6 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
               const SizedBox(height: 8),
               const Text('\u2022 Standby: 0.05 - 0.2 A'),
               const Text('\u2022 Alarm: 0.3 - 2.0 A'),
-              const SizedBox(height: 12),
-              const StandardInfoBox(toolKey: 'battery_load_test'),
             ],
           ),
         ),

@@ -19,6 +19,8 @@ class VideoProcessingScreen extends StatefulWidget {
   final int totalDurationMs;
   final DateTime? recordingStartTime;
   final String? fontPath;
+  final String? coords;
+  final String? address;
 
   const VideoProcessingScreen({
     super.key,
@@ -27,6 +29,8 @@ class VideoProcessingScreen extends StatefulWidget {
     required this.totalDurationMs,
     this.recordingStartTime,
     this.fontPath,
+    this.coords,
+    this.address,
   });
 
   @override
@@ -134,6 +138,8 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
       settings: settings,
       recordingStartTime: widget.recordingStartTime!,
       durationMs: widget.totalDurationMs,
+      coords: widget.coords,
+      address: widget.address,
       fontPath: widget.fontPath,
     );
 

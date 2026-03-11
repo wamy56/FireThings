@@ -148,41 +148,53 @@ class TimestampCameraService {
     final isLeft = positionIndex == 0 || positionIndex == 2; // bottomLeft or topLeft
     final isTop = positionIndex == 2 || positionIndex == 3;  // topLeft or topRight
 
-    // Use arial48 (largest built-in font). For very high-res photos we
-    // accept the fixed size — it's readable at 1080p+ and avoids the
-    // complexity of TTF rendering in an isolate.
+    // Scale factor relative to 1080p baseline
+    final scale = (imgWidth / 1080).clamp(1.0, 3.0);
+
     final font = img.arial48;
-    final lineHeight = (font.lineHeight * 1.3).round();
+    final lineHeight = (font.lineHeight * 1.5 * scale).round();
     final margin = (imgWidth * 0.03).round();
-    final padding = (font.lineHeight * 0.5).round();
+    final padding = (font.lineHeight * 0.5 * scale).round();
+    final maxTextWidth = (imgWidth * 0.55).round();
+
+    // Word-wrap lines that exceed max text width
+    final wrappedLines = <String>[];
+    for (final line in overlayLines) {
+      wrappedLines.addAll(_wrapText(font, line, maxTextWidth));
+    }
 
     // Measure max line width
     int maxLineWidth = 0;
-    for (final line in overlayLines) {
+    for (final line in wrappedLines) {
       final w = _measureTextWidth(font, line);
       if (w > maxLineWidth) maxLineWidth = w;
     }
 
     final blockWidth = maxLineWidth + (padding * 2);
-    final blockHeight = (overlayLines.length * lineHeight) + (padding * 2);
+    final blockHeight = (wrappedLines.length * lineHeight) + (padding * 2);
 
-    // Position the background rect
-    final rectX = isLeft ? margin : imgWidth - blockWidth - margin;
-    final rectY = isTop ? margin : imgHeight - blockHeight - margin;
+    // Position the background rect, clamped to image bounds
+    int rectX = isLeft ? margin : imgWidth - blockWidth - margin;
+    int rectY = isTop ? margin : imgHeight - blockHeight - margin;
+    rectX = rectX.clamp(0, (imgWidth - blockWidth).clamp(0, imgWidth));
+    rectY = rectY.clamp(0, (imgHeight - blockHeight).clamp(0, imgHeight));
+
+    final rectX2 = (rectX + blockWidth).clamp(0, imgWidth);
+    final rectY2 = (rectY + blockHeight).clamp(0, imgHeight);
 
     img.fillRect(
       image,
       x1: rectX,
       y1: rectY,
-      x2: rectX + blockWidth,
-      y2: rectY + blockHeight,
+      x2: rectX2,
+      y2: rectY2,
       color: img.ColorRgba8(0, 0, 0, 140),
       alphaBlend: true,
     );
 
     // Draw each line aligned within the block
-    for (var i = 0; i < overlayLines.length; i++) {
-      final line = overlayLines[i];
+    for (var i = 0; i < wrappedLines.length; i++) {
+      final line = wrappedLines[i];
       final lineWidth = _measureTextWidth(font, line);
       final x = isLeft
           ? rectX + padding
@@ -200,6 +212,28 @@ class TimestampCameraService {
     }
 
     return Uint8List.fromList(img.encodeJpg(image, quality: 92));
+  }
+
+  /// Word-wrap a text line to fit within maxWidth pixels using the bitmap font.
+  static List<String> _wrapText(img.BitmapFont font, String text, int maxWidth) {
+    if (_measureTextWidth(font, text) <= maxWidth) return [text];
+
+    final words = text.split(' ');
+    final lines = <String>[];
+    var currentLine = '';
+
+    for (final word in words) {
+      final testLine = currentLine.isEmpty ? word : '$currentLine $word';
+      if (_measureTextWidth(font, testLine) <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        if (currentLine.isNotEmpty) lines.add(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine.isNotEmpty) lines.add(currentLine);
+
+    return lines.isEmpty ? [text] : lines;
   }
 
   /// Measure the pixel width of a text string using the bitmap font.

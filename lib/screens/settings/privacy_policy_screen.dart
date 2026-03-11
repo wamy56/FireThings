@@ -18,7 +18,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
         padding: const EdgeInsets.all(20),
         children: [
           Text(
-            'Last updated: 7 March 2026',
+            'Last updated: 10 March 2026',
             style: theme.textTheme.bodySmall?.copyWith(
               color: Colors.grey[600],
             ),
@@ -116,9 +116,12 @@ class PrivacyPolicyScreen extends StatelessWidget {
             style: bodyStyle,
           ),
           const SizedBox(height: 24),
-          Text('9. Contact', style: headingStyle),
+          Text('9. Data Controller & Contact', style: headingStyle),
           const SizedBox(height: 8),
           Text(
+            'FireThings is registered with the Information Commissioner\'s Office (ICO) as a data controller.\n\n'
+            'ICO registration number: ZC102827\n\n'
+            'You can verify this registration on the ICO register at ico.org.uk.\n\n'
             'If you have any questions about this privacy policy, your data, or wish to exercise any of your rights, contact us at cscott93@hotmail.co.uk.\n\n'
             'We aim to respond to all enquiries within 30 days.',
             style: bodyStyle,

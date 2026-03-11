@@ -258,7 +258,7 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
         ReferenceItem(
           heading: 'Corridor / narrow room (< 5m wide)',
           content:
-              'Detectors may be spaced up to 10m apart. Maximum distance from end wall to first detector: 5m.',
+              'Detectors may be spaced up to 10.6m apart. Maximum distance from end wall to first detector: 5.3m.',
         ),
         ReferenceItem(
           heading: 'High-risk areas (kitchens, plant rooms)',

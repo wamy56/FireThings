@@ -19,7 +19,7 @@ class CameraOverlayPainter extends CustomPainter {
     if (overlayLines.isEmpty) return;
 
     final fontSize = size.height * 0.024;
-    final lineHeight = fontSize * 1.5;
+    final lineGap = fontSize * 0.4;
     final margin = size.width * 0.03;
     final padding = fontSize * 0.6;
 
@@ -29,29 +29,36 @@ class CameraOverlayPainter extends CustomPainter {
         position == OverlayPosition.topRight;
 
     final textAlign = isLeft ? TextAlign.left : TextAlign.right;
+    final maxTextWidth = size.width * 0.55;
 
-    // Build paragraphs and measure max width
+    // Build paragraphs and measure actual dimensions
     final paragraphs = <ui.Paragraph>[];
+    final paragraphHeights = <double>[];
     double maxLineWidth = 0;
+    double totalTextHeight = 0;
 
-    for (final line in overlayLines) {
+    for (var i = 0; i < overlayLines.length; i++) {
       final paragraph =
-          _buildParagraph(line, fontSize, size.width * 0.55, textAlign);
+          _buildParagraph(overlayLines[i], fontSize, maxTextWidth, textAlign);
       paragraphs.add(paragraph);
+
+      final pHeight = paragraph.height;
+      paragraphHeights.add(pHeight);
+      totalTextHeight += pHeight;
+      if (i < overlayLines.length - 1) totalTextHeight += lineGap;
+
       if (paragraph.longestLine > maxLineWidth) {
         maxLineWidth = paragraph.longestLine;
       }
     }
 
     // Add shadow compensation (shadow offset 1 + blur 3 ≈ 4px overshoot)
-    final shadowCompensation = 4.0;
+    const shadowCompensation = 4.0;
     final blockWidth = maxLineWidth + (padding * 2) + shadowCompensation;
-    final blockHeight = (overlayLines.length * lineHeight) + (padding * 2);
+    final blockHeight = totalTextHeight + (padding * 2);
 
     // Safe margins to avoid overlapping camera controls / status bar
-    // Bottom: ~28% clears mode toggle + shutter + lens selector + safe area
-    // Top: ~12% clears status bar area
-    final safeBottomMargin = size.height * 0.28;
+    final safeBottomMargin = size.height * 0.20;
     final safeTopMargin = size.height * 0.12;
 
     // Compute block X, clamped so block never extends past right edge
@@ -77,7 +84,8 @@ class CameraOverlayPainter extends CustomPainter {
       Paint()..color = Colors.black.withValues(alpha: 0.55),
     );
 
-    // Draw each text line aligned within the block
+    // Draw each text line aligned within the block using cumulative heights
+    double yOffset = blockY + padding;
     for (var i = 0; i < paragraphs.length; i++) {
       final paragraph = paragraphs[i];
       final lineWidth = paragraph.longestLine;
@@ -87,8 +95,9 @@ class CameraOverlayPainter extends CustomPainter {
       } else {
         x = blockX + blockWidth - padding - lineWidth;
       }
-      final y = blockY + padding + (i * lineHeight);
-      canvas.drawParagraph(paragraph, Offset(x, y));
+      canvas.drawParagraph(paragraph, Offset(x, yOffset));
+      yOffset += paragraphHeights[i];
+      if (i < paragraphs.length - 1) yOffset += lineGap;
     }
   }
 

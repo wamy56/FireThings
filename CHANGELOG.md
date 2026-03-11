@@ -4,6 +4,50 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-11 (Session 14)
+
+### Timestamp Camera — 5 Bug Fixes + Zoom Enhancement
+
+- **Fix: Pinch-to-zoom broken** — Wrapped overlay in `IgnorePointer` so touch events pass through to the zoom gesture layer beneath (`timestamp_camera_screen.dart`)
+- **Fix: Photo/Video toggle overlapping lens selector** — Changed lens selector positioning from hardcoded `bottom: 140` to `MediaQuery.padding.bottom + 180` to clear SafeArea + controls (`timestamp_camera_screen.dart`)
+- **Fix: Live overlay text overflowing background box** — Replaced assumed `lineHeight` per entry with actual `paragraph.height` after layout. Uses cumulative paragraph heights + inter-line gaps for accurate block sizing. Reduced `safeBottomMargin` from 0.28 to 0.20 (`camera_overlay_painter.dart`)
+- **Fix: Photo watermark sloppy/overlapping text** — Added scale factor `(imgWidth / 1080).clamp(1.0, 3.0)` for spacing relative to image resolution. Added `_wrapText()` helper for word-wrapping long lines. Clamped rect coordinates to image bounds (`timestamp_camera_service.dart`)
+- **Fix: Video date/time not rendering** — Switched from `buildDynamicFfmpegFilter` (uses `%{pts:localtime:EPOCH}` which silently fails) to `buildFallbackFfmpegFilter` (pre-computed per-second text) as primary filter. Added `coords` and `address` fields to `VideoProcessingScreen` so retry path preserves GPS data (`timestamp_camera_screen.dart`, `video_processing_screen.dart`)
+- **Enhancement: Zoom beyond 2x + dynamic indicator** — Added 5x and 10x lens stops (when camera supports them). Shows dynamic zoom level (e.g. "4.2x") in a yellow pill when pinch-zooming between preset stops (`lens_selector_widget.dart`)
+
+---
+
+## 2026-03-10 (Session 13)
+
+### StandardInfoBox Consistency
+
+- **Moved disclaimer to top of info dialogs**: `StandardInfoBox` now appears at the top of the info dialog in both the Detector Spacing Calculator and Battery Load Test screens, matching the existing order in Decibel Meter and BS 5839 Reference. All four tools now show the warning/disclaimer before technical content.
+
+---
+
+## 2026-03-10 (Session 12)
+
+### Detector Spacing Calculator Improvements
+
+- **Merged heat detector grades**: Removed `pointHeatGrade1` and `pointHeatGrade2` enum values, replaced with single `pointHeat` (5.3m radius, 10.6m corridor spacing, 7.5m max ceiling). Grade 2 values were incorrect per BS 5839-1 Table 4.
+- **Corridor spacing corrected**: Heat detector corridor spacing updated from 10.5m to 10.6m (2 × 5.3m radius per Table 4).
+- **Ceiling height hard block**: Calculator now blocks calculation entirely when ceiling exceeds max height, showing a red warning card recommending aspirating/beam detection. Removed old height-adjustment reduction logic.
+- **Corridor/open area suggestion banner**: Amber info banner appears when width doesn't match selected mode (≤2m in open area suggests corridor; >2m in corridor suggests open area). Removed old corridor width warning from calculation notes.
+- **Dropdown subtitle**: Point Heat dropdown item now shows "Fixed-temperature or rate-of-rise (EN 54-5)" subtitle.
+- **Info dialog updated**: Removed Grade 1/2 entries, single Point Heat line. Key principles updated to reflect ceiling hard block.
+
+### BS 5839 Reference Screen
+
+- **Heat corridor spacing**: Updated from "10m apart / 5m from wall" to "10.6m apart / 5.3m from wall" for consistency with Table 4.
+
+### Privacy Policy — ICO Registration
+
+- **Date updated**: "Last updated" changed from 7 March 2026 to 10 March 2026.
+- **Section 9 renamed**: "Contact" → "Data Controller & Contact".
+- **ICO registration**: Added ICO data controller registration number ZC102827 with verification link to ico.org.uk.
+
+---
+
 ## 2026-03-08 (Session 11)
 
 ### BS 5839-1:2025 Standards Update

@@ -9,7 +9,7 @@ import '../../widgets/standard_info_box.dart';
 
 // ─── Data Model ─────────────────────────────────────────────────────────────
 
-enum DetectorType { pointSmoke, pointHeatGrade1, pointHeatGrade2 }
+enum DetectorType { pointSmoke, pointHeat }
 
 enum RoomType { openArea, corridor }
 
@@ -34,17 +34,11 @@ const _detectorSpecs = {
     corridorSpacing: 15.0,
     maxCeiling: 10.5,
   ),
-  DetectorType.pointHeatGrade1: _DetectorSpec(
-    label: 'Point Heat (Grade 1)',
+  DetectorType.pointHeat: _DetectorSpec(
+    label: 'Point Heat',
     radius: 5.3,
-    corridorSpacing: 10.5,
+    corridorSpacing: 10.6,
     maxCeiling: 7.5,
-  ),
-  DetectorType.pointHeatGrade2: _DetectorSpec(
-    label: 'Point Heat (Grade 2)',
-    radius: 7.5,
-    corridorSpacing: 15.0,
-    maxCeiling: 9.0,
   ),
 };
 
@@ -99,6 +93,7 @@ class _DetectorSpacingCalculatorScreenState
   RoomType _roomType = RoomType.openArea;
 
   _CalcResult? _result;
+  String? _ceilingExceededMessage;
 
   @override
   void dispose() {
@@ -120,6 +115,28 @@ class _DetectorSpacingCalculatorScreenState
     final spec = _detectorSpecs[_detectorType]!;
     final notes = <String>[];
 
+    // Hard block on ceiling height exceeded
+    if (height > spec.maxCeiling) {
+      setState(() {
+        _result = null;
+        _ceilingExceededMessage =
+            'Ceiling height (${height.toStringAsFixed(1)}m) exceeds the maximum '
+            '(${spec.maxCeiling.toStringAsFixed(1)}m) for ${spec.label}. '
+            'Consider using aspirating detection, beam detection, or another '
+            'suitable detection method for this ceiling height.';
+      });
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 500),
+            curve: Curves.easeOutCubic,
+          );
+        }
+      });
+      return;
+    }
+
     int cols;
     int rows;
     double spacingX;
@@ -129,21 +146,7 @@ class _DetectorSpacingCalculatorScreenState
 
     if (_roomType == RoomType.corridor) {
       // Corridor: single row centred in width
-      var corridorSpacing = spec.corridorSpacing;
-
-      // Height adjustment
-      if (height > spec.maxCeiling) {
-        final excess = height - spec.maxCeiling;
-        final reduction = excess * 0.5;
-        final adjusted =
-            max(corridorSpacing * 0.5, corridorSpacing - reduction);
-        notes.add(
-          'Ceiling height (${height.toStringAsFixed(1)}m) exceeds maximum '
-          '(${spec.maxCeiling}m) for ${spec.label}. Spacing reduced from '
-          '${corridorSpacing.toStringAsFixed(1)}m to ${adjusted.toStringAsFixed(1)}m.',
-        );
-        corridorSpacing = adjusted;
-      }
+      final corridorSpacing = spec.corridorSpacing;
 
       // Even distribution: wall offset = L/(2*cols), spacing = L/cols
       cols = max(1, (length / corridorSpacing).ceil());
@@ -152,29 +155,9 @@ class _DetectorSpacingCalculatorScreenState
       spacingX = cols > 1 ? length / cols : 0;
       wallOffY = width / 2;
       spacingY = 0;
-
-      if (width > 2.0) {
-        notes.add(
-          'Corridor width exceeds 2m. Consider using open-area spacing '
-          'instead for better coverage.',
-        );
-      }
     } else {
       // Open area — minimum-detector search
-      var R = spec.radius;
-
-      // Height adjustment (reduces effective radius)
-      if (height > spec.maxCeiling) {
-        final excess = height - spec.maxCeiling;
-        final reduction = excess * 0.5;
-        final oldR = R;
-        R = max(R * 0.5, R - reduction);
-        notes.add(
-          'Ceiling height (${height.toStringAsFixed(1)}m) exceeds maximum '
-          '(${spec.maxCeiling}m) for ${spec.label}. Effective radius reduced from '
-          '${oldR.toStringAsFixed(1)}m to ${R.toStringAsFixed(1)}m.',
-        );
-      }
+      final R = spec.radius;
 
       // Very small rooms: 1 detector centered
       if (length < 1.0 || width < 1.0) {
@@ -232,6 +215,7 @@ class _DetectorSpacingCalculatorScreenState
     final coverage = total > 0 ? area / total : 0.0;
 
     setState(() {
+      _ceilingExceededMessage = null;
       _result = _CalcResult(
         detectorCount: total,
         columns: cols,
@@ -306,6 +290,7 @@ class _DetectorSpacingCalculatorScreenState
       _detectorType = DetectorType.pointSmoke;
       _roomType = RoomType.openArea;
       _result = null;
+      _ceilingExceededMessage = null;
     });
   }
 
@@ -337,8 +322,13 @@ class _DetectorSpacingCalculatorScreenState
               _buildInfoCard(),
               const SizedBox(height: 20),
               _buildInputSection(),
+              _buildSuggestionBanner(),
               const SizedBox(height: 20),
               _buildCalculateButton(),
+              if (_ceilingExceededMessage != null) ...[
+                const SizedBox(height: 20),
+                _buildCeilingExceededCard(),
+              ],
               if (_result != null) ...[
                 const SizedBox(height: 24),
                 _buildSummaryCard(),
@@ -497,9 +487,24 @@ class _DetectorSpacingCalculatorScreenState
                 prefixIcon: Icon(AppIcons.flash),
               ),
               items: DetectorType.values.map((type) {
+                final spec = _detectorSpecs[type]!;
                 return DropdownMenuItem(
                   value: type,
-                  child: Text(_detectorSpecs[type]!.label),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(spec.label),
+                      if (type == DetectorType.pointHeat)
+                        Text(
+                          'Fixed-temperature or rate-of-rise (EN 54-5)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                    ],
+                  ),
                 );
               }).toList(),
               onChanged: (value) {
@@ -562,6 +567,103 @@ class _DetectorSpacingCalculatorScreenState
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCeilingExceededCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Card(
+      elevation: 2,
+      color: isDark
+          ? Colors.red.shade900.withValues(alpha: 0.3)
+          : Colors.red.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  AppIcons.warning,
+                  color: isDark ? Colors.red.shade300 : Colors.red.shade700,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Ceiling Height Exceeded',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.red.shade200 : Colors.red.shade900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _ceilingExceededMessage!,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark ? Colors.red.shade100 : Colors.red.shade800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSuggestionBanner() {
+    final widthText = _widthController.text;
+    final width = double.tryParse(widthText);
+    if (width == null) return const SizedBox.shrink();
+
+    String? message;
+    if (_roomType == RoomType.openArea && width <= 2.0) {
+      message =
+          'Width is ${width.toStringAsFixed(1)}m or less \u2014 consider using corridor mode for this room.';
+    } else if (_roomType == RoomType.corridor && width > 2.0) {
+      message =
+          'Width exceeds 2m \u2014 consider using open area mode for this room.';
+    }
+
+    if (message == null) return const SizedBox.shrink();
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDark
+              ? Colors.amber.shade900.withValues(alpha: 0.2)
+              : Colors.amber.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isDark
+                ? Colors.amber.shade700.withValues(alpha: 0.4)
+                : Colors.amber.shade200,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              AppIcons.infoCircle,
+              size: 18,
+              color: isDark ? Colors.amber.shade300 : Colors.amber.shade800,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? Colors.amber.shade200 : Colors.amber.shade900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -784,14 +886,15 @@ class _DetectorSpacingCalculatorScreenState
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
+                const StandardInfoBox(toolKey: 'detector_spacing'),
+                const SizedBox(height: 12),
                 const Text(
                   'Detector Coverage Radii',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 const Text('\u2022 Point Smoke: 7.5m radius'),
-                const Text('\u2022 Point Heat (Grade 1): 5.3m radius'),
-                const Text('\u2022 Point Heat (Grade 2): 7.5m radius'),
+                const Text('\u2022 Point Heat: 5.3m radius'),
                 const SizedBox(height: 12),
                 const Text(
                   'Corridor Spacing',
@@ -799,8 +902,7 @@ class _DetectorSpacingCalculatorScreenState
                 ),
                 const SizedBox(height: 8),
                 const Text('\u2022 Point Smoke: 15.0m max'),
-                const Text('\u2022 Point Heat (Grade 1): 10.5m max'),
-                const Text('\u2022 Point Heat (Grade 2): 15.0m max'),
+                const Text('\u2022 Point Heat: 10.6m max'),
                 const SizedBox(height: 12),
                 const Text(
                   'Maximum Ceiling Heights',
@@ -808,8 +910,7 @@ class _DetectorSpacingCalculatorScreenState
                 ),
                 const SizedBox(height: 8),
                 const Text('\u2022 Point Smoke: 10.5m'),
-                const Text('\u2022 Point Heat (Grade 1): 7.5m'),
-                const Text('\u2022 Point Heat (Grade 2): 9.0m'),
+                const Text('\u2022 Point Heat: 7.5m'),
                 const SizedBox(height: 12),
                 const Text(
                   'Key Principles',
@@ -820,11 +921,9 @@ class _DetectorSpacingCalculatorScreenState
                   '\u2022 No ceiling point may be further than R from the nearest detector\n'
                   '\u2022 Wall offset calculated automatically (minimum 0.5m per BS 5839-1)\n'
                   '\u2022 Algorithm finds minimum detectors for full coverage\n'
-                  '\u2022 Spacing reduced for ceilings above max height\n'
+                  '\u2022 Ceilings above the maximum height are not supported \u2014 consider alternative detection methods\n'
                   '\u2022 Corridors \u2264 2m wide use single-row spacing',
                 ),
-                const SizedBox(height: 12),
-                const StandardInfoBox(toolKey: 'detector_spacing'),
               ],
             ),
           ),

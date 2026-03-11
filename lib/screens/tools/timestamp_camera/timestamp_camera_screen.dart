@@ -346,7 +346,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         }
 
         final filter = TimestampCameraService.instance
-            .buildDynamicFfmpegFilter(
+            .buildFallbackFfmpegFilter(
           settings: _overlaySettings,
           recordingStartTime: recordingStartTime ?? DateTime.now(),
           durationMs: durationMs,
@@ -365,6 +365,8 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
                 totalDurationMs: durationMs,
                 recordingStartTime: recordingStartTime,
                 fontPath: fontPath,
+                coords: _locationService.currentCoords,
+                address: _locationService.currentAddress,
               ),
             ),
           );
@@ -482,10 +484,12 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           // Overlay painter (self-contained timer, behind RepaintBoundary)
           if (_isCameraInitialized)
             Positioned.fill(
-              child: RepaintBoundary(
-                child: OverlayWidget(
-                  settings: _overlaySettings,
-                  locationService: _locationService,
+              child: IgnorePointer(
+                child: RepaintBoundary(
+                  child: OverlayWidget(
+                    settings: _overlaySettings,
+                    locationService: _locationService,
+                  ),
                 ),
               ),
             ),
@@ -496,7 +500,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           // Lens selector
           if (_isCameraInitialized && _maxZoom > _minZoom)
             Positioned(
-              bottom: 140,
+              bottom: MediaQuery.of(context).padding.bottom + 180,
               left: 0,
               right: 0,
               child: ValueListenableBuilder<double>(
