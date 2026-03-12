@@ -36,8 +36,13 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   // Camera
   CameraController? _controller;
   List<CameraDescription> _cameras = [];
+  List<CameraDescription> _backCameras = [];
+  List<CameraDescription> _frontCameras = [];
   int _currentCameraIndex = 0;
   bool _isCameraInitialized = false;
+  bool _isUsingUltraWide = false;
+  bool _hasUltraWide = false;
+  bool _isUsingFrontCamera = false;
   String? _cameraError;
 
   // Mode & state
@@ -109,19 +114,23 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_controller == null || !_isCameraInitialized) return;
-
     if (state == AppLifecycleState.inactive) {
-      _handleInactive();
+      if (_controller != null && _isCameraInitialized) {
+        _handleInactive();
+      }
     } else if (state == AppLifecycleState.resumed) {
-      _initCamera();
+      if (!_isCameraInitialized) {
+        _initCamera();
+      }
     }
   }
 
   Future<void> _handleInactive() async {
     if (_isRecording) await _stopRecording();
-    _controller?.dispose();
+    final controller = _controller;
+    _controller = null;
     if (mounted) setState(() => _isCameraInitialized = false);
+    await controller?.dispose();
   }
 
   // ─── Permissions ───────────────────────────────────────────────────
@@ -140,6 +149,19 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         setState(() => _cameraError = 'No cameras found on this device');
         return;
       }
+
+      // Categorize cameras by direction
+      _backCameras = _cameras
+          .where((c) => c.lensDirection == CameraLensDirection.back)
+          .toList();
+      _frontCameras = _cameras
+          .where((c) => c.lensDirection == CameraLensDirection.front)
+          .toList();
+
+      // Detect ultra-wide: on iOS, back cameras[0] = wide, [1] = ultra-wide
+      _hasUltraWide = _backCameras.length >= 2 &&
+          defaultTargetPlatform == TargetPlatform.iOS;
+
       await _setupController(_cameras[_currentCameraIndex]);
     } catch (e) {
       setState(() => _cameraError = 'Failed to initialise camera: $e');
@@ -205,8 +227,31 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   Future<void> _flipCamera() async {
     if (_cameras.length < 2 || _isRecording || _isFlipping) return;
     setState(() => _isFlipping = true);
-    _currentCameraIndex = (_currentCameraIndex + 1) % _cameras.length;
-    await _setupController(_cameras[_currentCameraIndex]);
+
+    _isUsingFrontCamera = !_isUsingFrontCamera;
+    _isUsingUltraWide = false;
+
+    final targetCameras = _isUsingFrontCamera ? _frontCameras : _backCameras;
+    final camera = targetCameras.isNotEmpty ? targetCameras.first : _cameras.first;
+    _currentCameraIndex = _cameras.indexOf(camera);
+
+    await _setupController(camera);
+    if (mounted) setState(() => _isFlipping = false);
+  }
+
+  Future<void> _switchToUltraWide(bool useUltraWide) async {
+    if (_isRecording || _isFlipping || !_hasUltraWide) return;
+    if (useUltraWide == _isUsingUltraWide) return;
+    setState(() => _isFlipping = true);
+
+    // Back cameras: index 0 = wide, index 1 = ultra-wide
+    final cameraIndex = useUltraWide ? 1 : 0;
+    final camera = _backCameras[cameraIndex];
+    _currentCameraIndex = _cameras.indexOf(camera);
+    _isUsingUltraWide = useUltraWide;
+    _isUsingFrontCamera = false;
+
+    await _setupController(camera);
     if (mounted) setState(() => _isFlipping = false);
   }
 
@@ -222,6 +267,27 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   }
 
   void _setZoom(double zoom) {
+    // Handle ultra-wide lens switching on iOS
+    if (_hasUltraWide && !_isUsingFrontCamera) {
+      if (zoom < 1.0 && !_isUsingUltraWide) {
+        // Switch to ultra-wide camera for 0.5x
+        _switchToUltraWide(true);
+        return;
+      } else if (zoom >= 1.0 && _isUsingUltraWide) {
+        // Switch back to main wide camera
+        _switchToUltraWide(false).then((_) {
+          if (zoom > 1.0) {
+            final clamped = zoom.clamp(_minZoom, _maxZoom);
+            _zoomNotifier.value = clamped;
+            try {
+              _controller?.setZoomLevel(clamped);
+            } catch (_) {}
+          }
+        });
+        return;
+      }
+    }
+
     final clamped = zoom.clamp(_minZoom, _maxZoom);
     _zoomNotifier.value = clamped;
     try {
@@ -498,7 +564,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           _buildTopBar(),
 
           // Lens selector
-          if (_isCameraInitialized && _maxZoom > _minZoom)
+          if (_isCameraInitialized && (_maxZoom > _minZoom || _hasUltraWide))
             Positioned(
               bottom: MediaQuery.of(context).padding.bottom + 180,
               left: 0,
@@ -507,9 +573,10 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
                 valueListenable: _zoomNotifier,
                 builder: (context, zoom, _) {
                   return LensSelectorWidget(
-                    currentZoom: zoom,
+                    currentZoom: _isUsingUltraWide ? 0.5 : zoom,
                     minZoom: _minZoom,
                     maxZoom: _maxZoom,
+                    hasUltraWide: _hasUltraWide && !_isUsingFrontCamera,
                     onZoomChanged: _setZoom,
                   );
                 },

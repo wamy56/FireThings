@@ -4,6 +4,17 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-12 (Session 16)
+
+### Timestamp Camera — 4 Fixes
+
+- **Fix: Black screen after background return** — Restructured `didChangeAppLifecycleState` so `resumed` is no longer blocked by the early-return guard. `_handleInactive` now nulls out `_controller` before disposing so resumed state always reinitializes (`timestamp_camera_screen.dart`)
+- **Fix: Preview overlay overflow on right edge** — Clamped `blockWidth` to `size.width - margin*2` and ensured clamp upper bound is always >= lower bound. Increased `maxTextWidth` from 55% to 70% for long addresses (`camera_overlay_painter.dart`)
+- **Fix: 0.5x ultra-wide lens unavailable on iPhone** — Categorized cameras into back/front lists, detected ultra-wide availability on iOS (`backCameras.length >= 2`). Added `_switchToUltraWide` method and `hasUltraWide` param to `LensSelectorWidget`. Tapping 0.5x switches to ultra-wide camera; 1x+ switches back to main wide camera. `_flipCamera` now toggles front/back instead of cycling all cameras (`timestamp_camera_screen.dart`, `lens_selector_widget.dart`)
+- **Fix: Uniform photo & video overlays** — Photo watermark now uses `dart:ui` Canvas with `CameraOverlayPainter` (same as live preview) rendered to PNG then composited onto photo in isolate. FFmpeg video filter now uses single `drawbox` background instead of per-line `box=1`, proportional font sizes (`h*0.024`), proportional margins (`w*0.03`), and 0.55 opacity matching the preview (`timestamp_camera_service.dart`)
+
+---
+
 ## 2026-03-11 (Session 15)
 
 ### Privacy Policy Markdown Update

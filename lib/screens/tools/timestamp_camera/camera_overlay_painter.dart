@@ -29,7 +29,7 @@ class CameraOverlayPainter extends CustomPainter {
         position == OverlayPosition.topRight;
 
     final textAlign = isLeft ? TextAlign.left : TextAlign.right;
-    final maxTextWidth = size.width * 0.55;
+    final maxTextWidth = size.width * 0.70;
 
     // Build paragraphs and measure actual dimensions
     final paragraphs = <ui.Paragraph>[];
@@ -54,16 +54,19 @@ class CameraOverlayPainter extends CustomPainter {
 
     // Add shadow compensation (shadow offset 1 + blur 3 ≈ 4px overshoot)
     const shadowCompensation = 4.0;
-    final blockWidth = maxLineWidth + (padding * 2) + shadowCompensation;
+    final maxBlockWidth = size.width - (margin * 2);
+    final blockWidth =
+        (maxLineWidth + (padding * 2) + shadowCompensation).clamp(0.0, maxBlockWidth);
     final blockHeight = totalTextHeight + (padding * 2);
 
     // Safe margins to avoid overlapping camera controls / status bar
     final safeBottomMargin = size.height * 0.20;
     final safeTopMargin = size.height * 0.12;
 
-    // Compute block X, clamped so block never extends past right edge
+    // Compute block X, clamped so block never extends past edges
     final rawBlockX = isLeft ? margin : size.width - blockWidth - margin;
-    final blockX = rawBlockX.clamp(margin, size.width - blockWidth - margin);
+    final clampMax = (size.width - blockWidth - margin).clamp(margin, size.width);
+    final blockX = rawBlockX.clamp(margin, clampMax);
 
     // Compute block Y
     final double blockY;
