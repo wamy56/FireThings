@@ -38,6 +38,8 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   List<CameraDescription> _cameras = [];
   List<CameraDescription> _backCameras = [];
   List<CameraDescription> _frontCameras = [];
+  CameraDescription? _mainBackCamera;
+  CameraDescription? _ultraWideCamera;
   int _currentCameraIndex = 0;
   bool _isCameraInitialized = false;
   bool _isUsingUltraWide = false;
@@ -158,9 +160,21 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           .where((c) => c.lensDirection == CameraLensDirection.front)
           .toList();
 
-      // Detect ultra-wide: on iOS, back cameras[0] = wide, [1] = ultra-wide
-      _hasUltraWide = _backCameras.length >= 2 &&
-          defaultTargetPlatform == TargetPlatform.iOS;
+      // Detect ultra-wide by name rather than assuming index order
+      _mainBackCamera = null;
+      _ultraWideCamera = null;
+      for (final cam in _backCameras) {
+        if (cam.name.toLowerCase().contains('ultra')) {
+          _ultraWideCamera = cam;
+        } else {
+          _mainBackCamera ??= cam;
+        }
+      }
+      _hasUltraWide = _ultraWideCamera != null;
+
+      // Set initial front/back state from actual first camera
+      _isUsingFrontCamera = _cameras[_currentCameraIndex].lensDirection ==
+          CameraLensDirection.front;
 
       await _setupController(_cameras[_currentCameraIndex]);
     } catch (e) {
@@ -186,7 +200,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       await controller.setFlashMode(_flashMode);
 
       _minZoom = await controller.getMinZoomLevel();
-      _maxZoom = await controller.getMaxZoomLevel();
+      _maxZoom = (await controller.getMaxZoomLevel()).clamp(1.0, 20.0);
       _zoomNotifier.value = _minZoom;
 
       await prevController?.dispose();
@@ -225,14 +239,17 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   // ─── Camera Controls ──────────────────────────────────────────────
 
   Future<void> _flipCamera() async {
-    if (_cameras.length < 2 || _isRecording || _isFlipping) return;
+    if (_isRecording || _isFlipping) return;
+    // Only flip if both front and back cameras exist
+    if (_frontCameras.isEmpty || _backCameras.isEmpty) return;
     setState(() => _isFlipping = true);
 
     _isUsingFrontCamera = !_isUsingFrontCamera;
     _isUsingUltraWide = false;
 
-    final targetCameras = _isUsingFrontCamera ? _frontCameras : _backCameras;
-    final camera = targetCameras.isNotEmpty ? targetCameras.first : _cameras.first;
+    final camera = _isUsingFrontCamera
+        ? _frontCameras.first
+        : (_mainBackCamera ?? _backCameras.first);
     _currentCameraIndex = _cameras.indexOf(camera);
 
     await _setupController(camera);
@@ -244,9 +261,9 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     if (useUltraWide == _isUsingUltraWide) return;
     setState(() => _isFlipping = true);
 
-    // Back cameras: index 0 = wide, index 1 = ultra-wide
-    final cameraIndex = useUltraWide ? 1 : 0;
-    final camera = _backCameras[cameraIndex];
+    final camera = useUltraWide
+        ? _ultraWideCamera!
+        : (_mainBackCamera ?? _backCameras.first);
     _currentCameraIndex = _cameras.indexOf(camera);
     _isUsingUltraWide = useUltraWide;
     _isUsingFrontCamera = false;

@@ -4,6 +4,20 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-12 (Session 17)
+
+### Timestamp Camera — Fix Regressions from Session 16
+
+- **Fix: FFmpeg video overlay fails (code 1)** — Reverted FFmpeg filter from expression-based syntax (`fontsize='(h*0.024)'`) to pre-computed integer values (`fontsize=36`) per resolution. Single-quoted expressions caused FFmpeg parser errors. Kept the drawbox grouping improvement. (`timestamp_camera_service.dart`)
+- **Fix: Photo overlay position mismatch** — Reverted photo watermark from `dart:ui`/`CameraOverlayPainter` approach back to isolate-based `img.drawString` with `image` package. Uses same 3% margin ratio as preview so overlay position matches. (`timestamp_camera_service.dart`)
+- **Fix: Live preview overlay 20% from bottom** — Removed `safeBottomMargin=0.20` and `safeTopMargin=0.12` from `CameraOverlayPainter`. Now uses 3% margin from edges to match saved photo/video output. (`camera_overlay_painter.dart`)
+- **Fix: 0.5x ultra-wide detection fragile** — Replaced index-based assumption (`backCameras[1]`) with name-based detection (`cam.name.contains('ultra')`). Stores explicit `_mainBackCamera` and `_ultraWideCamera` references. (`timestamp_camera_screen.dart`)
+- **Fix: Flip camera may not toggle** — Initializes `_isUsingFrontCamera` from actual first camera's direction. Flip now requires both front and back cameras to exist. (`timestamp_camera_screen.dart`)
+- **Fix: Max zoom capped at 20x** — Clamped `_maxZoom` to 20.0 in `_setupController`. (`timestamp_camera_screen.dart`)
+- **Fix: Remove 10x lens stop** — Only .5x, 1x, 2x, 5x stops shown. (`lens_selector_widget.dart`)
+
+---
+
 ## 2026-03-12 (Session 16)
 
 ### Timestamp Camera — 4 Fixes

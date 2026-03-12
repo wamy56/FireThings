@@ -59,21 +59,17 @@ class CameraOverlayPainter extends CustomPainter {
         (maxLineWidth + (padding * 2) + shadowCompensation).clamp(0.0, maxBlockWidth);
     final blockHeight = totalTextHeight + (padding * 2);
 
-    // Safe margins to avoid overlapping camera controls / status bar
-    final safeBottomMargin = size.height * 0.20;
-    final safeTopMargin = size.height * 0.12;
-
     // Compute block X, clamped so block never extends past edges
     final rawBlockX = isLeft ? margin : size.width - blockWidth - margin;
     final clampMax = (size.width - blockWidth - margin).clamp(margin, size.width);
     final blockX = rawBlockX.clamp(margin, clampMax);
 
-    // Compute block Y
+    // Compute block Y — use same 3% margin from edges so preview matches saved output
     final double blockY;
     if (isTop) {
-      blockY = safeTopMargin;
+      blockY = margin;
     } else {
-      blockY = size.height - blockHeight - safeBottomMargin;
+      blockY = size.height - blockHeight - margin;
     }
 
     // Compact rounded rect

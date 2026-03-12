@@ -31,9 +31,6 @@ class LensSelectorWidget extends StatelessWidget {
     if (maxZoom >= 5.0) {
       stops.add(_LensStop(label: '5x', zoom: 5.0));
     }
-    if (maxZoom >= 10.0) {
-      stops.add(_LensStop(label: '10x', zoom: 10.0));
-    }
 
     if (stops.length < 2) return const SizedBox.shrink();
 

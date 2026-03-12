@@ -1,12 +1,8 @@
 import 'dart:isolate';
-import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
-
-import '../screens/tools/timestamp_camera/camera_overlay_painter.dart';
 
 /// Position of the overlay block on the camera preview and output media.
 enum OverlayPosition { bottomLeft, bottomRight, topLeft, topRight }
@@ -121,8 +117,8 @@ class TimestampCameraService {
     await prefs.setString('${_prefix}position', settings.position.name);
   }
 
-  /// Watermark a photo with overlay text using the same CameraOverlayPainter
-  /// as the live preview, then compositing onto the photo in an isolate.
+  /// Watermark a photo with overlay text using the `image` package in an
+  /// isolate. Uses the same 3% margin ratio as the live preview painter.
   /// Returns JPEG bytes.
   Future<Uint8List> watermarkPhoto(
     Uint8List imageBytes,
@@ -131,165 +127,187 @@ class TimestampCameraService {
   }) async {
     if (overlayLines.isEmpty) return imageBytes;
 
-    // Decode image dimensions on isolate first
-    final dimensions = await Isolate.run(() {
-      final image = img.decodeImage(imageBytes);
-      if (image == null) return null;
-      return [image.width, image.height];
-    });
-    if (dimensions == null) return imageBytes;
-
-    final imgWidth = dimensions[0].toDouble();
-    final imgHeight = dimensions[1].toDouble();
-
-    // Render overlay using dart:ui Canvas (same painter as live preview)
-    final overlayBytes = await _renderOverlayImage(
-      overlayLines,
-      position,
-      imgWidth,
-      imgHeight,
-    );
-
-    // Composite overlay onto photo in isolate
     final posIndex = position.index;
     return Isolate.run(() {
-      return _compositeInIsolate(imageBytes, overlayBytes, posIndex);
+      return _watermarkInIsolate(imageBytes, overlayLines, posIndex);
     });
   }
 
-  /// Render the overlay as a PNG image using CameraOverlayPainter (dart:ui).
-  /// This runs on the main thread but is very fast (just text + a rounded rect).
-  Future<Uint8List> _renderOverlayImage(
-    List<String> overlayLines,
-    OverlayPosition position,
-    double width,
-    double height,
-  ) async {
-    final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder);
-    final size = Size(width, height);
-
-    final painter = CameraOverlayPainter(
-      overlayLines: overlayLines,
-      position: position,
-    );
-    painter.paint(canvas, size);
-
-    final picture = recorder.endRecording();
-    final image = await picture.toImage(width.toInt(), height.toInt());
-    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return byteData!.buffer.asUint8List();
-  }
-
-  /// Composite a PNG overlay onto a photo in an isolate.
-  static Uint8List _compositeInIsolate(
+  /// Draw overlay text directly onto a photo using the `image` package.
+  static Uint8List _watermarkInIsolate(
     Uint8List photoBytes,
-    Uint8List overlayPngBytes,
+    List<String> overlayLines,
     int positionIndex,
   ) {
     final photo = img.decodeImage(photoBytes);
     if (photo == null) return photoBytes;
 
-    final overlay = img.decodePng(overlayPngBytes);
-    if (overlay == null) return photoBytes;
+    final position = OverlayPosition.values[positionIndex];
+    final isLeft = position == OverlayPosition.bottomLeft ||
+        position == OverlayPosition.topLeft;
+    final isTop = position == OverlayPosition.topLeft ||
+        position == OverlayPosition.topRight;
 
-    img.compositeImage(photo, overlay);
+    // Use arial48 font from image package — scale by choosing appropriate font
+    final font = img.arial48;
+    final charHeight = font.lineHeight;
+    final margin = (photo.width * 0.03).round();
+    final padding = (charHeight * 0.6).round();
+    final lineGap = (charHeight * 0.4).round();
+
+    // Measure text widths
+    int maxTextWidth = 0;
+    for (final line in overlayLines) {
+      int lineWidth = 0;
+      for (final ch in line.codeUnits) {
+        final glyph = font.characters[ch];
+        if (glyph != null) lineWidth += glyph.xAdvance;
+      }
+      if (lineWidth > maxTextWidth) maxTextWidth = lineWidth;
+    }
+
+    // Block dimensions
+    final blockWidth = maxTextWidth + (padding * 2);
+    final blockHeight = (overlayLines.length * charHeight) +
+        ((overlayLines.length - 1) * lineGap) +
+        (padding * 2);
+
+    // Block position — 3% margin from edges (matches live preview)
+    final int blockX;
+    if (isLeft) {
+      blockX = margin;
+    } else {
+      blockX = photo.width - blockWidth - margin;
+    }
+
+    final int blockY;
+    if (isTop) {
+      blockY = margin;
+    } else {
+      blockY = photo.height - blockHeight - margin;
+    }
+
+    // Draw background rectangle
+    img.fillRect(
+      photo,
+      x1: blockX,
+      y1: blockY,
+      x2: blockX + blockWidth,
+      y2: blockY + blockHeight,
+      color: img.ColorRgba8(0, 0, 0, 140),
+    );
+
+    // Draw each text line
+    for (var i = 0; i < overlayLines.length; i++) {
+      final textY = blockY + padding + (i * (charHeight + lineGap));
+
+      int textX;
+      if (isLeft) {
+        textX = blockX + padding;
+      } else {
+        // Right-align: measure this line's width
+        int lineWidth = 0;
+        for (final ch in overlayLines[i].codeUnits) {
+          final glyph = font.characters[ch];
+          if (glyph != null) lineWidth += glyph.xAdvance;
+        }
+        textX = blockX + blockWidth - padding - lineWidth;
+      }
+
+      img.drawString(
+        photo,
+        overlayLines[i],
+        font: font,
+        x: textX,
+        y: textY,
+        color: img.ColorRgba8(255, 255, 255, 255),
+      );
+    }
 
     return Uint8List.fromList(img.encodeJpg(photo, quality: 92));
   }
 
   // ─── FFmpeg Video Overlay ─────────────────────────────────────────
 
-  /// Font size proportional to video height (~2.4% to match live preview).
-  static String _ffmpegFontSizeExpr() => '(h*0.024)';
+  /// Pre-computed integer font size based on resolution setting.
+  static int _ffmpegFontSize(String resolution) {
+    switch (resolution) {
+      case 'low':
+        return 20;
+      case 'medium':
+        return 28;
+      case 'high':
+      default:
+        return 36;
+    }
+  }
 
-  /// Margin expression: 3% of width (matching live preview).
-  static String _ffmpegMarginExpr() => '(w*0.03)';
+  /// Margin in pixels proportional to resolution (~3% of width).
+  static int _ffmpegMargin(String resolution) {
+    switch (resolution) {
+      case 'low':
+        return 14;
+      case 'medium':
+        return 20;
+      case 'high':
+      default:
+        return 28;
+    }
+  }
 
-  /// Padding expression: 60% of font size (matching live preview).
-  static String _ffmpegPaddingExpr() => '(h*0.024*0.6)';
+  /// Padding: ~60% of font size.
+  static int _ffmpegPadding(int fontSize) => (fontSize * 0.6).round();
 
-  /// Line gap expression: 40% of font size.
-  static String _ffmpegLineGapExpr() => '(h*0.024*0.4)';
+  /// Line gap: ~40% of font size.
+  static int _ffmpegLineGap(int fontSize) => (fontSize * 0.4).round();
 
-  /// Return the FFmpeg `x` expression for text within the block.
-  static String _ffmpegTextX(OverlayPosition position) {
-    final margin = _ffmpegMarginExpr();
-    final padding = _ffmpegPaddingExpr();
+  /// Return the FFmpeg `x` value for text within the block.
+  static String _ffmpegTextX({
+    required OverlayPosition position,
+    required int margin,
+    required int padding,
+  }) {
     final isLeft = position == OverlayPosition.bottomLeft ||
         position == OverlayPosition.topLeft;
     if (isLeft) {
-      return '$margin+$padding';
+      return '${margin + padding}';
     } else {
-      return 'w-tw-$margin-$padding';
+      return 'w-tw-${margin + padding}';
     }
   }
 
-  /// Return the FFmpeg `y` expression for a text line at [lineIndex].
-  static String _ffmpegTextY({
-    required OverlayPosition position,
-    required int lineIndex,
-    required int totalLines,
-  }) {
-    final padding = _ffmpegPaddingExpr();
-    final fontSize = _ffmpegFontSizeExpr();
-    final lineGap = _ffmpegLineGapExpr();
-    final isTop = position == OverlayPosition.topLeft ||
-        position == OverlayPosition.topRight;
-
-    // Offset from block top edge to this line
-    final lineOffset = lineIndex == 0
-        ? padding
-        : '$padding+$lineIndex*($fontSize+$lineGap)';
-
-    if (isTop) {
-      // Safe top margin ~12% of height
-      return '(h*0.12)+$lineOffset';
-    } else {
-      // Block total height = padding*2 + totalLines*fontSize + (totalLines-1)*lineGap
-      final blockH = totalLines == 1
-          ? '$padding*2+$fontSize'
-          : '$padding*2+$totalLines*$fontSize+${totalLines - 1}*$lineGap';
-      // Safe bottom margin ~20% of height
-      return 'h-($blockH)-(h*0.20)+$lineOffset';
-    }
-  }
-
-  /// Build a drawbox filter for the grouped background rect.
+  /// Build a drawbox filter for the grouped background rect using integer values.
   static String _ffmpegDrawBox({
     required OverlayPosition position,
     required int totalLines,
     required int maxTextChars,
+    required int margin,
+    required int padding,
+    required int fontSize,
+    required int lineGap,
   }) {
-    final margin = _ffmpegMarginExpr();
-    final padding = _ffmpegPaddingExpr();
-    final fontSize = _ffmpegFontSizeExpr();
-    final lineGap = _ffmpegLineGapExpr();
     final isLeft = position == OverlayPosition.bottomLeft ||
         position == OverlayPosition.topLeft;
     final isTop = position == OverlayPosition.topLeft ||
         position == OverlayPosition.topRight;
 
-    // Block dimensions — width is estimated from max char count * average char width
-    // Average char width ≈ 0.55 * fontSize for bold Inter
-    final blockW = '$padding*2+$maxTextChars*$fontSize*0.55+4';
-    final blockH = totalLines == 1
-        ? '$padding*2+$fontSize'
-        : '$padding*2+$totalLines*$fontSize+${totalLines - 1}*$lineGap';
+    // Estimate block width from max char count * average char width (0.55 * fontSize)
+    final blockW = (padding * 2) + (maxTextChars * fontSize * 0.55).round() + 4;
+    final blockH = (padding * 2) +
+        (totalLines * fontSize) +
+        ((totalLines - 1) * lineGap);
 
-    final x = isLeft ? margin : 'w-($blockW)-$margin';
-    final y = isTop ? '(h*0.12)' : 'h-($blockH)-(h*0.20)';
+    final x = isLeft ? '$margin' : 'w-${blockW + margin}';
+    final y = isTop ? '$margin' : 'h-${blockH + margin}';
 
-    return "drawbox=x='$x':y='$y':w='$blockW':h='$blockH'"
-        ":color=black@0.55:t=fill";
+    return 'drawbox=x=$x:y=$y:w=$blockW:h=$blockH'
+        ':color=black@0.55:t=fill';
   }
 
   /// Build a dynamic FFmpeg drawtext filter where the date/time line updates
   /// per-frame using `%{pts\:localtime\:EPOCH}`.
   ///
-  /// Static lines (coords, address, note) remain constant.
-  /// Uses a single drawbox for the grouped background, matching the live
-  /// preview's rounded-rect block style (without rounded corners in FFmpeg).
+  /// Uses pre-computed integer values — no single-quoted FFmpeg expressions.
   String buildDynamicFfmpegFilter({
     required OverlaySettings settings,
     required DateTime recordingStartTime,
@@ -298,18 +316,22 @@ class TimestampCameraService {
     String? address,
     String? fontPath,
   }) {
-    final fontSizeExpr = _ffmpegFontSizeExpr();
+    final fontSize = _ffmpegFontSize(settings.resolution);
+    final margin = _ffmpegMargin(settings.resolution);
+    final padding = _ffmpegPadding(fontSize);
+    final lineGap = _ffmpegLineGap(fontSize);
     final filters = <String>[];
+
+    final isTop = settings.position == OverlayPosition.topLeft ||
+        settings.position == OverlayPosition.topRight;
 
     // Collect all lines — date/time is dynamic, rest are static
     final staticLines = <String>[];
     bool hasDateTime = false;
     int maxChars = 0;
 
-    // Date/time line (dynamic)
     if (settings.showDate || settings.showTime) {
       hasDateTime = true;
-      // Estimate max char count for date/time: "dd/MM/yyyy  HH:mm:ss" = 20
       int dtChars = 0;
       if (settings.showDate) dtChars += 10;
       if (settings.showDate && settings.showTime) dtChars += 2;
@@ -317,7 +339,6 @@ class TimestampCameraService {
       if (dtChars > maxChars) maxChars = dtChars;
     }
 
-    // Static lines
     if (settings.showCoords && coords != null && coords.isNotEmpty) {
       staticLines.add(coords);
       if (coords.length > maxChars) maxChars = coords.length;
@@ -334,17 +355,41 @@ class TimestampCameraService {
     final totalLines = (hasDateTime ? 1 : 0) + staticLines.length;
     if (totalLines == 0) return '';
 
+    final blockH = (padding * 2) +
+        (totalLines * fontSize) +
+        ((totalLines - 1) * lineGap);
+
     // Single grouped background box
     filters.add(_ffmpegDrawBox(
       position: settings.position,
       totalLines: totalLines,
       maxTextChars: maxChars,
+      margin: margin,
+      padding: padding,
+      fontSize: fontSize,
+      lineGap: lineGap,
     ));
 
     int lineIndex = 0;
     final fontParam = fontPath != null ? ":fontfile='$fontPath'" : '';
 
-    // Dynamic date/time line using pts:localtime expansion
+    // Helper to compute y for a given line index
+    String yForLine(int idx) {
+      final lineOffset = padding + (idx * (fontSize + lineGap));
+      if (isTop) {
+        return '${margin + lineOffset}';
+      } else {
+        return 'h-${blockH + margin - lineOffset}';
+      }
+    }
+
+    final xVal = _ffmpegTextX(
+      position: settings.position,
+      margin: margin,
+      padding: padding,
+    );
+
+    // Dynamic date/time line
     if (hasDateTime) {
       final epoch = recordingStartTime.millisecondsSinceEpoch ~/ 1000;
 
@@ -353,19 +398,12 @@ class TimestampCameraService {
       if (settings.showDate && settings.showTime) format += '  ';
       if (settings.showTime) format += '%H\\:%M\\:%S';
 
-      final xExpr = _ffmpegTextX(settings.position);
-      final yExpr = _ffmpegTextY(
-        position: settings.position,
-        lineIndex: lineIndex,
-        totalLines: totalLines,
-      );
-
       filters.add(
         "drawtext=text='%{pts\\:localtime\\:$epoch\\:$format}'"
-        ":fontsize='$fontSizeExpr'"
+        ':fontsize=$fontSize'
         ':fontcolor=white'
-        ":x='$xExpr'"
-        ":y='$yExpr'"
+        ':x=$xVal'
+        ':y=${yForLine(lineIndex)}'
         '$fontParam',
       );
       lineIndex++;
@@ -373,20 +411,14 @@ class TimestampCameraService {
 
     // Static lines
     for (final line in staticLines) {
-      final xExpr = _ffmpegTextX(settings.position);
-      final yExpr = _ffmpegTextY(
-        position: settings.position,
-        lineIndex: lineIndex,
-        totalLines: totalLines,
-      );
       final escapedText = _escapeForFfmpegDrawtext(line);
 
       filters.add(
         "drawtext=text='$escapedText'"
-        ":fontsize='$fontSizeExpr'"
+        ':fontsize=$fontSize'
         ':fontcolor=white'
-        ":x='$xExpr'"
-        ":y='$yExpr'"
+        ':x=$xVal'
+        ':y=${yForLine(lineIndex)}'
         '$fontParam',
       );
       lineIndex++;
@@ -396,7 +428,7 @@ class TimestampCameraService {
   }
 
   /// Build a fallback FFmpeg filter using per-second `enable='between(t,N,N+1)'`
-  /// segments. Works with any FFmpeg build that doesn't support `%{pts:localtime}`.
+  /// segments. Uses pre-computed integer values.
   String buildFallbackFfmpegFilter({
     required OverlaySettings settings,
     required DateTime recordingStartTime,
@@ -405,11 +437,16 @@ class TimestampCameraService {
     String? address,
     String? fontPath,
   }) {
-    final fontSizeExpr = _ffmpegFontSizeExpr();
+    final fontSize = _ffmpegFontSize(settings.resolution);
+    final margin = _ffmpegMargin(settings.resolution);
+    final padding = _ffmpegPadding(fontSize);
+    final lineGap = _ffmpegLineGap(fontSize);
     final filters = <String>[];
     final totalSeconds = (durationMs / 1000).ceil() + 1;
 
-    // Static lines (coords, address, note)
+    final isTop = settings.position == OverlayPosition.topLeft ||
+        settings.position == OverlayPosition.topRight;
+
     final staticLines = <String>[];
     int maxChars = 0;
 
@@ -438,24 +475,41 @@ class TimestampCameraService {
     final totalLines = (hasDateTime ? 1 : 0) + staticLines.length;
     if (totalLines == 0) return '';
 
+    final blockH = (padding * 2) +
+        (totalLines * fontSize) +
+        ((totalLines - 1) * lineGap);
+
     // Single grouped background box
     filters.add(_ffmpegDrawBox(
       position: settings.position,
       totalLines: totalLines,
       maxTextChars: maxChars,
+      margin: margin,
+      padding: padding,
+      fontSize: fontSize,
+      lineGap: lineGap,
     ));
 
     final fontParam = fontPath != null ? ":fontfile='$fontPath'" : '';
 
+    // Helper to compute y for a given line index
+    String yForLine(int idx) {
+      final lineOffset = padding + (idx * (fontSize + lineGap));
+      if (isTop) {
+        return '${margin + lineOffset}';
+      } else {
+        return 'h-${blockH + margin - lineOffset}';
+      }
+    }
+
+    final xVal = _ffmpegTextX(
+      position: settings.position,
+      margin: margin,
+      padding: padding,
+    );
+
     // Generate per-second drawtext for the dynamic date/time line
     if (hasDateTime) {
-      final xExpr = _ffmpegTextX(settings.position);
-      final yExpr = _ffmpegTextY(
-        position: settings.position,
-        lineIndex: 0,
-        totalLines: totalLines,
-      );
-
       for (var s = 0; s < totalSeconds; s++) {
         final t = recordingStartTime.add(Duration(seconds: s));
         final datePart =
@@ -467,10 +521,10 @@ class TimestampCameraService {
 
         filters.add(
           "drawtext=text='$escaped'"
-          ":fontsize='$fontSizeExpr'"
+          ':fontsize=$fontSize'
           ':fontcolor=white'
-          ":x='$xExpr'"
-          ":y='$yExpr'"
+          ':x=$xVal'
+          ':y=${yForLine(0)}'
           '$fontParam'
           ":enable='between(t,$s,${s + 1})'",
         );
@@ -480,20 +534,14 @@ class TimestampCameraService {
     // Static lines (always visible)
     int lineIndex = hasDateTime ? 1 : 0;
     for (final line in staticLines) {
-      final xExpr = _ffmpegTextX(settings.position);
-      final yExpr = _ffmpegTextY(
-        position: settings.position,
-        lineIndex: lineIndex,
-        totalLines: totalLines,
-      );
       final escapedText = _escapeForFfmpegDrawtext(line);
 
       filters.add(
         "drawtext=text='$escapedText'"
-        ":fontsize='$fontSizeExpr'"
+        ':fontsize=$fontSize'
         ':fontcolor=white'
-        ":x='$xExpr'"
-        ":y='$yExpr'"
+        ':x=$xVal'
+        ':y=${yForLine(lineIndex)}'
         '$fontParam',
       );
       lineIndex++;
