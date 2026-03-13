@@ -4,6 +4,24 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-13 (Session 21)
+
+### Timestamp Camera — Complete Tear-Out and Rebuild
+
+- **Delete: Old timestamp camera** — Removed all 10 screen files (`timestamp_camera/` folder), `timestamp_camera_service.dart`, `location_service.dart`, and `Inter-Bold.ttf`. Cleaned references from `home_screen.dart` and `analytics_service.dart`.
+- **New: Per-corner overlay system** — Each of the 4 corners (TL, TR, BL, BR) independently assigned a data type: Date, Time, GPS Coordinates, GPS Address, or Custom Note. Replaces old toggle-based system with single-block overlay. Defaults: TL=Date, TR=Time, BL=GPS Coords, BR=None.
+- **New: `OverlaySettings` model** — `OverlayDataType` enum + `OverlayCorner` enum + `OverlaySettings` class with `copyWith()` (nullable function pattern for clearing corners), `textForCorner()`, `buildCornerTexts()`, `hasCustomNote`, `hasAnyOverlay`. (`timestamp_camera_service.dart`)
+- **New: `CameraOverlayPainter`** — Renders up to 4 independent rounded-rect blocks with white bold text + shadow. Top corners avoid Dynamic Island via `safeAreaTop`. `OverlayWidget` wraps it with 1-second timer for clock updates. (`camera_overlay_painter.dart`)
+- **New: `OverlaySettingsSheet`** — DraggableScrollableSheet with 4 dropdown rows (one per corner), custom note text field (shown when any corner uses customNote), and resolution selector. Changes saved immediately. (`overlay_settings_sheet.dart`)
+- **New: `VideoProcessingScreen`** — Same proven FFmpeg processing pattern with progress bar, retry with fallback filter, save without overlay buttons. Now receives `OverlaySettings` directly for fallback rebuild. (`video_processing_screen.dart`)
+- **New: `TimestampCameraScreen`** — Rebuilt main screen (was 856 lines across 10 files, now ~650 lines in 1 file + 3 supporting files). Inlines FocusIndicator, LensSelectorWidget, and bottom controls. Camera flip with try/finally, 3-pass ultra-wide heuristic, pinch-to-zoom, tap-to-focus, photo/video mode toggle. (`timestamp_camera_screen.dart`)
+- **New: FFmpeg per-corner filters** — `buildFfmpegFilter()` and `buildFallbackFfmpegFilter()` generate independent drawbox+drawtext chains per corner. Date/time use `%{pts\:localtime\:EPOCH}`, fallback uses per-second `enable='between(t,N,N+1)'`. (`timestamp_camera_service.dart`)
+- **Preserved: `LocationService`** — Identical singleton with GPS stream + reverse geocoding throttling. (`location_service.dart`)
+- **Re-integrated: Home screen tile + analytics events** — Timestamp Camera tile and 3 analytics events (photo_captured, video_recording_started, video_recording_completed) re-added.
+- **File count**: 12 files → 6 files (4 screens + 2 services)
+
+---
+
 ## 2026-03-13 (Session 20)
 
 ### Timestamp Camera — Fix Flip, Ultra-Wide, Preview Position, and Unified Overlay

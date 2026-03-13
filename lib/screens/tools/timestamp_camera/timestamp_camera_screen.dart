@@ -13,15 +13,13 @@ import '../../../widgets/premium_toast.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/timestamp_camera_service.dart';
-import 'overlay_widget.dart';
-import 'zoom_gesture_layer.dart';
-import 'camera_controls_widget.dart';
-import 'camera_settings_panel.dart';
-import 'focus_indicator_widget.dart';
-import 'lens_selector_widget.dart';
+import 'camera_overlay_painter.dart';
+import 'overlay_settings_sheet.dart';
 import 'video_processing_screen.dart';
 
-/// Full-screen timestamp camera with live overlay preview, photo capture,
+enum CameraMode { photo, video }
+
+/// Full-screen timestamp camera with per-corner overlay, photo capture,
 /// video recording, and configurable metadata overlays.
 class TimestampCameraScreen extends StatefulWidget {
   const TimestampCameraScreen({super.key});
@@ -62,7 +60,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   final _locationService = LocationService.instance;
   bool _gpsAvailable = false;
 
-  // Zoom — ValueNotifier so only ValueListenableBuilder consumers rebuild
+  // Zoom
   final ValueNotifier<double> _zoomNotifier = ValueNotifier(1.0);
   double _minZoom = 1.0;
   double _maxZoom = 1.0;
@@ -71,7 +69,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   Offset? _focusPoint;
   bool _showFocusIndicator = false;
 
-  // Recording duration timer (updates top bar only)
+  // Recording duration timer
   Timer? _durationTimer;
 
   bool get _isMobile =>
@@ -151,7 +149,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         return;
       }
 
-      // Categorize cameras by direction
       _backCameras = _cameras
           .where((c) => c.lensDirection == CameraLensDirection.back)
           .toList();
@@ -159,11 +156,10 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           .where((c) => c.lensDirection == CameraLensDirection.front)
           .toList();
 
-      // Detect ultra-wide camera with multi-pass heuristic
+      // Detect ultra-wide camera with 3-pass heuristic
       _mainBackCamera = null;
       _ultraWideCamera = null;
 
-      // Log all cameras for debugging
       for (final cam in _backCameras) {
         debugPrint('Back camera: name="${cam.name}", direction=${cam.lensDirection}');
       }
@@ -178,9 +174,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         }
       }
 
-      // Pass 2 — iOS ID-based: parse numeric suffix from AVCaptureDevice IDs
-      // e.g. "com.apple.avfoundation.avcapturedevice.built-in_video:0"
-      // Lowest suffix (:0) = ultra-wide, next (:2) = wide/main on iPhone Pro
+      // Pass 2 — iOS ID suffix-based
       if (_ultraWideCamera == null &&
           _backCameras.length >= 2 &&
           defaultTargetPlatform == TargetPlatform.iOS) {
@@ -201,7 +195,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         }
       }
 
-      // Pass 3 — generic fallback: if 2+ back cameras, treat non-main as ultra-wide
+      // Pass 3 — generic fallback
       if (_ultraWideCamera == null && _backCameras.length >= 2) {
         _mainBackCamera ??= _backCameras.first;
         for (final cam in _backCameras) {
@@ -213,12 +207,10 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         }
       }
 
-      // Ensure main camera is set even if only one back camera
       _mainBackCamera ??= _backCameras.isNotEmpty ? _backCameras.first : null;
       _hasUltraWide = _ultraWideCamera != null;
       debugPrint('Ultra-wide detected: $_hasUltraWide');
 
-      // Set initial front/back state from actual first camera
       _isUsingFrontCamera = _cameras[_currentCameraIndex].lensDirection ==
           CameraLensDirection.front;
 
@@ -334,14 +326,11 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   }
 
   void _setZoom(double zoom) {
-    // Handle ultra-wide lens switching on iOS
     if (_hasUltraWide && !_isUsingFrontCamera) {
       if (zoom < 1.0 && !_isUsingUltraWide) {
-        // Switch to ultra-wide camera for 0.5x
         _switchToUltraWide(true);
         return;
       } else if (zoom >= 1.0 && _isUsingUltraWide) {
-        // Switch back to main wide camera
         _switchToUltraWide(false).then((_) {
           if (zoom > 1.0) {
             final clamped = zoom.clamp(_minZoom, _maxZoom);
@@ -385,18 +374,14 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       final bytes = await xFile.readAsBytes();
       final now = DateTime.now();
 
-      final lines = _overlaySettings.buildOverlayLines(
+      final cornerTexts = _overlaySettings.buildCornerTexts(
         coords: _locationService.currentCoords,
         address: _locationService.currentAddress,
         dateTime: now,
       );
 
       final watermarked =
-          await TimestampCameraService.instance.watermarkPhoto(
-        bytes,
-        lines,
-        position: _overlaySettings.position,
-      );
+          await TimestampCameraService.instance.watermarkPhoto(bytes, cornerTexts);
 
       await Gal.putImageBytes(
         watermarked,
@@ -427,7 +412,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         _recordingStart = DateTime.now();
         _recordingDuration = Duration.zero;
       });
-      // Timer for updating the recording duration display only
       _durationTimer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (_isRecording && _recordingStart != null) {
           setState(() {
@@ -458,13 +442,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         _recordingDuration = Duration.zero;
       });
 
-      // Build overlay lines (static parts for FFmpeg)
-      final lines = _overlaySettings.buildOverlayLines(
-        coords: _locationService.currentCoords,
-        address: _locationService.currentAddress,
-      );
-
-      if (_isMobile && lines.isNotEmpty) {
+      if (_isMobile && _overlaySettings.hasAnyOverlay) {
         // Extract bundled font to temp file for FFmpeg drawtext
         String? fontPath;
         try {
@@ -474,12 +452,9 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           final fontFile = File('${tempDir.path}/Inter-Bold.ttf');
           await fontFile.writeAsBytes(fontData.buffer.asUint8List());
           fontPath = fontFile.path;
-        } catch (_) {
-          // Font extraction failed — filters will omit fontfile param
-        }
+        } catch (_) {}
 
-        final filter = TimestampCameraService.instance
-            .buildFallbackFfmpegFilter(
+        final filter = TimestampCameraService.instance.buildFfmpegFilter(
           settings: _overlaySettings,
           recordingStartTime: recordingStartTime ?? DateTime.now(),
           durationMs: durationMs,
@@ -498,6 +473,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
                 totalDurationMs: durationMs,
                 recordingStartTime: recordingStartTime,
                 fontPath: fontPath,
+                settings: _overlaySettings,
                 coords: _locationService.currentCoords,
                 address: _locationService.currentAddress,
               ),
@@ -549,14 +525,13 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => CameraSettingsPanel(
+      builder: (_) => OverlaySettingsSheet(
         settings: _overlaySettings,
         gpsAvailable: _gpsAvailable,
         onSettingsChanged: (newSettings) {
           final resolutionChanged =
               newSettings.resolution != _overlaySettings.resolution;
           setState(() => _overlaySettings = newSettings);
-          // Re-init camera if resolution changed
           if (resolutionChanged) {
             _setupController(_cameras[_currentCameraIndex]);
           }
@@ -576,7 +551,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Camera preview + overlay (overlay inside preview bounds)
+          // Camera preview + overlay
           if (_isFlipping)
             const Center(
               child: CircularProgressIndicator(
@@ -590,19 +565,16 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
                 aspectRatio: 1 / _controller!.value.aspectRatio,
                 child: Stack(
                   children: [
-                    // Camera preview
                     Positioned.fill(
                       child: RepaintBoundary(
                         child: CameraPreview(_controller!),
                       ),
                     ),
-                    // Overlay — now inside preview bounds
                     Positioned.fill(
                       child: IgnorePointer(
                         child: RepaintBoundary(
                           child: Builder(
                             builder: (context) {
-                              // Compute how much safe area overlaps the preview
                               final screenHeight = MediaQuery.of(context).size.height;
                               final screenWidth = MediaQuery.of(context).size.width;
                               final previewAspect = 1 / _controller!.value.aspectRatio;
@@ -629,21 +601,30 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           else
             const Center(child: AdaptiveLoadingIndicator()),
 
-          // Zoom gesture layer (transparent, on top of preview)
+          // Tap to focus + pinch to zoom
           if (_isCameraInitialized && _controller != null)
             Positioned.fill(
-              child: ZoomGestureLayer(
-                controller: _controller!,
-                zoomNotifier: _zoomNotifier,
-                minZoom: _minZoom,
-                maxZoom: _maxZoom,
-                onTapDown: _handleTapToFocus,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTapDown: (details) {
+                      _handleTapToFocus(details.localPosition, constraints);
+                    },
+                    onScaleUpdate: (details) {
+                      if (details.pointerCount >= 2) {
+                        final newZoom = _zoomNotifier.value * details.scale;
+                        _setZoom(newZoom);
+                      }
+                    },
+                  );
+                },
               ),
             ),
 
           // Focus indicator
           if (_showFocusIndicator && _focusPoint != null)
-            FocusIndicator(
+            _FocusIndicator(
               position: _focusPoint!,
               onAnimationComplete: () {
                 if (mounted) setState(() => _showFocusIndicator = false);
@@ -662,7 +643,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
               child: ValueListenableBuilder<double>(
                 valueListenable: _zoomNotifier,
                 builder: (context, zoom, _) {
-                  return LensSelectorWidget(
+                  return _LensSelectorWidget(
                     currentZoom: _isUsingUltraWide ? 0.5 : zoom,
                     minZoom: _minZoom,
                     maxZoom: _maxZoom,
@@ -698,17 +679,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
               left: 0,
               right: 0,
               bottom: 0,
-              child: CameraControlsWidget(
-                mode: _mode,
-                flashMode: _flashMode,
-                isRecording: _isRecording,
-                recordingDuration: _recordingDuration,
-                onCapture: _onCaptureTap,
-                onFlipCamera: _flipCamera,
-                onCycleFlash: _cycleFlash,
-                onModeChanged: (m) => setState(() => _mode = m),
-                canFlip: _cameras.length > 1,
-              ),
+              child: _buildBottomControls(),
             ),
         ],
       ),
@@ -792,6 +763,158 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     );
   }
 
+  Widget _buildBottomControls() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      color: Colors.black.withValues(alpha: 0.3),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Mode toggle (hidden while recording)
+            if (!_isRecording)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _buildModeToggle(),
+              ),
+            // Controls row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildCircleButton(
+                  icon: _flashIcon(),
+                  onTap: _isRecording ? null : _cycleFlash,
+                  size: 48,
+                ),
+                _buildShutterButton(),
+                _buildCircleButton(
+                  icon: AppIcons.rotateRight,
+                  onTap: (_cameras.length > 1 && !_isRecording) ? _flipCamera : null,
+                  size: 48,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModeToggle() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildModeChip(CameraMode.photo, 'Photo', AppIcons.camera),
+          const SizedBox(width: 4),
+          _buildModeChip(CameraMode.video, 'Video', AppIcons.video),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeChip(CameraMode chipMode, String label, IconData icon) {
+    final isSelected = _mode == chipMode;
+    return GestureDetector(
+      onTap: () => setState(() => _mode = chipMode),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white.withValues(alpha: 0.25) : Colors.transparent,
+          borderRadius: BorderRadius.circular(17),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShutterButton() {
+    final isVideo = _mode == CameraMode.video;
+    return GestureDetector(
+      onTap: _onCaptureTap,
+      child: Container(
+        width: 72,
+        height: 72,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _isRecording ? Colors.red : Colors.white,
+            width: 4,
+          ),
+        ),
+        padding: const EdgeInsets.all(4),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          decoration: BoxDecoration(
+            color: isVideo ? Colors.red : Colors.white,
+            shape: _isRecording ? BoxShape.rectangle : BoxShape.circle,
+            borderRadius: _isRecording ? BorderRadius.circular(8) : null,
+          ),
+          margin: _isRecording ? const EdgeInsets.all(10) : EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCircleButton({
+    required IconData icon,
+    required VoidCallback? onTap,
+    double size = 44,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: onTap != null ? 0.2 : 0.08),
+        ),
+        child: Icon(
+          icon,
+          color: onTap != null
+              ? Colors.white
+              : Colors.white.withValues(alpha: 0.3),
+          size: size * 0.5,
+        ),
+      ),
+    );
+  }
+
+  IconData _flashIcon() {
+    switch (_flashMode) {
+      case FlashMode.auto:
+        return AppIcons.flash;
+      case FlashMode.always:
+        return AppIcons.flashBold;
+      case FlashMode.off:
+        return AppIcons.flashSlash;
+      case FlashMode.torch:
+        return AppIcons.flashBold;
+    }
+  }
+
   Widget _buildErrorView() {
     return Center(
       child: Padding(
@@ -852,4 +975,206 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
   }
+}
+
+// ─── Inline Widgets ────────────────────────────────────────────────
+
+/// iOS-style yellow focus square.
+class _FocusIndicator extends StatefulWidget {
+  final Offset position;
+  final VoidCallback onAnimationComplete;
+
+  const _FocusIndicator({
+    required this.position,
+    required this.onAnimationComplete,
+  });
+
+  @override
+  State<_FocusIndicator> createState() => _FocusIndicatorState();
+}
+
+class _FocusIndicatorState extends State<_FocusIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          widget.onAnimationComplete();
+        }
+      })
+      ..forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: widget.position.dx - 35,
+      top: widget.position.dy - 35,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final t = _controller.value;
+          double scale;
+          double opacity;
+
+          if (t < 0.15) {
+            scale = 1.3 - (0.3 * (t / 0.15));
+            opacity = 1.0;
+          } else if (t < 0.70) {
+            scale = 1.0;
+            opacity = 1.0;
+          } else {
+            scale = 1.0;
+            opacity = 1.0 - ((t - 0.70) / 0.30);
+          }
+
+          return Transform.scale(
+            scale: scale,
+            child: Opacity(
+              opacity: opacity.clamp(0.0, 1.0),
+              child: child,
+            ),
+          );
+        },
+        child: Container(
+          width: 70,
+          height: 70,
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: const Color(0xFFFFCC00),
+              width: 1.5,
+            ),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Lens selector with 0.5x / 1x / 2x / 5x stops.
+class _LensSelectorWidget extends StatelessWidget {
+  final double currentZoom;
+  final double minZoom;
+  final double maxZoom;
+  final bool hasUltraWide;
+  final ValueChanged<double> onZoomChanged;
+
+  const _LensSelectorWidget({
+    required this.currentZoom,
+    required this.minZoom,
+    required this.maxZoom,
+    this.hasUltraWide = false,
+    required this.onZoomChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final stops = <_LensStop>[];
+
+    if (hasUltraWide || minZoom <= 0.6) {
+      stops.add(const _LensStop(label: '.5', zoom: 0.5));
+    }
+    stops.add(const _LensStop(label: '1x', zoom: 1.0));
+    if (maxZoom >= 2.0) {
+      stops.add(const _LensStop(label: '2x', zoom: 2.0));
+    }
+    if (maxZoom >= 5.0) {
+      stops.add(const _LensStop(label: '5x', zoom: 5.0));
+    }
+
+    if (stops.length < 2) return const SizedBox.shrink();
+
+    int activeIndex = 0;
+    double minDist = double.infinity;
+    for (var i = 0; i < stops.length; i++) {
+      final dist = (stops[i].zoom - currentZoom).abs();
+      if (dist < minDist && dist <= 0.25) {
+        minDist = dist;
+        activeIndex = i;
+      }
+    }
+    final hasActive = minDist <= 0.25;
+    final showDynamic = !hasActive;
+    final dynamicLabel = '${currentZoom.toStringAsFixed(1)}x';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (showDynamic)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 44,
+              height: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                color: const Color(0xFFFFCC00),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                dynamicLabel,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ...stops.asMap().entries.map((entry) {
+          final i = entry.key;
+          final stop = entry.value;
+          final isActive = hasActive && i == activeIndex;
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: GestureDetector(
+              onTap: () => onZoomChanged(stop.zoom.clamp(minZoom, maxZoom)),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: isActive ? 36 : 32,
+                height: isActive ? 36 : 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isActive
+                      ? const Color(0xFFFFCC00)
+                      : Colors.black.withValues(alpha: 0.5),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  stop.label,
+                  style: TextStyle(
+                    color: isActive ? Colors.black : Colors.white,
+                    fontSize: isActive ? 13 : 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _LensStop {
+  final String label;
+  final double zoom;
+  const _LensStop({required this.label, required this.zoom});
 }

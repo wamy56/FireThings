@@ -4,102 +4,133 @@ import 'package:image/image.dart' as img;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 
-/// Position of the overlay block on the camera preview and output media.
-enum OverlayPosition { bottomLeft, bottomRight, topLeft, topRight }
+/// Data types that can be assigned to each overlay corner.
+enum OverlayDataType { date, time, gpsCoords, gpsAddress, customNote }
 
-/// Shared overlay sizing metrics computed proportionally from output dimensions.
+/// The four corners of the overlay.
+enum OverlayCorner { topLeft, topRight, bottomLeft, bottomRight }
+
+/// Per-corner overlay settings — each corner independently assigned a data type.
+class OverlaySettings {
+  final OverlayDataType? topLeft;
+  final OverlayDataType? topRight;
+  final OverlayDataType? bottomLeft;
+  final OverlayDataType? bottomRight;
+  final String customNote;
+  final String resolution; // 'low', 'medium', 'high'
+
+  const OverlaySettings({
+    this.topLeft = OverlayDataType.date,
+    this.topRight = OverlayDataType.time,
+    this.bottomLeft = OverlayDataType.gpsCoords,
+    this.bottomRight,
+    this.customNote = '',
+    this.resolution = 'high',
+  });
+
+  OverlaySettings copyWith({
+    OverlayDataType? Function()? topLeft,
+    OverlayDataType? Function()? topRight,
+    OverlayDataType? Function()? bottomLeft,
+    OverlayDataType? Function()? bottomRight,
+    String? customNote,
+    String? resolution,
+  }) {
+    return OverlaySettings(
+      topLeft: topLeft != null ? topLeft() : this.topLeft,
+      topRight: topRight != null ? topRight() : this.topRight,
+      bottomLeft: bottomLeft != null ? bottomLeft() : this.bottomLeft,
+      bottomRight: bottomRight != null ? bottomRight() : this.bottomRight,
+      customNote: customNote ?? this.customNote,
+      resolution: resolution ?? this.resolution,
+    );
+  }
+
+  /// Get the data type assigned to a specific corner.
+  OverlayDataType? operator [](OverlayCorner corner) {
+    switch (corner) {
+      case OverlayCorner.topLeft:
+        return topLeft;
+      case OverlayCorner.topRight:
+        return topRight;
+      case OverlayCorner.bottomLeft:
+        return bottomLeft;
+      case OverlayCorner.bottomRight:
+        return bottomRight;
+    }
+  }
+
+  /// Whether any corner uses the customNote type.
+  bool get hasCustomNote =>
+      topLeft == OverlayDataType.customNote ||
+      topRight == OverlayDataType.customNote ||
+      bottomLeft == OverlayDataType.customNote ||
+      bottomRight == OverlayDataType.customNote;
+
+  /// Whether any corner has an assigned data type.
+  bool get hasAnyOverlay =>
+      topLeft != null || topRight != null || bottomLeft != null || bottomRight != null;
+
+  /// Resolve the display text for a specific corner.
+  String? textForCorner(
+    OverlayCorner corner, {
+    String? coords,
+    String? address,
+    DateTime? dateTime,
+  }) {
+    final type = this[corner];
+    if (type == null) return null;
+    final now = dateTime ?? DateTime.now();
+
+    switch (type) {
+      case OverlayDataType.date:
+        return DateFormat('dd/MM/yyyy').format(now);
+      case OverlayDataType.time:
+        return DateFormat('HH:mm:ss').format(now);
+      case OverlayDataType.gpsCoords:
+        return coords;
+      case OverlayDataType.gpsAddress:
+        return address;
+      case OverlayDataType.customNote:
+        return customNote.isNotEmpty ? customNote : null;
+    }
+  }
+
+  /// Build a map of corner → resolved text for all corners with data.
+  Map<OverlayCorner, String> buildCornerTexts({
+    String? coords,
+    String? address,
+    DateTime? dateTime,
+  }) {
+    final map = <OverlayCorner, String>{};
+    for (final corner in OverlayCorner.values) {
+      final text = textForCorner(corner, coords: coords, address: address, dateTime: dateTime);
+      if (text != null && text.isNotEmpty) {
+        map[corner] = text;
+      }
+    }
+    return map;
+  }
+}
+
+/// Shared proportional metrics for overlay sizing.
 class OverlayMetrics {
-  final double fontSize, margin, padding, lineGap;
+  final double fontSize, margin, padding;
   const OverlayMetrics({
     required this.fontSize,
     required this.margin,
     required this.padding,
-    required this.lineGap,
   });
 }
 
-/// Compute proportional overlay metrics from output width/height.
-/// Used by the live preview painter, photo watermark, and FFmpeg filters.
+/// Compute proportional overlay metrics from output dimensions.
 OverlayMetrics computeOverlayMetrics(double width, double height) {
   final fontSize = height * 0.024;
   return OverlayMetrics(
     fontSize: fontSize,
     margin: width * 0.03,
     padding: fontSize * 0.6,
-    lineGap: fontSize * 0.4,
   );
-}
-
-/// Overlay settings data class.
-class OverlaySettings {
-  final bool showDate;
-  final bool showTime;
-  final bool showCoords;
-  final bool showAddress;
-  final bool showNote;
-  final String customNote;
-  final String resolution; // 'low', 'medium', 'high'
-  final OverlayPosition position;
-
-  const OverlaySettings({
-    this.showDate = true,
-    this.showTime = true,
-    this.showCoords = true,
-    this.showAddress = false,
-    this.showNote = false,
-    this.customNote = '',
-    this.resolution = 'high',
-    this.position = OverlayPosition.bottomLeft,
-  });
-
-  OverlaySettings copyWith({
-    bool? showDate,
-    bool? showTime,
-    bool? showCoords,
-    bool? showAddress,
-    bool? showNote,
-    String? customNote,
-    String? resolution,
-    OverlayPosition? position,
-  }) {
-    return OverlaySettings(
-      showDate: showDate ?? this.showDate,
-      showTime: showTime ?? this.showTime,
-      showCoords: showCoords ?? this.showCoords,
-      showAddress: showAddress ?? this.showAddress,
-      showNote: showNote ?? this.showNote,
-      customNote: customNote ?? this.customNote,
-      resolution: resolution ?? this.resolution,
-      position: position ?? this.position,
-    );
-  }
-
-  /// Build the overlay text lines for the current settings.
-  List<String> buildOverlayLines({
-    String? coords,
-    String? address,
-    DateTime? dateTime,
-  }) {
-    final lines = <String>[];
-    final now = dateTime ?? DateTime.now();
-
-    final datePart = showDate ? DateFormat('dd/MM/yyyy').format(now) : '';
-    final timePart = showTime ? DateFormat('HH:mm:ss').format(now) : '';
-    final dateTimeLine = '$datePart  $timePart'.trim();
-    if (dateTimeLine.isNotEmpty) lines.add(dateTimeLine);
-
-    if (showCoords && coords != null && coords.isNotEmpty) {
-      lines.add(coords);
-    }
-    if (showAddress && address != null && address.isNotEmpty) {
-      lines.add(address);
-    }
-    if (showNote && customNote.isNotEmpty) {
-      lines.add(customNote);
-    }
-
-    return lines;
-  }
 }
 
 /// Service for persisting overlay settings and watermarking photos/videos.
@@ -124,76 +155,71 @@ class TimestampCameraService {
 
   Future<OverlaySettings> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final positionName = prefs.getString('${_prefix}position') ?? 'bottomLeft';
-    final position = OverlayPosition.values.firstWhere(
-      (e) => e.name == positionName,
-      orElse: () => OverlayPosition.bottomLeft,
-    );
+
+    OverlayDataType? readCorner(String key) {
+      final val = prefs.getString('$_prefix$key');
+      if (val == null || val == 'none') return null;
+      return OverlayDataType.values.firstWhere(
+        (e) => e.name == val,
+        orElse: () => OverlayDataType.date,
+      );
+    }
+
     return OverlaySettings(
-      showDate: prefs.getBool('${_prefix}showDate') ?? true,
-      showTime: prefs.getBool('${_prefix}showTime') ?? true,
-      showCoords: prefs.getBool('${_prefix}showCoords') ?? true,
-      showAddress: prefs.getBool('${_prefix}showAddress') ?? false,
-      showNote: prefs.getBool('${_prefix}showNote') ?? false,
+      topLeft: readCorner('topLeft') ??
+          (prefs.containsKey('${_prefix}topLeft') ? null : OverlayDataType.date),
+      topRight: readCorner('topRight') ??
+          (prefs.containsKey('${_prefix}topRight') ? null : OverlayDataType.time),
+      bottomLeft: readCorner('bottomLeft') ??
+          (prefs.containsKey('${_prefix}bottomLeft') ? null : OverlayDataType.gpsCoords),
+      bottomRight: readCorner('bottomRight'),
       customNote: prefs.getString('${_prefix}customNote') ?? '',
       resolution: prefs.getString('${_prefix}resolution') ?? 'high',
-      position: position,
     );
   }
 
   Future<void> saveSettings(OverlaySettings settings) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('${_prefix}showDate', settings.showDate);
-    await prefs.setBool('${_prefix}showTime', settings.showTime);
-    await prefs.setBool('${_prefix}showCoords', settings.showCoords);
-    await prefs.setBool('${_prefix}showAddress', settings.showAddress);
-    await prefs.setBool('${_prefix}showNote', settings.showNote);
+    await prefs.setString('${_prefix}topLeft', settings.topLeft?.name ?? 'none');
+    await prefs.setString('${_prefix}topRight', settings.topRight?.name ?? 'none');
+    await prefs.setString('${_prefix}bottomLeft', settings.bottomLeft?.name ?? 'none');
+    await prefs.setString('${_prefix}bottomRight', settings.bottomRight?.name ?? 'none');
     await prefs.setString('${_prefix}customNote', settings.customNote);
     await prefs.setString('${_prefix}resolution', settings.resolution);
-    await prefs.setString('${_prefix}position', settings.position.name);
   }
 
-  /// Watermark a photo with overlay text using the `image` package in an
-  /// isolate. Uses the same 3% margin ratio as the live preview painter.
-  /// Returns JPEG bytes.
+  // ─── Photo Watermark ──────────────────────────────────────────────
+
+  /// Watermark a photo with per-corner overlay text using the `image` package
+  /// in an isolate. Returns JPEG bytes.
   Future<Uint8List> watermarkPhoto(
     Uint8List imageBytes,
-    List<String> overlayLines, {
-    OverlayPosition position = OverlayPosition.bottomLeft,
-  }) async {
-    if (overlayLines.isEmpty) return imageBytes;
+    Map<OverlayCorner, String> cornerTexts,
+  ) async {
+    if (cornerTexts.isEmpty) return imageBytes;
 
-    final posIndex = position.index;
+    // Serialize corner data for isolate (enums can't cross isolate boundary)
+    final serialized = cornerTexts.map(
+      (corner, text) => MapEntry(corner.index, text),
+    );
     return Isolate.run(() {
-      return _watermarkInIsolate(imageBytes, overlayLines, posIndex);
+      return _watermarkInIsolate(imageBytes, serialized);
     });
   }
 
-  /// Draw overlay text directly onto a photo using the `image` package.
-  /// Uses shared [computeOverlayMetrics] for proportional positioning that
-  /// matches the live preview and FFmpeg video overlay.
   static Uint8List _watermarkInIsolate(
     Uint8List photoBytes,
-    List<String> overlayLines,
-    int positionIndex,
+    Map<int, String> cornerTexts,
   ) {
     final photo = img.decodeImage(photoBytes);
     if (photo == null) return photoBytes;
 
-    final position = OverlayPosition.values[positionIndex];
-    final isLeft = position == OverlayPosition.bottomLeft ||
-        position == OverlayPosition.topLeft;
-    final isTop = position == OverlayPosition.topLeft ||
-        position == OverlayPosition.topRight;
-
-    // Shared proportional metrics
     final metrics = computeOverlayMetrics(
       photo.width.toDouble(),
       photo.height.toDouble(),
     );
     final margin = metrics.margin.round();
     final padding = metrics.padding.round();
-    final lineGap = metrics.lineGap.round();
 
     // Select closest built-in bitmap font based on target size
     final targetFontSize = metrics.fontSize;
@@ -207,68 +233,50 @@ class TimestampCameraService {
     }
     final charHeight = font.lineHeight;
 
-    // Measure text widths
-    int maxTextWidth = 0;
-    for (final line in overlayLines) {
-      int lineWidth = 0;
-      for (final ch in line.codeUnits) {
+    for (final entry in cornerTexts.entries) {
+      final cornerIndex = entry.key;
+      final text = entry.value;
+      final isLeft = cornerIndex == OverlayCorner.topLeft.index ||
+          cornerIndex == OverlayCorner.bottomLeft.index;
+      final isTop = cornerIndex == OverlayCorner.topLeft.index ||
+          cornerIndex == OverlayCorner.topRight.index;
+
+      // Measure text width
+      int textWidth = 0;
+      for (final ch in text.codeUnits) {
         final glyph = font.characters[ch];
-        if (glyph != null) lineWidth += glyph.xAdvance;
+        if (glyph != null) textWidth += glyph.xAdvance;
       }
-      if (lineWidth > maxTextWidth) maxTextWidth = lineWidth;
-    }
 
-    // Block dimensions — use actual charHeight for text, shared metrics for spacing
-    final blockWidth = maxTextWidth + (padding * 2);
-    final blockHeight = (overlayLines.length * charHeight) +
-        ((overlayLines.length - 1) * lineGap) +
-        (padding * 2);
+      final blockWidth = textWidth + (padding * 2);
+      final blockHeight = charHeight + (padding * 2);
 
-    // Block position — proportional margin (no safe area for saved photos)
-    final int blockX;
-    if (isLeft) {
-      blockX = margin;
-    } else {
-      blockX = photo.width - blockWidth - margin;
-    }
+      // Block position
+      final int blockX = isLeft ? margin : photo.width - blockWidth - margin;
+      final int blockY = isTop ? margin : photo.height - blockHeight - margin;
 
-    final int blockY;
-    if (isTop) {
-      blockY = margin;
-    } else {
-      blockY = photo.height - blockHeight - margin;
-    }
+      // Draw background rectangle
+      img.fillRect(
+        photo,
+        x1: blockX,
+        y1: blockY,
+        x2: blockX + blockWidth,
+        y2: blockY + blockHeight,
+        color: img.ColorRgba8(0, 0, 0, 140),
+      );
 
-    // Draw background rectangle
-    img.fillRect(
-      photo,
-      x1: blockX,
-      y1: blockY,
-      x2: blockX + blockWidth,
-      y2: blockY + blockHeight,
-      color: img.ColorRgba8(0, 0, 0, 140),
-    );
-
-    // Draw each text line
-    for (var i = 0; i < overlayLines.length; i++) {
-      final textY = blockY + padding + (i * (charHeight + lineGap));
-
+      // Draw text
       int textX;
       if (isLeft) {
         textX = blockX + padding;
       } else {
-        // Right-align: measure this line's width
-        int lineWidth = 0;
-        for (final ch in overlayLines[i].codeUnits) {
-          final glyph = font.characters[ch];
-          if (glyph != null) lineWidth += glyph.xAdvance;
-        }
-        textX = blockX + blockWidth - padding - lineWidth;
+        textX = blockX + blockWidth - padding - textWidth;
       }
+      final textY = blockY + padding;
 
       img.drawString(
         photo,
-        overlayLines[i],
+        text,
         font: font,
         x: textX,
         y: textY,
@@ -281,54 +289,9 @@ class TimestampCameraService {
 
   // ─── FFmpeg Video Overlay ─────────────────────────────────────────
 
-  /// Return the FFmpeg `x` value for text within the block.
-  static String _ffmpegTextX({
-    required OverlayPosition position,
-    required int margin,
-    required int padding,
-  }) {
-    final isLeft = position == OverlayPosition.bottomLeft ||
-        position == OverlayPosition.topLeft;
-    if (isLeft) {
-      return '${margin + padding}';
-    } else {
-      return 'w-tw-${margin + padding}';
-    }
-  }
-
-  /// Build a drawbox filter for the grouped background rect using integer values.
-  static String _ffmpegDrawBox({
-    required OverlayPosition position,
-    required int totalLines,
-    required int maxTextChars,
-    required int margin,
-    required int padding,
-    required int fontSize,
-    required int lineGap,
-  }) {
-    final isLeft = position == OverlayPosition.bottomLeft ||
-        position == OverlayPosition.topLeft;
-    final isTop = position == OverlayPosition.topLeft ||
-        position == OverlayPosition.topRight;
-
-    // Estimate block width from max char count * average char width (0.55 * fontSize)
-    final blockW = (padding * 2) + (maxTextChars * fontSize * 0.55).round() + 4;
-    final blockH = (padding * 2) +
-        (totalLines * fontSize) +
-        ((totalLines - 1) * lineGap);
-
-    final x = isLeft ? '$margin' : 'w-${blockW + margin}';
-    final y = isTop ? '$margin' : 'h-${blockH + margin}';
-
-    return 'drawbox=x=$x:y=$y:w=$blockW:h=$blockH'
-        ':color=black@0.55:t=fill';
-  }
-
-  /// Build a dynamic FFmpeg drawtext filter where the date/time line updates
-  /// per-frame using `%{pts\:localtime\:EPOCH}`.
-  ///
-  /// Uses pre-computed integer values — no single-quoted FFmpeg expressions.
-  String buildDynamicFfmpegFilter({
+  /// Build a dynamic FFmpeg drawtext filter with per-corner overlays.
+  /// Date/time corners use `%{pts\:localtime\:EPOCH}` for per-frame updates.
+  String buildFfmpegFilter({
     required OverlaySettings settings,
     required DateTime recordingStartTime,
     required int durationMs,
@@ -341,116 +304,92 @@ class TimestampCameraService {
     final fontSize = metrics.fontSize.round();
     final margin = metrics.margin.round();
     final padding = metrics.padding.round();
-    final lineGap = metrics.lineGap.round();
     final filters = <String>[];
-
-    final isTop = settings.position == OverlayPosition.topLeft ||
-        settings.position == OverlayPosition.topRight;
-
-    // Collect all lines — date/time is dynamic, rest are static
-    final staticLines = <String>[];
-    bool hasDateTime = false;
-    int maxChars = 0;
-
-    if (settings.showDate || settings.showTime) {
-      hasDateTime = true;
-      int dtChars = 0;
-      if (settings.showDate) dtChars += 10;
-      if (settings.showDate && settings.showTime) dtChars += 2;
-      if (settings.showTime) dtChars += 8;
-      if (dtChars > maxChars) maxChars = dtChars;
-    }
-
-    if (settings.showCoords && coords != null && coords.isNotEmpty) {
-      staticLines.add(coords);
-      if (coords.length > maxChars) maxChars = coords.length;
-    }
-    if (settings.showAddress && address != null && address.isNotEmpty) {
-      staticLines.add(address);
-      if (address.length > maxChars) maxChars = address.length;
-    }
-    if (settings.showNote && settings.customNote.isNotEmpty) {
-      staticLines.add(settings.customNote);
-      if (settings.customNote.length > maxChars) maxChars = settings.customNote.length;
-    }
-
-    final totalLines = (hasDateTime ? 1 : 0) + staticLines.length;
-    if (totalLines == 0) return '';
-
-    final blockH = (padding * 2) +
-        (totalLines * fontSize) +
-        ((totalLines - 1) * lineGap);
-
-    // Single grouped background box
-    filters.add(_ffmpegDrawBox(
-      position: settings.position,
-      totalLines: totalLines,
-      maxTextChars: maxChars,
-      margin: margin,
-      padding: padding,
-      fontSize: fontSize,
-      lineGap: lineGap,
-    ));
-
-    int lineIndex = 0;
     final fontParam = fontPath != null ? ":fontfile='$fontPath'" : '';
+    final epoch = recordingStartTime.millisecondsSinceEpoch ~/ 1000;
 
-    // Helper to compute y for a given line index
-    String yForLine(int idx) {
-      final lineOffset = padding + (idx * (fontSize + lineGap));
-      if (isTop) {
-        return '${margin + lineOffset}';
-      } else {
-        return 'h-${blockH + margin - lineOffset}';
+    // Estimated char width for drawbox sizing
+    final charWidthEst = (fontSize * 0.55).round();
+
+    for (final corner in OverlayCorner.values) {
+      final type = settings[corner];
+      if (type == null) continue;
+
+      final isLeft = corner == OverlayCorner.topLeft || corner == OverlayCorner.bottomLeft;
+      final isTop = corner == OverlayCorner.topLeft || corner == OverlayCorner.topRight;
+
+      // Resolve text or format string
+      String? text;
+      String? dynamicFormat;
+      int estimatedChars = 0;
+
+      switch (type) {
+        case OverlayDataType.date:
+          dynamicFormat = '%d/%m/%Y';
+          estimatedChars = 10;
+          break;
+        case OverlayDataType.time:
+          dynamicFormat = '%H\\:%M\\:%S';
+          estimatedChars = 8;
+          break;
+        case OverlayDataType.gpsCoords:
+          text = coords;
+          estimatedChars = coords?.length ?? 0;
+          break;
+        case OverlayDataType.gpsAddress:
+          text = address;
+          estimatedChars = address?.length ?? 0;
+          break;
+        case OverlayDataType.customNote:
+          text = settings.customNote;
+          estimatedChars = settings.customNote.length;
+          break;
       }
-    }
 
-    final xVal = _ffmpegTextX(
-      position: settings.position,
-      margin: margin,
-      padding: padding,
-    );
+      if (text == null && dynamicFormat == null) continue;
+      if (text != null && text.isEmpty) continue;
 
-    // Dynamic date/time line
-    if (hasDateTime) {
-      final epoch = recordingStartTime.millisecondsSinceEpoch ~/ 1000;
-
-      String format = '';
-      if (settings.showDate) format += '%d/%m/%Y';
-      if (settings.showDate && settings.showTime) format += '  ';
-      if (settings.showTime) format += '%H\\:%M\\:%S';
+      // Drawbox
+      final blockW = (padding * 2) + (estimatedChars * charWidthEst) + 4;
+      final blockH = (padding * 2) + fontSize;
+      final boxX = isLeft ? '$margin' : 'w-${blockW + margin}';
+      final boxY = isTop ? '$margin' : 'h-${blockH + margin}';
 
       filters.add(
-        "drawtext=text='%{pts\\:localtime\\:$epoch\\:$format}'"
-        ':fontsize=$fontSize'
-        ':fontcolor=white'
-        ':x=$xVal'
-        ':y=${yForLine(lineIndex)}'
-        '$fontParam',
+        'drawbox=x=$boxX:y=$boxY:w=$blockW:h=$blockH:color=black@0.55:t=fill',
       );
-      lineIndex++;
-    }
 
-    // Static lines
-    for (final line in staticLines) {
-      final escapedText = _escapeForFfmpegDrawtext(line);
+      // Drawtext
+      final textX = isLeft ? '${margin + padding}' : 'w-tw-${margin + padding}';
+      final textY = isTop ? '${margin + padding}' : 'h-${blockH + margin - padding}';
 
-      filters.add(
-        "drawtext=text='$escapedText'"
-        ':fontsize=$fontSize'
-        ':fontcolor=white'
-        ':x=$xVal'
-        ':y=${yForLine(lineIndex)}'
-        '$fontParam',
-      );
-      lineIndex++;
+      if (dynamicFormat != null) {
+        filters.add(
+          "drawtext=text='%{pts\\:localtime\\:$epoch\\:$dynamicFormat}'"
+          ':fontsize=$fontSize'
+          ':fontcolor=white'
+          ':x=$textX'
+          ':y=$textY'
+          '$fontParam',
+        );
+      } else {
+        final escaped = _escapeForFfmpegDrawtext(text!);
+        filters.add(
+          "drawtext=text='$escaped'"
+          ':fontsize=$fontSize'
+          ':fontcolor=white'
+          ':x=$textX'
+          ':y=$textY'
+          '$fontParam',
+        );
+      }
     }
 
     return filters.join(',');
   }
 
   /// Build a fallback FFmpeg filter using per-second `enable='between(t,N,N+1)'`
-  /// segments. Uses pre-computed integer values.
+  /// segments for date/time corners.
   String buildFallbackFfmpegFilter({
     required OverlaySettings settings,
     required DateTime recordingStartTime,
@@ -464,117 +403,96 @@ class TimestampCameraService {
     final fontSize = metrics.fontSize.round();
     final margin = metrics.margin.round();
     final padding = metrics.padding.round();
-    final lineGap = metrics.lineGap.round();
     final filters = <String>[];
+    final fontParam = fontPath != null ? ":fontfile='$fontPath'" : '';
     final totalSeconds = (durationMs / 1000).ceil() + 1;
 
-    final isTop = settings.position == OverlayPosition.topLeft ||
-        settings.position == OverlayPosition.topRight;
+    final charWidthEst = (fontSize * 0.55).round();
 
-    final staticLines = <String>[];
-    int maxChars = 0;
+    for (final corner in OverlayCorner.values) {
+      final type = settings[corner];
+      if (type == null) continue;
 
-    if (settings.showCoords && coords != null && coords.isNotEmpty) {
-      staticLines.add(coords);
-      if (coords.length > maxChars) maxChars = coords.length;
-    }
-    if (settings.showAddress && address != null && address.isNotEmpty) {
-      staticLines.add(address);
-      if (address.length > maxChars) maxChars = address.length;
-    }
-    if (settings.showNote && settings.customNote.isNotEmpty) {
-      staticLines.add(settings.customNote);
-      if (settings.customNote.length > maxChars) maxChars = settings.customNote.length;
-    }
+      final isLeft = corner == OverlayCorner.topLeft || corner == OverlayCorner.bottomLeft;
+      final isTop = corner == OverlayCorner.topLeft || corner == OverlayCorner.topRight;
+      final isDynamic = type == OverlayDataType.date || type == OverlayDataType.time;
 
-    final hasDateTime = settings.showDate || settings.showTime;
-    if (hasDateTime) {
-      int dtChars = 0;
-      if (settings.showDate) dtChars += 10;
-      if (settings.showDate && settings.showTime) dtChars += 2;
-      if (settings.showTime) dtChars += 8;
-      if (dtChars > maxChars) maxChars = dtChars;
-    }
-
-    final totalLines = (hasDateTime ? 1 : 0) + staticLines.length;
-    if (totalLines == 0) return '';
-
-    final blockH = (padding * 2) +
-        (totalLines * fontSize) +
-        ((totalLines - 1) * lineGap);
-
-    // Single grouped background box
-    filters.add(_ffmpegDrawBox(
-      position: settings.position,
-      totalLines: totalLines,
-      maxTextChars: maxChars,
-      margin: margin,
-      padding: padding,
-      fontSize: fontSize,
-      lineGap: lineGap,
-    ));
-
-    final fontParam = fontPath != null ? ":fontfile='$fontPath'" : '';
-
-    // Helper to compute y for a given line index
-    String yForLine(int idx) {
-      final lineOffset = padding + (idx * (fontSize + lineGap));
-      if (isTop) {
-        return '${margin + lineOffset}';
+      // Resolve static text
+      String? staticText;
+      int estimatedChars = 0;
+      if (!isDynamic) {
+        switch (type) {
+          case OverlayDataType.gpsCoords:
+            staticText = coords;
+            estimatedChars = coords?.length ?? 0;
+            break;
+          case OverlayDataType.gpsAddress:
+            staticText = address;
+            estimatedChars = address?.length ?? 0;
+            break;
+          case OverlayDataType.customNote:
+            staticText = settings.customNote;
+            estimatedChars = settings.customNote.length;
+            break;
+          default:
+            break;
+        }
+        if (staticText == null || staticText.isEmpty) continue;
       } else {
-        return 'h-${blockH + margin - lineOffset}';
+        estimatedChars = type == OverlayDataType.date ? 10 : 8;
       }
-    }
 
-    final xVal = _ffmpegTextX(
-      position: settings.position,
-      margin: margin,
-      padding: padding,
-    );
+      // Drawbox
+      final blockW = (padding * 2) + (estimatedChars * charWidthEst) + 4;
+      final blockH = (padding * 2) + fontSize;
+      final boxX = isLeft ? '$margin' : 'w-${blockW + margin}';
+      final boxY = isTop ? '$margin' : 'h-${blockH + margin}';
 
-    // Generate per-second drawtext for the dynamic date/time line
-    if (hasDateTime) {
-      for (var s = 0; s < totalSeconds; s++) {
-        final t = recordingStartTime.add(Duration(seconds: s));
-        final datePart =
-            settings.showDate ? DateFormat('dd/MM/yyyy').format(t) : '';
-        final timePart =
-            settings.showTime ? DateFormat('HH:mm:ss').format(t) : '';
-        final text = '$datePart  $timePart'.trim();
-        final escaped = _escapeForFfmpegDrawtext(text);
+      filters.add(
+        'drawbox=x=$boxX:y=$boxY:w=$blockW:h=$blockH:color=black@0.55:t=fill',
+      );
 
+      final textX = isLeft ? '${margin + padding}' : 'w-tw-${margin + padding}';
+      final textY = isTop ? '${margin + padding}' : 'h-${blockH + margin - padding}';
+
+      if (isDynamic) {
+        // Per-second drawtext for date/time
+        for (var s = 0; s < totalSeconds; s++) {
+          final t = recordingStartTime.add(Duration(seconds: s));
+          String text;
+          if (type == OverlayDataType.date) {
+            text = DateFormat('dd/MM/yyyy').format(t);
+          } else {
+            text = DateFormat('HH:mm:ss').format(t);
+          }
+          final escaped = _escapeForFfmpegDrawtext(text);
+
+          filters.add(
+            "drawtext=text='$escaped'"
+            ':fontsize=$fontSize'
+            ':fontcolor=white'
+            ':x=$textX'
+            ':y=$textY'
+            '$fontParam'
+            ":enable='between(t,$s,${s + 1})'",
+          );
+        }
+      } else {
+        final escaped = _escapeForFfmpegDrawtext(staticText!);
         filters.add(
           "drawtext=text='$escaped'"
           ':fontsize=$fontSize'
           ':fontcolor=white'
-          ':x=$xVal'
-          ':y=${yForLine(0)}'
-          '$fontParam'
-          ":enable='between(t,$s,${s + 1})'",
+          ':x=$textX'
+          ':y=$textY'
+          '$fontParam',
         );
       }
-    }
-
-    // Static lines (always visible)
-    int lineIndex = hasDateTime ? 1 : 0;
-    for (final line in staticLines) {
-      final escapedText = _escapeForFfmpegDrawtext(line);
-
-      filters.add(
-        "drawtext=text='$escapedText'"
-        ':fontsize=$fontSize'
-        ':fontcolor=white'
-        ':x=$xVal'
-        ':y=${yForLine(lineIndex)}'
-        '$fontParam',
-      );
-      lineIndex++;
     }
 
     return filters.join(',');
   }
 
-  /// Escape all characters that are special in FFmpeg's drawtext filter.
   String _escapeForFfmpegDrawtext(String text) {
     return text
         .replaceAll(r'\', r'\\')
