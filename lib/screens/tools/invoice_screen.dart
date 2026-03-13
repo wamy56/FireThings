@@ -136,6 +136,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     _engineerNameController.text = invoice.engineerName;
     _customerNameController.text = invoice.customerName;
     _customerAddressController.text = invoice.customerAddress;
+    _customerEmailController.text = invoice.customerEmail ?? '';
     _invoiceDate = invoice.date;
     _dueDate = invoice.dueDate;
     _items = List.from(invoice.items);
@@ -1046,6 +1047,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       engineerName: _engineerNameController.text,
       customerName: _customerNameController.text,
       customerAddress: _customerAddressController.text,
+      customerEmail: _customerEmailController.text.trim().isEmpty
+          ? null
+          : _customerEmailController.text.trim(),
       date: _invoiceDate,
       dueDate: _dueDate,
       items: _items,

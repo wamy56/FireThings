@@ -13,7 +13,6 @@ import '../../../widgets/premium_toast.dart';
 import '../../../services/analytics_service.dart';
 import '../../../services/location_service.dart';
 import '../../../services/timestamp_camera_service.dart';
-import 'camera_preview_widget.dart';
 import 'overlay_widget.dart';
 import 'zoom_gesture_layer.dart';
 import 'camera_controls_widget.dart';
@@ -160,17 +159,64 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
           .where((c) => c.lensDirection == CameraLensDirection.front)
           .toList();
 
-      // Detect ultra-wide by name rather than assuming index order
+      // Detect ultra-wide camera with multi-pass heuristic
       _mainBackCamera = null;
       _ultraWideCamera = null;
+
+      // Log all cameras for debugging
       for (final cam in _backCameras) {
-        if (cam.name.toLowerCase().contains('ultra')) {
-          _ultraWideCamera = cam;
+        debugPrint('Back camera: name="${cam.name}", direction=${cam.lensDirection}');
+      }
+
+      // Pass 1 — name-based (works on Android)
+      for (final cam in _backCameras) {
+        final nameLower = cam.name.toLowerCase();
+        if (nameLower.contains('ultra') || nameLower.contains('wide')) {
+          _ultraWideCamera ??= cam;
         } else {
           _mainBackCamera ??= cam;
         }
       }
+
+      // Pass 2 — iOS ID-based: parse numeric suffix from AVCaptureDevice IDs
+      // e.g. "com.apple.avfoundation.avcapturedevice.built-in_video:0"
+      // Lowest suffix (:0) = ultra-wide, next (:2) = wide/main on iPhone Pro
+      if (_ultraWideCamera == null &&
+          _backCameras.length >= 2 &&
+          defaultTargetPlatform == TargetPlatform.iOS) {
+        final parsed = <CameraDescription, int>{};
+        final suffixRegex = RegExp(r':(\d+)$');
+        for (final cam in _backCameras) {
+          final match = suffixRegex.firstMatch(cam.name);
+          if (match != null) {
+            parsed[cam] = int.parse(match.group(1)!);
+          }
+        }
+        if (parsed.length >= 2) {
+          final sorted = parsed.entries.toList()
+            ..sort((a, b) => a.value.compareTo(b.value));
+          _ultraWideCamera = sorted.first.key;
+          _mainBackCamera = sorted[1].key;
+          debugPrint('iOS camera assignment: ultra-wide="${_ultraWideCamera!.name}", main="${_mainBackCamera!.name}"');
+        }
+      }
+
+      // Pass 3 — generic fallback: if 2+ back cameras, treat non-main as ultra-wide
+      if (_ultraWideCamera == null && _backCameras.length >= 2) {
+        _mainBackCamera ??= _backCameras.first;
+        for (final cam in _backCameras) {
+          if (cam != _mainBackCamera) {
+            _ultraWideCamera = cam;
+            debugPrint('Fallback ultra-wide: "${cam.name}"');
+            break;
+          }
+        }
+      }
+
+      // Ensure main camera is set even if only one back camera
+      _mainBackCamera ??= _backCameras.isNotEmpty ? _backCameras.first : null;
       _hasUltraWide = _ultraWideCamera != null;
+      debugPrint('Ultra-wide detected: $_hasUltraWide');
 
       // Set initial front/back state from actual first camera
       _isUsingFrontCamera = _cameras[_currentCameraIndex].lensDirection ==
@@ -240,36 +286,40 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
 
   Future<void> _flipCamera() async {
     if (_isRecording || _isFlipping) return;
-    // Only flip if both front and back cameras exist
     if (_frontCameras.isEmpty || _backCameras.isEmpty) return;
     setState(() => _isFlipping = true);
-
-    _isUsingFrontCamera = !_isUsingFrontCamera;
-    _isUsingUltraWide = false;
-
-    final camera = _isUsingFrontCamera
-        ? _frontCameras.first
-        : (_mainBackCamera ?? _backCameras.first);
-    _currentCameraIndex = _cameras.indexOf(camera);
-
-    await _setupController(camera);
-    if (mounted) setState(() => _isFlipping = false);
+    try {
+      _isUsingFrontCamera = !_isUsingFrontCamera;
+      _isUsingUltraWide = false;
+      final camera = _isUsingFrontCamera
+          ? _frontCameras.first
+          : (_mainBackCamera ?? _backCameras.first);
+      _currentCameraIndex = _cameras.indexOf(camera);
+      await _setupController(camera);
+    } catch (e) {
+      debugPrint('Flip camera error: $e');
+    } finally {
+      if (mounted) setState(() => _isFlipping = false);
+    }
   }
 
   Future<void> _switchToUltraWide(bool useUltraWide) async {
     if (_isRecording || _isFlipping || !_hasUltraWide) return;
     if (useUltraWide == _isUsingUltraWide) return;
     setState(() => _isFlipping = true);
-
-    final camera = useUltraWide
-        ? _ultraWideCamera!
-        : (_mainBackCamera ?? _backCameras.first);
-    _currentCameraIndex = _cameras.indexOf(camera);
-    _isUsingUltraWide = useUltraWide;
-    _isUsingFrontCamera = false;
-
-    await _setupController(camera);
-    if (mounted) setState(() => _isFlipping = false);
+    try {
+      final camera = useUltraWide
+          ? _ultraWideCamera!
+          : (_mainBackCamera ?? _backCameras.first);
+      _currentCameraIndex = _cameras.indexOf(camera);
+      _isUsingUltraWide = useUltraWide;
+      _isUsingFrontCamera = false;
+      await _setupController(camera);
+    } catch (e) {
+      debugPrint('Switch ultra-wide error: $e');
+    } finally {
+      if (mounted) setState(() => _isFlipping = false);
+    }
   }
 
   Future<void> _cycleFlash() async {
@@ -526,7 +576,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Camera preview
+          // Camera preview + overlay (overlay inside preview bounds)
           if (_isFlipping)
             const Center(
               child: CircularProgressIndicator(
@@ -535,8 +585,44 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
               ),
             )
           else if (_isCameraInitialized && _controller != null)
-            RepaintBoundary(
-              child: CameraPreviewWidget(controller: _controller!),
+            Center(
+              child: AspectRatio(
+                aspectRatio: 1 / _controller!.value.aspectRatio,
+                child: Stack(
+                  children: [
+                    // Camera preview
+                    Positioned.fill(
+                      child: RepaintBoundary(
+                        child: CameraPreview(_controller!),
+                      ),
+                    ),
+                    // Overlay — now inside preview bounds
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: RepaintBoundary(
+                          child: Builder(
+                            builder: (context) {
+                              // Compute how much safe area overlaps the preview
+                              final screenHeight = MediaQuery.of(context).size.height;
+                              final screenWidth = MediaQuery.of(context).size.width;
+                              final previewAspect = 1 / _controller!.value.aspectRatio;
+                              final previewHeight = screenWidth / previewAspect;
+                              final previewTopOffset = (screenHeight - previewHeight) / 2;
+                              final safeAreaTop = (MediaQuery.of(context).padding.top - previewTopOffset)
+                                  .clamp(0.0, double.infinity);
+                              return OverlayWidget(
+                                settings: _overlaySettings,
+                                locationService: _locationService,
+                                safeAreaTop: safeAreaTop,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             )
           else if (_cameraError != null)
             _buildErrorView()
@@ -562,19 +648,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
               onAnimationComplete: () {
                 if (mounted) setState(() => _showFocusIndicator = false);
               },
-            ),
-
-          // Overlay painter (self-contained timer, behind RepaintBoundary)
-          if (_isCameraInitialized)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: RepaintBoundary(
-                  child: OverlayWidget(
-                    settings: _overlaySettings,
-                    locationService: _locationService,
-                  ),
-                ),
-              ),
             ),
 
           // Top bar

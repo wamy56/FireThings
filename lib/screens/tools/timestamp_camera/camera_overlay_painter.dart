@@ -8,20 +8,23 @@ import '../../../services/timestamp_camera_service.dart';
 class CameraOverlayPainter extends CustomPainter {
   final List<String> overlayLines;
   final OverlayPosition position;
+  final double safeAreaTop;
 
   CameraOverlayPainter({
     required this.overlayLines,
     this.position = OverlayPosition.bottomLeft,
+    this.safeAreaTop = 0.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (overlayLines.isEmpty) return;
 
-    final fontSize = size.height * 0.024;
-    final lineGap = fontSize * 0.4;
-    final margin = size.width * 0.03;
-    final padding = fontSize * 0.6;
+    final metrics = computeOverlayMetrics(size.width, size.height);
+    final fontSize = metrics.fontSize;
+    final lineGap = metrics.lineGap;
+    final margin = metrics.margin;
+    final padding = metrics.padding;
 
     final isLeft = position == OverlayPosition.bottomLeft ||
         position == OverlayPosition.topLeft;
@@ -64,10 +67,11 @@ class CameraOverlayPainter extends CustomPainter {
     final clampMax = (size.width - blockWidth - margin).clamp(margin, size.width);
     final blockX = rawBlockX.clamp(margin, clampMax);
 
-    // Compute block Y — use same 3% margin from edges so preview matches saved output
+    // Compute block Y — use margin from edges, with safe area adjustment for top positions
     final double blockY;
     if (isTop) {
-      blockY = margin;
+      // Push below Dynamic Island / safe area when in preview
+      blockY = margin > safeAreaTop + 4.0 ? margin : safeAreaTop + 4.0;
     } else {
       blockY = size.height - blockHeight - margin;
     }
@@ -135,6 +139,7 @@ class CameraOverlayPainter extends CustomPainter {
   @override
   bool shouldRepaint(CameraOverlayPainter oldDelegate) {
     if (oldDelegate.position != position) return true;
+    if (oldDelegate.safeAreaTop != safeAreaTop) return true;
     if (oldDelegate.overlayLines.length != overlayLines.length) return true;
     for (var i = 0; i < overlayLines.length; i++) {
       if (oldDelegate.overlayLines[i] != overlayLines[i]) return true;

@@ -11,11 +11,13 @@ import 'camera_overlay_painter.dart';
 class OverlayWidget extends StatefulWidget {
   final OverlaySettings settings;
   final LocationService locationService;
+  final double safeAreaTop;
 
   const OverlayWidget({
     super.key,
     required this.settings,
     required this.locationService,
+    this.safeAreaTop = 0.0,
   });
 
   @override
@@ -78,6 +80,7 @@ class _OverlayWidgetState extends State<OverlayWidget> {
       painter: CameraOverlayPainter(
         overlayLines: _overlayLines,
         position: widget.settings.position,
+        safeAreaTop: widget.safeAreaTop,
       ),
     );
   }

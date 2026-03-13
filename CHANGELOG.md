@@ -4,6 +4,37 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-13 (Session 20)
+
+### Timestamp Camera — Fix Flip, Ultra-Wide, Preview Position, and Unified Overlay
+
+- **Fix: Camera flip spinner forever** — Wrapped `_flipCamera()` and `_switchToUltraWide()` in try/finally so `_isFlipping` is always reset even if `_setupController()` throws. Previously an error left the permanent spinner on screen. (`timestamp_camera_screen.dart`)
+- **Fix: 0.5x ultra-wide not showing on iOS** — Camera detection now uses a 3-pass heuristic: (1) name-based for Android ("ultra"/"wide"), (2) iOS AVCaptureDevice ID suffix parsing (`:0` = ultra-wide, `:2` = main), (3) generic fallback for 2+ back cameras. Added debug logging for camera names/assignments. (`timestamp_camera_screen.dart`)
+- **Fix: Overlay renders behind Dynamic Island** — Moved overlay widget inside the camera preview's AspectRatio bounds (was full-screen Positioned.fill). Added `safeAreaTop` parameter computed from preview offset vs screen safe area. Painter pushes top-position overlays below the Dynamic Island in preview; saved output uses 0 (no safe area). (`timestamp_camera_screen.dart`, `overlay_widget.dart`, `camera_overlay_painter.dart`)
+- **Add: Unified overlay metrics** — New `OverlayMetrics` class and `computeOverlayMetrics(width, height)` function used by all three renderers (live preview painter, photo watermark, FFmpeg video filter). Replaces hardcoded per-resolution switch statements. All use `height * 0.024` fontSize, `width * 0.03` margin, proportional padding/lineGap. (`timestamp_camera_service.dart`)
+- **Fix: Photo watermark font selection** — Now selects closest bitmap font (`arial48`/`arial24`/`arial14`) based on target fontSize from shared metrics. Uses shared proportional margin/padding for block positioning. (`timestamp_camera_service.dart`)
+- **Fix: FFmpeg overlay sizing** — Replaced `_ffmpegFontSize`, `_ffmpegMargin`, `_ffmpegPadding`, `_ffmpegLineGap` hardcoded helpers with `videoDimensionsForResolution()` + `computeOverlayMetrics()`. Both `buildDynamicFfmpegFilter` and `buildFallbackFfmpegFilter` now use shared metrics. (`timestamp_camera_service.dart`)
+- **Simplify: CameraPreviewWidget** — Removed Center/AspectRatio wrapper (moved to parent screen). Widget now just returns `CameraPreview(controller)`. (`camera_preview_widget.dart`)
+
+---
+
+## 2026-03-13 (Session 19)
+
+### Fix: iOS Keyboard Done Bar + Field Navigation Arrows
+
+- **Fix: Done bar never showing on iOS** — `KeyboardDoneBar` used `MediaQuery.of(context).viewInsets.bottom` which is always 0 inside a Scaffold body (Scaffold consumes viewInsets). Switched to `MediaQueryData.fromView(View.of(context)).viewInsets.bottom` to read raw view insets. Changed positioning from `bottom: viewInsets.bottom` to `bottom: 0` since Scaffold already pushes the body above the keyboard. (`keyboard_done_bar.dart`)
+- **Add: Up/down field navigation arrows** — Added chevron up/down buttons (using `AppIcons.arrowUp`/`AppIcons.arrowDown`) on the left side of the toolbar, matching iOS native keyboard accessory view behaviour. Up calls `previousFocus()`, down calls `nextFocus()`. Layout: arrows left + spacer + "Done" right. (`keyboard_done_bar.dart`)
+
+---
+
+## 2026-03-13 (Session 18)
+
+### Fix: Invoice Customer Email Not Persisting
+
+- **Fix: customerEmail lost on reload** — Added `customerEmail` (nullable String) to `Invoice` model with full `toJson`/`fromJson`/`copyWith` support. DB migrated from v11→v12 (`ALTER TABLE invoices ADD COLUMN customerEmail TEXT`). Fresh installs include the column in `_createInvoicesTable`. Invoice screen now passes email to `_buildInvoice()` and restores it in `_loadExistingInvoice()`. Firestore sync works automatically via existing `toJson`/`fromJson` flow. (`invoice.dart`, `database_helper.dart`, `invoice_screen.dart`)
+
+---
+
 ## 2026-03-12 (Session 17)
 
 ### Timestamp Camera — Fix Regressions from Session 16

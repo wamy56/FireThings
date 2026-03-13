@@ -7,6 +7,29 @@ import 'package:intl/intl.dart';
 /// Position of the overlay block on the camera preview and output media.
 enum OverlayPosition { bottomLeft, bottomRight, topLeft, topRight }
 
+/// Shared overlay sizing metrics computed proportionally from output dimensions.
+class OverlayMetrics {
+  final double fontSize, margin, padding, lineGap;
+  const OverlayMetrics({
+    required this.fontSize,
+    required this.margin,
+    required this.padding,
+    required this.lineGap,
+  });
+}
+
+/// Compute proportional overlay metrics from output width/height.
+/// Used by the live preview painter, photo watermark, and FFmpeg filters.
+OverlayMetrics computeOverlayMetrics(double width, double height) {
+  final fontSize = height * 0.024;
+  return OverlayMetrics(
+    fontSize: fontSize,
+    margin: width * 0.03,
+    padding: fontSize * 0.6,
+    lineGap: fontSize * 0.4,
+  );
+}
+
 /// Overlay settings data class.
 class OverlaySettings {
   final bool showDate;
@@ -86,6 +109,19 @@ class TimestampCameraService {
 
   static const _prefix = 'timestamp_camera_';
 
+  /// Approximate video dimensions for each resolution setting (portrait).
+  static (int, int) videoDimensionsForResolution(String resolution) {
+    switch (resolution) {
+      case 'low':
+        return (720, 1280);
+      case 'medium':
+        return (1080, 1920);
+      case 'high':
+      default:
+        return (1080, 1920);
+    }
+  }
+
   Future<OverlaySettings> loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final positionName = prefs.getString('${_prefix}position') ?? 'bottomLeft';
@@ -134,6 +170,8 @@ class TimestampCameraService {
   }
 
   /// Draw overlay text directly onto a photo using the `image` package.
+  /// Uses shared [computeOverlayMetrics] for proportional positioning that
+  /// matches the live preview and FFmpeg video overlay.
   static Uint8List _watermarkInIsolate(
     Uint8List photoBytes,
     List<String> overlayLines,
@@ -148,12 +186,26 @@ class TimestampCameraService {
     final isTop = position == OverlayPosition.topLeft ||
         position == OverlayPosition.topRight;
 
-    // Use arial48 font from image package — scale by choosing appropriate font
-    final font = img.arial48;
+    // Shared proportional metrics
+    final metrics = computeOverlayMetrics(
+      photo.width.toDouble(),
+      photo.height.toDouble(),
+    );
+    final margin = metrics.margin.round();
+    final padding = metrics.padding.round();
+    final lineGap = metrics.lineGap.round();
+
+    // Select closest built-in bitmap font based on target size
+    final targetFontSize = metrics.fontSize;
+    final img.BitmapFont font;
+    if (targetFontSize >= 36) {
+      font = img.arial48;
+    } else if (targetFontSize >= 19) {
+      font = img.arial24;
+    } else {
+      font = img.arial14;
+    }
     final charHeight = font.lineHeight;
-    final margin = (photo.width * 0.03).round();
-    final padding = (charHeight * 0.6).round();
-    final lineGap = (charHeight * 0.4).round();
 
     // Measure text widths
     int maxTextWidth = 0;
@@ -166,13 +218,13 @@ class TimestampCameraService {
       if (lineWidth > maxTextWidth) maxTextWidth = lineWidth;
     }
 
-    // Block dimensions
+    // Block dimensions — use actual charHeight for text, shared metrics for spacing
     final blockWidth = maxTextWidth + (padding * 2);
     final blockHeight = (overlayLines.length * charHeight) +
         ((overlayLines.length - 1) * lineGap) +
         (padding * 2);
 
-    // Block position — 3% margin from edges (matches live preview)
+    // Block position — proportional margin (no safe area for saved photos)
     final int blockX;
     if (isLeft) {
       blockX = margin;
@@ -229,38 +281,6 @@ class TimestampCameraService {
 
   // ─── FFmpeg Video Overlay ─────────────────────────────────────────
 
-  /// Pre-computed integer font size based on resolution setting.
-  static int _ffmpegFontSize(String resolution) {
-    switch (resolution) {
-      case 'low':
-        return 20;
-      case 'medium':
-        return 28;
-      case 'high':
-      default:
-        return 36;
-    }
-  }
-
-  /// Margin in pixels proportional to resolution (~3% of width).
-  static int _ffmpegMargin(String resolution) {
-    switch (resolution) {
-      case 'low':
-        return 14;
-      case 'medium':
-        return 20;
-      case 'high':
-      default:
-        return 28;
-    }
-  }
-
-  /// Padding: ~60% of font size.
-  static int _ffmpegPadding(int fontSize) => (fontSize * 0.6).round();
-
-  /// Line gap: ~40% of font size.
-  static int _ffmpegLineGap(int fontSize) => (fontSize * 0.4).round();
-
   /// Return the FFmpeg `x` value for text within the block.
   static String _ffmpegTextX({
     required OverlayPosition position,
@@ -316,10 +336,12 @@ class TimestampCameraService {
     String? address,
     String? fontPath,
   }) {
-    final fontSize = _ffmpegFontSize(settings.resolution);
-    final margin = _ffmpegMargin(settings.resolution);
-    final padding = _ffmpegPadding(fontSize);
-    final lineGap = _ffmpegLineGap(fontSize);
+    final (videoW, videoH) = videoDimensionsForResolution(settings.resolution);
+    final metrics = computeOverlayMetrics(videoW.toDouble(), videoH.toDouble());
+    final fontSize = metrics.fontSize.round();
+    final margin = metrics.margin.round();
+    final padding = metrics.padding.round();
+    final lineGap = metrics.lineGap.round();
     final filters = <String>[];
 
     final isTop = settings.position == OverlayPosition.topLeft ||
@@ -437,10 +459,12 @@ class TimestampCameraService {
     String? address,
     String? fontPath,
   }) {
-    final fontSize = _ffmpegFontSize(settings.resolution);
-    final margin = _ffmpegMargin(settings.resolution);
-    final padding = _ffmpegPadding(fontSize);
-    final lineGap = _ffmpegLineGap(fontSize);
+    final (videoW, videoH) = videoDimensionsForResolution(settings.resolution);
+    final metrics = computeOverlayMetrics(videoW.toDouble(), videoH.toDouble());
+    final fontSize = metrics.fontSize.round();
+    final margin = metrics.margin.round();
+    final padding = metrics.padding.round();
+    final lineGap = metrics.lineGap.round();
     final filters = <String>[];
     final totalSeconds = (durationMs / 1000).ceil() + 1;
 

@@ -40,6 +40,7 @@ class Invoice {
   final String engineerName;
   final String customerName;
   final String customerAddress;
+  final String? customerEmail;
   final DateTime date;
   final DateTime dueDate;
   final List<InvoiceItem> items;
@@ -56,6 +57,7 @@ class Invoice {
     required this.engineerName,
     required this.customerName,
     required this.customerAddress,
+    this.customerEmail,
     required this.date,
     required this.dueDate,
     required this.items,
@@ -78,6 +80,7 @@ class Invoice {
       'engineerName': engineerName,
       'customerName': customerName,
       'customerAddress': customerAddress,
+      'customerEmail': customerEmail,
       'date': date.toIso8601String(),
       'dueDate': dueDate.toIso8601String(),
       'items': items.map((item) => item.toJson()).toList(),
@@ -97,6 +100,7 @@ class Invoice {
       engineerName: json['engineerName'] as String? ?? '',
       customerName: json['customerName'] as String,
       customerAddress: json['customerAddress'] as String,
+      customerEmail: json['customerEmail'] as String?,
       date: DateTime.parse(json['date'] as String),
       dueDate: DateTime.parse(json['dueDate'] as String),
       items: (json['items'] as List)
@@ -122,6 +126,7 @@ class Invoice {
     String? engineerName,
     String? customerName,
     String? customerAddress,
+    String? customerEmail,
     DateTime? date,
     DateTime? dueDate,
     List<InvoiceItem>? items,
@@ -138,6 +143,7 @@ class Invoice {
       engineerName: engineerName ?? this.engineerName,
       customerName: customerName ?? this.customerName,
       customerAddress: customerAddress ?? this.customerAddress,
+      customerEmail: customerEmail ?? this.customerEmail,
       date: date ?? this.date,
       dueDate: dueDate ?? this.dueDate,
       items: items ?? this.items,

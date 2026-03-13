@@ -28,7 +28,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 11,
+      version: 12,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -74,6 +74,9 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE saved_sites ADD COLUMN lastModifiedAt TEXT');
       await db.execute('ALTER TABLE job_templates ADD COLUMN lastModifiedAt TEXT');
       await db.execute('ALTER TABLE filled_templates ADD COLUMN lastModifiedAt TEXT');
+    }
+    if (oldVersion < 12) {
+      await db.execute('ALTER TABLE invoices ADD COLUMN customerEmail TEXT');
     }
   }
 
@@ -177,6 +180,7 @@ class DatabaseHelper {
         engineerName $textType,
         customerName $textType,
         customerAddress $textType,
+        customerEmail $textTypeNullable,
         date $textType,
         dueDate $textType,
         items $textType,
