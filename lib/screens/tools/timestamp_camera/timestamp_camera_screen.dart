@@ -232,13 +232,25 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     final prevController = _controller;
     final resolutionPreset = _resolutionFromSettings();
 
+    // Release old camera FIRST so iOS hardware is free
+    _controller = null;
+    _isCameraInitialized = false;
+    if (prevController != null) {
+      try {
+        await prevController.dispose();
+      } catch (_) {}
+      // iOS needs a short delay for AVCaptureSession to release hardware
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        await Future.delayed(const Duration(milliseconds: 150));
+      }
+    }
+
     final controller = CameraController(
       camera,
       resolutionPreset,
       enableAudio: _isMobile,
       imageFormatGroup: ImageFormatGroup.jpeg,
     );
-
     _controller = controller;
 
     try {
@@ -249,8 +261,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       _maxZoom = (await controller.getMaxZoomLevel()).clamp(1.0, 20.0);
       _zoomNotifier.value = _minZoom;
 
-      await prevController?.dispose();
-
       if (mounted) {
         setState(() {
           _isCameraInitialized = true;
@@ -258,7 +268,7 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
         });
       }
     } catch (e) {
-      setState(() => _cameraError = 'Camera error: $e');
+      if (mounted) setState(() => _cameraError = 'Camera error: $e');
     }
   }
 
@@ -635,9 +645,10 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
               child: ZoomGestureLayer(
                 controller: _controller!,
                 zoomNotifier: _zoomNotifier,
-                minZoom: _minZoom,
+                minZoom: _hasUltraWide && !_isUsingFrontCamera ? 0.5 : _minZoom,
                 maxZoom: _maxZoom,
                 onTapDown: _handleTapToFocus,
+                onZoomChanged: _setZoom,
               ),
             ),
 

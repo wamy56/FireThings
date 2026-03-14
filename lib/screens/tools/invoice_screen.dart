@@ -280,7 +280,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _engineerNameKey,
               controller: _engineerNameController,
               focusNode: _engineerNameFocus,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'From (Your Name)',
                 border: OutlineInputBorder(),
@@ -319,7 +319,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _invoiceNumberKey,
               controller: _invoiceNumberController,
               focusNode: _invoiceNumberFocus,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Invoice Number',
                 border: OutlineInputBorder(),
@@ -431,7 +431,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _customerNameKey,
               controller: _customerNameController,
               focusNode: _customerNameFocus,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Customer Name',
                 border: OutlineInputBorder(),
@@ -450,7 +450,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _customerEmailKey,
               controller: _customerEmailController,
               focusNode: _customerEmailFocus,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Customer Email *',
                 border: OutlineInputBorder(),
@@ -473,7 +473,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _customerAddressKey,
               controller: _customerAddressController,
               focusNode: _customerAddressFocus,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Customer Address',
                 border: OutlineInputBorder(),
@@ -651,7 +651,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: controllers.description,
-                      keyboardAppearance: Brightness.light,
+                      keyboardAppearance: Theme.of(context).brightness,
                       decoration: const InputDecoration(
                         labelText: 'Description',
                         hintText: 'Enter item description...',
@@ -681,7 +681,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 width: 100,
                 child: TextFormField(
                   controller: controllers.quantity,
-                  keyboardAppearance: Brightness.light,
+                  keyboardAppearance: Theme.of(context).brightness,
                   decoration: const InputDecoration(
                     labelText: 'Quantity',
                     border: OutlineInputBorder(),
@@ -699,7 +699,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 width: 120,
                 child: TextFormField(
                   controller: controllers.unitPrice,
-                  keyboardAppearance: Brightness.light,
+                  keyboardAppearance: Theme.of(context).brightness,
                   decoration: const InputDecoration(
                     labelText: 'Unit Price',
                     border: OutlineInputBorder(),
@@ -949,7 +949,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _notesController,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: const InputDecoration(
                 hintText: 'Add any additional notes for this invoice...',
                 border: OutlineInputBorder(),

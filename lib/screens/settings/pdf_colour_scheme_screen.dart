@@ -571,7 +571,7 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
             ),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 9)),
+            child: Text(value, style: TextStyle(fontSize: 9, color: AppTheme.textPrimary)),
           ),
         ],
       ),

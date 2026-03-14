@@ -37,7 +37,7 @@ class PdfDesignScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'These settings apply to both invoice and jobsheet PDFs.',
+                    'Each designer lets you toggle between jobsheet and invoice styling, so you can customise them independently.',
                     style: TextStyle(
                       fontSize: 13.5,
                       color: isDark ? Colors.blue.shade200 : Colors.blue.shade800,

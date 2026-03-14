@@ -284,6 +284,7 @@ class _PdfFormsScreenState extends State<PdfFormsScreen>
                   labelText: 'Template Name',
                   border: OutlineInputBorder(),
                 ),
+                keyboardAppearance: Theme.of(context).brightness,
               ),
               const SizedBox(height: 16),
               TextField(
@@ -293,6 +294,7 @@ class _PdfFormsScreenState extends State<PdfFormsScreen>
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 2,
+                keyboardAppearance: Theme.of(context).brightness,
               ),
               const SizedBox(height: 16),
               StatefulBuilder(

@@ -132,6 +132,7 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
                       isDense: true,
                     ),
                     textInputAction: TextInputAction.done,
+                    keyboardAppearance: Theme.of(context).brightness,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -225,6 +226,7 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
             : null,
       ),
       textInputAction: TextInputAction.done,
+      keyboardAppearance: Theme.of(context).brightness,
       validator: field.required
           ? (v) => v?.isEmpty == true ? 'Required' : null
           : null,
@@ -243,6 +245,7 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
       maxLines: 4,
       keyboardType: TextInputType.multiline,
       textInputAction: TextInputAction.newline,
+      keyboardAppearance: Theme.of(context).brightness,
       validator: field.required
           ? (v) => v?.isEmpty == true ? 'Required' : null
           : null,

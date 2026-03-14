@@ -181,7 +181,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
             // Battery Capacity
             TextFormField(
               controller: _batteryCapacityController,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Installed Battery Capacity (Ah)',
                 prefixIcon: Icon(AppIcons.batteryFull),
@@ -214,7 +214,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
             // Standby Current
             TextFormField(
               controller: _standbyCurrentController,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Standby Current I\u2081 (A)',
                 prefixIcon: Icon(AppIcons.flash),
@@ -239,7 +239,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
             // Alarm Current
             TextFormField(
               controller: _alarmCurrentController,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Alarm Current I\u2082 (A)',
                 prefixIcon: Icon(AppIcons.notification),

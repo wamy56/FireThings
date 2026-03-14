@@ -84,7 +84,7 @@ class LensSelectorWidget extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: GestureDetector(
-              onTap: () => onZoomChanged(stop.zoom.clamp(minZoom, maxZoom)),
+              onTap: () => onZoomChanged(stop.zoom),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 width: isActive ? 36 : 32,

@@ -4,6 +4,48 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-14 (Session 30)
+
+### Fix iOS Dark Mode Keyboard — Missing `keyboardAppearance` on Remaining Fields
+
+- **Fix: Added `keyboardAppearance: Theme.of(context).brightness` to 15 remaining raw `TextFormField`/`TextField` instances** across 7 files that were missed in Session 27. Session 27 fixed fields that had `keyboardAppearance` hardcoded to `Brightness.light`, but these 15 fields never had the property set at all (iOS defaults to light keyboard).
+  - `profile_screen.dart` — 5 fields (name, email, current/new/confirm password)
+  - `pdf_header_designer_screen.dart` — 1 field (header text value)
+  - `pdf_footer_designer_screen.dart` — 1 field (footer text value)
+  - `jobsheet_settings_screen.dart` — 1 field (`_buildTextField` helper)
+  - `pdf_form_builder_screen.dart` — 3 fields (job reference, text field, multiline text)
+  - `custom_template_builder_screen.dart` — 2 fields (field label, dropdown options)
+  - `pdf_forms_screen.dart` — 2 fields (template name, description in upload dialog)
+
+---
+
+## 2026-03-14 (Session 29)
+
+### Timestamp Camera — Fix 0.5x Lens & Camera Flip on iOS
+
+- **Fix: 0.5x ultra-wide lens button now works** — The lens selector was clamping the 0.5 value to the main camera's minZoom (1.0), silently turning it into a no-op. Removed the `.clamp()` so the raw 0.5 value reaches `_setZoom` which handles the ultra-wide camera switch.
+- **Fix: Pinch-to-zoom can now reach ultra-wide** — Added `onZoomChanged` callback to `ZoomGestureLayer` so pinch gestures route through `_setZoom` instead of directly calling `controller.setZoomLevel()`. This allows pinching below 1.0x to trigger the ultra-wide camera switch. The gesture layer's `minZoom` is set to 0.5 when ultra-wide is available.
+- **Fix: Camera flip no longer freezes on iOS** — Reversed the init/dispose order in `_setupController()`: the old controller is now disposed BEFORE the new one is initialized, with a 150ms delay on iOS for AVCaptureSession to release hardware. Previously, two simultaneous AVCaptureSessions would conflict, causing a black screen or freeze after flipping.
+
+---
+
+## 2026-03-14 (Session 28)
+
+### PDF Design Screen — Banner Text & Preview Visibility Fix
+
+- **Fix: Updated misleading PDF Design hub banner** — Changed banner from "These settings apply to both invoice and jobsheet PDFs" to clarify that each designer lets you toggle between jobsheet and invoice styling independently.
+- **Fix: Jobsheet preview field values visible in dark mode** — Added explicit `color: AppTheme.textPrimary` to `_mockFieldRow()` value text in `pdf_colour_scheme_screen.dart`. Previously, values like "JS-001" and "John Smith" inherited the theme's default text colour, making them invisible (light text on white preview) in dark mode.
+
+---
+
+## 2026-03-14 (Session 27)
+
+### Fix iOS Dark Mode Keyboard Appearance
+
+- **Fix: iOS keyboard now follows app theme** — Replaced all 19 hardcoded `keyboardAppearance: Brightness.light` with `keyboardAppearance: Theme.of(context).brightness` across 6 files (`custom_text_field.dart`, `invoice_screen.dart`, `bank_details_screen.dart`, `dip_switch_calculator.dart`, `battery_load_test_screen.dart`, `detector_spacing_calculator_screen.dart`). iOS keyboards now render in dark style when the app is in dark mode and light style in light mode, while retaining the rounded-rectangle key backgrounds from Session 24.
+
+---
+
 ## 2026-03-14 (Session 26)
 
 ### Fix Detector Spacing Calculator Bugs

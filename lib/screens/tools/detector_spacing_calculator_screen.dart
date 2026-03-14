@@ -415,7 +415,7 @@ class _DetectorSpacingCalculatorScreenState
             // Length
             TextFormField(
               controller: _lengthController,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Room Length (m)',
                 prefixIcon: Icon(AppIcons.ruler),
@@ -439,7 +439,7 @@ class _DetectorSpacingCalculatorScreenState
             // Width
             TextFormField(
               controller: _widthController,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Room Width (m)',
                 prefixIcon: Icon(AppIcons.ruler),
@@ -463,7 +463,7 @@ class _DetectorSpacingCalculatorScreenState
             // Ceiling Height
             TextFormField(
               controller: _heightController,
-              keyboardAppearance: Brightness.light,
+              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Ceiling Height (m)',
                 prefixIcon: Icon(AppIcons.arrowUp),
