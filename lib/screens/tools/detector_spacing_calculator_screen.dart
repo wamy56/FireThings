@@ -94,6 +94,7 @@ class _DetectorSpacingCalculatorScreenState
 
   _CalcResult? _result;
   String? _ceilingExceededMessage;
+  bool _showCoverage = true;
 
   @override
   void dispose() {
@@ -415,7 +416,6 @@ class _DetectorSpacingCalculatorScreenState
             // Length
             TextFormField(
               controller: _lengthController,
-              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Room Length (m)',
                 prefixIcon: Icon(AppIcons.ruler),
@@ -439,7 +439,6 @@ class _DetectorSpacingCalculatorScreenState
             // Width
             TextFormField(
               controller: _widthController,
-              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Room Width (m)',
                 prefixIcon: Icon(AppIcons.ruler),
@@ -463,7 +462,6 @@ class _DetectorSpacingCalculatorScreenState
             // Ceiling Height
             TextFormField(
               controller: _heightController,
-              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Ceiling Height (m)',
                 prefixIcon: Icon(AppIcons.arrowUp),
@@ -832,12 +830,28 @@ class _DetectorSpacingCalculatorScreenState
                       brightness: Theme.of(context).brightness,
                       marginLeft: marginLeft,
                       marginBottom: marginBottom,
+                      detectorRadius: _detectorSpecs[_detectorType]!.radius,
+                      showCoverage: _showCoverage,
                     ),
                   );
                 },
               ),
             ),
             const SizedBox(height: 12),
+            Center(
+              child: FilterChip(
+                label: const Text('Show coverage'),
+                selected: _showCoverage,
+                onSelected: (value) => setState(() => _showCoverage = value),
+                avatar: Icon(
+                  AppIcons.eye,
+                  size: 16,
+                  color: _showCoverage ? Colors.indigo : null,
+                ),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            const SizedBox(height: 8),
             Center(
               child: Text(
                 '${length.toStringAsFixed(1)}m \u00d7 ${width.toStringAsFixed(1)}m',
@@ -967,6 +981,8 @@ class _DetectorGridPainter extends CustomPainter {
   final Brightness brightness;
   final double marginLeft;
   final double marginBottom;
+  final double detectorRadius;
+  final bool showCoverage;
 
   _DetectorGridPainter({
     required this.columns,
@@ -981,6 +997,8 @@ class _DetectorGridPainter extends CustomPainter {
     required this.brightness,
     required this.marginLeft,
     required this.marginBottom,
+    required this.detectorRadius,
+    required this.showCoverage,
   });
 
   @override
@@ -1073,6 +1091,29 @@ class _DetectorGridPainter extends CustomPainter {
           canvas.drawCircle(Offset(x, y), dotRadius, dotPaint);
         }
       }
+    }
+
+    // ─── Coverage Radius Circles ──────────────────────────────────────
+    if (showCoverage) {
+      final scaleX = roomW / roomLength;
+      final scaleY = roomH / roomWidth;
+      final pxRadius = detectorRadius * min(scaleX, scaleY);
+
+      final coverFill = Paint()
+        ..color = Colors.indigo.withValues(alpha: isDark ? 0.10 : 0.08)
+        ..style = PaintingStyle.fill;
+      final coverStroke = Paint()
+        ..color = Colors.indigo.withValues(alpha: isDark ? 0.25 : 0.20)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0;
+
+      canvas.save();
+      canvas.clipRect(roomRect);
+      for (final pos in detectorPositions) {
+        canvas.drawCircle(pos, pxRadius, coverFill);
+        canvas.drawCircle(pos, pxRadius, coverStroke);
+      }
+      canvas.restore();
     }
 
     // ─── Dimension Annotations ─────────────────────────────────────────
@@ -1213,6 +1254,8 @@ class _DetectorGridPainter extends CustomPainter {
         gridSpacingX != oldDelegate.gridSpacingX ||
         gridSpacingY != oldDelegate.gridSpacingY ||
         isCorridor != oldDelegate.isCorridor ||
-        brightness != oldDelegate.brightness;
+        brightness != oldDelegate.brightness ||
+        detectorRadius != oldDelegate.detectorRadius ||
+        showCoverage != oldDelegate.showCoverage;
   }
 }

@@ -172,7 +172,6 @@ class _JobsheetSettingsScreenState extends State<JobsheetSettingsScreen> {
         ),
       ),
       textInputAction: TextInputAction.done,
-      keyboardAppearance: Theme.of(context).brightness,
     );
   }
 }

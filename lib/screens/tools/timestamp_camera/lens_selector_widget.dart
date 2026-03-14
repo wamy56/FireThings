@@ -5,7 +5,6 @@ class LensSelectorWidget extends StatelessWidget {
   final double currentZoom;
   final double minZoom;
   final double maxZoom;
-  final bool hasUltraWide;
   final ValueChanged<double> onZoomChanged;
 
   const LensSelectorWidget({
@@ -13,7 +12,6 @@ class LensSelectorWidget extends StatelessWidget {
     required this.currentZoom,
     required this.minZoom,
     required this.maxZoom,
-    this.hasUltraWide = false,
     required this.onZoomChanged,
   });
 
@@ -21,9 +19,6 @@ class LensSelectorWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final stops = <_LensStop>[];
 
-    if (hasUltraWide || minZoom <= 0.6) {
-      stops.add(_LensStop(label: '.5', zoom: 0.5));
-    }
     stops.add(_LensStop(label: '1x', zoom: 1.0));
     if (maxZoom >= 2.0) {
       stops.add(_LensStop(label: '2x', zoom: 2.0));

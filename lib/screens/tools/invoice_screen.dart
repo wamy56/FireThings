@@ -280,7 +280,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _engineerNameKey,
               controller: _engineerNameController,
               focusNode: _engineerNameFocus,
-              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'From (Your Name)',
                 border: OutlineInputBorder(),
@@ -319,7 +318,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _invoiceNumberKey,
               controller: _invoiceNumberController,
               focusNode: _invoiceNumberFocus,
-              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Invoice Number',
                 border: OutlineInputBorder(),
@@ -431,7 +429,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _customerNameKey,
               controller: _customerNameController,
               focusNode: _customerNameFocus,
-              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Customer Name',
                 border: OutlineInputBorder(),
@@ -450,7 +447,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _customerEmailKey,
               controller: _customerEmailController,
               focusNode: _customerEmailFocus,
-              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Customer Email *',
                 border: OutlineInputBorder(),
@@ -473,7 +469,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               key: _customerAddressKey,
               controller: _customerAddressController,
               focusNode: _customerAddressFocus,
-              keyboardAppearance: Theme.of(context).brightness,
               decoration: InputDecoration(
                 labelText: 'Customer Address',
                 border: OutlineInputBorder(),
@@ -651,8 +646,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: controllers.description,
-                      keyboardAppearance: Theme.of(context).brightness,
-                      decoration: const InputDecoration(
+                              decoration: const InputDecoration(
                         labelText: 'Description',
                         hintText: 'Enter item description...',
                         border: OutlineInputBorder(),
@@ -681,8 +675,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 width: 100,
                 child: TextFormField(
                   controller: controllers.quantity,
-                  keyboardAppearance: Theme.of(context).brightness,
-                  decoration: const InputDecoration(
+                      decoration: const InputDecoration(
                     labelText: 'Quantity',
                     border: OutlineInputBorder(),
                   ),
@@ -699,8 +692,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 width: 120,
                 child: TextFormField(
                   controller: controllers.unitPrice,
-                  keyboardAppearance: Theme.of(context).brightness,
-                  decoration: const InputDecoration(
+                      decoration: const InputDecoration(
                     labelText: 'Unit Price',
                     border: OutlineInputBorder(),
                     prefixText: '\u00A3',
@@ -949,7 +941,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _notesController,
-              keyboardAppearance: Theme.of(context).brightness,
               decoration: const InputDecoration(
                 hintText: 'Add any additional notes for this invoice...',
                 border: OutlineInputBorder(),

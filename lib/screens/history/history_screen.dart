@@ -194,11 +194,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         },
                       )
                     : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: AppTheme.primaryLight,
               ),
               onChanged: _filterJobsheets,
             ),

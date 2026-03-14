@@ -125,6 +125,7 @@ class _CameraSettingsPanelState extends State<CameraSettingsPanel> {
                   label: 'Note text',
                   hint: 'e.g. Site inspection - Panel A',
                   maxLines: 2,
+                  textInputAction: TextInputAction.done,
                   onChanged: (value) {
                     _update(_settings.copyWith(customNote: value));
                   },

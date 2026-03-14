@@ -593,7 +593,6 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
                 isDense: true,
               ),
               textInputAction: TextInputAction.done,
-              keyboardAppearance: Theme.of(context).brightness,
               onChanged: (val) {
                 final updated = List<HeaderTextLine>.from(lines);
                 updated[index] = updated[index].copyWith(value: val);

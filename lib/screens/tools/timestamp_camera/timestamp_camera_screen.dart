@@ -41,7 +41,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
   CameraDescription? _ultraWideCamera;
   int _currentCameraIndex = 0;
   bool _isCameraInitialized = false;
-  bool _isUsingUltraWide = false;
   bool _hasUltraWide = false;
   bool _isUsingFrontCamera = false;
   String? _cameraError;
@@ -300,7 +299,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
     setState(() => _isFlipping = true);
     try {
       _isUsingFrontCamera = !_isUsingFrontCamera;
-      _isUsingUltraWide = false;
       final camera = _isUsingFrontCamera
           ? _frontCameras.first
           : (_mainBackCamera ?? _backCameras.first);
@@ -308,25 +306,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       await _setupController(camera);
     } catch (e) {
       debugPrint('Flip camera error: $e');
-    } finally {
-      if (mounted) setState(() => _isFlipping = false);
-    }
-  }
-
-  Future<void> _switchToUltraWide(bool useUltraWide) async {
-    if (_isRecording || _isFlipping || !_hasUltraWide) return;
-    if (useUltraWide == _isUsingUltraWide) return;
-    setState(() => _isFlipping = true);
-    try {
-      final camera = useUltraWide
-          ? _ultraWideCamera!
-          : (_mainBackCamera ?? _backCameras.first);
-      _currentCameraIndex = _cameras.indexOf(camera);
-      _isUsingUltraWide = useUltraWide;
-      _isUsingFrontCamera = false;
-      await _setupController(camera);
-    } catch (e) {
-      debugPrint('Switch ultra-wide error: $e');
     } finally {
       if (mounted) setState(() => _isFlipping = false);
     }
@@ -341,35 +320,6 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
       await _controller!.setFlashMode(_flashMode);
     } catch (_) {}
     setState(() {});
-  }
-
-  void _setZoom(double zoom) {
-    // Handle ultra-wide lens switching on iOS
-    if (_hasUltraWide && !_isUsingFrontCamera) {
-      if (zoom < 1.0 && !_isUsingUltraWide) {
-        // Switch to ultra-wide camera for 0.5x
-        _switchToUltraWide(true);
-        return;
-      } else if (zoom >= 1.0 && _isUsingUltraWide) {
-        // Switch back to main wide camera
-        _switchToUltraWide(false).then((_) {
-          if (zoom > 1.0) {
-            final clamped = zoom.clamp(_minZoom, _maxZoom);
-            _zoomNotifier.value = clamped;
-            try {
-              _controller?.setZoomLevel(clamped);
-            } catch (_) {}
-          }
-        });
-        return;
-      }
-    }
-
-    final clamped = zoom.clamp(_minZoom, _maxZoom);
-    _zoomNotifier.value = clamped;
-    try {
-      _controller?.setZoomLevel(clamped);
-    } catch (_) {}
   }
 
   // ─── Capture ──────────────────────────────────────────────────────
@@ -645,10 +595,9 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
               child: ZoomGestureLayer(
                 controller: _controller!,
                 zoomNotifier: _zoomNotifier,
-                minZoom: _hasUltraWide && !_isUsingFrontCamera ? 0.5 : _minZoom,
+                minZoom: _minZoom,
                 maxZoom: _maxZoom,
                 onTapDown: _handleTapToFocus,
-                onZoomChanged: _setZoom,
               ),
             ),
 
@@ -674,11 +623,16 @@ class _TimestampCameraScreenState extends State<TimestampCameraScreen>
                 valueListenable: _zoomNotifier,
                 builder: (context, zoom, _) {
                   return LensSelectorWidget(
-                    currentZoom: _isUsingUltraWide ? 0.5 : zoom,
+                    currentZoom: zoom,
                     minZoom: _minZoom,
                     maxZoom: _maxZoom,
-                    hasUltraWide: _hasUltraWide && !_isUsingFrontCamera,
-                    onZoomChanged: _setZoom,
+                    onZoomChanged: (zoom) {
+                      final clamped = zoom.clamp(_minZoom, _maxZoom);
+                      _zoomNotifier.value = clamped;
+                      try {
+                        _controller?.setZoomLevel(clamped);
+                      } catch (_) {}
+                    },
                   );
                 },
               ),

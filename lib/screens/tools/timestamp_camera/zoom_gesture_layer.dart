@@ -14,11 +14,6 @@ class ZoomGestureLayer extends StatefulWidget {
   final void Function(Offset localPosition, BoxConstraints constraints)?
       onTapDown;
 
-  /// Optional zoom callback — when provided, zoom changes route through this
-  /// instead of calling controller.setZoomLevel directly. This allows the
-  /// parent to handle ultra-wide lens switching via _setZoom.
-  final ValueChanged<double>? onZoomChanged;
-
   const ZoomGestureLayer({
     super.key,
     required this.controller,
@@ -26,7 +21,6 @@ class ZoomGestureLayer extends StatefulWidget {
     required this.minZoom,
     required this.maxZoom,
     this.onTapDown,
-    this.onZoomChanged,
   });
 
   @override
@@ -53,14 +47,10 @@ class _ZoomGestureLayerState extends State<ZoomGestureLayer> {
             if (details.pointerCount < 2) return;
             final newZoom =
                 (_baseZoom * details.scale).clamp(widget.minZoom, widget.maxZoom);
-            if (widget.onZoomChanged != null) {
-              widget.onZoomChanged!(newZoom);
-            } else {
-              widget.zoomNotifier.value = newZoom;
-              try {
-                widget.controller.setZoomLevel(newZoom);
-              } catch (_) {}
-            }
+            widget.zoomNotifier.value = newZoom;
+            try {
+              widget.controller.setZoomLevel(newZoom);
+            } catch (_) {}
           },
         );
       },

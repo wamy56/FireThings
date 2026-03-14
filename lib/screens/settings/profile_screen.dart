@@ -200,7 +200,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 textCapitalization: TextCapitalization.words,
-              keyboardAppearance: Theme.of(context).brightness,
               ),
               const SizedBox(height: 12),
               Row(
@@ -276,8 +275,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 keyboardType: TextInputType.emailAddress,
-                keyboardAppearance: Theme.of(context).brightness,
-              ),
+                ),
               const SizedBox(height: 8),
               Text(
                 'A verification email will be sent to your new address.',
@@ -393,8 +391,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       controller: _currentPasswordController,
                       obscureText: _obscureCurrentPassword,
                       textInputAction: TextInputAction.done,
-                      keyboardAppearance: Theme.of(context).brightness,
-                      decoration: InputDecoration(
+                              decoration: InputDecoration(
                         labelText: 'Current Password',
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(
@@ -425,8 +422,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       controller: _newPasswordController,
                       obscureText: _obscureNewPassword,
                       textInputAction: TextInputAction.done,
-                      keyboardAppearance: Theme.of(context).brightness,
-                      decoration: InputDecoration(
+                              decoration: InputDecoration(
                         labelText: 'New Password',
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(
@@ -459,8 +455,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirmPassword,
                       textInputAction: TextInputAction.done,
-                      keyboardAppearance: Theme.of(context).brightness,
-                      decoration: InputDecoration(
+                              decoration: InputDecoration(
                         labelText: 'Confirm New Password',
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(

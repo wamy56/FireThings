@@ -4,6 +4,38 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-14 (Session 33)
+
+### Timestamp Camera — Remove Dead Code (`_setZoom`, `_switchToUltraWide`, `_isUsingUltraWide`)
+
+- **Removed unused `_setZoom` method** from `timestamp_camera_screen.dart` — zoom is handled elsewhere, this method had no callers.
+- **Removed cascading dead code**: `_switchToUltraWide` method (only called by `_setZoom`) and `_isUsingUltraWide` field (only written, never read).
+- **Verification**: `flutter analyze` passes with no issues on the file.
+
+---
+
+## 2026-03-14 (Session 32)
+
+### iOS Dark Mode Keyboard — Remove Redundant `keyboardAppearance` From Raw TextFormFields
+
+- **Cleanup: Removed explicit `keyboardAppearance: Theme.of(context).brightness` from 36 raw `TextFormField` instances** across 12 files. Flutter's `TextField` already defaults `keyboardAppearance` to `theme.brightness`, making these lines redundant. Removing them may also fix the flat/borderless keyboard style on iOS 18+ dark mode (if Flutter's engine handles the unset case differently at the platform channel level).
+- **Retained: `CustomTextField` keeps its internal `keyboardAppearance` setting** (`lib/widgets/custom_text_field.dart:233`) as the centralised widget for all text input fields.
+- **Files modified**: `bank_details_screen.dart` (5), `battery_load_test_screen.dart` (3), `detector_spacing_calculator_screen.dart` (3), `dip_switch_calculator.dart` (2), `invoice_screen.dart` (9), `jobsheet_settings_screen.dart` (1), `pdf_footer_designer_screen.dart` (1), `pdf_header_designer_screen.dart` (1), `profile_screen.dart` (5), `custom_template_builder_screen.dart` (2), `pdf_forms_screen.dart` (2), `pdf_form_builder_screen.dart` (3).
+
+---
+
+## 2026-03-14 (Session 31)
+
+### Timestamp Camera — Revert Session 29 Zoom Changes & Remove 0.5x Toggle
+
+- **Revert: Removed 0.5x ultra-wide lens button** — Session 29 made the 0.5x button functional but broke 1x/2x/5x zoom levels (all appeared far more zoomed in than they should). Reverted all Session 29 zoom changes. The 0.5x lens stop is now removed entirely from `LensSelectorWidget` since it never worked properly.
+- **Revert: `ZoomGestureLayer` no longer routes through `onZoomChanged`** — Removed the `onZoomChanged` callback added in Session 29. Pinch-to-zoom now sets the controller zoom level directly again, staying within the main camera's native zoom range.
+- **Revert: `LensSelectorWidget` lens stops clamp to camera range** — The 1x/2x/5x buttons now clamp and set zoom directly on the controller instead of routing through `_setZoom`. Removed `hasUltraWide` property.
+- **Fix: Custom note keyboard on iOS shows "Done" button** — Added `textInputAction: TextInputAction.done` to the custom note `CustomTextField` in `CameraSettingsPanel`. Previously `maxLines: 2` caused iOS to show a return key with no way to dismiss the keyboard.
+- **Preserved: Camera flip fix from Session 29** — The `_setupController` dispose-before-init order and iOS 150ms delay are untouched and continue to work correctly.
+
+---
+
 ## 2026-03-14 (Session 30)
 
 ### Fix iOS Dark Mode Keyboard — Missing `keyboardAppearance` on Remaining Fields

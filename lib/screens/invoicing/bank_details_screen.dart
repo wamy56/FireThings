@@ -128,7 +128,6 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     const SizedBox(height: 24),
                     TextFormField(
                       controller: _bankNameController,
-                      keyboardAppearance: Theme.of(context).brightness,
                       decoration: const InputDecoration(
                         labelText: 'Bank Name',
                         prefixIcon: Icon(AppIcons.bank),
@@ -138,7 +137,6 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _accountNameController,
-                      keyboardAppearance: Theme.of(context).brightness,
                       decoration: const InputDecoration(
                         labelText: 'Account Name',
                         prefixIcon: Icon(AppIcons.user),
@@ -148,7 +146,6 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _sortCodeController,
-                      keyboardAppearance: Theme.of(context).brightness,
                       decoration: const InputDecoration(
                         labelText: 'Sort Code',
                         hintText: 'XX-XX-XX',
@@ -160,7 +157,6 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _accountNumberController,
-                      keyboardAppearance: Theme.of(context).brightness,
                       decoration: const InputDecoration(
                         labelText: 'Account Number',
                         prefixIcon: Icon(AppIcons.tag),
@@ -171,7 +167,6 @@ class _BankDetailsScreenState extends State<BankDetailsScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _paymentTermsController,
-                      keyboardAppearance: Theme.of(context).brightness,
                       decoration: const InputDecoration(
                         labelText: 'Payment Terms',
                         prefixIcon: Icon(AppIcons.clock),
