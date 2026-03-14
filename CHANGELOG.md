@@ -4,6 +4,44 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-14 (Session 26)
+
+### Fix Detector Spacing Calculator Bugs
+
+- **Fix: Calculator silent failure at exact multiples of detector radius** — When room dimensions were exact multiples of the detector radius (e.g. 15x15m smoke, 10.6x10.6m heat), `remainingR` became zero causing a division-by-zero (`Infinity.ceil()` throws `UnsupportedError`). Added `if (remainingR <= 0) continue` guard so the loop skips to the next column count.
+- **Fix: Auto-switch room type based on width** — Previously the calculator only showed a warning banner when width didn't match the selected room type. Now `_calculate()` automatically switches to Corridor mode when width ≤ 2m and to Open Area when width > 2m, with an explanatory note in the results.
+
+---
+
+## 2026-03-14 (Session 25)
+
+### Separate PDF Designer for Jobsheets vs Invoices
+
+- **Feature: Independent PDF configs per document type** — Added `PdfDocumentType` enum (`jobsheet` / `invoice`) to `pdf_header_config.dart`. All three config services (`PdfHeaderConfigService`, `PdfFooterConfigService`, `PdfColourSchemeService`) now accept a `PdfDocumentType` parameter, storing separate SharedPreferences keys per type (e.g., `pdf_header_config_v1_jobsheet` / `pdf_header_config_v1_invoice`). Includes automatic migration: existing untyped config is copied to both typed keys on first load.
+- **Feature: Document type toggle in designer screens** — Added `SegmentedButton<PdfDocumentType>` (Jobsheet / Invoice) to the top of `PdfHeaderDesignerScreen`, `PdfFooterDesignerScreen`, and `PdfColourSchemeScreen`. Switching types auto-saves the current config and loads the config for the selected type.
+- **Feature: Jobsheet preview in colour scheme screen** — Added `_buildJobsheetPreview()` showing a jobsheet-style mockup (section headers in primary colour, alternating light-tint rows, certification accent border, dual signature boxes) alongside the existing invoice preview, toggled by the document type selector.
+- **Firestore sync updated** — Sync methods now use typed Firestore doc IDs (`header_jobsheet`, `header_invoice`, etc.). Full sync pulls typed docs with fallback migration from old untyped docs. GDPR deletion unaffected (batch-deletes entire `pdf_config` subcollection).
+- **PDF generation updated** — `PDFService.generateJobsheetPDF` uses `PdfDocumentType.jobsheet`; `InvoicePDFService.generateInvoicePDF` uses `PdfDocumentType.invoice`.
+
+---
+
+## 2026-03-14 (Session 24)
+
+### Fix Dark Mode iOS Number Keyboard Appearance
+
+- **Fix: iOS dark mode keyboards showing flat keys** — Added `keyboardAppearance: Brightness.light` to all `TextFormField` and `TextField` widgets across the app. In dark mode, iOS renders number keyboards with flat, background-less keys; forcing light appearance restores the rounded-rectangle button backgrounds. Applied to `CustomTextField` (covers most fields app-wide), plus raw text fields in `bank_details_screen.dart`, `battery_load_test_screen.dart`, `detector_spacing_calculator_screen.dart`, `dip_switch_calculator.dart`, and `invoice_screen.dart`.
+
+---
+
+## 2026-03-14 (Session 23)
+
+### Fix Timestamp Camera Video Overlay + Preview Overflow
+
+- **Fix: Video overlay box misaligned** — In `_ffmpegDrawBox()`, replaced `w`/`h` with `iw`/`ih` for input video dimensions. FFmpeg's `drawbox` filter resolves `w`/`h` as the box's own dimensions, not the input frame, causing bottom-position boxes to render at the top and right-position boxes to be misaligned. (`lib/services/timestamp_camera_service.dart`)
+- **Fix: Preview overlay text overflowing on right positions** — Changed `CameraOverlayPainter` to always use `TextAlign.left` instead of `TextAlign.right` for right-side positions. The manual x-position calculation already handles right-alignment; adding `TextAlign.right` caused double-offsetting, pushing text off the right edge. (`lib/screens/tools/timestamp_camera/camera_overlay_painter.dart`)
+
+---
+
 ## 2026-03-14 (Session 22)
 
 ### Revert Timestamp Camera + Fix iOS Keyboard Done Bar

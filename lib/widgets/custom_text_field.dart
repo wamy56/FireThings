@@ -230,6 +230,7 @@ class _CustomTextFieldState extends State<CustomTextField>
         controller: widget.controller,
         focusNode: _focusNode,
         initialValue: widget.initialValue,
+        keyboardAppearance: Brightness.light,
         keyboardType: widget.maxLines > 1 && widget.keyboardType == TextInputType.text
             ? TextInputType.multiline
             : widget.keyboardType == TextInputType.number

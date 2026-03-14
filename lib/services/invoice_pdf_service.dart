@@ -469,9 +469,9 @@ class InvoicePDFService {
     }
 
     final logoBytes = await BrandingService.getLogoBytes();
-    final headerConfig = await PdfHeaderConfigService.getConfig();
-    final footerConfig = await PdfFooterConfigService.getConfig();
-    final colourScheme = await PdfColourSchemeService.getScheme();
+    final headerConfig = await PdfHeaderConfigService.getConfig(PdfDocumentType.invoice);
+    final footerConfig = await PdfFooterConfigService.getConfig(PdfDocumentType.invoice);
+    final colourScheme = await PdfColourSchemeService.getScheme(PdfDocumentType.invoice);
 
     final data = InvoicePdfData(
       invoiceJson: invoice.toJson(),

@@ -961,9 +961,9 @@ class PDFService {
 
     final settings = await JobsheetSettingsService.getSettings();
     final logoBytes = await BrandingService.getLogoBytes();
-    final headerConfig = await PdfHeaderConfigService.getConfig();
-    final footerConfig = await PdfFooterConfigService.getConfig();
-    final colourScheme = await PdfColourSchemeService.getScheme();
+    final headerConfig = await PdfHeaderConfigService.getConfig(PdfDocumentType.jobsheet);
+    final footerConfig = await PdfFooterConfigService.getConfig(PdfDocumentType.jobsheet);
+    final colourScheme = await PdfColourSchemeService.getScheme(PdfDocumentType.jobsheet);
 
     final data = JobsheetPdfData(
       jobsheetJson: jobsheet.toJson(),

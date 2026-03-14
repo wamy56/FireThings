@@ -317,8 +317,8 @@ class TimestampCameraService {
         (totalLines * fontSize) +
         ((totalLines - 1) * lineGap);
 
-    final x = isLeft ? '$margin' : 'w-${blockW + margin}';
-    final y = isTop ? '$margin' : 'h-${blockH + margin}';
+    final x = isLeft ? '$margin' : 'iw-${blockW + margin}';
+    final y = isTop ? '$margin' : 'ih-${blockH + margin}';
 
     return 'drawbox=x=$x:y=$y:w=$blockW:h=$blockH'
         ':color=black@0.55:t=fill';

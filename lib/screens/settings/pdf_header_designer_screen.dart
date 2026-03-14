@@ -27,7 +27,7 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
   PdfHeaderConfig _config = PdfHeaderConfig.defaults();
   String? _logoPath;
   bool _isLoading = true;
-
+  PdfDocumentType _selectedDocType = PdfDocumentType.jobsheet;
 
   @override
   void initState() {
@@ -43,7 +43,7 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
   }
 
   Future<void> _loadData() async {
-    final config = await PdfHeaderConfigService.getConfig();
+    final config = await PdfHeaderConfigService.getConfig(_selectedDocType);
     final logoPath = await BrandingService.getLogoPath();
     setState(() {
       _config = config;
@@ -52,9 +52,22 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
     });
   }
 
+  Future<void> _switchDocType(PdfDocumentType type) async {
+    if (type == _selectedDocType) return;
+    // Save current config before switching
+    await PdfHeaderConfigService.saveConfig(_config, _selectedDocType);
+    _selectedDocType = type;
+    setState(() => _isLoading = true);
+    final config = await PdfHeaderConfigService.getConfig(type);
+    setState(() {
+      _config = config;
+      _isLoading = false;
+    });
+  }
+
   Future<void> _save() async {
     try {
-      await PdfHeaderConfigService.saveConfig(_config);
+      await PdfHeaderConfigService.saveConfig(_config, _selectedDocType);
       if (!mounted) return;
       context.showSuccessToast('Header settings saved');
     } catch (e) {
@@ -146,6 +159,26 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
           ? const Center(child: AdaptiveLoadingIndicator())
           : Column(
               children: [
+                // Document type toggle
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: SegmentedButton<PdfDocumentType>(
+                    segments: [
+                      ButtonSegment(
+                        value: PdfDocumentType.jobsheet,
+                        label: const Text('Jobsheet'),
+                        icon: Icon(AppIcons.document),
+                      ),
+                      ButtonSegment(
+                        value: PdfDocumentType.invoice,
+                        label: const Text('Invoice'),
+                        icon: Icon(AppIcons.receipt),
+                      ),
+                    ],
+                    selected: {_selectedDocType},
+                    onSelectionChanged: (selection) => _switchDocType(selection.first),
+                  ),
+                ),
                 // Live Preview
                 _buildPreview(),
                 // Tabs

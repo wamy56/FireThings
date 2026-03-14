@@ -31,7 +31,7 @@ class CameraOverlayPainter extends CustomPainter {
     final isTop = position == OverlayPosition.topLeft ||
         position == OverlayPosition.topRight;
 
-    final textAlign = isLeft ? TextAlign.left : TextAlign.right;
+    const textAlign = TextAlign.left;
     final maxTextWidth = size.width * 0.70;
 
     // Build paragraphs and measure actual dimensions

@@ -115,6 +115,15 @@ class _DetectorSpacingCalculatorScreenState
     final spec = _detectorSpecs[_detectorType]!;
     final notes = <String>[];
 
+    // Auto-switch room type based on width
+    if (width <= 2.0 && _roomType == RoomType.openArea) {
+      _roomType = RoomType.corridor;
+      notes.add('Room type automatically switched to Corridor (width ≤ 2m).');
+    } else if (width > 2.0 && _roomType == RoomType.corridor) {
+      _roomType = RoomType.openArea;
+      notes.add('Room type automatically switched to Open Area (width > 2m).');
+    }
+
     // Hard block on ceiling height exceeded
     if (height > spec.maxCeiling) {
       setState(() {
@@ -177,6 +186,7 @@ class _DetectorSpacingCalculatorScreenState
           if (halfCellX < 0.5) break; // BS 5839-1 min wall offset
 
           final remainingR = sqrt(R * R - halfCellX * halfCellX);
+          if (remainingR <= 0) continue; // No remaining radius for Y coverage
           var minRows = max(1, (width / (2 * remainingR)).ceil());
 
           // Enforce min 0.5m wall offset in Y
@@ -405,6 +415,7 @@ class _DetectorSpacingCalculatorScreenState
             // Length
             TextFormField(
               controller: _lengthController,
+              keyboardAppearance: Brightness.light,
               decoration: InputDecoration(
                 labelText: 'Room Length (m)',
                 prefixIcon: Icon(AppIcons.ruler),
@@ -428,6 +439,7 @@ class _DetectorSpacingCalculatorScreenState
             // Width
             TextFormField(
               controller: _widthController,
+              keyboardAppearance: Brightness.light,
               decoration: InputDecoration(
                 labelText: 'Room Width (m)',
                 prefixIcon: Icon(AppIcons.ruler),
@@ -451,6 +463,7 @@ class _DetectorSpacingCalculatorScreenState
             // Ceiling Height
             TextFormField(
               controller: _heightController,
+              keyboardAppearance: Brightness.light,
               decoration: InputDecoration(
                 labelText: 'Ceiling Height (m)',
                 prefixIcon: Icon(AppIcons.arrowUp),

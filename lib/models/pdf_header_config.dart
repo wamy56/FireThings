@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+enum PdfDocumentType { jobsheet, invoice }
+
 enum LogoZone { left, centre, none }
 
 enum LogoSize {

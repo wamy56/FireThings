@@ -4,14 +4,18 @@ import '../models/pdf_header_config.dart';
 import 'firestore_sync_service.dart';
 
 class PdfFooterConfigService {
-  static const _configKey = 'pdf_footer_config_v1';
+  static const _oldConfigKey = 'pdf_footer_config_v1';
   static const _migratedKey = 'pdf_footer_config_migrated';
+  static const _typeMigratedKey = 'pdf_footer_config_type_migrated';
 
   // Old keys from JobsheetSettingsService
   static const _oldFooterLine1 = 'jobsheet_footer_line1';
   static const _oldFooterLine2 = 'jobsheet_footer_line2';
 
-  static Future<PdfFooterConfig> getConfig() async {
+  static String _configKeyForType(PdfDocumentType type) =>
+      'pdf_footer_config_v1_${type.name}';
+
+  static Future<PdfFooterConfig> getConfig(PdfDocumentType type) async {
     final prefs = await SharedPreferences.getInstance();
 
     // Attempt migration from old settings if not done yet
@@ -19,18 +23,23 @@ class PdfFooterConfigService {
       await _migrateFromOldSettings(prefs);
     }
 
-    final jsonString = prefs.getString(_configKey);
+    // Migrate from untyped key to typed keys
+    if (prefs.getBool(_typeMigratedKey) != true) {
+      await _migrateToTypedKeys(prefs);
+    }
+
+    final jsonString = prefs.getString(_configKeyForType(type));
     if (jsonString != null) {
       return PdfFooterConfig.fromJsonString(jsonString);
     }
     return PdfFooterConfig.defaults();
   }
 
-  static Future<void> saveConfig(PdfFooterConfig config) async {
+  static Future<void> saveConfig(PdfFooterConfig config, PdfDocumentType type) async {
     final prefs = await SharedPreferences.getInstance();
     final jsonString = config.toJsonString();
-    await prefs.setString(_configKey, jsonString);
-    FirestoreSyncService.instance.syncPdfFooterConfig(jsonString);
+    await prefs.setString(_configKeyForType(type), jsonString);
+    FirestoreSyncService.instance.syncPdfFooterConfig(jsonString, type);
   }
 
   static Future<void> _migrateFromOldSettings(SharedPreferences prefs) async {
@@ -51,9 +60,20 @@ class PdfFooterConfigService {
         leftLines: leftLines,
         centreLines: [],
       );
-      await prefs.setString(_configKey, config.toJsonString());
+      await prefs.setString(_oldConfigKey, config.toJsonString());
     }
 
     await prefs.setBool(_migratedKey, true);
+  }
+
+  /// Migrate untyped key to both jobsheet and invoice typed keys.
+  static Future<void> _migrateToTypedKeys(SharedPreferences prefs) async {
+    final existing = prefs.getString(_oldConfigKey);
+    if (existing != null) {
+      await prefs.setString(_configKeyForType(PdfDocumentType.jobsheet), existing);
+      await prefs.setString(_configKeyForType(PdfDocumentType.invoice), existing);
+      await prefs.remove(_oldConfigKey);
+    }
+    await prefs.setBool(_typeMigratedKey, true);
   }
 }

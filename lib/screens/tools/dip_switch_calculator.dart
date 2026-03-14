@@ -126,6 +126,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
+          keyboardAppearance: Brightness.light,
           decoration: const InputDecoration(
             labelText: 'Configuration Name',
             hintText: 'e.g., Zone 1 Detectors',
@@ -167,6 +168,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
             TextField(
               controller: controller,
               autofocus: true,
+              keyboardAppearance: Brightness.light,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Address',

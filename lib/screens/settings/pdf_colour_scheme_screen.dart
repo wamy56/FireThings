@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/premium_dialog.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import '../../models/pdf_colour_scheme.dart';
+import '../../models/pdf_header_config.dart' show PdfDocumentType;
 import '../../services/pdf_colour_scheme_service.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/theme.dart';
@@ -20,6 +21,7 @@ class PdfColourSchemeScreen extends StatefulWidget {
 class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
   PdfColourScheme _scheme = PdfColourScheme.defaults();
   bool _isLoading = true;
+  PdfDocumentType _selectedDocType = PdfDocumentType.jobsheet;
 
   @override
   void initState() {
@@ -28,7 +30,19 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
   }
 
   Future<void> _loadScheme() async {
-    final scheme = await PdfColourSchemeService.getScheme();
+    final scheme = await PdfColourSchemeService.getScheme(_selectedDocType);
+    setState(() {
+      _scheme = scheme;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _switchDocType(PdfDocumentType type) async {
+    if (type == _selectedDocType) return;
+    await PdfColourSchemeService.saveScheme(_scheme, _selectedDocType);
+    _selectedDocType = type;
+    setState(() => _isLoading = true);
+    final scheme = await PdfColourSchemeService.getScheme(type);
     setState(() {
       _scheme = scheme;
       _isLoading = false;
@@ -36,7 +50,7 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
   }
 
   Future<void> _save() async {
-    await PdfColourSchemeService.saveScheme(_scheme);
+    await PdfColourSchemeService.saveScheme(_scheme, _selectedDocType);
     if (!mounted) return;
     context.showSuccessToast('Colour scheme saved');
   }
@@ -115,8 +129,28 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
           : ListView(
               padding: const EdgeInsets.all(AppTheme.screenPadding),
               children: [
-                // Invoice preview mockup
-                _buildPreview(),
+                // Document type toggle
+                SegmentedButton<PdfDocumentType>(
+                  segments: [
+                    ButtonSegment(
+                      value: PdfDocumentType.jobsheet,
+                      label: const Text('Jobsheet'),
+                      icon: Icon(AppIcons.document),
+                    ),
+                    ButtonSegment(
+                      value: PdfDocumentType.invoice,
+                      label: const Text('Invoice'),
+                      icon: Icon(AppIcons.receipt),
+                    ),
+                  ],
+                  selected: {_selectedDocType},
+                  onSelectionChanged: (selection) => _switchDocType(selection.first),
+                ),
+                const SizedBox(height: 16),
+                // Preview mockup
+                _selectedDocType == PdfDocumentType.invoice
+                    ? _buildInvoicePreview()
+                    : _buildJobsheetPreview(),
                 const SizedBox(height: 24),
 
                 // Preset schemes
@@ -143,7 +177,7 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
     );
   }
 
-  Widget _buildPreview() {
+  Widget _buildInvoicePreview() {
     final primary = _primaryFlutterColor;
     final light = _lightTint(primary);
     final textColor = AppTheme.textPrimary;
@@ -319,6 +353,226 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
           Expanded(flex: 3, child: Text(desc, style: TextStyle(fontSize: 9, color: textColor))),
           Expanded(child: Text(qty, style: TextStyle(fontSize: 9, color: textColor), textAlign: TextAlign.center)),
           Expanded(child: Text(total, style: TextStyle(fontSize: 9, color: textColor), textAlign: TextAlign.right)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildJobsheetPreview() {
+    final primary = _primaryFlutterColor;
+    final light = _lightTint(primary);
+    final textColor = AppTheme.textPrimary;
+    final subtleText = AppTheme.textSecondary;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header bar with bottom border
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: primary, width: 2),
+              ),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'YOUR COMPANY',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: primary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Professional Services',
+                        style: TextStyle(fontSize: 9, color: subtleText),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'JOBSHEET',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Job Information section
+                _mockSectionHeader('JOB INFORMATION', primary),
+                _mockFieldRow('Date:', '14/03/2026', light, false),
+                _mockFieldRow('Engineer:', 'John Smith', light, true),
+                _mockFieldRow('Job No:', 'JS-001', light, false),
+                const SizedBox(height: 10),
+
+                // Work Details section
+                _mockSectionHeader('WORK DETAILS', primary),
+                _mockFieldRow('System Type:', 'Conventional', light, false),
+                _mockFieldRow('Panels Tested:', 'Yes', light, true),
+                const SizedBox(height: 10),
+
+                // Certification box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    border: Border(
+                      left: BorderSide(color: primary, width: 4),
+                      top: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                      right: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                      bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'CERTIFICATION STATEMENT',
+                        style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: textColor),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Work carried out in accordance with BS 5839-1.',
+                        style: TextStyle(fontSize: 8, color: subtleText),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Signatures
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Engineer', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: textColor)),
+                          const SizedBox(height: 4),
+                          Container(
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: light,
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: Center(
+                              child: Text('Signature', style: TextStyle(fontSize: 7, color: Colors.grey.shade400)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Customer', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: textColor)),
+                          const SizedBox(height: 4),
+                          Container(
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: light,
+                              border: Border.all(color: Colors.grey.shade300),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                            child: Center(
+                              child: Text('Signature', style: TextStyle(fontSize: 7, color: Colors.grey.shade400)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mockSectionHeader(String title, Color primary) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.only(bottom: 2),
+      decoration: BoxDecoration(
+        color: primary,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(4),
+          topRight: Radius.circular(4),
+        ),
+      ),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _mockFieldRow(String label, String value, Color light, bool isAlternate) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: isAlternate ? light : null,
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 75,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(value, style: const TextStyle(fontSize: 9)),
+          ),
         ],
       ),
     );
