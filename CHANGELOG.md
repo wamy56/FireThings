@@ -4,6 +4,15 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-14 (Session 22)
+
+### Revert Timestamp Camera + Fix iOS Keyboard Done Bar
+
+- **Revert: Timestamp Camera rebuild** — Restored all 10 original screen files, `timestamp_camera_service.dart`, and `assets/fonts/Inter-Bold.ttf` from commit `6e5d078` (pre-rebuild "almost working" state). Removed rebuild-only `overlay_settings_sheet.dart`. The Session 21 rebuild introduced too many regressions.
+- **Fix: `KeyboardDoneBar` never showing on iOS** — Converted from `StatelessWidget` to `StatefulWidget` with `WidgetsBindingObserver`. The `didChangeMetrics()` callback now triggers `setState()` when the keyboard appears/hides. Previously the widget read `viewInsets` but had no rebuild trigger, so the done bar with up/down field navigation arrows never appeared. Affects all 19 screens using `KeyboardDismissWrapper`. (`lib/widgets/keyboard_done_bar.dart`)
+
+---
+
 ## 2026-03-13 (Session 21)
 
 ### Timestamp Camera — Complete Tear-Out and Rebuild

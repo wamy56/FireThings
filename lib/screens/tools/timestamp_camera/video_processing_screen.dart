@@ -19,7 +19,6 @@ class VideoProcessingScreen extends StatefulWidget {
   final int totalDurationMs;
   final DateTime? recordingStartTime;
   final String? fontPath;
-  final OverlaySettings settings;
   final String? coords;
   final String? address;
 
@@ -30,7 +29,6 @@ class VideoProcessingScreen extends StatefulWidget {
     required this.totalDurationMs,
     this.recordingStartTime,
     this.fontPath,
-    required this.settings,
     this.coords,
     this.address,
   });
@@ -118,6 +116,7 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
 
   Future<void> _retryWithFallback() async {
     if (widget.recordingStartTime == null) {
+      // No start time — can't build fallback filter, just save raw
       await _saveWithoutOverlay();
       return;
     }
@@ -131,9 +130,12 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
       _errorDetail = null;
     });
 
+    // Build fallback per-second filter
+    // We need the settings, so we load them fresh
+    final settings = await TimestampCameraService.instance.loadSettings();
     final fallbackFilter =
         TimestampCameraService.instance.buildFallbackFfmpegFilter(
-      settings: widget.settings,
+      settings: settings,
       recordingStartTime: widget.recordingStartTime!,
       durationMs: widget.totalDurationMs,
       coords: widget.coords,
@@ -160,6 +162,7 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
         _deleteFile(widget.inputPath);
         _deleteFile(outputPath);
       } else {
+        // Fallback also failed — show save without overlay
         if (mounted) {
           setState(() {
             _isProcessing = false;
@@ -280,6 +283,7 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
                   ),
                 ],
                 const SizedBox(height: 24),
+                // Progress bar
                 if (_isProcessing) ...[
                   SizedBox(
                     width: 240,
@@ -304,6 +308,7 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
                     ),
                   ),
                 ],
+                // Error actions: Retry + Save Without Overlay
                 if (_showActions) ...[
                   const SizedBox(height: 8),
                   SizedBox(
@@ -334,6 +339,7 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
                     ),
                   ),
                 ],
+                // Done button when complete (non-error)
                 if (!_isProcessing && !_showActions) ...[
                   const SizedBox(height: 24),
                   ElevatedButton(

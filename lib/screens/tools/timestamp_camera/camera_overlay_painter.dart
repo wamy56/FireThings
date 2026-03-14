@@ -1,80 +1,106 @@
-import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../../services/timestamp_camera_service.dart';
-import '../../../services/location_service.dart';
 
-/// CustomPainter that renders per-corner overlay text on the live camera preview.
-/// Each corner independently draws a rounded rect with semi-transparent black bg
-/// and white bold text with shadow.
+/// CustomPainter that renders overlay text on top of the live camera preview.
+/// Draws a compact rounded-rect block at the selected corner position with
+/// aligned white bold text for each enabled overlay element.
 class CameraOverlayPainter extends CustomPainter {
-  final Map<OverlayCorner, String> cornerTexts;
+  final List<String> overlayLines;
+  final OverlayPosition position;
   final double safeAreaTop;
 
   CameraOverlayPainter({
-    required this.cornerTexts,
+    required this.overlayLines,
+    this.position = OverlayPosition.bottomLeft,
     this.safeAreaTop = 0.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (cornerTexts.isEmpty) return;
+    if (overlayLines.isEmpty) return;
 
     final metrics = computeOverlayMetrics(size.width, size.height);
     final fontSize = metrics.fontSize;
+    final lineGap = metrics.lineGap;
     final margin = metrics.margin;
     final padding = metrics.padding;
-    final maxTextWidth = size.width * 0.45;
 
-    for (final entry in cornerTexts.entries) {
-      final corner = entry.key;
-      final text = entry.value;
+    final isLeft = position == OverlayPosition.bottomLeft ||
+        position == OverlayPosition.topLeft;
+    final isTop = position == OverlayPosition.topLeft ||
+        position == OverlayPosition.topRight;
 
-      final isLeft = corner == OverlayCorner.topLeft || corner == OverlayCorner.bottomLeft;
-      final isTop = corner == OverlayCorner.topLeft || corner == OverlayCorner.topRight;
-      final textAlign = isLeft ? TextAlign.left : TextAlign.right;
+    final textAlign = isLeft ? TextAlign.left : TextAlign.right;
+    final maxTextWidth = size.width * 0.70;
 
-      // Build paragraph
-      final paragraph = _buildParagraph(text, fontSize, maxTextWidth, textAlign);
+    // Build paragraphs and measure actual dimensions
+    final paragraphs = <ui.Paragraph>[];
+    final paragraphHeights = <double>[];
+    double maxLineWidth = 0;
+    double totalTextHeight = 0;
+
+    for (var i = 0; i < overlayLines.length; i++) {
+      final paragraph =
+          _buildParagraph(overlayLines[i], fontSize, maxTextWidth, textAlign);
+      paragraphs.add(paragraph);
+
+      final pHeight = paragraph.height;
+      paragraphHeights.add(pHeight);
+      totalTextHeight += pHeight;
+      if (i < overlayLines.length - 1) totalTextHeight += lineGap;
+
+      if (paragraph.longestLine > maxLineWidth) {
+        maxLineWidth = paragraph.longestLine;
+      }
+    }
+
+    // Add shadow compensation (shadow offset 1 + blur 3 ≈ 4px overshoot)
+    const shadowCompensation = 4.0;
+    final maxBlockWidth = size.width - (margin * 2);
+    final blockWidth =
+        (maxLineWidth + (padding * 2) + shadowCompensation).clamp(0.0, maxBlockWidth);
+    final blockHeight = totalTextHeight + (padding * 2);
+
+    // Compute block X, clamped so block never extends past edges
+    final rawBlockX = isLeft ? margin : size.width - blockWidth - margin;
+    final clampMax = (size.width - blockWidth - margin).clamp(margin, size.width);
+    final blockX = rawBlockX.clamp(margin, clampMax);
+
+    // Compute block Y — use margin from edges, with safe area adjustment for top positions
+    final double blockY;
+    if (isTop) {
+      // Push below Dynamic Island / safe area when in preview
+      blockY = margin > safeAreaTop + 4.0 ? margin : safeAreaTop + 4.0;
+    } else {
+      blockY = size.height - blockHeight - margin;
+    }
+
+    // Compact rounded rect
+    final blockRect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(blockX, blockY, blockWidth, blockHeight),
+      const Radius.circular(8),
+    );
+
+    canvas.drawRRect(
+      blockRect,
+      Paint()..color = Colors.black.withValues(alpha: 0.55),
+    );
+
+    // Draw each text line aligned within the block using cumulative heights
+    double yOffset = blockY + padding;
+    for (var i = 0; i < paragraphs.length; i++) {
+      final paragraph = paragraphs[i];
       final lineWidth = paragraph.longestLine;
-      final lineHeight = paragraph.height;
-
-      const shadowCompensation = 4.0;
-      final blockWidth = (lineWidth + (padding * 2) + shadowCompensation)
-          .clamp(0.0, size.width - (margin * 2));
-      final blockHeight = lineHeight + (padding * 2);
-
-      // Block X
-      final double blockX = isLeft ? margin : size.width - blockWidth - margin;
-
-      // Block Y — top corners avoid Dynamic Island / safe area
-      final double blockY;
-      if (isTop) {
-        blockY = margin > safeAreaTop + 4.0 ? margin : safeAreaTop + 4.0;
-      } else {
-        blockY = size.height - blockHeight - margin;
-      }
-
-      // Rounded rect background
-      final blockRect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(blockX, blockY, blockWidth, blockHeight),
-        const Radius.circular(8),
-      );
-      canvas.drawRRect(
-        blockRect,
-        Paint()..color = Colors.black.withValues(alpha: 0.55),
-      );
-
-      // Text position
-      final double textX;
+      final double x;
       if (isLeft) {
-        textX = blockX + padding;
+        x = blockX + padding;
       } else {
-        textX = blockX + blockWidth - padding - lineWidth;
+        x = blockX + blockWidth - padding - lineWidth;
       }
-      final textY = blockY + padding;
-
-      canvas.drawParagraph(paragraph, Offset(textX, textY));
+      canvas.drawParagraph(paragraph, Offset(x, yOffset));
+      yOffset += paragraphHeights[i];
+      if (i < paragraphs.length - 1) yOffset += lineGap;
     }
   }
 
@@ -112,86 +138,12 @@ class CameraOverlayPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CameraOverlayPainter oldDelegate) {
+    if (oldDelegate.position != position) return true;
     if (oldDelegate.safeAreaTop != safeAreaTop) return true;
-    if (oldDelegate.cornerTexts.length != cornerTexts.length) return true;
-    for (final entry in cornerTexts.entries) {
-      if (oldDelegate.cornerTexts[entry.key] != entry.value) return true;
+    if (oldDelegate.overlayLines.length != overlayLines.length) return true;
+    for (var i = 0; i < overlayLines.length; i++) {
+      if (oldDelegate.overlayLines[i] != overlayLines[i]) return true;
     }
     return false;
-  }
-}
-
-/// Self-contained overlay widget that owns its own 1-second clock timer.
-/// Wrapped in a RepaintBoundary by the parent so timer-driven rebuilds
-/// never propagate to the camera preview or controls.
-class OverlayWidget extends StatefulWidget {
-  final OverlaySettings settings;
-  final LocationService locationService;
-  final double safeAreaTop;
-
-  const OverlayWidget({
-    super.key,
-    required this.settings,
-    required this.locationService,
-    this.safeAreaTop = 0.0,
-  });
-
-  @override
-  State<OverlayWidget> createState() => _OverlayWidgetState();
-}
-
-class _OverlayWidgetState extends State<OverlayWidget> {
-  Timer? _clockTimer;
-  Map<OverlayCorner, String> _cornerTexts = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _updateCornerTexts();
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      _updateCornerTexts();
-    });
-  }
-
-  @override
-  void didUpdateWidget(OverlayWidget oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _updateCornerTexts();
-  }
-
-  @override
-  void dispose() {
-    _clockTimer?.cancel();
-    super.dispose();
-  }
-
-  void _updateCornerTexts() {
-    if (!mounted) return;
-    final newTexts = widget.settings.buildCornerTexts(
-      coords: widget.locationService.currentCoords,
-      address: widget.locationService.currentAddress,
-    );
-    // Skip rebuild if texts haven't changed
-    if (!_mapsEqual(_cornerTexts, newTexts)) {
-      setState(() => _cornerTexts = newTexts);
-    }
-  }
-
-  bool _mapsEqual(Map<OverlayCorner, String> a, Map<OverlayCorner, String> b) {
-    if (a.length != b.length) return false;
-    for (final entry in a.entries) {
-      if (b[entry.key] != entry.value) return false;
-    }
-    return true;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: CameraOverlayPainter(
-        cornerTexts: _cornerTexts,
-        safeAreaTop: widget.safeAreaTop,
-      ),
-    );
   }
 }

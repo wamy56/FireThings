@@ -8,25 +8,49 @@ import '../utils/icon_map.dart';
 /// Wrap this around a screen's body (inside the Scaffold) to give users
 /// a way to dismiss the keyboard — especially useful for numeric keyboards
 /// which lack a return key on iOS.
-class KeyboardDoneBar extends StatelessWidget {
+class KeyboardDoneBar extends StatefulWidget {
   final Widget child;
 
   const KeyboardDoneBar({super.key, required this.child});
 
   @override
-  Widget build(BuildContext context) {
-    if (!PlatformUtils.isApple) return child;
+  State<KeyboardDoneBar> createState() => _KeyboardDoneBarState();
+}
 
-    // Read raw view insets directly from the View, bypassing Scaffold's
-    // consumption of viewInsets (which zeroes them out in the body).
+class _KeyboardDoneBarState extends State<KeyboardDoneBar>
+    with WidgetsBindingObserver {
+  bool _keyboardVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
     final rawInsets =
         MediaQueryData.fromView(View.of(context)).viewInsets;
-    final keyboardVisible = rawInsets.bottom > 0;
+    final visible = rawInsets.bottom > 0;
+    if (visible != _keyboardVisible) {
+      setState(() => _keyboardVisible = visible);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!PlatformUtils.isApple) return widget.child;
 
     return Stack(
       children: [
-        child,
-        if (keyboardVisible)
+        widget.child,
+        if (_keyboardVisible)
           Positioned(
             left: 0,
             right: 0,
