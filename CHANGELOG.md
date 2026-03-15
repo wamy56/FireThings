@@ -4,6 +4,26 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-15 (Session 36)
+
+### Dispatch Feature — Remote Config Flag Setup
+
+- **Added 3 dispatch Remote Config defaults**: `dispatch_enabled` (false), `dispatch_max_members` (25), `dispatch_notifications_enabled` (true) — all gated off by default so testers see nothing
+- **Added dispatch tester tagging**: `initialize()` now sets `dispatch_tester` Analytics user property for emails in `dispatchTesters` list, enabling targeted Remote Config conditions
+- **Added 3 dispatch getters**: `dispatchEnabled`, `dispatchMaxMembers`, `dispatchNotificationsEnabled` on `RemoteConfigService`
+- **Imports**: Added `firebase_analytics` and `firebase_auth` to remote config service
+
+---
+
+## 2026-03-15 (Session 35)
+
+### iOS App Icon Fix
+
+- **Regenerated all app icons** from new source image (`app_icon_1024.jpg`) by running `flutter_launcher_icons` — overwrote all iOS and Android icon PNGs
+- **Deleted orphan icon files**: removed unused `assets/images/app1024.png` and `assets/images/appp-icon1.jpg`
+
+---
+
 ## 2026-03-15 (Session 34)
 
 ### Invoice Line Items UI Redesign
