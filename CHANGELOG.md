@@ -4,6 +4,53 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-15 (Session 38)
+
+### Documentation Update
+- Updated `DISPATCH_FEATURE_SPEC.md` with implementation progress banner and completion markers (✅) on Phase 1-3 items
+- Noted remaining items from Phases 1-3: Home screen "Dispatched Jobs" card, company PDF config (deferred to Phase 4), site/customer autocomplete
+
+---
+
+## 2026-03-15 (Session 37)
+
+### Dispatch Feature — Phases 1-3: Full Implementation
+
+**New Data Models** (4 files):
+- `lib/models/company.dart` — Company class (id, name, address, phone, email, createdBy, inviteCode)
+- `lib/models/company_member.dart` — CompanyMember class + CompanyRole enum (admin/dispatcher/engineer)
+- `lib/models/dispatched_job.dart` — DispatchedJob class (30+ fields), DispatchedJobStatus enum, JobPriority enum
+- `lib/models/user_profile.dart` — UserProfile class (uid, companyId, companyRole, fcmToken)
+- Updated `lib/models/models.dart` barrel to export all 4 new models
+
+**New Services** (3 files):
+- `lib/services/user_profile_service.dart` — Singleton, loads/caches user profile from Firestore + SharedPreferences, manages FCM token updates
+- `lib/services/company_service.dart` — Singleton, company CRUD (create/join/leave/delete), member management, invite code generation (FT-XXXXXX format), batch Firestore writes
+- `lib/services/dispatch_service.dart` — Singleton, dispatched job CRUD, real-time Firestore streams, status transitions with validation, engineer job filtering
+
+**New Company Screens** (4 files):
+- `lib/screens/company/create_company_screen.dart` — Form to create company, shows generated invite code on success
+- `lib/screens/company/join_company_screen.dart` — Single invite code input, joins as engineer
+- `lib/screens/company/company_settings_screen.dart` — View/edit company details, regenerate invite code, leave/delete company
+- `lib/screens/company/team_management_screen.dart` — Real-time member list with role badges, admin role change/remove actions
+
+**New Dispatch Screens** (5 files):
+- `lib/screens/dispatch/dispatch_dashboard_screen.dart` — Summary cards (unassigned/in-progress/completed/urgent), filterable job list, FAB to create
+- `lib/screens/dispatch/create_job_screen.dart` — Full job creation form (all 30+ fields), engineer assignment dropdown, priority segmented control, edit mode
+- `lib/screens/dispatch/dispatched_job_detail_screen.dart` — Dispatcher view with all details, reassign, edit, get directions, tap-to-call
+- `lib/screens/dispatch/engineer_jobs_screen.dart` — Engineer's assigned jobs grouped by Active/Upcoming/Completed
+- `lib/screens/dispatch/engineer_job_detail_screen.dart` — Field-friendly layout with status action buttons (Accept→En Route→On Site→Complete), decline flow, get directions
+- `lib/screens/dispatch/decline_job_dialog.dart` — Quick-select reasons + custom text
+
+**Modified Files**:
+- `lib/main.dart` — Added UserProfileService init in AuthWrapper, conditional 5th "Dispatch" tab (dispatchers→dashboard, engineers→job list), dynamic nav bar generation
+- `lib/screens/settings/settings_screen.dart` — Added "Company" section (create/join when no company, settings/team when in company), gated behind `dispatchEnabled`
+- `lib/utils/icon_map.dart` — Added 8 dispatch icons (taskOutline/Bold, routing, call, map, timer, crown, userAdd)
+- `firestore.rules` — Added company security rules with helper functions (isCompanyMember, isCompanyAdmin, isCompanyDispatcherOrAdmin), member/job/site/customer subcollection rules
+- `pubspec.yaml` — Added `url_launcher: ^6.2.0`
+
+---
+
 ## 2026-03-15 (Session 36)
 
 ### Dispatch Feature — Remote Config Flag Setup

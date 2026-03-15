@@ -10,3 +10,7 @@ export 'pdf_form_template.dart';
 export 'pdf_header_config.dart';
 export 'pdf_footer_config.dart';
 export 'pdf_section_layout_config.dart';
+export 'company.dart';
+export 'company_member.dart';
+export 'dispatched_job.dart';
+export 'user_profile.dart';

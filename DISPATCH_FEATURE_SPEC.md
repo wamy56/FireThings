@@ -6,6 +6,21 @@
 
 ---
 
+> **Implementation Progress (updated 2026-03-15, Session 37):**
+> - [x] Phase 1: Data Models & Company Setup *(items 8-9 deferred to Phase 4)*
+> - [x] Phase 2: Dispatch CRUD — Dispatcher Side
+> - [x] Phase 3: Engineer Job Views & Status Flow *(item 5 — Home screen card — not yet done)*
+> - [ ] Phase 4: Jobsheet Integration & Company PDF Branding
+> - [ ] Phase 5: Push Notifications (FCM)
+> - [ ] Phase 6: Team Management & Polish
+>
+> **Remaining from Phases 1-3:**
+> - Home screen "Dispatched Jobs" card (Phase 3, item 5)
+> - Company PDF config structure + design screen (Phase 1, items 8-9 — actually Phase 4 work)
+> - Site/customer autocomplete in Create Job screen (data sources not yet created)
+
+---
+
 ## Table of Contents
 
 1. [Feature Overview](#1-feature-overview)
@@ -1239,34 +1254,34 @@ Build in this order. Each phase produces a working, testable increment.
 
 ### Phase 1: Data Model & Company Setup (Week 1)
 
-1. Create the data models: `Company`, `CompanyMember`, `DispatchedJob`
-2. Create `CompanyService` — create company, join company via invite code, manage members
-3. Create the Firestore security rules (don't deploy yet — test locally first)
-4. Add company-related screens: Create Company, Join Company, Company Settings
-5. Add the "Company" section in Settings
-6. Add `companyId` and `companyRole` to SharedPreferences
-7. Add `dispatch_enabled` to Remote Config service
-8. Add company PDF config structure to Firestore (`companies/{companyId}/pdf_config/`)
-9. Build Company PDF Design screen (reuse existing designer screens with company config path)
-10. Test: create a company, generate invite code, join from a second test account, verify members appear, set up company branding
+1. ✅ Create the data models: `Company`, `CompanyMember`, `DispatchedJob`
+2. ✅ Create `CompanyService` — create company, join company via invite code, manage members
+3. ✅ Create the Firestore security rules (don't deploy yet — test locally first)
+4. ✅ Add company-related screens: Create Company, Join Company, Company Settings
+5. ✅ Add the "Company" section in Settings
+6. ✅ Add `companyId` and `companyRole` to SharedPreferences
+7. ✅ Add `dispatch_enabled` to Remote Config service
+8. Add company PDF config structure to Firestore (`companies/{companyId}/pdf_config/`) *(deferred to Phase 4)*
+9. Build Company PDF Design screen (reuse existing designer screens with company config path) *(deferred to Phase 4)*
+10. Test: create a company, generate invite code, join from a second test account, verify members appear, set up company branding *(partially done — not yet fully tested)*
 
 ### Phase 2: Dispatch CRUD — Dispatcher Side (Week 2)
 
-1. Create `DispatchService` — CRUD operations for dispatched jobs, Firestore listeners
-2. Build the Create Dispatched Job screen with all form fields
-3. Build the Dispatch Dashboard screen with job listing and filters
-4. Build the Dispatched Job Detail screen (dispatcher view)
-5. Add real-time Firestore snapshot listeners for the job list
-6. Test: create jobs as dispatcher, verify they appear in Firestore, verify real-time updates
+1. ✅ Create `DispatchService` — CRUD operations for dispatched jobs, Firestore listeners
+2. ✅ Build the Create Dispatched Job screen with all form fields
+3. ✅ Build the Dispatch Dashboard screen with job listing and filters
+4. ✅ Build the Dispatched Job Detail screen (dispatcher view)
+5. ✅ Add real-time Firestore snapshot listeners for the job list
+6. Test: create jobs as dispatcher, verify they appear in Firestore, verify real-time updates *(not yet tested)*
 
 ### Phase 3: Engineer Job Views (Week 3)
 
-1. Build the Engineer Jobs List screen (assigned jobs only)
-2. Build the Engineer Job Detail screen with all site info, contact, map, directions
-3. Implement status update flow (accept → en route → on site → complete)
-4. Implement job decline flow with reason
-5. Add the "Dispatched Jobs" section to the Home screen (conditional on companyId)
-6. Test with two accounts: dispatcher creates and assigns, engineer accepts and updates status, dispatcher sees status change in real time
+1. ✅ Build the Engineer Jobs List screen (assigned jobs only)
+2. ✅ Build the Engineer Job Detail screen with all site info, contact, map, directions
+3. ✅ Implement status update flow (accept → en route → on site → complete)
+4. ✅ Implement job decline flow with reason
+5. Add the "Dispatched Jobs" section to the Home screen (conditional on companyId) *(not yet done)*
+6. Test with two accounts: dispatcher creates and assigns, engineer accepts and updates status, dispatcher sees status change in real time *(not yet tested)*
 
 ### Phase 4: Jobsheet Integration & Company Branding (Week 3–4)
 

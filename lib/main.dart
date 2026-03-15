@@ -13,12 +13,15 @@ import 'services/remote_config_service.dart';
 import 'services/firestore_sync_service.dart';
 import 'services/template_service.dart';
 import 'services/notification_service.dart';
+import 'services/user_profile_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
 import 'screens/new_job/jobsheet_drafts_screen.dart';
 import 'screens/invoicing/invoicing_hub_screen.dart';
 import 'screens/jobs/jobs_hub_screen.dart';
+import 'screens/dispatch/dispatch_dashboard_screen.dart';
+import 'screens/dispatch/engineer_jobs_screen.dart';
 import 'utils/theme.dart';
 import 'utils/responsive.dart';
 import 'utils/adaptive_widgets.dart';
@@ -133,11 +136,13 @@ class AuthWrapper extends StatelessWidget {
 
         // Show main screen if logged in, login screen if not
         if (snapshot.hasData) {
-          // Trigger cloud sync in the background
+          // Trigger cloud sync and load user profile in the background
           final user = snapshot.data!;
           FirestoreSyncService.instance.performFullSync(user.uid);
+          UserProfileService.instance.loadProfile(user.uid);
           return const MainNavigationScreen();
         } else {
+          UserProfileService.instance.clearProfile();
           return const LoginScreen();
         }
       },
@@ -158,7 +163,19 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   int _currentIndex = 0;
   int _previousIndex = 0;
 
-  static const _titles = ['Home', 'Jobs', 'Invoices', 'Settings'];
+  bool get _showDispatchTab {
+    final rc = RemoteConfigService.instance;
+    final profile = UserProfileService.instance;
+    return rc.dispatchEnabled && profile.hasCompany;
+  }
+
+  List<String> get _titles => [
+        'Home',
+        'Jobs',
+        'Invoices',
+        if (_showDispatchTab) 'Dispatch',
+        'Settings',
+      ];
 
   void _switchTab(int newIndex) {
     if (newIndex == _currentIndex) return;
@@ -208,26 +225,37 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     }
   }
 
-  late final _screens = <Widget>[
-    HomeScreen(onTabChanged: _switchTab),
-    const JobsHubScreen(),
-    const InvoicingHubScreen(),
-    const SettingsScreen(),
-  ];
+  Widget get _dispatchScreen {
+    final profile = UserProfileService.instance;
+    if (profile.isDispatcherOrAdmin) {
+      return const DispatchDashboardScreen();
+    }
+    return const EngineerJobsScreen();
+  }
 
-  static const _navIcons = [
-    AppIcons.homeOutline,
-    AppIcons.briefcaseOutline,
-    AppIcons.receiptOutline,
-    AppIcons.settingOutline,
-  ];
+  List<Widget> get _screens => [
+        HomeScreen(onTabChanged: _switchTab),
+        const JobsHubScreen(),
+        const InvoicingHubScreen(),
+        if (_showDispatchTab) _dispatchScreen,
+        const SettingsScreen(),
+      ];
 
-  static const _navSelectedIcons = [
-    AppIcons.homeBold,
-    AppIcons.briefcaseBold,
-    AppIcons.receiptBold,
-    AppIcons.settingBold,
-  ];
+  List<IconData> get _navIcons => [
+        AppIcons.homeOutline,
+        AppIcons.briefcaseOutline,
+        AppIcons.receiptOutline,
+        if (_showDispatchTab) AppIcons.taskOutline,
+        AppIcons.settingOutline,
+      ];
+
+  List<IconData> get _navSelectedIcons => [
+        AppIcons.homeBold,
+        AppIcons.briefcaseBold,
+        AppIcons.receiptBold,
+        if (_showDispatchTab) AppIcons.taskBold,
+        AppIcons.settingBold,
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -235,16 +263,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     final screenSize = context.screenSize;
     final useRail = screenSize != ScreenSize.compact;
 
+    final titles = _titles;
+    final screens = _screens;
+    final navIcons = _navIcons;
+    final navSelectedIcons = _navSelectedIcons;
+    // Clamp index in case dispatch tab was removed
+    final safeIndex = _currentIndex.clamp(0, screens.length - 1);
+    if (safeIndex != _currentIndex) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() => _currentIndex = safeIndex);
+      });
+    }
+
     final body = Scaffold(
       appBar: AdaptiveNavigationBar(
-        title: _titles[_currentIndex],
+        title: titles[safeIndex],
       ),
       body: GestureDetector(
         onHorizontalDragEnd: (details) {
           final velocity = details.primaryVelocity ?? 0;
           if (velocity > 300 && _currentIndex > 0) {
             _switchTab(_currentIndex - 1);
-          } else if (velocity < -300 && _currentIndex < _screens.length - 1) {
+          } else if (velocity < -300 && _currentIndex < screens.length - 1) {
             _switchTab(_currentIndex + 1);
           }
         },
@@ -270,16 +310,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
             return SlideTransition(position: offset, child: child);
           },
           child: KeyedSubtree(
-            key: ValueKey(_currentIndex),
-            child: _screens[_currentIndex],
+            key: ValueKey(safeIndex),
+            child: screens[safeIndex],
           ),
         ),
       ),
       bottomNavigationBar: useRail
           ? null
           : PlatformUtils.isApple
-              ? _buildCupertinoNavBar(isDark)
-              : _buildMaterialNavBar(isDark),
+              ? _buildCupertinoNavBar(isDark, navIcons, navSelectedIcons, titles, screens.length)
+              : _buildMaterialNavBar(isDark, navIcons, navSelectedIcons, titles, screens.length),
     );
 
     if (!useRail) return body;
@@ -305,11 +345,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
             ),
             unselectedLabelTextStyle: TextStyle(color: unselectedColor),
             indicatorColor: primaryColor.withValues(alpha: 0.15),
-            destinations: List.generate(_titles.length, (i) {
+            destinations: List.generate(titles.length, (i) {
               return NavigationRailDestination(
-                icon: Icon(_navIcons[i]),
-                selectedIcon: Icon(_navSelectedIcons[i]),
-                label: Text(_titles[i]),
+                icon: Icon(navIcons[i]),
+                selectedIcon: Icon(navSelectedIcons[i]),
+                label: Text(titles[i]),
               );
             }),
           ),
@@ -324,7 +364,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     );
   }
 
-  Widget _buildCupertinoNavBar(bool isDark) {
+  Widget _buildCupertinoNavBar(bool isDark, List<IconData> icons, List<IconData> selectedIcons, List<String> titles, int count) {
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -348,28 +388,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               backgroundColor: Colors.transparent,
               activeColor: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
               inactiveColor: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(AppIcons.homeOutline),
-                  activeIcon: Icon(AppIcons.homeBold),
-                  label: 'Home',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(AppIcons.briefcaseOutline),
-                  activeIcon: Icon(AppIcons.briefcaseBold),
-                  label: 'Jobs',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(AppIcons.receiptOutline),
-                  activeIcon: Icon(AppIcons.receiptBold),
-                  label: 'Invoices',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(AppIcons.settingOutline),
-                  activeIcon: Icon(AppIcons.settingBold),
-                  label: 'Settings',
-                ),
-              ],
+              items: List.generate(count, (i) => BottomNavigationBarItem(
+                icon: Icon(icons[i]),
+                activeIcon: Icon(selectedIcons[i]),
+                label: titles[i],
+              )),
             ),
           ),
         ),
@@ -377,7 +400,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     );
   }
 
-  Widget _buildMaterialNavBar(bool isDark) {
+  Widget _buildMaterialNavBar(bool isDark, List<IconData> icons, List<IconData> selectedIcons, List<String> titles, int count) {
     return NavigationBar(
       selectedIndex: _currentIndex,
       onDestinationSelected: _switchTab,
@@ -388,52 +411,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       elevation: 0,
       animationDuration: AppTheme.normalAnimation,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      destinations: [
-        NavigationDestination(
-          icon: Icon(
-            AppIcons.homeOutline,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          ),
-          selectedIcon: Icon(
-            AppIcons.homeBold,
-            color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
-          ),
-          label: 'Home',
+      destinations: List.generate(count, (i) => NavigationDestination(
+        icon: Icon(
+          icons[i],
+          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
         ),
-        NavigationDestination(
-          icon: Icon(
-            AppIcons.briefcaseOutline,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          ),
-          selectedIcon: Icon(
-            AppIcons.briefcaseBold,
-            color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
-          ),
-          label: 'Jobs',
+        selectedIcon: Icon(
+          selectedIcons[i],
+          color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
         ),
-        NavigationDestination(
-          icon: Icon(
-            AppIcons.receiptOutline,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          ),
-          selectedIcon: Icon(
-            AppIcons.receiptBold,
-            color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
-          ),
-          label: 'Invoices',
-        ),
-        NavigationDestination(
-          icon: Icon(
-            AppIcons.settingOutline,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          ),
-          selectedIcon: Icon(
-            AppIcons.settingBold,
-            color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
-          ),
-          label: 'Settings',
-        ),
-      ],
+        label: titles[i],
+      )),
     );
   }
 }

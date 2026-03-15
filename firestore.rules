@@ -12,5 +12,77 @@ service cloud.firestore {
     match /users/{userId}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Company data
+    match /companies/{companyId} {
+
+      // Company document: readable by members, writable by admins
+      allow read: if isCompanyMember(companyId);
+      allow create: if request.auth != null;
+      allow update, delete: if isCompanyAdmin(companyId);
+
+      // Members subcollection
+      match /members/{memberId} {
+        // Members can read all members (to see team list)
+        allow read: if isCompanyMember(companyId);
+        // Admins can add/remove members
+        allow create, delete: if isCompanyAdmin(companyId);
+        // Admins can update any member
+        allow update: if isCompanyAdmin(companyId);
+        // Members can update their own fcmToken
+        allow update: if request.auth.uid == memberId
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken']);
+      }
+
+      // Dispatched jobs
+      match /dispatched_jobs/{jobId} {
+        // All company members can read all jobs
+        allow read: if isCompanyMember(companyId);
+        // Dispatchers and admins can create jobs
+        allow create: if isCompanyDispatcherOrAdmin(companyId);
+        // Dispatchers/admins can fully update, engineers can update status fields on their assigned jobs
+        allow update: if isCompanyDispatcherOrAdmin(companyId)
+                      || (isCompanyMember(companyId)
+                          && resource.data.assignedTo == request.auth.uid
+                          && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['status', 'updatedAt', 'completedAt', 'linkedJobsheetId', 'declineReason', 'assignedTo', 'assignedToName']));
+        allow delete: if isCompanyAdmin(companyId);
+      }
+
+      // Shared company sites
+      match /sites/{siteId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyDispatcherOrAdmin(companyId);
+      }
+
+      // Shared company customers
+      match /customers/{customerId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyDispatcherOrAdmin(companyId);
+      }
+
+      // Company PDF config
+      match /pdf_config/{configId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyAdmin(companyId);
+      }
+    }
+
+    // Helper functions
+    function isCompanyMember(companyId) {
+      return request.auth != null
+             && exists(/databases/$(database)/documents/companies/$(companyId)/members/$(request.auth.uid))
+             && get(/databases/$(database)/documents/companies/$(companyId)/members/$(request.auth.uid)).data.isActive == true;
+    }
+
+    function isCompanyAdmin(companyId) {
+      return isCompanyMember(companyId)
+             && get(/databases/$(database)/documents/companies/$(companyId)/members/$(request.auth.uid)).data.role == "admin";
+    }
+
+    function isCompanyDispatcherOrAdmin(companyId) {
+      return isCompanyMember(companyId)
+             && get(/databases/$(database)/documents/companies/$(companyId)/members/$(request.auth.uid)).data.role in ["admin", "dispatcher"];
+    }
   }
 }

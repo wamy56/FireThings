@@ -140,6 +140,18 @@ class AppIcons {
   static const IconData message = IconsaxPlusLinear.message;
 
   // ============================================
+  // Dispatch
+  // ============================================
+  static const IconData taskOutline = IconsaxPlusLinear.task_square;
+  static const IconData taskBold = IconsaxPlusBold.task_square;
+  static const IconData routing = IconsaxPlusLinear.routing;
+  static const IconData call = IconsaxPlusLinear.call;
+  static const IconData map = IconsaxPlusLinear.map;
+  static const IconData timer = IconsaxPlusLinear.timer;
+  static const IconData crown = IconsaxPlusLinear.crown;
+  static const IconData userAdd = IconsaxPlusLinear.user_add;
+
+  // ============================================
   // Misc
   // ============================================
   static const IconData searchOff = IconsaxPlusLinear.search_zoom_out;

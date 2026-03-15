@@ -16,7 +16,13 @@ import '../../utils/adaptive_widgets.dart';
 import '../saved_sites/saved_sites_screen.dart';
 import '../saved_customers/saved_customers_screen.dart';
 import '../../services/email_service.dart';
+import '../../services/remote_config_service.dart';
+import '../../services/user_profile_service.dart';
 import '../debug/debug_screen.dart';
+import '../company/create_company_screen.dart';
+import '../company/join_company_screen.dart';
+import '../company/company_settings_screen.dart';
+import '../company/team_management_screen.dart';
 import 'profile_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'manage_permissions_screen.dart';
@@ -292,6 +298,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ).animateEntrance(delay: const Duration(milliseconds: 360)),
           const SizedBox(height: 24),
 
+          // Company Section (dispatch feature)
+          if (RemoteConfigService.instance.dispatchEnabled)
+            _buildCompanySection(isApple)
+                .animateEntrance(delay: const Duration(milliseconds: 380)),
+          if (RemoteConfigService.instance.dispatchEnabled)
+            const SizedBox(height: 24),
+
           // App Section
           _buildAdaptiveSection(
             context,
@@ -474,6 +487,88 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle: const Text('Remind about unpaid invoices past due date'),
           value: _overdueReminders,
           onChanged: _setOverdueReminders,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompanySection(bool isApple) {
+    final profile = UserProfileService.instance;
+
+    if (!profile.hasCompany) {
+      return _buildAdaptiveSection(
+        context,
+        header: 'Company',
+        isApple: isApple,
+        tiles: [
+          _SettingsTileData(
+            title: 'Create Company',
+            subtitle: 'Set up your own company',
+            icon: AppIcons.building,
+            onTap: () async {
+              final result = await Navigator.push<bool>(
+                context,
+                adaptivePageRoute(builder: (_) => const CreateCompanyScreen()),
+              );
+              if (result == true && mounted) setState(() {});
+            },
+          ),
+          _SettingsTileData(
+            title: 'Join Company',
+            subtitle: 'Join with an invite code',
+            icon: AppIcons.userAdd,
+            onTap: () async {
+              final result = await Navigator.push<bool>(
+                context,
+                adaptivePageRoute(builder: (_) => const JoinCompanyScreen()),
+              );
+              if (result == true && mounted) setState(() {});
+            },
+          ),
+        ],
+      );
+    }
+
+    final roleName = profile.companyRole?.name ?? 'member';
+    final roleLabel = roleName[0].toUpperCase() + roleName.substring(1);
+
+    final tiles = <_SettingsTileData>[
+      _SettingsTileData(
+        title: 'Company Settings',
+        subtitle: 'View company details and invite code',
+        icon: AppIcons.building,
+        onTap: () async {
+          final result = await Navigator.push<bool>(
+            context,
+            adaptivePageRoute(builder: (_) => const CompanySettingsScreen()),
+          );
+          if (result == true && mounted) setState(() {});
+        },
+      ),
+    ];
+
+    if (profile.isDispatcherOrAdmin) {
+      tiles.add(_SettingsTileData(
+        title: 'Team',
+        subtitle: 'Manage team members',
+        icon: AppIcons.people,
+        onTap: () {
+          Navigator.push(
+            context,
+            adaptivePageRoute(builder: (_) => const TeamManagementScreen()),
+          );
+        },
+      ));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildAdaptiveSection(
+          context,
+          header: 'Company — $roleLabel',
+          isApple: isApple,
+          tiles: tiles,
         ),
       ],
     );
