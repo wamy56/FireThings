@@ -4,6 +4,18 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-15 (Session 34)
+
+### Invoice Line Items UI Redesign
+
+- **Item header row**: Moved delete (X) button inline with "Item N" label in its own Row, freeing the description field from being squeezed.
+- **Full-width description**: Description TextFormField now spans the entire card width instead of sharing a Row with the delete button.
+- **Responsive quantity/price fields**: Replaced fixed-width `SizedBox(width: 100/120)` with `Expanded` so Quantity, Unit Price, and Line Total fill the row evenly on all screen sizes.
+- **Always-visible line total**: Line total now shows `£0.00` in muted grey when empty instead of hiding via `SizedBox.shrink()`.
+- **Fixed duplicate "+" on button**: Changed label from `'+ Add Another Item'` to `'Add Another Item'` since the icon already provides the "+".
+
+---
+
 ## 2026-03-14 (Session 33)
 
 ### Timestamp Camera — Remove Dead Code (`_setZoom`, `_switchToUltraWide`, `_isUsingUltraWide`)

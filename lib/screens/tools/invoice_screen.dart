@@ -630,35 +630,15 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Item ${index + 1}',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).primaryColor,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: controllers.description,
-                              decoration: const InputDecoration(
-                        labelText: 'Description',
-                        hintText: 'Enter item description...',
-                        border: OutlineInputBorder(),
-                      ),
-                      maxLines: 3,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                    ),
-                  ],
+              Text(
+                'Item ${index + 1}',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).primaryColor,
                 ),
               ),
-              const SizedBox(width: 8),
               IconButton(
                 icon: Icon(AppIcons.close, size: 20, color: Colors.red),
                 onPressed: _itemControllers.length > 1
@@ -668,14 +648,25 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: controllers.description,
+            decoration: const InputDecoration(
+              labelText: 'Description',
+              hintText: 'Enter item description...',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
-              SizedBox(
-                width: 100,
+              Expanded(
                 child: TextFormField(
                   controller: controllers.quantity,
-                      decoration: const InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Quantity',
                     border: OutlineInputBorder(),
                   ),
@@ -688,11 +679,10 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              SizedBox(
-                width: 120,
+              Expanded(
                 child: TextFormField(
                   controller: controllers.unitPrice,
-                      decoration: const InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Unit Price',
                     border: OutlineInputBorder(),
                     prefixText: '\u00A3',
@@ -714,7 +704,6 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                         double.tryParse(controllers.unitPrice.text.trim()) ??
                         0.0;
                     final lineTotal = qty * price;
-                    if (lineTotal <= 0) return const SizedBox.shrink();
                     final formatted = NumberFormat.currency(
                       symbol: '\u00A3',
                       decimalDigits: 2,
@@ -723,7 +712,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                       formatted,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Theme.of(context).primaryColor,
+                        color: lineTotal > 0
+                            ? Theme.of(context).primaryColor
+                            : (isDark ? Colors.grey[600] : Colors.grey[400]),
                       ),
                       textAlign: TextAlign.right,
                     );
@@ -765,7 +756,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
               child: ElevatedButton.icon(
                 onPressed: _addItemRow,
                 icon: Icon(AppIcons.add, size: 18),
-                label: const Text('+ Add Another Item'),
+                label: const Text('Add Another Item'),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
