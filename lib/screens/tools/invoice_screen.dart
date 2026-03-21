@@ -16,6 +16,7 @@ import '../../widgets/premium_dialog.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../services/analytics_service.dart';
+import '../../services/user_profile_service.dart';
 import '../common/pdf_preview_screen.dart';
 
 class InvoiceScreen extends StatefulWidget {
@@ -59,6 +60,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   List<InvoiceItem> _items = [];
   final List<_ItemControllers> _itemControllers = [];
   bool _includeVat = false;
+  bool _useCompanyBranding = false;
   bool _isLoading = false;
   bool _isSaved = false;
   InvoiceStatus _status = InvoiceStatus.draft;
@@ -141,6 +143,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     _dueDate = invoice.dueDate;
     _items = List.from(invoice.items);
     _includeVat = invoice.includeVat;
+    _useCompanyBranding = invoice.useCompanyBranding;
     _notesController.text = invoice.notes ?? '';
     _isSaved = true;
     _status = invoice.status;
@@ -240,6 +243,10 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     _buildItemsSection(),
                     const SizedBox(height: 20),
                     _buildVatSection(),
+                    if (UserProfileService.instance.hasCompany) ...[
+                      const SizedBox(height: 8),
+                      _buildCompanyBrandingToggle(),
+                    ],
                     const SizedBox(height: 12),
                     _buildTotalsSection(),
                     const SizedBox(height: 20),
@@ -787,6 +794,19 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     );
   }
 
+  Widget _buildCompanyBrandingToggle() {
+    return Card(
+      child: SwitchListTile(
+        title: const Text('Use Company Branding'),
+        subtitle: const Text('Apply company PDF header, footer & colours'),
+        value: _useCompanyBranding,
+        onChanged: (value) {
+          setState(() => _useCompanyBranding = value);
+        },
+      ),
+    );
+  }
+
   double _calculateSubtotalFromControllers() {
     double subtotal = 0.0;
     for (final controllers in _itemControllers) {
@@ -1046,6 +1066,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       items: _items,
       notes: _notesController.text.isEmpty ? null : _notesController.text,
       includeVat: _includeVat,
+      useCompanyBranding: _useCompanyBranding,
       status: _status,
       createdAt: DateTime.now(),
     );

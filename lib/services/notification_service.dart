@@ -16,6 +16,7 @@ class NotificationService {
   static const _draftInvoiceId = 1;
   static const _draftJobsheetId = 2;
   static const _overdueInvoiceId = 3;
+  static const _dispatchNotificationId = 10;
 
   // SharedPreferences keys
   static const _lastNotifiedPrefix = 'lastNotifiedAt_';
@@ -55,18 +56,25 @@ class NotificationService {
       },
     );
 
-    // Create Android notification channel
-    const channel = AndroidNotificationChannel(
+    // Create Android notification channels
+    const remindersChannel = AndroidNotificationChannel(
       'firethings_reminders',
       'Reminders',
       description: 'Draft and overdue invoice reminders',
       importance: Importance.defaultImportance,
     );
 
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
+    const dispatchChannel = AndroidNotificationChannel(
+      'firethings_dispatch',
+      'Dispatch',
+      description: 'Job assignment and status update notifications',
+      importance: Importance.high,
+    );
+
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(remindersChannel);
+    await androidPlugin?.createNotificationChannel(dispatchChannel);
 
     _initialized = true;
   }
@@ -173,6 +181,29 @@ class NotificationService {
     final last = DateTime.tryParse(lastStr);
     if (last == null) return true;
     return now.difference(last).inHours >= 24;
+  }
+
+  /// Show a local notification for a dispatch FCM message received in foreground.
+  Future<void> showDispatchNotification({
+    required String title,
+    required String body,
+    required String payload,
+  }) async {
+    const androidDetails = AndroidNotificationDetails(
+      'firethings_dispatch',
+      'Dispatch',
+      channelDescription: 'Job assignment and status update notifications',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const iosDetails = DarwinNotificationDetails();
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _plugin.show(_dispatchNotificationId, title, body, details,
+        payload: payload);
   }
 
   Future<void> _showNotification(

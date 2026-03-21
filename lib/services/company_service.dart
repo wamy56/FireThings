@@ -4,8 +4,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/company.dart';
 import '../models/company_member.dart';
+import '../models/company_site.dart';
+import '../models/company_customer.dart';
 import '../models/user_profile.dart';
 import 'user_profile_service.dart';
+import 'analytics_service.dart';
 
 /// Manages company creation, membership, and settings.
 /// All company data lives in Firestore under companies/{companyId}/.
@@ -84,6 +87,8 @@ class CompanyService {
       ),
     );
 
+    AnalyticsService.instance.logCompanyCreated(docRef.id);
+
     return company;
   }
 
@@ -151,6 +156,8 @@ class CompanyService {
         fcmToken: UserProfileService.instance.profile?.fcmToken,
       ),
     );
+
+    AnalyticsService.instance.logCompanyJoined(company.id, CompanyRole.engineer.name);
 
     return company;
   }
@@ -354,6 +361,90 @@ class CompanyService {
         );
       }
     }
+  }
+
+  // ─── Shared Sites ──────────────────────────────────────────────────
+
+  /// Create a shared company site.
+  Future<void> createSite(String companyId, CompanySite site) async {
+    await _companiesCol
+        .doc(companyId)
+        .collection('sites')
+        .doc(site.id)
+        .set(site.toJson());
+  }
+
+  /// Update a shared company site.
+  Future<void> updateSite(String companyId, CompanySite site) async {
+    await _companiesCol
+        .doc(companyId)
+        .collection('sites')
+        .doc(site.id)
+        .update(site.toJson());
+  }
+
+  /// Delete a shared company site.
+  Future<void> deleteSite(String companyId, String siteId) async {
+    await _companiesCol
+        .doc(companyId)
+        .collection('sites')
+        .doc(siteId)
+        .delete();
+  }
+
+  /// Stream of all company sites (real-time).
+  Stream<List<CompanySite>> getSitesStream(String companyId) {
+    return _companiesCol
+        .doc(companyId)
+        .collection('sites')
+        .orderBy('name')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => CompanySite.fromJson(doc.data()))
+            .toList());
+  }
+
+  // ─── Shared Customers ─────────────────────────────────────────────
+
+  /// Create a shared company customer.
+  Future<void> createCustomer(
+      String companyId, CompanyCustomer customer) async {
+    await _companiesCol
+        .doc(companyId)
+        .collection('customers')
+        .doc(customer.id)
+        .set(customer.toJson());
+  }
+
+  /// Update a shared company customer.
+  Future<void> updateCustomer(
+      String companyId, CompanyCustomer customer) async {
+    await _companiesCol
+        .doc(companyId)
+        .collection('customers')
+        .doc(customer.id)
+        .update(customer.toJson());
+  }
+
+  /// Delete a shared company customer.
+  Future<void> deleteCustomer(String companyId, String customerId) async {
+    await _companiesCol
+        .doc(companyId)
+        .collection('customers')
+        .doc(customerId)
+        .delete();
+  }
+
+  /// Stream of all company customers (real-time).
+  Stream<List<CompanyCustomer>> getCustomersStream(String companyId) {
+    return _companiesCol
+        .doc(companyId)
+        .collection('customers')
+        .orderBy('name')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => CompanyCustomer.fromJson(doc.data()))
+            .toList());
   }
 
   /// Generate a random invite code like "FT-ABC123".

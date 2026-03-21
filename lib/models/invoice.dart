@@ -49,6 +49,7 @@ class Invoice {
   final InvoiceStatus status;
   final DateTime createdAt;
   final DateTime? lastModifiedAt;
+  final bool useCompanyBranding;
 
   Invoice({
     required this.id,
@@ -66,6 +67,7 @@ class Invoice {
     this.status = InvoiceStatus.draft,
     required this.createdAt,
     this.lastModifiedAt,
+    this.useCompanyBranding = false,
   });
 
   double get subtotal => items.fold(0, (sum, item) => sum + item.total);
@@ -89,6 +91,7 @@ class Invoice {
       'status': status.name,
       'createdAt': createdAt.toIso8601String(),
       'lastModifiedAt': lastModifiedAt?.toIso8601String(),
+      'useCompanyBranding': useCompanyBranding ? 1 : 0,
     };
   }
 
@@ -116,6 +119,7 @@ class Invoice {
       lastModifiedAt: json['lastModifiedAt'] != null
           ? DateTime.tryParse(json['lastModifiedAt'] as String)
           : null,
+      useCompanyBranding: json['useCompanyBranding'] == 1 || json['useCompanyBranding'] == true,
     );
   }
 
@@ -135,6 +139,7 @@ class Invoice {
     InvoiceStatus? status,
     DateTime? createdAt,
     DateTime? lastModifiedAt,
+    bool? useCompanyBranding,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -152,6 +157,7 @@ class Invoice {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
+      useCompanyBranding: useCompanyBranding ?? this.useCompanyBranding,
     );
   }
 }

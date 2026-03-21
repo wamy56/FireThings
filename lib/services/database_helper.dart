@@ -28,7 +28,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 12,
+      version: 13,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -78,6 +78,10 @@ class DatabaseHelper {
     if (oldVersion < 12) {
       await db.execute('ALTER TABLE invoices ADD COLUMN customerEmail TEXT');
     }
+    if (oldVersion < 13) {
+      await db.execute('ALTER TABLE jobsheets ADD COLUMN dispatchedJobId TEXT');
+      await db.execute('ALTER TABLE invoices ADD COLUMN useCompanyBranding INTEGER DEFAULT 0');
+    }
   }
 
   /// Create database tables
@@ -107,7 +111,8 @@ class DatabaseHelper {
         defects $textTypeNullable,
         createdAt $textType,
         sectionLayout $textTypeNullable,
-        lastModifiedAt $textTypeNullable
+        lastModifiedAt $textTypeNullable,
+        dispatchedJobId $textTypeNullable
       )
     ''');
 
@@ -188,7 +193,8 @@ class DatabaseHelper {
         includeVat INTEGER NOT NULL DEFAULT 0,
         status $textType,
         createdAt $textType,
-        lastModifiedAt $textTypeNullable
+        lastModifiedAt $textTypeNullable,
+        useCompanyBranding INTEGER NOT NULL DEFAULT 0
       )
     ''');
 

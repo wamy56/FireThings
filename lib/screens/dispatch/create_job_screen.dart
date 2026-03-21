@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/dispatched_job.dart';
 import '../../models/company_member.dart';
+import '../../models/company_site.dart';
+import '../../models/company_customer.dart';
 import '../../services/dispatch_service.dart';
 import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
+import '../../services/analytics_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -61,15 +65,39 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
   String? _assignedToName;
   List<CompanyMember> _members = [];
 
+  // Autocomplete data
+  List<CompanySite> _companySites = [];
+  List<CompanyCustomer> _companyCustomers = [];
+  StreamSubscription? _sitesSubscription;
+  StreamSubscription? _customersSubscription;
+
   @override
   void initState() {
     super.initState();
     _loadMembers();
+    _loadSharedData();
 
     if (widget.editJob != null) {
       _isEdit = true;
       _populateFromJob(widget.editJob!);
     }
+  }
+
+  void _loadSharedData() {
+    final companyId = UserProfileService.instance.companyId;
+    if (companyId == null) return;
+
+    _sitesSubscription = CompanyService.instance
+        .getSitesStream(companyId)
+        .listen((sites) {
+      if (mounted) setState(() => _companySites = sites);
+    });
+
+    _customersSubscription = CompanyService.instance
+        .getCustomersStream(companyId)
+        .listen((customers) {
+      if (mounted) setState(() => _companyCustomers = customers);
+    });
   }
 
   void _populateFromJob(DispatchedJob job) {
@@ -111,6 +139,8 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
 
   @override
   void dispose() {
+    _sitesSubscription?.cancel();
+    _customersSubscription?.cancel();
     _titleController.dispose();
     _descriptionController.dispose();
     _jobNumberController.dispose();
@@ -187,6 +217,17 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
         await DispatchService.instance.updateJob(job);
       } else {
         await DispatchService.instance.createJob(job);
+        AnalyticsService.instance.logDispatchJobCreated(
+          companyId,
+          job.jobType,
+          job.assignedTo != null,
+        );
+        if (job.assignedTo != null) {
+          AnalyticsService.instance.logDispatchJobAssigned(
+            companyId,
+            job.jobType,
+          );
+        }
       }
 
       if (mounted) Navigator.of(context).pop(true);
@@ -282,15 +323,7 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
 
             _sectionHeader('Site'),
             const SizedBox(height: 8),
-            CustomTextField(
-              controller: _siteNameController,
-              label: 'Site Name',
-              hint: 'e.g. Hilton Hotel Manchester',
-              prefixIcon: Icon(AppIcons.building),
-              validator: (v) => v == null || v.trim().isEmpty
-                  ? 'Site name is required'
-                  : null,
-            ),
+            _buildSiteAutocomplete(),
             const SizedBox(height: 12),
             CustomTextField(
               controller: _siteAddressController,
@@ -328,11 +361,7 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
 
             _sectionHeader('Contact'),
             const SizedBox(height: 8),
-            CustomTextField(
-              controller: _contactNameController,
-              label: 'Contact Name',
-              prefixIcon: Icon(AppIcons.user),
-            ),
+            _buildCustomerAutocomplete(),
             const SizedBox(height: 12),
             CustomTextField(
               controller: _contactPhoneController,
@@ -443,6 +472,140 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSiteAutocomplete() {
+    return Autocomplete<CompanySite>(
+      displayStringForOption: (site) => site.name,
+      optionsBuilder: (textEditingValue) {
+        final query = textEditingValue.text.toLowerCase();
+        if (query.isEmpty) return const Iterable.empty();
+        return _companySites.where(
+            (s) => s.name.toLowerCase().contains(query));
+      },
+      onSelected: (site) {
+        _siteNameController.text = site.name;
+        _siteAddressController.text = site.address;
+        if (site.notes != null && site.notes!.isNotEmpty) {
+          _siteNotesController.text = site.notes!;
+        }
+      },
+      fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+        // Sync with our own controller
+        if (controller.text.isEmpty && _siteNameController.text.isNotEmpty) {
+          controller.text = _siteNameController.text;
+        }
+        controller.addListener(() {
+          _siteNameController.text = controller.text;
+        });
+        return CustomTextField(
+          controller: controller,
+          focusNode: focusNode,
+          label: 'Site Name',
+          hint: 'e.g. Hilton Hotel Manchester',
+          prefixIcon: Icon(AppIcons.building),
+          validator: (v) => v == null || v.trim().isEmpty
+              ? 'Site name is required'
+              : null,
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (context, index) {
+                  final site = options.elementAt(index);
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(AppIcons.building, size: 18),
+                    title: Text(site.name),
+                    subtitle: Text(
+                      site.address,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () => onSelected(site),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCustomerAutocomplete() {
+    return Autocomplete<CompanyCustomer>(
+      displayStringForOption: (customer) => customer.name,
+      optionsBuilder: (textEditingValue) {
+        final query = textEditingValue.text.toLowerCase();
+        if (query.isEmpty) return const Iterable.empty();
+        return _companyCustomers.where(
+            (c) => c.name.toLowerCase().contains(query));
+      },
+      onSelected: (customer) {
+        _contactNameController.text = customer.name;
+        if (customer.phone != null && customer.phone!.isNotEmpty) {
+          _contactPhoneController.text = customer.phone!;
+        }
+        if (customer.email != null && customer.email!.isNotEmpty) {
+          _contactEmailController.text = customer.email!;
+        }
+      },
+      fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+        if (controller.text.isEmpty &&
+            _contactNameController.text.isNotEmpty) {
+          controller.text = _contactNameController.text;
+        }
+        controller.addListener(() {
+          _contactNameController.text = controller.text;
+        });
+        return CustomTextField(
+          controller: controller,
+          focusNode: focusNode,
+          label: 'Contact Name',
+          prefixIcon: Icon(AppIcons.user),
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(8),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                itemBuilder: (context, index) {
+                  final customer = options.elementAt(index);
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(AppIcons.user, size: 18),
+                    title: Text(customer.name),
+                    subtitle: customer.phone != null
+                        ? Text(customer.phone!)
+                        : null,
+                    onTap: () => onSelected(customer),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

@@ -10,6 +10,9 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 import 'team_management_screen.dart';
+import 'company_pdf_design_screen.dart';
+import 'company_sites_screen.dart';
+import 'company_customers_screen.dart';
 
 class CompanySettingsScreen extends StatefulWidget {
   const CompanySettingsScreen({super.key});
@@ -66,6 +69,14 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                     const SizedBox(height: 24),
                     _buildTeamSection(isDark),
                     const SizedBox(height: 24),
+                    if (_isAdmin || UserProfileService.instance.isDispatcherOrAdmin) ...[
+                      _buildSharedDataSection(isDark),
+                      const SizedBox(height: 24),
+                    ],
+                    if (_isAdmin) ...[
+                      _buildPdfBrandingSection(isDark),
+                      const SizedBox(height: 24),
+                    ],
                     if (!_isAdmin) _buildLeaveButton(),
                     if (_isAdmin) ...[
                       _buildEditButton(),
@@ -188,6 +199,93 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
               context,
               adaptivePageRoute(
                 builder: (_) => const TeamManagementScreen(),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSharedDataSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Shared Data',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppTheme.darkTextSecondary : Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          leading: Icon(AppIcons.building),
+          title: const Text(
+            'Shared Sites',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text('Company-wide site locations'),
+          trailing: Icon(AppIcons.arrowRight),
+          onTap: () {
+            Navigator.push(
+              context,
+              adaptivePageRoute(
+                builder: (_) =>
+                    CompanySitesScreen(companyId: _company!.id),
+              ),
+            );
+          },
+        ),
+        ListTile(
+          leading: Icon(AppIcons.people),
+          title: const Text(
+            'Shared Customers',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text('Company-wide customer contacts'),
+          trailing: Icon(AppIcons.arrowRight),
+          onTap: () {
+            Navigator.push(
+              context,
+              adaptivePageRoute(
+                builder: (_) =>
+                    CompanyCustomersScreen(companyId: _company!.id),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPdfBrandingSection(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Branding',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: isDark ? AppTheme.darkTextSecondary : Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          leading: Icon(AppIcons.designtools),
+          title: const Text(
+            'PDF Branding',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: const Text('Customise company PDF headers, footers & colours'),
+          trailing: Icon(AppIcons.arrowRight),
+          onTap: () {
+            Navigator.push(
+              context,
+              adaptivePageRoute(
+                builder: (_) => CompanyPdfDesignScreen(companyId: _company!.id),
               ),
             );
           },

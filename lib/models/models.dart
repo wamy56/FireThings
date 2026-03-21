@@ -14,3 +14,5 @@ export 'company.dart';
 export 'company_member.dart';
 export 'dispatched_job.dart';
 export 'user_profile.dart';
+export 'company_site.dart';
+export 'company_customer.dart';

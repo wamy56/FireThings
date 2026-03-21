@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../models/dispatched_job.dart';
+import '../../models/models.dart';
 import '../../services/dispatch_service.dart';
+import '../../services/database_helper.dart';
+import '../../services/analytics_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
+import '../new_job/new_job_screen.dart';
+import '../history/job_detail_screen.dart';
 import 'decline_job_dialog.dart';
 
 class EngineerJobDetailScreen extends StatelessWidget {
@@ -105,7 +109,10 @@ class _EngineerJobContent extends StatelessWidget {
               if (job.contactName != null) _infoRow('Name', job.contactName!),
               if (job.contactPhone != null)
                 InkWell(
-                  onTap: () => _launchUrl('tel:${job.contactPhone}'),
+                  onTap: () {
+                    AnalyticsService.instance.logDispatchContactCalled(job.companyId);
+                    _launchUrl('tel:${job.contactPhone}');
+                  },
                   child: _infoRow('Phone', job.contactPhone!,
                       valueColor: isDark
                           ? AppTheme.darkPrimaryBlue
@@ -230,15 +237,67 @@ class _EngineerJobContent extends StatelessWidget {
             width: double.infinity,
             height: 52,
             child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  adaptivePageRoute(
+                    builder: (_) => NewJobScreen(dispatchedJob: job),
+                  ),
+                );
+              },
+              icon: Icon(AppIcons.clipboardTick),
+              label: const Text('Create Jobsheet'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
               onPressed: () =>
                   _updateStatus(context, DispatchedJobStatus.completed),
               icon: Icon(AppIcons.tickCircle),
-              label: const Text('Complete Job'),
+              label: const Text('Complete Without Jobsheet'),
             ),
           ),
         ];
+      case DispatchedJobStatus.completed:
+        if (job.linkedJobsheetId != null) {
+          return [
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: () => _viewLinkedJobsheet(context, job.linkedJobsheetId!),
+                icon: Icon(AppIcons.document),
+                label: const Text('View Linked Jobsheet'),
+              ),
+            ),
+          ];
+        }
+        return [];
       default:
         return [];
+    }
+  }
+
+  Future<void> _viewLinkedJobsheet(BuildContext context, String jobsheetId) async {
+    try {
+      final jobsheet = await DatabaseHelper.instance.getJobsheetById(jobsheetId);
+      if (jobsheet != null && context.mounted) {
+        Navigator.push(
+          context,
+          adaptivePageRoute(
+            builder: (_) => JobDetailScreen(jobsheet: jobsheet),
+          ),
+        );
+      } else if (context.mounted) {
+        context.showErrorToast('Jobsheet not found');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        context.showErrorToast('Failed to load jobsheet');
+      }
     }
   }
 
@@ -247,11 +306,29 @@ class _EngineerJobContent extends StatelessWidget {
     DispatchedJobStatus newStatus,
   ) async {
     try {
+      final oldStatus = job.status;
       await DispatchService.instance.updateJobStatus(
         companyId: job.companyId,
         jobId: job.id,
         newStatus: newStatus,
       );
+      AnalyticsService.instance.logDispatchJobStatusChanged(
+        job.companyId,
+        oldStatus.name,
+        newStatus.name,
+      );
+      if (newStatus == DispatchedJobStatus.accepted) {
+        AnalyticsService.instance.logDispatchJobAccepted(
+          job.companyId,
+          job.id,
+        );
+      } else if (newStatus == DispatchedJobStatus.completed) {
+        AnalyticsService.instance.logDispatchJobCompleted(
+          job.companyId,
+          job.id,
+          job.linkedJobsheetId != null,
+        );
+      }
     } catch (e) {
       if (context.mounted) {
         context.showErrorToast('Failed to update status');
@@ -273,6 +350,10 @@ class _EngineerJobContent extends StatelessWidget {
         jobId: job.id,
         newStatus: DispatchedJobStatus.declined,
         declineReason: reason,
+      );
+      AnalyticsService.instance.logDispatchJobDeclined(
+        job.companyId,
+        reason,
       );
       if (context.mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -373,6 +454,7 @@ class _EngineerJobContent extends StatelessWidget {
   }
 
   void _openMaps(String address) {
+    AnalyticsService.instance.logDispatchDirectionsOpened(job.companyId);
     final encodedAddress = Uri.encodeComponent(address);
     _launchUrl(
         'https://www.google.com/maps/search/?api=1&query=$encodedAddress');

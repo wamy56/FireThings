@@ -24,6 +24,8 @@ import '../history/history_screen.dart';
 import '../invoicing/invoice_list_screen.dart';
 import '../../services/analytics_service.dart';
 import '../../services/remote_config_service.dart';
+import '../../services/dispatch_service.dart';
+import '../../services/user_profile_service.dart';
 import '../../widgets/background_decoration.dart';
 import '../../widgets/tools_disclaimer_gate.dart';
 
@@ -44,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Invoice> _outstandingInvoices = [];
   List<Invoice> _draftInvoices = [];
   List<Jobsheet> _draftJobsheets = [];
+  int _pendingDispatchCount = 0;
   bool _isLoading = true;
 
   @override
@@ -83,11 +86,22 @@ class _HomeScreenState extends State<HomeScreen> {
           .where((j) => j.status == JobsheetStatus.completed)
           .toList();
 
+      // Load pending dispatch count if user has a company
+      int pendingCount = 0;
+      final companyId = UserProfileService.instance.companyId;
+      if (companyId != null && RemoteConfigService.instance.dispatchEnabled) {
+        pendingCount = await DispatchService.instance.getPendingJobCount(
+          companyId,
+          user.uid,
+        );
+      }
+
       setState(() {
         _totalCompleted = completedJobsheets.length;
         _outstandingInvoices = outstandingInvoices;
         _draftInvoices = draftInvoices;
         _draftJobsheets = draftJobsheets;
+        _pendingDispatchCount = pendingCount;
         _isLoading = false;
       });
     } catch (e) {
@@ -116,6 +130,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       // Stats Row
                       _buildStatsRow().animateEntrance(delay: 100.ms),
+
+                      // Dispatched Jobs Card
+                      if (_pendingDispatchCount > 0) ...[
+                        const SizedBox(height: 16),
+                        _buildDispatchCard().animateEntrance(delay: 150.ms),
+                      ],
                       const SizedBox(height: AppTheme.sectionGap),
 
                       // Quick Actions
@@ -170,6 +190,75 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(child: SkeletonBox(height: 100, borderRadius: 16)),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDispatchCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: () {
+        // Navigate to dispatch tab (index 3 or 4 depending on nav layout)
+        // The dispatch tab is the last tab before settings
+        final hasDispatch = RemoteConfigService.instance.dispatchEnabled &&
+            UserProfileService.instance.hasCompany;
+        if (hasDispatch) {
+          widget.onTabChanged(3);
+        }
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppTheme.cardPadding),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
+          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          boxShadow: isDark ? null : AppTheme.cardShadow,
+          border: Border.all(
+            color: AppTheme.accentOrange.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.accentOrange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                AppIcons.routing,
+                color: AppTheme.accentOrange,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dispatched Jobs',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$_pendingDispatchCount pending ${_pendingDispatchCount == 1 ? 'job' : 'jobs'}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(AppIcons.arrowRight, color: AppTheme.textHint),
           ],
         ),
       ),

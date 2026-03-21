@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../models/dispatched_job.dart';
-import '../../models/company_member.dart';
+import '../../models/models.dart';
 import '../../services/dispatch_service.dart';
 import '../../services/company_service.dart';
+import '../../services/database_helper.dart';
 import '../../services/user_profile_service.dart';
+import '../../services/analytics_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
+import '../history/job_detail_screen.dart';
 import 'create_job_screen.dart';
 
 class DispatchedJobDetailScreen extends StatelessWidget {
@@ -182,6 +184,21 @@ class _JobDetailContent extends StatelessWidget {
 
         const SizedBox(height: 24),
 
+        // View Linked Jobsheet
+        if (job.status == DispatchedJobStatus.completed &&
+            job.linkedJobsheetId != null) ...[
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: () => _viewLinkedJobsheet(context, job.linkedJobsheetId!),
+              icon: Icon(AppIcons.document),
+              label: const Text('View Linked Jobsheet'),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
         // Actions
         if (_isDispatcherOrAdmin) ...[
           if (job.status != DispatchedJobStatus.completed)
@@ -350,6 +367,26 @@ class _JobDetailContent extends StatelessWidget {
     );
   }
 
+  Future<void> _viewLinkedJobsheet(BuildContext context, String jobsheetId) async {
+    try {
+      final jobsheet = await DatabaseHelper.instance.getJobsheetById(jobsheetId);
+      if (jobsheet != null && context.mounted) {
+        Navigator.push(
+          context,
+          adaptivePageRoute(
+            builder: (_) => JobDetailScreen(jobsheet: jobsheet),
+          ),
+        );
+      } else if (context.mounted) {
+        context.showErrorToast('Jobsheet not found');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        context.showErrorToast('Failed to load jobsheet');
+      }
+    }
+  }
+
   Future<void> _reassignJob(BuildContext context) async {
     final companyId = UserProfileService.instance.companyId;
     if (companyId == null) return;
@@ -396,6 +433,10 @@ class _JobDetailContent extends StatelessWidget {
           jobId: job.id,
           engineerUid: selected.uid,
           engineerName: selected.displayName,
+        );
+        AnalyticsService.instance.logDispatchJobAssigned(
+          companyId,
+          job.jobType,
         );
       }
     } catch (e) {

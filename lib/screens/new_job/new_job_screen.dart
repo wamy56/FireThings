@@ -16,7 +16,9 @@ import '../pdf_forms/pdf_form_fill_screen.dart';
 import '../pdf_forms/minor_works_form_fill_screen.dart';
 
 class NewJobScreen extends StatefulWidget {
-  const NewJobScreen({super.key});
+  final DispatchedJob? dispatchedJob;
+
+  const NewJobScreen({super.key, this.dispatchedJob});
 
   @override
   State<NewJobScreen> createState() => _NewJobScreenState();
@@ -376,7 +378,10 @@ class _NewJobScreenState extends State<NewJobScreen> {
             Navigator.push(
               context,
               adaptivePageRoute(
-                builder: (_) => JobFormScreen(template: template),
+                builder: (_) => JobFormScreen(
+                  template: template,
+                  dispatchedJob: widget.dispatchedJob,
+                ),
               ),
             );
           },
@@ -431,7 +436,10 @@ class _NewJobScreenState extends State<NewJobScreen> {
                         onTap: () => Navigator.push(
                           context,
                           adaptivePageRoute(
-                            builder: (_) => JobFormScreen(template: template),
+                            builder: (_) => JobFormScreen(
+                              template: template,
+                              dispatchedJob: widget.dispatchedJob,
+                            ),
                           ),
                         ),
                       ),
@@ -628,7 +636,10 @@ class _NewJobScreenState extends State<NewJobScreen> {
                     Navigator.push(
                       context,
                       adaptivePageRoute(
-                        builder: (context) => JobFormScreen(template: template),
+                        builder: (context) => JobFormScreen(
+                          template: template,
+                          dispatchedJob: widget.dispatchedJob,
+                        ),
                       ),
                     );
                   },

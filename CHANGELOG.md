@@ -4,6 +4,187 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-21 (Session 45)
+
+### Cloud Functions — Node.js 22 Upgrade
+
+- Upgraded Cloud Functions runtime from Node.js 20 to Node.js 22 (Node 20 EOL April 2026)
+- Updated `functions/package.json` engines field from `"20"` to `"22"`
+- Redeployed both `onJobAssigned` and `onJobStatusChanged` functions successfully
+
+---
+
+## 2026-03-21 (Session 44)
+
+### Dispatch Feature — Deployment Complete (All 8 Steps Done)
+
+All dispatch deployment steps are now complete. The feature is fully built and deployed behind the `dispatch_enabled` Remote Config flag.
+
+**Steps completed this session (5 & 8):**
+- **APNs Key Setup (Step 5)** — .p8 key created in Apple Developer (Sandbox & Production), uploaded to both Dev and Prod slots in Firebase Console Cloud Messaging
+- **App Store Connect Privacy (Step 8)** — Device ID added under Identifiers, Phone Number added under Contact Info, both marked as App Functionality / Linked to user / No tracking. Published.
+
+**Summary of all 8 deployment steps (Sessions 42-44):**
+1. Firebase Blaze plan upgrade
+2. Cloud Functions deployed (`onJobAssigned`, `onJobStatusChanged`)
+3. Firestore security rules deployed
+4. Firestore composite indexes created (`firestore.indexes.json`)
+5. APNs authentication key uploaded to Firebase
+6. Xcode push notification capabilities configured
+7. Privacy policy updated with dispatch disclosures
+8. App Store Connect privacy declaration updated
+
+**Remaining to go live:**
+- Deploy indexes: `firebase deploy --only firestore:indexes`
+- Enable `dispatch_enabled` Remote Config flag for test accounts
+- End-to-end multi-user testing
+
+---
+
+## 2026-03-21 (Session 43)
+
+### Dispatch Feature — Deployment (Steps 4, 6)
+
+**Firestore Composite Indexes (Step 4)**
+- Created `firestore.indexes.json` with 3 composite indexes for `dispatched_jobs` collection:
+  - `companyId + assignedTo + status` (engineer job filtering)
+  - `companyId + status + scheduledDate` (dispatch dashboard)
+  - `companyId + createdAt DESC` (job list ordering)
+- Updated `firebase.json` to reference `firestore.indexes.json`
+- Deploy with: `firebase deploy --only firestore:indexes`
+
+**iOS Push Notification Capabilities (Step 6)**
+- Created `ios/Runner/Runner.entitlements` with `aps-environment` key (development)
+- Added `CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements` to all 3 Runner build configs (Debug/Release/Profile) in `project.pbxproj`
+- Added `UIBackgroundModes` → `remote-notification` to `ios/Runner/Info.plist`
+
+---
+
+## 2026-03-21 (Session 42)
+
+### Dispatch Feature — Deployment (Steps 2-3, 7)
+
+**Firebase Configuration**
+- `firebase.json` — added `"functions": { "source": "functions" }` section for Cloud Functions deployment
+- `.firebaserc` — created, linking project to `firethings-51e00`
+- `functions/package.json` — updated Node.js runtime from 18 (decommissioned) to 20
+
+**Cloud Functions Deployed**
+- `onJobAssigned` (us-central1) — sends FCM push notification to engineer when assigned to a dispatched job
+- `onJobStatusChanged` (us-central1) — sends FCM push notification to dispatcher when job status changes
+- Container image cleanup policy configured (1 day retention)
+
+**Firestore Security Rules Deployed**
+- Full company/dispatch security rules now live: member access, dispatcher/admin writes, engineer status field updates, shared sites/customers, PDF config
+
+**Privacy Policy Updated**
+- `privacy_policy.md` — added dispatch-related disclosures: push notification tokens, company data sharing between members, dispatched job data (site addresses, contacts), FCM as third-party service
+- Updated "Who Can Access Your Data" section to explain company-scoped data sharing
+- Updated date to 21 March 2026
+
+---
+
+## 2026-03-15 (Session 41)
+
+### Dispatch Feature — Phase 6: Team Management & Polish
+
+**New Models**
+- `lib/models/company_site.dart` — `CompanySite` model (id, name, address, notes, createdBy, timestamps) with toJson/fromJson/copyWith
+- `lib/models/company_customer.dart` — `CompanyCustomer` model (id, name, address, email, phone, notes, createdBy, timestamps) with toJson/fromJson/copyWith
+- Added barrel exports in `lib/models/models.dart`
+
+**CompanyService — Shared Sites & Customers CRUD**
+- `createSite`, `updateSite`, `deleteSite`, `getSitesStream` — Firestore CRUD under `companies/{companyId}/sites/`
+- `createCustomer`, `updateCustomer`, `deleteCustomer`, `getCustomersStream` — Firestore CRUD under `companies/{companyId}/customers/`
+- Analytics wiring: `logCompanyCreated` on company creation, `logCompanyJoined` on company join
+
+**New Screens**
+- `lib/screens/company/company_sites_screen.dart` — StreamBuilder list of shared sites with add/edit/delete (dispatcher/admin only), empty state, real-time updates
+- `lib/screens/company/company_customers_screen.dart` — StreamBuilder list of shared customers with add/edit/delete (dispatcher/admin only), empty state, real-time updates
+- Both screens wired into Company Settings as "Shared Data" section (visible to dispatcher/admin roles)
+
+**Create Job Screen — Site/Customer Autocomplete**
+- Site name field: `Autocomplete<CompanySite>` — auto-fills address and notes on selection
+- Contact name field: `Autocomplete<CompanyCustomer>` — auto-fills phone and email on selection
+- Data loaded via real-time streams from company sites/customers collections
+- Free typing still allowed if no match
+
+**Analytics Events (11 new dispatch events)**
+- `company_created`, `company_joined`, `dispatch_job_created`, `dispatch_job_assigned`, `dispatch_job_accepted`, `dispatch_job_declined`, `dispatch_job_status_changed`, `dispatch_job_completed`, `dispatch_jobsheet_created`, `dispatch_directions_opened`, `dispatch_contact_called`
+- Wired into: CompanyService (create/join), CreateJobScreen (job create/assign), EngineerJobDetailScreen (accept/decline/status/directions/call), DispatchedJobDetailScreen (reassign), SignatureScreen (jobsheet from dispatch)
+
+**Spec Update**
+- `DISPATCH_FEATURE_SPEC.md` — Phase 6 marked complete (items 1-5), items 6-9 noted as excluded
+
+---
+
+## 2026-03-15 (Session 40)
+
+### Dispatch Feature — Phase 5: Push Notifications (FCM)
+
+**Dependencies & Cloud Functions**
+- Added `firebase_messaging: ^16.1.1` to pubspec.yaml
+- Created `functions/` directory with Cloud Functions (Node.js 18, firebase-functions v2):
+  - `onJobAssigned` — Firestore `onWrite` trigger sends push notification to newly assigned engineer with job title and site name
+  - `onJobStatusChanged` — Firestore `onUpdate` trigger sends push notification to dispatcher (job creator) when engineer updates job status
+- `functions/package.json` with firebase-admin v12 + firebase-functions v5
+- `functions/.gitignore` to exclude node_modules
+
+**Client-side FCM Integration (lib/main.dart)**
+- Added global `navigatorKey` for notification-driven navigation from outside widget tree
+- Added top-level `_firebaseMessagingBackgroundHandler` for background FCM messages
+- FCM permission requested on startup (iOS + Android 13+)
+- `AuthWrapper` converted from `StatelessWidget` to `StatefulWidget` — manages FCM lifecycle:
+  - Gets and stores FCM token via `UserProfileService.updateFcmToken()` on login
+  - Listens for token refresh and updates automatically
+  - Foreground messages re-fired as local notifications via `NotificationService.showDispatchNotification()`
+  - Background tap handling via `FirebaseMessaging.onMessageOpenedApp`
+  - Terminated tap handling via `getInitialMessage()` on startup
+  - All FCM setup gated behind `RemoteConfigService.dispatchNotificationsEnabled`
+  - Subscriptions cancelled on sign-out and widget disposal
+
+**Notification Tap Routing**
+- Dispatch notification payload format: `type|jobId|companyId`
+- `MainNavigationScreen._handleNotificationTap` extended to parse dispatch payloads and navigate to `DispatchedJobDetailScreen` (dispatchers/admins) or `EngineerJobDetailScreen` (engineers)
+- Same routing logic in `AuthWrapper._navigateToJobFromMessage` for FCM taps
+
+**NotificationService Updates (lib/services/notification_service.dart)**
+- New `firethings_dispatch` Android notification channel (high importance) for dispatch notifications
+- New `showDispatchNotification()` method for foreground FCM re-fire
+- Dedicated notification ID (`_dispatchNotificationId = 10`) for dispatch notifications
+
+**Deployment notes:**
+- Cloud Functions require Firebase Blaze plan to deploy: `cd functions && npm install && firebase deploy --only functions`
+- APNs key must be uploaded to Firebase Console for iOS push notifications
+- All client-side code works regardless of whether Cloud Functions are deployed
+
+---
+
+## 2026-03-15 (Session 39)
+
+### Dispatch Feature — Phase 4: Jobsheet Integration & Company PDF Branding
+
+**Workstream A: Jobsheet Integration**
+- SQLite schema v13: added `dispatchedJobId` column to jobsheets table, `useCompanyBranding` column to invoices table
+- `Jobsheet` model: added `dispatchedJobId` field (toJson/fromJson/copyWith)
+- `Invoice` model: added `useCompanyBranding` field (toJson/fromJson/copyWith)
+- `NewJobScreen`: added optional `dispatchedJob` parameter, passed through to `JobFormScreen`
+- `JobFormScreen`: added `dispatchedJob` parameter + `_prefillFromDispatchedJob()` — auto-fills customer name, site address, job number, system category, and date from dispatched job data
+- `SignatureScreen`: added `dispatchedJob` parameter — on jobsheet completion, auto-updates dispatched job status to `completed` with `linkedJobsheetId`
+- `EngineerJobDetailScreen`: "On Site" status now shows "Create Jobsheet" (navigates to `NewJobScreen`) + "Complete Without Jobsheet" buttons; "Completed" status shows "View Linked Jobsheet" button when `linkedJobsheetId` exists
+- `DispatchedJobDetailScreen`: added "View Linked Jobsheet" button for completed jobs with `linkedJobsheetId`
+
+**Workstream B: Company PDF Branding**
+- New `CompanyPdfConfigService` (`lib/services/company_pdf_config_service.dart`) — singleton, reads/writes header, footer, colour scheme from `companies/{companyId}/pdf_config/` Firestore subcollection, in-memory caching, `getEffectiveHeaderConfig`/`getEffectiveFooterConfig`/`getEffectiveColourScheme` methods with company→personal fallback logic
+- `PdfService.generateJobsheetPDF()` now uses effective config — company branding auto-applied when jobsheet has `dispatchedJobId`
+- `InvoicePdfService.generateInvoicePDF()` now uses effective config — company branding applied when `invoice.useCompanyBranding` is true
+- New `CompanyPdfDesignScreen` (`lib/screens/company/company_pdf_design_screen.dart`) — accessible from Company Settings (admin only), inline editors for header, footer, and colour scheme for both jobsheet and invoice document types
+- `CompanySettingsScreen`: added "PDF Branding" section tile (admin only)
+- `InvoiceScreen`: added "Use Company Branding" `SwitchListTile` (visible when user has company), stored in invoice model
+- `HomeScreen`: added dispatched jobs card showing pending job count with tap-to-navigate to dispatch tab
+
+---
+
 ## 2026-03-15 (Session 38)
 
 ### Documentation Update

@@ -26,6 +26,7 @@ class Jobsheet {
   final JobsheetStatus status;
   final PdfSectionLayoutConfig? sectionLayout;
   final DateTime? lastModifiedAt;
+  final String? dispatchedJobId;
 
   Jobsheet({
     required this.id,
@@ -48,6 +49,7 @@ class Jobsheet {
     this.status = JobsheetStatus.draft,
     this.sectionLayout,
     this.lastModifiedAt,
+    this.dispatchedJobId,
   });
 
   /// Convert Jobsheet to JSON map (for database storage)
@@ -73,6 +75,7 @@ class Jobsheet {
       'status': status.name,
       'sectionLayout': sectionLayout?.toJsonString(),
       'lastModifiedAt': lastModifiedAt?.toIso8601String(),
+      'dispatchedJobId': dispatchedJobId,
     };
   }
 
@@ -117,6 +120,7 @@ class Jobsheet {
       lastModifiedAt: json['lastModifiedAt'] != null
           ? DateTime.tryParse(json['lastModifiedAt'] as String)
           : null,
+      dispatchedJobId: json['dispatchedJobId'] as String?,
     );
   }
 
@@ -142,6 +146,7 @@ class Jobsheet {
     JobsheetStatus? status,
     PdfSectionLayoutConfig? sectionLayout,
     DateTime? lastModifiedAt,
+    String? dispatchedJobId,
   }) {
     return Jobsheet(
       id: id ?? this.id,
@@ -165,6 +170,7 @@ class Jobsheet {
       status: status ?? this.status,
       sectionLayout: sectionLayout ?? this.sectionLayout,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
+      dispatchedJobId: dispatchedJobId ?? this.dispatchedJobId,
     );
   }
 

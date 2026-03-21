@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:workmanager/workmanager.dart';
 import 'firebase_options.dart';
@@ -21,12 +23,25 @@ import 'screens/new_job/jobsheet_drafts_screen.dart';
 import 'screens/invoicing/invoicing_hub_screen.dart';
 import 'screens/jobs/jobs_hub_screen.dart';
 import 'screens/dispatch/dispatch_dashboard_screen.dart';
+import 'screens/dispatch/dispatched_job_detail_screen.dart';
+import 'screens/dispatch/engineer_job_detail_screen.dart';
 import 'screens/dispatch/engineer_jobs_screen.dart';
 import 'utils/theme.dart';
 import 'utils/responsive.dart';
 import 'utils/adaptive_widgets.dart';
 import 'utils/icon_map.dart';
 import 'widgets/adaptive_app_bar.dart';
+
+/// Global navigator key for notification-driven navigation.
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// Handle FCM messages received while the app is in the background.
+/// Must be a top-level function.
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint('FCM background message: ${message.messageId}');
+}
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -53,6 +68,16 @@ void main() {
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+    );
+
+    // Register FCM background handler (must be before any FCM usage)
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Request FCM notification permission (iOS primarily, Android 13+)
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
     );
 
     // Initialize Remote Config
@@ -93,6 +118,7 @@ class JobsheetApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'FireThings',
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       navigatorObservers: [AnalyticsService.instance.observer],
       theme: AppTheme.lightTheme,
@@ -112,9 +138,115 @@ class JobsheetApp extends StatelessWidget {
   }
 }
 
-/// Wrapper that shows login or main screen based on auth state
-class AuthWrapper extends StatelessWidget {
+/// Wrapper that shows login or main screen based on auth state.
+/// Also manages FCM token registration and notification listeners.
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  StreamSubscription<String>? _tokenRefreshSub;
+  StreamSubscription<RemoteMessage>? _foregroundMessageSub;
+  StreamSubscription<RemoteMessage>? _messageOpenedSub;
+
+  @override
+  void dispose() {
+    _tokenRefreshSub?.cancel();
+    _foregroundMessageSub?.cancel();
+    _messageOpenedSub?.cancel();
+    super.dispose();
+  }
+
+  /// Set up FCM token and notification listeners after login.
+  Future<void> _setupFcm(String uid) async {
+    if (!RemoteConfigService.instance.dispatchNotificationsEnabled) return;
+
+    // Get and store the current FCM token
+    try {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await UserProfileService.instance.updateFcmToken(token);
+      }
+    } catch (e) {
+      debugPrint('FCM: failed to get token: $e');
+    }
+
+    // Listen for token refresh
+    _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+      UserProfileService.instance.updateFcmToken(newToken);
+    });
+
+    // Foreground messages — re-fire as local notification
+    _foregroundMessageSub?.cancel();
+    _foregroundMessageSub = FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+
+    // Background/terminated tap — user tapped notification while app was in background
+    _messageOpenedSub?.cancel();
+    _messageOpenedSub = FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+
+    // Check if app was opened from terminated state via notification tap
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      // Slight delay to let the navigator settle
+      Future.delayed(const Duration(milliseconds: 500), () {
+        _navigateToJobFromMessage(initialMessage.data);
+      });
+    }
+  }
+
+  /// Show a local notification for FCM messages received while app is in foreground.
+  void _handleForegroundMessage(RemoteMessage message) {
+    final notification = message.notification;
+    if (notification == null) return;
+
+    final data = message.data;
+    final payload = '${data['type'] ?? ''}|${data['jobId'] ?? ''}|${data['companyId'] ?? ''}';
+
+    NotificationService.instance.showDispatchNotification(
+      title: notification.title ?? 'FireThings',
+      body: notification.body ?? '',
+      payload: payload,
+    );
+  }
+
+  /// Navigate to job detail when user taps a notification (background state).
+  void _handleMessageOpenedApp(RemoteMessage message) {
+    _navigateToJobFromMessage(message.data);
+  }
+
+  /// Parse FCM data payload and navigate to the appropriate dispatch job screen.
+  void _navigateToJobFromMessage(Map<String, dynamic> data) {
+    final jobId = data['jobId'] as String?;
+    final companyId = data['companyId'] as String?;
+    if (jobId == null || companyId == null) return;
+
+    final nav = navigatorKey.currentState;
+    if (nav == null) return;
+
+    final profile = UserProfileService.instance;
+    if (profile.isDispatcherOrAdmin) {
+      nav.push(MaterialPageRoute(
+        builder: (_) => DispatchedJobDetailScreen(companyId: companyId, jobId: jobId),
+      ));
+    } else {
+      nav.push(MaterialPageRoute(
+        builder: (_) => EngineerJobDetailScreen(companyId: companyId, jobId: jobId),
+      ));
+    }
+  }
+
+  void _teardownFcm() {
+    _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = null;
+    _foregroundMessageSub?.cancel();
+    _foregroundMessageSub = null;
+    _messageOpenedSub?.cancel();
+    _messageOpenedSub = null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -140,8 +272,10 @@ class AuthWrapper extends StatelessWidget {
           final user = snapshot.data!;
           FirestoreSyncService.instance.performFullSync(user.uid);
           UserProfileService.instance.loadProfile(user.uid);
+          _setupFcm(user.uid);
           return const MainNavigationScreen();
         } else {
+          _teardownFcm();
           UserProfileService.instance.clearProfile();
           return const LoginScreen();
         }
@@ -209,6 +343,36 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   void _handleNotificationTap(String payload) {
+    // Check for dispatch notification payload (format: type|jobId|companyId)
+    if (payload.contains('|')) {
+      final parts = payload.split('|');
+      if (parts.length >= 3) {
+        final jobId = parts[1];
+        final companyId = parts[2];
+        if (jobId.isNotEmpty && companyId.isNotEmpty) {
+          final profile = UserProfileService.instance;
+          if (profile.isDispatcherOrAdmin) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DispatchedJobDetailScreen(
+                    companyId: companyId, jobId: jobId),
+              ),
+            );
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => EngineerJobDetailScreen(
+                    companyId: companyId, jobId: jobId),
+              ),
+            );
+          }
+          return;
+        }
+      }
+    }
+
     switch (payload) {
       case NotificationService.payloadDraftInvoice:
       case NotificationService.payloadOverdueInvoice:

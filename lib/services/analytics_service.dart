@@ -113,4 +113,94 @@ class AnalyticsService {
 
   Future<void> logSignUp(String method) =>
       _analytics.logSignUp(signUpMethod: method);
+
+  // ─── Dispatch ─────────────────────────────────────────────────────
+
+  Future<void> logCompanyCreated(String companyId) =>
+      _analytics.logEvent(name: 'company_created', parameters: {
+        'company_id': companyId,
+      });
+
+  Future<void> logCompanyJoined(String companyId, String role) =>
+      _analytics.logEvent(name: 'company_joined', parameters: {
+        'company_id': companyId,
+        'role': role,
+      });
+
+  Future<void> logDispatchJobCreated(
+    String companyId,
+    String? jobType,
+    bool hasAssignment,
+  ) =>
+      _analytics.logEvent(name: 'dispatch_job_created', parameters: {
+        'company_id': companyId,
+        'job_type': jobType ?? 'unspecified',
+        'has_assignment': hasAssignment.toString(),
+      });
+
+  Future<void> logDispatchJobAssigned(
+          String companyId, String? jobType) =>
+      _analytics.logEvent(name: 'dispatch_job_assigned', parameters: {
+        'company_id': companyId,
+        'job_type': jobType ?? 'unspecified',
+      });
+
+  Future<void> logDispatchJobAccepted(String companyId, String jobId) =>
+      _analytics.logEvent(name: 'dispatch_job_accepted', parameters: {
+        'company_id': companyId,
+        'job_id': jobId,
+      });
+
+  Future<void> logDispatchJobDeclined(
+          String companyId, String? reason) =>
+      _analytics.logEvent(name: 'dispatch_job_declined', parameters: {
+        'company_id': companyId,
+        'reason': reason ?? 'none',
+      });
+
+  Future<void> logDispatchJobStatusChanged(
+    String companyId,
+    String oldStatus,
+    String newStatus,
+  ) =>
+      _analytics
+          .logEvent(name: 'dispatch_job_status_changed', parameters: {
+        'company_id': companyId,
+        'old_status': oldStatus,
+        'new_status': newStatus,
+      });
+
+  Future<void> logDispatchJobCompleted(
+    String companyId,
+    String jobId,
+    bool hasJobsheet,
+  ) =>
+      _analytics.logEvent(name: 'dispatch_job_completed', parameters: {
+        'company_id': companyId,
+        'job_id': jobId,
+        'has_jobsheet': hasJobsheet.toString(),
+      });
+
+  Future<void> logDispatchJobsheetCreated(
+    String companyId,
+    String jobId,
+    String? templateType,
+  ) =>
+      _analytics
+          .logEvent(name: 'dispatch_jobsheet_created', parameters: {
+        'company_id': companyId,
+        'job_id': jobId,
+        'template_type': templateType ?? 'unknown',
+      });
+
+  Future<void> logDispatchDirectionsOpened(String companyId) =>
+      _analytics
+          .logEvent(name: 'dispatch_directions_opened', parameters: {
+        'company_id': companyId,
+      });
+
+  Future<void> logDispatchContactCalled(String companyId) =>
+      _analytics.logEvent(name: 'dispatch_contact_called', parameters: {
+        'company_id': companyId,
+      });
 }

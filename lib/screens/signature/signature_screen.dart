@@ -1,10 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../utils/adaptive_widgets.dart';
 import 'package:signature/signature.dart';
-import 'dart:typed_data';
 import 'dart:convert';
 import '../../models/models.dart';
 import '../../services/database_helper.dart';
+import '../../services/dispatch_service.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/widgets.dart';
 import '../../services/analytics_service.dart';
@@ -12,8 +13,13 @@ import '../history/job_detail_screen.dart';
 
 class SignatureScreen extends StatefulWidget {
   final Jobsheet jobsheet;
+  final DispatchedJob? dispatchedJob;
 
-  const SignatureScreen({super.key, required this.jobsheet});
+  const SignatureScreen({
+    super.key,
+    required this.jobsheet,
+    this.dispatchedJob,
+  });
 
   @override
   State<SignatureScreen> createState() => _SignatureScreenState();
@@ -203,6 +209,30 @@ class _SignatureScreenState extends State<SignatureScreen> {
       // Update in database
       await _dbHelper.updateJobsheet(updatedJobsheet);
       AnalyticsService.instance.logJobsheetCompleted();
+
+      // Update dispatched job status if linked
+      if (widget.dispatchedJob != null) {
+        try {
+          await DispatchService.instance.updateJobStatus(
+            companyId: widget.dispatchedJob!.companyId,
+            jobId: widget.dispatchedJob!.id,
+            newStatus: DispatchedJobStatus.completed,
+            linkedJobsheetId: updatedJobsheet.id,
+          );
+          AnalyticsService.instance.logDispatchJobsheetCreated(
+            widget.dispatchedJob!.companyId,
+            widget.dispatchedJob!.id,
+            updatedJobsheet.templateType,
+          );
+          AnalyticsService.instance.logDispatchJobCompleted(
+            widget.dispatchedJob!.companyId,
+            widget.dispatchedJob!.id,
+            true,
+          );
+        } catch (e) {
+          debugPrint('Failed to update dispatched job status: $e');
+        }
+      }
 
       if (mounted) {
         // Navigate to job details screen for overview

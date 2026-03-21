@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 10 March 2026
+Last updated: 21 March 2026
 
 FireThings ("we", "us", or "our") is committed to protecting your privacy. This policy explains what data we collect, why we collect it, where it is stored, how long we keep it, and what rights you have over your data.
 
@@ -15,6 +15,9 @@ FireThings ("we", "us", or "our") is committed to protecting your privacy. This 
 - **Usage analytics** — anonymous usage events (such as screens visited, features used, and actions taken) collected via Firebase Analytics to help us understand how the app is used.
 - **Crash reports** — automatic error and crash reports collected via Firebase Crashlytics to help us identify and fix bugs.
 - **Device information** — device model, operating system version, and app version, collected alongside crash reports and analytics.
+- **Push notification tokens** — Firebase Cloud Messaging (FCM) device tokens, used to deliver push notifications for job assignments and status updates when you are part of a company using the dispatch feature.
+- **Company data** — if you join a company within FireThings, your display name, email, and role are shared with other members of that company to enable dispatch and team coordination.
+- **Dispatched job data** — job details including site addresses, contact names, phone numbers, and job descriptions created and shared between company members (dispatchers, admins, and engineers) for job assignment and tracking purposes.
 
 ## 2. Why We Collect It
 
@@ -22,6 +25,7 @@ FireThings ("we", "us", or "our") is committed to protecting your privacy. This 
 - **Cloud backup and sync** — to back up your data securely and keep it in sync across your devices. Your local SQLite database is the primary data store; Firestore provides a cloud backup that syncs automatically.
 - **Crash monitoring** — to identify and fix errors that affect your experience, using Firebase Crashlytics.
 - **Usage analytics** — to understand which features are used so we can prioritise improvements and make the app better for fire alarm engineers.
+- **Dispatch and team coordination** — to assign jobs to engineers, track job status, and send push notifications for job updates within your company.
 
 ## 3. Where Your Data Is Stored
 
@@ -40,7 +44,16 @@ Crash reports and analytics data are retained by Google in accordance with their
 
 ## 5. Who Can Access Your Data
 
-Only you. Your Firestore data is stored under your unique user account and protected by security rules that prevent any other user from reading or writing it. Each user's data is completely isolated.
+Your personal data (jobsheets, invoices, saved customers, saved sites, and templates) is stored under your unique user account and protected by security rules that prevent any other user from reading or writing it.
+
+If you join a company within FireThings, certain data is shared with other members of that company:
+
+- Your display name, email, and role are visible to other company members.
+- Dispatched job data (site addresses, contact details, job descriptions, and status updates) is shared between dispatchers, admins, and engineers within the company.
+- Shared company sites and customers are accessible to all company members.
+- Your FCM push notification token is stored to enable job assignment notifications.
+
+Company data is protected by security rules that restrict access to authenticated members of that company only. No data is shared outside your company.
 
 We do not sell, share, rent, or provide your data to third parties for marketing, advertising, or any other commercial purpose.
 
@@ -68,6 +81,7 @@ We use the following third-party services provided by Google, each governed by t
 - **Firebase Crashlytics** — crash and error reporting. Collects crash logs, stack traces, and device information to help us fix bugs.
 - **Firebase Analytics** — anonymous usage analytics. Collects interaction events and screen views to help us understand feature usage.
 - **Firebase Remote Config** — server-side feature configuration. Does not collect personal data; it delivers configuration values to the app.
+- **Firebase Cloud Messaging (FCM)** — push notifications for job assignment and status updates. Collects and stores a device token to route notifications to your device. Tokens are stored in Firestore and are only accessible to your company.
 
 All Firebase services are subject to the Google Cloud Privacy Notice and the Firebase Terms of Service.
 

@@ -15,8 +15,14 @@ import '../signature/signature_screen.dart';
 class JobFormScreen extends StatefulWidget {
   final JobTemplate template;
   final Jobsheet? existingDraft;
+  final DispatchedJob? dispatchedJob;
 
-  const JobFormScreen({super.key, required this.template, this.existingDraft});
+  const JobFormScreen({
+    super.key,
+    required this.template,
+    this.existingDraft,
+    this.dispatchedJob,
+  });
 
   @override
   State<JobFormScreen> createState() => _JobFormScreenState();
@@ -85,6 +91,25 @@ class _JobFormScreenState extends State<JobFormScreen> {
     // Load existing draft data if provided
     if (widget.existingDraft != null) {
       _loadDraftData(widget.existingDraft!);
+    }
+
+    // Pre-fill from dispatched job if provided
+    if (widget.dispatchedJob != null) {
+      _prefillFromDispatchedJob(widget.dispatchedJob!);
+    }
+  }
+
+  void _prefillFromDispatchedJob(DispatchedJob job) {
+    _customerNameController.text = job.contactName ?? job.siteName;
+    _siteAddressController.text = job.siteAddress;
+    if (job.jobNumber != null) {
+      _jobNumberController.text = job.jobNumber!;
+    }
+    if (job.systemCategory != null) {
+      _systemCategoryController.text = job.systemCategory!;
+    }
+    if (job.scheduledDate != null) {
+      _selectedDate = job.scheduledDate!;
     }
   }
 
@@ -569,6 +594,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
         createdAt: _isEditingDraft ? widget.existingDraft!.createdAt : DateTime.now(),
         status: JobsheetStatus.draft,
         sectionLayout: widget.template.sectionLayout,
+        dispatchedJobId: widget.dispatchedJob?.id,
       );
 
       if (_isEditingDraft) {
@@ -657,6 +683,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
         defects: [],
         createdAt: DateTime.now(),
         sectionLayout: widget.template.sectionLayout,
+        dispatchedJobId: widget.dispatchedJob?.id,
       );
 
       // Save to database (without signatures yet)
@@ -670,7 +697,10 @@ class _JobFormScreenState extends State<JobFormScreen> {
         Navigator.push(
           context,
           adaptivePageRoute(
-            builder: (_) => SignatureScreen(jobsheet: jobsheet),
+            builder: (_) => SignatureScreen(
+              jobsheet: jobsheet,
+              dispatchedJob: widget.dispatchedJob,
+            ),
           ),
         );
       }

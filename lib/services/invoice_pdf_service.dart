@@ -7,11 +7,9 @@ import '../models/models.dart';
 import '../models/pdf_colour_scheme.dart';
 import 'payment_settings_service.dart';
 import 'branding_service.dart';
-import 'pdf_header_config_service.dart';
 import 'pdf_header_builder.dart';
-import 'pdf_footer_config_service.dart';
 import 'pdf_footer_builder.dart';
-import 'pdf_colour_scheme_service.dart';
+import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
 
 /// Top-level function for compute() — builds the invoice PDF in a background isolate.
@@ -469,9 +467,19 @@ class InvoicePDFService {
     }
 
     final logoBytes = await BrandingService.getLogoBytes();
-    final headerConfig = await PdfHeaderConfigService.getConfig(PdfDocumentType.invoice);
-    final footerConfig = await PdfFooterConfigService.getConfig(PdfDocumentType.invoice);
-    final colourScheme = await PdfColourSchemeService.getScheme(PdfDocumentType.invoice);
+    final companyPdf = CompanyPdfConfigService.instance;
+    final headerConfig = await companyPdf.getEffectiveHeaderConfig(
+      PdfDocumentType.invoice,
+      useCompanyBranding: invoice.useCompanyBranding,
+    );
+    final footerConfig = await companyPdf.getEffectiveFooterConfig(
+      PdfDocumentType.invoice,
+      useCompanyBranding: invoice.useCompanyBranding,
+    );
+    final colourScheme = await companyPdf.getEffectiveColourScheme(
+      PdfDocumentType.invoice,
+      useCompanyBranding: invoice.useCompanyBranding,
+    );
 
     final data = InvoicePdfData(
       invoiceJson: invoice.toJson(),
