@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -151,6 +152,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
   StreamSubscription<String>? _tokenRefreshSub;
   StreamSubscription<RemoteMessage>? _foregroundMessageSub;
   StreamSubscription<RemoteMessage>? _messageOpenedSub;
+  late final AuthService _authService;
+  late final Stream<User?> _authStream;
+  String? _lastSetupUid;
+
+  @override
+  void initState() {
+    super.initState();
+    _authService = AuthService();
+    _authStream = _authService.authStateChanges;
+  }
 
   @override
   void dispose() {
@@ -248,12 +259,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
     _messageOpenedSub = null;
   }
 
+  /// Run post-login setup once per user, then trigger rebuild so
+  /// MainNavigationScreen picks up dispatch flag changes.
+  Future<void> _runPostLoginSetup(User user) async {
+    FirestoreSyncService.instance.performFullSync(user.uid);
+    UserProfileService.instance.loadProfile(user.uid);
+    await RemoteConfigService.instance.refreshForUser(user.email);
+    _setupFcm(user.uid);
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
-    final authService = AuthService();
-
     return StreamBuilder(
-      stream: authService.authStateChanges,
+      stream: _authStream,
       builder: (context, snapshot) {
         // Show loading while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -268,13 +287,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // Show main screen if logged in, login screen if not
         if (snapshot.hasData) {
-          // Trigger cloud sync and load user profile in the background
           final user = snapshot.data!;
-          FirestoreSyncService.instance.performFullSync(user.uid);
-          UserProfileService.instance.loadProfile(user.uid);
-          _setupFcm(user.uid);
+          if (_lastSetupUid != user.uid) {
+            _lastSetupUid = user.uid;
+            _runPostLoginSetup(user);
+          }
           return const MainNavigationScreen();
         } else {
+          _lastSetupUid = null;
           _teardownFcm();
           UserProfileService.instance.clearProfile();
           return const LoginScreen();
