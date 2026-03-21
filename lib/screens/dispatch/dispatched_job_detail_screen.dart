@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/models.dart';
 import '../../services/dispatch_service.dart';
@@ -11,7 +12,9 @@ import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
 import '../history/job_detail_screen.dart';
+import '../new_job/new_job_screen.dart';
 import 'create_job_screen.dart';
+import 'decline_job_dialog.dart';
 
 class DispatchedJobDetailScreen extends StatelessWidget {
   final String companyId;
@@ -56,6 +59,9 @@ class _JobDetailContent extends StatelessWidget {
 
   bool get _isDispatcherOrAdmin =>
       UserProfileService.instance.isDispatcherOrAdmin;
+
+  bool get _isAssignee =>
+      FirebaseAuth.instance.currentUser?.uid == job.assignedTo;
 
   @override
   Widget build(BuildContext context) {
@@ -199,7 +205,10 @@ class _JobDetailContent extends StatelessWidget {
           const SizedBox(height: 16),
         ],
 
-        // Actions
+        // Assignee actions (status progression)
+        if (_isAssignee) ..._buildAssigneeActions(context),
+
+        // Dispatcher actions
         if (_isDispatcherOrAdmin) ...[
           if (job.status != DispatchedJobStatus.completed)
             Row(
@@ -232,6 +241,159 @@ class _JobDetailContent extends StatelessWidget {
         ],
       ],
     );
+  }
+
+  List<Widget> _buildAssigneeActions(BuildContext context) {
+    switch (job.status) {
+      case DispatchedJobStatus.assigned:
+        return [
+          _section('Your Assignment', []),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () => _updateStatus(context, DispatchedJobStatus.accepted),
+              child: const Text('Accept Job'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton(
+              onPressed: () => _declineJob(context),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+              ),
+              child: const Text('Decline'),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ];
+      case DispatchedJobStatus.accepted:
+        return [
+          _section('Your Assignment', []),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: () => _updateStatus(context, DispatchedJobStatus.enRoute),
+              icon: Icon(AppIcons.routing),
+              label: const Text('En Route'),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ];
+      case DispatchedJobStatus.enRoute:
+        return [
+          _section('Your Assignment', []),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: () => _updateStatus(context, DispatchedJobStatus.onSite),
+              icon: Icon(AppIcons.location),
+              label: const Text('Arrived On Site'),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ];
+      case DispatchedJobStatus.onSite:
+        return [
+          _section('Your Assignment', []),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  adaptivePageRoute(
+                    builder: (_) => NewJobScreen(dispatchedJob: job),
+                  ),
+                );
+              },
+              icon: Icon(AppIcons.clipboardTick),
+              label: const Text('Create Jobsheet'),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: () => _updateStatus(context, DispatchedJobStatus.completed),
+              icon: Icon(AppIcons.tickCircle),
+              label: const Text('Complete Without Jobsheet'),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ];
+      default:
+        return [];
+    }
+  }
+
+  Future<void> _updateStatus(
+    BuildContext context,
+    DispatchedJobStatus newStatus,
+  ) async {
+    try {
+      final oldStatus = job.status;
+      await DispatchService.instance.updateJobStatus(
+        companyId: job.companyId,
+        jobId: job.id,
+        newStatus: newStatus,
+      );
+      AnalyticsService.instance.logDispatchJobStatusChanged(
+        job.companyId,
+        oldStatus.name,
+        newStatus.name,
+      );
+      if (newStatus == DispatchedJobStatus.accepted) {
+        AnalyticsService.instance.logDispatchJobAccepted(
+          job.companyId,
+          job.id,
+        );
+      } else if (newStatus == DispatchedJobStatus.completed) {
+        AnalyticsService.instance.logDispatchJobCompleted(
+          job.companyId,
+          job.id,
+          job.linkedJobsheetId != null,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        context.showErrorToast('Failed to update status');
+      }
+    }
+  }
+
+  Future<void> _declineJob(BuildContext context) async {
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (_) => const DeclineJobDialog(),
+    );
+
+    if (reason == null) return;
+
+    try {
+      await DispatchService.instance.updateJobStatus(
+        companyId: job.companyId,
+        jobId: job.id,
+        newStatus: DispatchedJobStatus.declined,
+        declineReason: reason,
+      );
+      AnalyticsService.instance.logDispatchJobDeclined(
+        job.companyId,
+        reason,
+      );
+    } catch (e) {
+      if (context.mounted) {
+        context.showErrorToast('Failed to decline job');
+      }
+    }
   }
 
   Widget _section(String title, List<Widget> children) {

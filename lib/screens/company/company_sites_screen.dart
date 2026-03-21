@@ -8,6 +8,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 
@@ -21,7 +22,16 @@ class CompanySitesScreen extends StatefulWidget {
 }
 
 class _CompanySitesScreenState extends State<CompanySitesScreen> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
   bool get _canEdit => UserProfileService.instance.isDispatcherOrAdmin;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,62 +45,142 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
               child: Icon(AppIcons.add),
             )
           : null,
-      body: StreamBuilder<List<CompanySite>>(
-        stream: CompanyService.instance.getSitesStream(widget.companyId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: AdaptiveLoadingIndicator());
-          }
-
-          final sites = snapshot.data ?? [];
-
-          if (sites.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(AppIcons.building,
-                      size: 64,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.mediumGrey),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No shared sites yet',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.mediumGrey,
-                    ),
-                  ),
-                  if (_canEdit) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tap + to add a site',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDark
-                            ? AppTheme.darkTextSecondary
-                            : AppTheme.textHint,
-                      ),
-                    ),
-                  ],
-                ],
+      body: KeyboardDismissWrapper(
+        child: Column(
+          children: [
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search sites...',
+                  prefixIcon: const Icon(AppIcons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(AppIcons.close),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: (val) => setState(() => _searchQuery = val),
               ),
-            );
-          }
+            ),
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(AppTheme.screenPadding),
-            itemCount: sites.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final site = sites[index];
-              return _buildSiteCard(site, isDark);
-            },
-          );
-        },
+            // Stream content
+            Expanded(
+              child: StreamBuilder<List<CompanySite>>(
+                stream: CompanyService.instance.getSitesStream(
+                  widget.companyId,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: AdaptiveLoadingIndicator());
+                  }
+
+                  final sites = snapshot.data ?? [];
+                  final filtered = _searchQuery.isEmpty
+                      ? sites
+                      : sites.where((s) {
+                          final q = _searchQuery.toLowerCase();
+                          return s.name.toLowerCase().contains(q) ||
+                              s.address.toLowerCase().contains(q);
+                        }).toList();
+
+                  // Count label + list
+                  return Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          children: [
+                            Text(
+                              '${filtered.length} site${filtered.length == 1 ? '' : 's'}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: filtered.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _searchQuery.isNotEmpty
+                                          ? AppIcons.searchOff
+                                          : AppIcons.building,
+                                      size: 64,
+                                      color: isDark
+                                          ? AppTheme.darkTextSecondary
+                                          : AppTheme.mediumGrey,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _searchQuery.isNotEmpty
+                                          ? 'No Results Found'
+                                          : 'No shared sites yet',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        color: isDark
+                                            ? AppTheme.darkTextSecondary
+                                            : AppTheme.mediumGrey,
+                                      ),
+                                    ),
+                                    if (_searchQuery.isNotEmpty) ...[
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Try a different search term',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: isDark
+                                              ? AppTheme.darkTextSecondary
+                                              : AppTheme.textHint,
+                                        ),
+                                      ),
+                                    ] else if (_canEdit) ...[
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Tap + to add a site',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: isDark
+                                              ? AppTheme.darkTextSecondary
+                                              : AppTheme.textHint,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              )
+                            : ListView.separated(
+                                padding: const EdgeInsets.all(
+                                  AppTheme.screenPadding,
+                                ),
+                                itemCount: filtered.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 12),
+                                itemBuilder: (context, index) {
+                                  final site = filtered[index];
+                                  return _buildSiteCard(site, isDark);
+                                },
+                              ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -106,11 +196,11 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(AppIcons.building,
-              size: 20,
-              color: isDark
-                  ? AppTheme.darkTextSecondary
-                  : AppTheme.mediumGrey),
+          Icon(
+            AppIcons.building,
+            size: 20,
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -173,11 +263,13 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
                   value: 'delete',
                   child: Row(
                     children: [
-                      const Icon(Icons.delete_outline,
-                          size: 18, color: Colors.red),
+                      const Icon(
+                        Icons.delete_outline,
+                        size: 18,
+                        color: Colors.red,
+                      ),
                       const SizedBox(width: 8),
-                      const Text('Delete',
-                          style: TextStyle(color: Colors.red)),
+                      const Text('Delete', style: TextStyle(color: Colors.red)),
                     ],
                   ),
                 ),
@@ -190,8 +282,7 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
 
   Future<void> _showSiteDialog({CompanySite? site}) async {
     final nameController = TextEditingController(text: site?.name ?? '');
-    final addressController =
-        TextEditingController(text: site?.address ?? '');
+    final addressController = TextEditingController(text: site?.address ?? '');
     final notesController = TextEditingController(text: site?.notes ?? '');
     final isEdit = site != null;
 
@@ -199,30 +290,32 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(isEdit ? 'Edit Site' : 'Add Site'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CustomTextField(
-                controller: nameController,
-                label: 'Site Name',
-                prefixIcon: Icon(AppIcons.building),
-              ),
-              const SizedBox(height: 12),
-              CustomTextField(
-                controller: addressController,
-                label: 'Address',
-                prefixIcon: Icon(AppIcons.location),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 12),
-              CustomTextField(
-                controller: notesController,
-                label: 'Notes (optional)',
-                prefixIcon: Icon(AppIcons.note),
-                maxLines: 2,
-              ),
-            ],
+        content: KeyboardDismissWrapper(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CustomTextField(
+                  controller: nameController,
+                  label: 'Site Name',
+                  prefixIcon: Icon(AppIcons.building),
+                ),
+                const SizedBox(height: 12),
+                CustomTextField(
+                  controller: addressController,
+                  label: 'Address',
+                  prefixIcon: Icon(AppIcons.location),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 12),
+                CustomTextField(
+                  controller: notesController,
+                  label: 'Notes (optional)',
+                  prefixIcon: Icon(AppIcons.note),
+                  maxLines: 2,
+                ),
+              ],
+            ),
           ),
         ),
         actions: [

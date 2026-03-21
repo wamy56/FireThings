@@ -16,9 +16,18 @@ class TeamManagementScreen extends StatefulWidget {
 }
 
 class _TeamManagementScreenState extends State<TeamManagementScreen> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
   bool get _isAdmin => UserProfileService.instance.isAdmin;
   String? get _companyId => UserProfileService.instance.companyId;
   String? get _currentUid => UserProfileService.instance.profile?.uid;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,25 +43,118 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Team')),
-      body: StreamBuilder<List<CompanyMember>>(
-        stream: CompanyService.instance.getCompanyMembersStream(companyId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: AdaptiveLoadingIndicator());
-          }
+      body: Column(
+        children: [
+          // Search bar
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search members...',
+                prefixIcon: const Icon(AppIcons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(AppIcons.close),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (val) => setState(() => _searchQuery = val),
+            ),
+          ),
 
-          final members = snapshot.data ?? [];
-          if (members.isEmpty) {
-            return const Center(child: Text('No team members'));
-          }
+          // Stream content
+          Expanded(
+            child: StreamBuilder<List<CompanyMember>>(
+              stream: CompanyService.instance.getCompanyMembersStream(companyId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: AdaptiveLoadingIndicator());
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(AppTheme.screenPadding),
-            itemCount: members.length,
-            itemBuilder: (context, index) =>
-                _buildMemberTile(members[index], isDark),
-          );
-        },
+                final members = snapshot.data ?? [];
+                final filtered = _searchQuery.isEmpty
+                    ? members
+                    : members.where((m) {
+                        final q = _searchQuery.toLowerCase();
+                        return m.displayName.toLowerCase().contains(q) ||
+                            m.email.toLowerCase().contains(q);
+                      }).toList();
+
+                // Count label + list
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${filtered.length} member${filtered.length == 1 ? '' : 's'}',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _searchQuery.isNotEmpty
+                                        ? AppIcons.searchOff
+                                        : AppIcons.people,
+                                    size: 64,
+                                    color: isDark
+                                        ? AppTheme.darkTextSecondary
+                                        : AppTheme.mediumGrey,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _searchQuery.isNotEmpty
+                                        ? 'No Results Found'
+                                        : 'No team members',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: isDark
+                                          ? AppTheme.darkTextSecondary
+                                          : AppTheme.mediumGrey,
+                                    ),
+                                  ),
+                                  if (_searchQuery.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Try a different search term',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isDark
+                                            ? AppTheme.darkTextSecondary
+                                            : AppTheme.textHint,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(AppTheme.screenPadding),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) =>
+                                  _buildMemberTile(filtered[index], isDark),
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -5,6 +5,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 
 class CreateCompanyScreen extends StatefulWidget {
@@ -70,9 +71,11 @@ class _CreateCompanyScreenState extends State<CreateCompanyScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Create Company')),
-      body: _generatedInviteCode != null
+      body: KeyboardDismissWrapper(
+        child: _generatedInviteCode != null
           ? _buildSuccessView(isDark)
           : _buildFormView(),
+      ),
     );
   }
 

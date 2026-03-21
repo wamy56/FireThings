@@ -16,8 +16,8 @@ service cloud.firestore {
     // Company data
     match /companies/{companyId} {
 
-      // Company document: readable by members, writable by admins
-      allow read: if isCompanyMember(companyId);
+      // Company document: readable by any authenticated user (needed for join-by-invite-code query)
+      allow read: if request.auth != null;
       allow create: if request.auth != null;
       allow update, delete: if isCompanyAdmin(companyId);
 
@@ -26,7 +26,18 @@ service cloud.firestore {
         // Members can read all members (to see team list)
         allow read: if isCompanyMember(companyId);
         // Admins can add/remove members
-        allow create, delete: if isCompanyAdmin(companyId);
+        allow delete: if isCompanyAdmin(companyId);
+        // Admins can create members, OR users can create their own member doc
+        allow create: if isCompanyAdmin(companyId)
+                      || (request.auth.uid == memberId
+                          && request.resource.data.isActive == true
+                          && (
+                            // Founder: can self-add as admin when company doc doesn't exist yet (same batch)
+                            (request.resource.data.role == "admin"
+                              && !exists(/databases/$(database)/documents/companies/$(companyId)))
+                            // Joiner: can self-add as engineer to an existing company
+                            || request.resource.data.role == "engineer"
+                          ));
         // Admins can update any member
         allow update: if isCompanyAdmin(companyId);
         // Members can update their own fcmToken

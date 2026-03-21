@@ -4,6 +4,57 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-21 (Session 48)
+
+### DIP Switch Calculator — Light Mode Toggle Visibility Fix
+
+- Changed `primaryColor` in all 5 widget builders from conditional `isDark ? darkPrimaryBlue : primaryBlue` to always use `AppTheme.darkPrimaryBlue` (`#3D7AC7`)
+- Fixes low contrast of selected/ON toggle states in light mode — brighter blue now clearly visible against white backgrounds
+- Affects: toggle containers, switch thumbs/tracks, text/badge colours, rotary switches, result panel, favourites list
+
+---
+
+## 2026-03-21 (Session 47)
+
+### Company PDF Branding — Previews, Colour Picker, Company Logo
+
+**Company logo storage via Firestore Blobs:**
+- Added `saveCompanyLogo`, `getCompanyLogoBytes`, `removeCompanyLogo` to `CompanyPdfConfigService` — stores logo bytes at `companies/{companyId}/pdf_config/logo` with in-memory cache
+- Added `getEffectiveLogoBytes(useCompanyBranding)` — resolves company logo first, falls back to personal `BrandingService` logo
+- Updated `PDFService.generateJobsheetPDF` and `InvoicePDFService.generateInvoicePDF` to use `getEffectiveLogoBytes()` instead of `BrandingService.getLogoBytes()` directly
+
+**Company header editor rebuilt with live preview + logo tab:**
+- Added live header preview (white container with navy border, left/centre zones, scaled text + logo)
+- Added Logo tab with image picker (camera/gallery), upload/remove buttons, logo placement (`SegmentedButton<LogoZone>`), logo size (`SegmentedButton<LogoSize>`)
+- Added Left Zone and Centre tabs with reorderable text lines, font size sliders, bold toggles, add/delete line support
+- All text changes update the preview live via `onChanged` → `setState`
+
+**Company footer editor rebuilt with live preview:**
+- Added live footer preview (white container with top grey border, left/centre text zones, "Page 1 of 1")
+- Added Left Zone and Centre tabs matching the header editor pattern (reorderable lines, font size, bold)
+
+**Company colour scheme editor fully rebuilt:**
+- Replaced hardcoded 10-colour `Wrap` with `_buildPresetGrid()` using `PdfColourScheme.presets` (8 named presets in 4-column grid with labels)
+- Added "Custom Colour" button → `flutter_colorpicker` dialog via `showPremiumDialog`
+- Added rich preview: jobsheet preview (section headers, field rows, certification box, signature boxes) or invoice preview (table with header row, totals, payment details) — all tinted with selected colour
+- All editors now use `AnimatedSaveButton` for consistent save UX
+
+---
+
+## 2026-03-21 (Session 46)
+
+### Dispatch — Accept Button + Keyboard Done Bar
+
+**Accept/Decline buttons for assignee-admins:**
+- Added assignee action buttons to `DispatchedJobDetailScreen` — when the current user is the job's assignee, they now see the full status progression (Accept → En Route → On Site → Complete) in a "Your Assignment" section above the existing dispatcher Edit/Reassign controls
+- Admins who assign jobs to themselves can now accept and progress through the full job lifecycle without needing `EngineerJobDetailScreen`
+
+**Keyboard Done bar added to 8 dispatch/company screens:**
+- `CreateJobScreen`, `DeclineJobDialog`, `CreateCompanyScreen`, `JoinCompanyScreen`, `CompanySettingsScreen` (main + edit dialog), `CompanyPdfDesignScreen` (main + header/footer editors), `CompanySitesScreen` (add/edit dialog), `CompanyCustomersScreen` (add/edit dialog)
+- All now show the iOS "Done" bar with up/down field navigation arrows when a text field is focused
+
+---
+
 ## 2026-03-21 (Session 45)
 
 ### Cloud Functions — Node.js 22 Upgrade

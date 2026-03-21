@@ -4,6 +4,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 
 class JoinCompanyScreen extends StatefulWidget {
@@ -52,9 +53,11 @@ class _JoinCompanyScreenState extends State<JoinCompanyScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Join Company')),
-      body: _joinedCompanyName != null
+      body: KeyboardDismissWrapper(
+        child: _joinedCompanyName != null
           ? _buildSuccessView(isDark)
           : _buildFormView(),
+      ),
     );
   }
 

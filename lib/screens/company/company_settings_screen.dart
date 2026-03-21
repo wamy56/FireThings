@@ -7,6 +7,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 import 'team_management_screen.dart';
@@ -56,7 +57,8 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Company Settings')),
-      body: _isLoading
+      body: KeyboardDismissWrapper(
+        child: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
           : _company == null
               ? const Center(child: Text('Company not found'))
@@ -85,6 +87,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                     ],
                   ],
                 ),
+      ),
     );
   }
 
@@ -418,7 +421,8 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Edit Company'),
-        content: SingleChildScrollView(
+        content: KeyboardDismissWrapper(
+          child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -447,6 +451,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
               ),
             ],
           ),
+        ),
         ),
         actions: [
           TextButton(

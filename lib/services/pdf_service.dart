@@ -6,7 +6,6 @@ import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
 import 'jobsheet_settings_service.dart';
-import 'branding_service.dart';
 import 'pdf_header_builder.dart';
 import 'pdf_footer_builder.dart';
 import 'company_pdf_config_service.dart';
@@ -958,8 +957,10 @@ class PDFService {
     }
 
     final settings = await JobsheetSettingsService.getSettings();
-    final logoBytes = await BrandingService.getLogoBytes();
     final useCompanyBranding = jobsheet.dispatchedJobId != null;
+    final logoBytes = await CompanyPdfConfigService.instance.getEffectiveLogoBytes(
+      useCompanyBranding: useCompanyBranding,
+    );
     final companyPdf = CompanyPdfConfigService.instance;
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(
       PdfDocumentType.jobsheet,

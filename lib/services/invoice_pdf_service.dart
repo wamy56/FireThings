@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../models/pdf_colour_scheme.dart';
 import 'payment_settings_service.dart';
-import 'branding_service.dart';
 import 'pdf_header_builder.dart';
 import 'pdf_footer_builder.dart';
 import 'company_pdf_config_service.dart';
@@ -466,8 +465,10 @@ class InvoicePDFService {
       // Google Fonts unavailable — isolate will fall back to Helvetica
     }
 
-    final logoBytes = await BrandingService.getLogoBytes();
     final companyPdf = CompanyPdfConfigService.instance;
+    final logoBytes = await companyPdf.getEffectiveLogoBytes(
+      useCompanyBranding: invoice.useCompanyBranding,
+    );
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(
       PdfDocumentType.invoice,
       useCompanyBranding: invoice.useCompanyBranding,

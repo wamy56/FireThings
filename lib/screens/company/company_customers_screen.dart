@@ -8,6 +8,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 
@@ -21,7 +22,16 @@ class CompanyCustomersScreen extends StatefulWidget {
 }
 
 class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
   bool get _canEdit => UserProfileService.instance.isDispatcherOrAdmin;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,65 +45,135 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
               child: Icon(AppIcons.add),
             )
           : null,
-      body: StreamBuilder<List<CompanyCustomer>>(
-        stream: CompanyService.instance.getCustomersStream(widget.companyId),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: AdaptiveLoadingIndicator());
-          }
+      body: KeyboardDismissWrapper(child: Column(
+        children: [
+          // Search bar
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search customers...',
+                prefixIcon: const Icon(AppIcons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(AppIcons.close),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (val) => setState(() => _searchQuery = val),
+            ),
+          ),
 
-          final customers = snapshot.data ?? [];
+          // Stream content
+          Expanded(
+            child: StreamBuilder<List<CompanyCustomer>>(
+              stream: CompanyService.instance.getCustomersStream(widget.companyId),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: AdaptiveLoadingIndicator());
+                }
 
-          if (customers.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    AppIcons.user,
-                    size: 64,
-                    color: isDark
-                        ? AppTheme.darkTextSecondary
-                        : AppTheme.mediumGrey,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No shared customers yet',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.mediumGrey,
-                    ),
-                  ),
-                  if (_canEdit) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tap + to add a customer',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDark
-                            ? AppTheme.darkTextSecondary
-                            : AppTheme.textHint,
+                final customers = snapshot.data ?? [];
+                final filtered = _searchQuery.isEmpty
+                    ? customers
+                    : customers.where((c) {
+                        final q = _searchQuery.toLowerCase();
+                        return c.name.toLowerCase().contains(q) ||
+                            (c.address?.toLowerCase().contains(q) ?? false) ||
+                            (c.email?.toLowerCase().contains(q) ?? false) ||
+                            (c.phone?.toLowerCase().contains(q) ?? false);
+                      }).toList();
+
+                // Count label
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          Text(
+                            '${filtered.length} customer${filtered.length == 1 ? '' : 's'}',
+                            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                          ),
+                        ],
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: filtered.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _searchQuery.isNotEmpty
+                                        ? AppIcons.searchOff
+                                        : AppIcons.user,
+                                    size: 64,
+                                    color: isDark
+                                        ? AppTheme.darkTextSecondary
+                                        : AppTheme.mediumGrey,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _searchQuery.isNotEmpty
+                                        ? 'No Results Found'
+                                        : 'No shared customers yet',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: isDark
+                                          ? AppTheme.darkTextSecondary
+                                          : AppTheme.mediumGrey,
+                                    ),
+                                  ),
+                                  if (_searchQuery.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Try a different search term',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isDark
+                                            ? AppTheme.darkTextSecondary
+                                            : AppTheme.textHint,
+                                      ),
+                                    ),
+                                  ] else if (_canEdit) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Tap + to add a customer',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: isDark
+                                            ? AppTheme.darkTextSecondary
+                                            : AppTheme.textHint,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: const EdgeInsets.all(AppTheme.screenPadding),
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, _) => const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                final customer = filtered[index];
+                                return _buildCustomerCard(customer, isDark);
+                              },
+                            ),
+                    ),
                   ],
-                ],
-              ),
-            );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.all(AppTheme.screenPadding),
-            itemCount: customers.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final customer = customers[index];
-              return _buildCustomerCard(customer, isDark);
-            },
-          );
-        },
-      ),
+                );
+              },
+            ),
+          ),
+        ],
+      )),
     );
   }
 
@@ -233,7 +313,8 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(isEdit ? 'Edit Customer' : 'Add Customer'),
-        content: SingleChildScrollView(
+        content: KeyboardDismissWrapper(
+          child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -272,6 +353,7 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
               ),
             ],
           ),
+        ),
         ),
         actions: [
           TextButton(

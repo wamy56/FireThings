@@ -1,4 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../models/pdf_header_config.dart';
 import '../../models/pdf_footer_config.dart';
 import '../../models/pdf_colour_scheme.dart';
@@ -6,8 +9,11 @@ import '../../services/company_pdf_config_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
+import '../../widgets/premium_dialog.dart';
 import '../../widgets/adaptive_app_bar.dart';
+import '../../widgets/animated_save_button.dart';
 
 class CompanyPdfDesignScreen extends StatefulWidget {
   final String companyId;
@@ -65,7 +71,8 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
 
     return Scaffold(
       appBar: AdaptiveNavigationBar(title: 'Company PDF Branding'),
-      body: _isLoading
+      body: KeyboardDismissWrapper(
+        child: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
           : ListView(
               padding: const EdgeInsets.all(AppTheme.screenPadding),
@@ -138,6 +145,7 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
                 const SizedBox(height: 40),
               ],
             ),
+      ),
     );
   }
 
@@ -233,7 +241,9 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
   }
 }
 
-// --- Inline editor screens for company PDF config ---
+// ═══════════════════════════════════════════════════════════════════
+// HEADER EDITOR — with live preview, logo tab, zone tabs
+// ═══════════════════════════════════════════════════════════════════
 
 class _CompanyHeaderEditorScreen extends StatefulWidget {
   final String companyId;
@@ -252,33 +262,102 @@ class _CompanyHeaderEditorScreen extends StatefulWidget {
   State<_CompanyHeaderEditorScreen> createState() => _CompanyHeaderEditorState();
 }
 
-class _CompanyHeaderEditorState extends State<_CompanyHeaderEditorScreen> {
+class _CompanyHeaderEditorState extends State<_CompanyHeaderEditorScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   late PdfHeaderConfig _config;
-  final Map<String, TextEditingController> _leftControllers = {};
-  final Map<String, TextEditingController> _centreControllers = {};
-  bool _isSaving = false;
+  Uint8List? _logoBytes;
+  bool _isLoadingLogo = true;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _config = widget.initialConfig;
-    for (final line in _config.leftLines) {
-      _leftControllers[line.key] = TextEditingController(text: line.value);
-    }
-    for (final line in _config.centreLines) {
-      _centreControllers[line.key] = TextEditingController(text: line.value);
-    }
+    _loadLogo();
   }
 
   @override
   void dispose() {
-    for (final c in _leftControllers.values) {
-      c.dispose();
-    }
-    for (final c in _centreControllers.values) {
-      c.dispose();
-    }
+    _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadLogo() async {
+    final bytes = await CompanyPdfConfigService.instance
+        .getCompanyLogoBytes(widget.companyId);
+    if (mounted) {
+      setState(() {
+        _logoBytes = bytes;
+        _isLoadingLogo = false;
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    await CompanyPdfConfigService.instance.saveHeaderConfig(
+      widget.companyId,
+      _config,
+      widget.docType,
+    );
+    if (!mounted) return;
+    context.showSuccessToast('Header saved');
+    Navigator.pop(context);
+  }
+
+  Future<void> _pickLogo() async {
+    final picker = ImagePicker();
+    ImageSource? source;
+
+    await showAdaptiveActionSheet(
+      context: context,
+      title: 'Select Image Source',
+      options: [
+        ActionSheetOption(
+          label: 'Camera',
+          icon: AppIcons.gallery,
+          onTap: () => source = ImageSource.camera,
+        ),
+        ActionSheetOption(
+          label: 'Gallery',
+          icon: AppIcons.gallery,
+          onTap: () => source = ImageSource.gallery,
+        ),
+      ],
+    );
+
+    if (source == null) return;
+
+    final picked = await picker.pickImage(
+      source: source!,
+      maxWidth: 512,
+      maxHeight: 512,
+    );
+    if (picked == null) return;
+
+    final bytes = await picked.readAsBytes();
+    await CompanyPdfConfigService.instance
+        .saveCompanyLogo(widget.companyId, bytes);
+    setState(() => _logoBytes = bytes);
+
+    if (mounted) context.showSuccessToast('Logo saved');
+  }
+
+  Future<void> _removeLogo() async {
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Remove Logo',
+      message: 'Are you sure you want to remove the company logo?',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm != true) return;
+
+    await CompanyPdfConfigService.instance
+        .removeCompanyLogo(widget.companyId);
+    setState(() => _logoBytes = null);
   }
 
   @override
@@ -289,91 +368,512 @@ class _CompanyHeaderEditorState extends State<_CompanyHeaderEditorScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: TextButton(
-              onPressed: _isSaving ? null : _save,
-              child: const Text('Save'),
+            child: AnimatedSaveButton(
+              label: 'Save',
+              onPressed: _save,
+              outlined: true,
             ),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppTheme.screenPadding),
+      body: KeyboardDismissWrapper(
+        child: Column(
+          children: [
+            _buildPreview(),
+            TabBar(
+              controller: _tabController,
+              tabs: [
+                Tab(icon: Icon(AppIcons.image), text: 'Logo'),
+                Tab(icon: Icon(AppIcons.noteText), text: 'Left Zone'),
+                Tab(icon: Icon(AppIcons.noteText), text: 'Centre'),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildLogoTab(),
+                  _buildZoneTab(isLeft: true),
+                  _buildZoneTab(isLeft: false),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── LIVE PREVIEW ───────────────────────────────────────────
+
+  Widget _buildPreview() {
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Left Lines',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          Text(
+            'Preview',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          const SizedBox(height: 12),
-          ..._config.leftLines.map((line) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextField(
-                  controller: _leftControllers[line.key],
-                  decoration: InputDecoration(
-                    labelText: line.key,
-                    border: const OutlineInputBorder(),
+          const SizedBox(height: 8),
+          Container(
+            decoration: const BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: Color(0xFF1E3A5F),
+                  width: 2,
+                ),
+              ),
+            ),
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildPreviewZone(isLeft: true),
+                      if (_config.centreLines.isNotEmpty ||
+                          _config.logoZone == LogoZone.centre) ...[
+                        const SizedBox(width: 8),
+                        _buildPreviewZone(isLeft: false),
+                      ],
+                    ],
                   ),
                 ),
-              )),
-          const SizedBox(height: 24),
-          const Text(
-            'Centre Lines',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 12),
-          ..._config.centreLines.map((line) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextField(
-                  controller: _centreControllers[line.key],
-                  decoration: InputDecoration(
-                    labelText: line.key,
-                    border: const OutlineInputBorder(),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    'FORM TYPE\nREF: 001',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 8,
+                      color: Colors.grey[500],
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              )),
-          if (_config.leftLines.isEmpty && _config.centreLines.isEmpty)
-            const Text('No header lines configured. Save to create defaults.'),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Future<void> _save() async {
-    setState(() => _isSaving = true);
-    try {
-      final updatedLeft = _config.leftLines.map((line) {
-        final controller = _leftControllers[line.key];
-        return line.copyWith(value: controller?.text ?? line.value);
-      }).toList();
+  Widget _buildPreviewZone({required bool isLeft}) {
+    final lines = isLeft ? _config.leftLines : _config.centreLines;
+    final showLogo = _logoBytes != null &&
+        ((isLeft && _config.logoZone == LogoZone.left) ||
+            (!isLeft && _config.logoZone == LogoZone.centre));
 
-      final updatedCentre = _config.centreLines.map((line) {
-        final controller = _centreControllers[line.key];
-        return line.copyWith(value: controller?.text ?? line.value);
-      }).toList();
+    final previewSize = _config.logoSize.pixels * 0.5;
 
-      final updated = PdfHeaderConfig(
-        logoZone: _config.logoZone,
-        logoSize: _config.logoSize,
-        leftLines: updatedLeft,
-        centreLines: updatedCentre,
+    final children = <Widget>[];
+    if (showLogo) {
+      children.add(
+        Container(
+          width: previewSize,
+          height: previewSize,
+          margin: const EdgeInsets.only(right: 6),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(2),
+            child: Image.memory(_logoBytes!, fit: BoxFit.contain),
+          ),
+        ),
       );
+    }
 
-      await CompanyPdfConfigService.instance.saveHeaderConfig(
-        widget.companyId,
-        updated,
-        widget.docType,
+    final textWidgets = <Widget>[];
+    for (final line in lines) {
+      final text = line.value.isNotEmpty ? line.value : '';
+      if (text.isEmpty) continue;
+      final isCompanyName = line.key == 'companyName';
+      textWidgets.add(
+        Text(
+          isCompanyName ? text.toUpperCase() : text,
+          style: TextStyle(
+            fontSize: (line.fontSize * 0.55).clamp(5.0, 14.0),
+            fontWeight: line.bold ? FontWeight.bold : FontWeight.normal,
+            color: isCompanyName
+                ? const Color(0xFF1E3A5F)
+                : const Color(0xFF424242),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       );
+    }
 
-      if (mounted) {
-        context.showSuccessToast('Header saved');
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) context.showErrorToast('Failed to save header');
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+    if (textWidgets.isNotEmpty) {
+      children.add(
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: textWidgets,
+          ),
+        ),
+      );
+    }
+
+    if (children.isEmpty) return const SizedBox.shrink();
+
+    return Expanded(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+
+  // ─── LOGO TAB ──────────────────────────────────────────────
+
+  Widget _buildLogoTab() {
+    if (_isLoadingLogo) {
+      return const Center(child: AdaptiveLoadingIndicator());
+    }
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Logo preview / upload
+        Container(
+          height: 120,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: _logoBytes != null
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(11),
+                  child: Image.memory(_logoBytes!, fit: BoxFit.contain),
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(AppIcons.image, size: 40, color: Colors.grey[400]),
+                    const SizedBox(height: 8),
+                    Text('No logo uploaded',
+                        style: TextStyle(color: Colors.grey[600])),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _pickLogo,
+                icon: Icon(AppIcons.document, size: 18),
+                label: Text(_logoBytes != null ? 'Change Logo' : 'Upload Logo'),
+              ),
+            ),
+            if (_logoBytes != null) ...[
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: _removeLogo,
+                icon: Icon(AppIcons.trash, size: 18),
+                label: const Text('Remove'),
+                style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // Logo placement
+        const Text('Logo Placement',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        SegmentedButton<LogoZone>(
+          segments: const [
+            ButtonSegment(value: LogoZone.left, label: Text('Left')),
+            ButtonSegment(value: LogoZone.centre, label: Text('Centre')),
+            ButtonSegment(value: LogoZone.none, label: Text('None')),
+          ],
+          selected: {_config.logoZone},
+          onSelectionChanged: (selection) {
+            setState(() {
+              _config = _config.copyWith(logoZone: selection.first);
+            });
+          },
+        ),
+        const SizedBox(height: 24),
+
+        // Logo size
+        const Text('Logo Size',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        SegmentedButton<LogoSize>(
+          segments: const [
+            ButtonSegment(value: LogoSize.small, label: Text('Small (40px)')),
+            ButtonSegment(value: LogoSize.medium, label: Text('Medium (60px)')),
+            ButtonSegment(value: LogoSize.large, label: Text('Large (80px)')),
+          ],
+          selected: {_config.logoSize},
+          onSelectionChanged: (selection) {
+            setState(() {
+              _config = _config.copyWith(logoSize: selection.first);
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  // ─── ZONE TABS ─────────────────────────────────────────────
+
+  Widget _buildZoneTab({required bool isLeft}) {
+    final lines = isLeft ? _config.leftLines : _config.centreLines;
+
+    return Column(
+      children: [
+        Expanded(
+          child: lines.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(AppIcons.noteText, size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 12),
+                        Text(
+                          isLeft
+                              ? 'No text lines configured.\nTap "Add Text Line" to start.'
+                              : 'The centre zone is empty by default.\nAdd text lines here for a two-column header.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ReorderableListView.builder(
+                  padding: const EdgeInsets.all(8),
+                  itemCount: lines.length,
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (newIndex > oldIndex) newIndex--;
+                      final updated = List<HeaderTextLine>.from(lines);
+                      final item = updated.removeAt(oldIndex);
+                      updated.insert(newIndex, item);
+                      _config = isLeft
+                          ? _config.copyWith(leftLines: updated)
+                          : _config.copyWith(centreLines: updated);
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    return _buildLineCard(
+                      key: ValueKey('${isLeft ? "left" : "centre"}_$index'),
+                      line: lines[index],
+                      index: index,
+                      isLeft: isLeft,
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _addLine(isLeft),
+              icon: Icon(AppIcons.add),
+              label: const Text('Add Text Line'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLineCard({
+    required Key key,
+    required HeaderTextLine line,
+    required int index,
+    required bool isLeft,
+  }) {
+    final lines = isLeft ? _config.leftLines : _config.centreLines;
+
+    return Card(
+      key: key,
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(AppIcons.menu, color: Colors.grey),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _labelForKey(line.key),
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(AppIcons.trash, size: 20),
+                  color: Colors.red,
+                  onPressed: () {
+                    setState(() {
+                      final updated = List<HeaderTextLine>.from(lines);
+                      updated.removeAt(index);
+                      _config = isLeft
+                          ? _config.copyWith(leftLines: updated)
+                          : _config.copyWith(centreLines: updated);
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              initialValue: line.value,
+              decoration: const InputDecoration(
+                labelText: 'Text',
+                hintText: 'Enter text...',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              textInputAction: TextInputAction.done,
+              onChanged: (val) {
+                final updated = List<HeaderTextLine>.from(lines);
+                updated[index] = updated[index].copyWith(value: val);
+                _config = isLeft
+                    ? _config.copyWith(leftLines: updated)
+                    : _config.copyWith(centreLines: updated);
+                setState(() {});
+              },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('Size:', style: TextStyle(fontSize: 12)),
+                Expanded(
+                  child: AdaptiveSlider(
+                    value: line.fontSize,
+                    min: 8,
+                    max: 24,
+                    divisions: 16,
+                    onChanged: (val) {
+                      setState(() {
+                        final updated = List<HeaderTextLine>.from(lines);
+                        updated[index] = updated[index].copyWith(fontSize: val);
+                        _config = isLeft
+                            ? _config.copyWith(leftLines: updated)
+                            : _config.copyWith(centreLines: updated);
+                      });
+                    },
+                  ),
+                ),
+                Text('${line.fontSize.toInt()}',
+                    style: const TextStyle(fontSize: 12)),
+                const SizedBox(width: 12),
+                FilterChip(
+                  label: const Text('B',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  selected: line.bold,
+                  onSelected: (val) {
+                    setState(() {
+                      final updated = List<HeaderTextLine>.from(lines);
+                      updated[index] = updated[index].copyWith(bold: val);
+                      _config = isLeft
+                          ? _config.copyWith(leftLines: updated)
+                          : _config.copyWith(centreLines: updated);
+                    });
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addLine(bool isLeft) {
+    final options = <_LineOption>[
+      const _LineOption('companyName', 'Company Name'),
+      const _LineOption('tagline', 'Tagline'),
+      const _LineOption('address', 'Address'),
+      const _LineOption('phone', 'Phone'),
+      const _LineOption('engineerName', 'Engineer Name'),
+      const _LineOption('custom', 'Custom Text'),
+    ];
+
+    showAdaptiveActionSheet(
+      context: context,
+      title: 'Add Text Line',
+      options: options.map((opt) {
+        return ActionSheetOption(
+          label: opt.label,
+          onTap: () {
+            setState(() {
+              final newLine = HeaderTextLine(
+                key: opt.key,
+                fontSize: opt.key == 'companyName' ? 18 : 10,
+                bold: opt.key == 'companyName' || opt.key == 'tagline',
+              );
+              final lines = isLeft
+                  ? List<HeaderTextLine>.from(_config.leftLines)
+                  : List<HeaderTextLine>.from(_config.centreLines);
+              lines.add(newLine);
+              _config = isLeft
+                  ? _config.copyWith(leftLines: lines)
+                  : _config.copyWith(centreLines: lines);
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  String _labelForKey(String key) {
+    switch (key) {
+      case 'companyName': return 'Company Name';
+      case 'tagline': return 'Tagline';
+      case 'address': return 'Address';
+      case 'phone': return 'Phone';
+      case 'engineerName': return 'Engineer Name';
+      case 'custom': return 'Custom Text';
+      default: return key;
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// FOOTER EDITOR — with live preview + zone tabs
+// ═══════════════════════════════════════════════════════════════════
 
 class _CompanyFooterEditorScreen extends StatefulWidget {
   final String companyId;
@@ -392,33 +892,33 @@ class _CompanyFooterEditorScreen extends StatefulWidget {
   State<_CompanyFooterEditorScreen> createState() => _CompanyFooterEditorState();
 }
 
-class _CompanyFooterEditorState extends State<_CompanyFooterEditorScreen> {
-  final Map<String, TextEditingController> _leftControllers = {};
-  final Map<String, TextEditingController> _centreControllers = {};
+class _CompanyFooterEditorState extends State<_CompanyFooterEditorScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   late PdfFooterConfig _config;
-  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _config = widget.initialConfig;
-    for (final line in _config.leftLines) {
-      _leftControllers[line.key] = TextEditingController(text: line.value);
-    }
-    for (final line in _config.centreLines) {
-      _centreControllers[line.key] = TextEditingController(text: line.value);
-    }
   }
 
   @override
   void dispose() {
-    for (final c in _leftControllers.values) {
-      c.dispose();
-    }
-    for (final c in _centreControllers.values) {
-      c.dispose();
-    }
+    _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _save() async {
+    await CompanyPdfConfigService.instance.saveFooterConfig(
+      widget.companyId,
+      _config,
+      widget.docType,
+    );
+    if (!mounted) return;
+    context.showSuccessToast('Footer saved');
+    Navigator.pop(context);
   }
 
   @override
@@ -429,89 +929,349 @@ class _CompanyFooterEditorState extends State<_CompanyFooterEditorScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: TextButton(
-              onPressed: _isSaving ? null : _save,
-              child: const Text('Save'),
+            child: AnimatedSaveButton(
+              label: 'Save',
+              onPressed: _save,
+              outlined: true,
             ),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppTheme.screenPadding),
+      body: KeyboardDismissWrapper(
+        child: Column(
+          children: [
+            _buildPreview(),
+            TabBar(
+              controller: _tabController,
+              tabs: [
+                Tab(icon: Icon(AppIcons.noteText), text: 'Left Zone'),
+                Tab(icon: Icon(AppIcons.noteText), text: 'Centre'),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildZoneTab(isLeft: true),
+                  _buildZoneTab(isLeft: false),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── LIVE PREVIEW ───────────────────────────────────────────
+
+  Widget _buildPreview() {
+    return Container(
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Left Lines',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          Text(
+            'Preview',
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          const SizedBox(height: 12),
-          ..._config.leftLines.map((line) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextField(
-                  controller: _leftControllers[line.key],
-                  decoration: InputDecoration(
-                    labelText: line.key,
-                    border: const OutlineInputBorder(),
-                  ),
+          const SizedBox(height: 8),
+          Container(
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: Color(0xFFE0E0E0), width: 1),
+              ),
+            ),
+            padding: const EdgeInsets.only(top: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: _buildPreviewZone(isLeft: true),
                 ),
-              )),
-          const SizedBox(height: 24),
-          const Text(
-            'Centre Lines',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                if (_config.centreLines.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: _buildPreviewZone(isLeft: false),
+                  ),
+                ],
+                const SizedBox(width: 8),
+                Text(
+                  'Page 1 of 1',
+                  style: TextStyle(fontSize: 7, color: Colors.grey[600]),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          ..._config.centreLines.map((line) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextField(
-                  controller: _centreControllers[line.key],
-                  decoration: InputDecoration(
-                    labelText: line.key,
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-              )),
-          if (_config.leftLines.isEmpty && _config.centreLines.isEmpty)
-            const Text('No footer lines configured. Save to create defaults.'),
         ],
       ),
     );
   }
 
-  Future<void> _save() async {
-    setState(() => _isSaving = true);
-    try {
-      final updatedLeft = _config.leftLines.map((line) {
-        final controller = _leftControllers[line.key];
-        return line.copyWith(value: controller?.text ?? line.value);
-      }).toList();
-
-      final updatedCentre = _config.centreLines.map((line) {
-        final controller = _centreControllers[line.key];
-        return line.copyWith(value: controller?.text ?? line.value);
-      }).toList();
-
-      final updated = PdfFooterConfig(
-        leftLines: updatedLeft,
-        centreLines: updatedCentre,
+  Widget _buildPreviewZone({required bool isLeft}) {
+    final lines = isLeft ? _config.leftLines : _config.centreLines;
+    final textWidgets = <Widget>[];
+    for (final line in lines) {
+      if (line.value.isEmpty) continue;
+      textWidgets.add(
+        Text(
+          line.value,
+          style: TextStyle(
+            fontSize: (line.fontSize * 0.55).clamp(5.0, 14.0),
+            fontWeight: line.bold ? FontWeight.bold : FontWeight.normal,
+            color: const Color(0xFF424242),
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       );
+    }
+    if (textWidgets.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: textWidgets,
+    );
+  }
 
-      await CompanyPdfConfigService.instance.saveFooterConfig(
-        widget.companyId,
-        updated,
-        widget.docType,
-      );
+  // ─── ZONE TABS ─────────────────────────────────────────────
 
-      if (mounted) {
-        context.showSuccessToast('Footer saved');
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) context.showErrorToast('Failed to save footer');
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
+  Widget _buildZoneTab({required bool isLeft}) {
+    final lines = isLeft ? _config.leftLines : _config.centreLines;
+
+    return Column(
+      children: [
+        Expanded(
+          child: lines.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(AppIcons.noteText, size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 12),
+                        Text(
+                          isLeft
+                              ? 'No text lines configured.\nTap "Add Text Line" to start.'
+                              : 'The centre zone is empty by default.\nAdd text lines here for a two-column footer.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : ReorderableListView.builder(
+                  padding: const EdgeInsets.all(8),
+                  itemCount: lines.length,
+                  onReorder: (oldIndex, newIndex) {
+                    setState(() {
+                      if (newIndex > oldIndex) newIndex--;
+                      final updated = List<HeaderTextLine>.from(lines);
+                      final item = updated.removeAt(oldIndex);
+                      updated.insert(newIndex, item);
+                      _config = isLeft
+                          ? _config.copyWith(leftLines: updated)
+                          : _config.copyWith(centreLines: updated);
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    return _buildLineCard(
+                      key: ValueKey('${isLeft ? "left" : "centre"}_$index'),
+                      line: lines[index],
+                      index: index,
+                      isLeft: isLeft,
+                    );
+                  },
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(12),
+          child: SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => _addLine(isLeft),
+              icon: Icon(AppIcons.add),
+              label: const Text('Add Text Line'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLineCard({
+    required Key key,
+    required HeaderTextLine line,
+    required int index,
+    required bool isLeft,
+  }) {
+    final lines = isLeft ? _config.leftLines : _config.centreLines;
+
+    return Card(
+      key: key,
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(AppIcons.menu, color: Colors.grey),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _labelForKey(line.key),
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(AppIcons.trash, size: 20),
+                  color: Colors.red,
+                  onPressed: () {
+                    setState(() {
+                      final updated = List<HeaderTextLine>.from(lines);
+                      updated.removeAt(index);
+                      _config = isLeft
+                          ? _config.copyWith(leftLines: updated)
+                          : _config.copyWith(centreLines: updated);
+                    });
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              initialValue: line.value,
+              decoration: const InputDecoration(
+                labelText: 'Text',
+                hintText: 'Enter text...',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              textInputAction: TextInputAction.done,
+              onChanged: (val) {
+                final updated = List<HeaderTextLine>.from(lines);
+                updated[index] = updated[index].copyWith(value: val);
+                _config = isLeft
+                    ? _config.copyWith(leftLines: updated)
+                    : _config.copyWith(centreLines: updated);
+                setState(() {});
+              },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text('Size:', style: TextStyle(fontSize: 12)),
+                Expanded(
+                  child: AdaptiveSlider(
+                    value: line.fontSize,
+                    min: 6,
+                    max: 14,
+                    divisions: 8,
+                    onChanged: (val) {
+                      setState(() {
+                        final updated = List<HeaderTextLine>.from(lines);
+                        updated[index] = updated[index].copyWith(fontSize: val);
+                        _config = isLeft
+                            ? _config.copyWith(leftLines: updated)
+                            : _config.copyWith(centreLines: updated);
+                      });
+                    },
+                  ),
+                ),
+                Text('${line.fontSize.toInt()}',
+                    style: const TextStyle(fontSize: 12)),
+                const SizedBox(width: 12),
+                FilterChip(
+                  label: const Text('B',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  selected: line.bold,
+                  onSelected: (val) {
+                    setState(() {
+                      final updated = List<HeaderTextLine>.from(lines);
+                      updated[index] = updated[index].copyWith(bold: val);
+                      _config = isLeft
+                          ? _config.copyWith(leftLines: updated)
+                          : _config.copyWith(centreLines: updated);
+                    });
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _addLine(bool isLeft) {
+    final options = <_LineOption>[
+      const _LineOption('companyDetails', 'Company Details'),
+      const _LineOption('contactInfo', 'Contact Info'),
+      const _LineOption('website', 'Website'),
+      const _LineOption('email', 'Email'),
+      const _LineOption('custom', 'Custom Text'),
+    ];
+
+    showAdaptiveActionSheet(
+      context: context,
+      title: 'Add Text Line',
+      options: options.map((opt) {
+        return ActionSheetOption(
+          label: opt.label,
+          onTap: () {
+            setState(() {
+              final newLine = HeaderTextLine(key: opt.key, fontSize: 7);
+              final lines = isLeft
+                  ? List<HeaderTextLine>.from(_config.leftLines)
+                  : List<HeaderTextLine>.from(_config.centreLines);
+              lines.add(newLine);
+              _config = isLeft
+                  ? _config.copyWith(leftLines: lines)
+                  : _config.copyWith(centreLines: lines);
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  String _labelForKey(String key) {
+    switch (key) {
+      case 'companyDetails': return 'Company Details';
+      case 'contactInfo': return 'Contact Info';
+      case 'website': return 'Website';
+      case 'email': return 'Email';
+      case 'custom': return 'Custom Text';
+      default: return key;
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// COLOUR SCHEME EDITOR — preset grid, custom picker, rich preview
+// ═══════════════════════════════════════════════════════════════════
 
 class _CompanyColourEditorScreen extends StatefulWidget {
   final String companyId;
@@ -531,13 +1291,70 @@ class _CompanyColourEditorScreen extends StatefulWidget {
 }
 
 class _CompanyColourEditorState extends State<_CompanyColourEditorScreen> {
-  late Color _selectedColor;
-  bool _isSaving = false;
+  late PdfColourScheme _scheme;
 
   @override
   void initState() {
     super.initState();
-    _selectedColor = Color(widget.initialScheme.primaryColorValue);
+    _scheme = widget.initialScheme;
+  }
+
+  Color get _primaryFlutterColor => Color(_scheme.primaryColorValue);
+
+  Color _lightTint(Color c) => Color.lerp(c, Colors.white, 0.9)!;
+
+  Color _mediumTint(Color c) => Color.lerp(c, Colors.white, 0.6)!;
+
+  void _selectPreset(PdfColourScheme scheme) {
+    setState(() => _scheme = scheme);
+  }
+
+  void _openCustomPicker() {
+    Color pickerColor = _primaryFlutterColor;
+    showPremiumDialog(
+      context: context,
+      child: Builder(
+        builder: (context) => AlertDialog(
+          title: const Text('Pick a colour'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              pickerColor: pickerColor,
+              onColorChanged: (color) => pickerColor = color,
+              enableAlpha: false,
+              labelTypes: const [],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _scheme = PdfColourScheme(
+                    primaryColorValue: pickerColor.toARGB32(),
+                  );
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Select'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    await CompanyPdfConfigService.instance.saveColourScheme(
+      widget.companyId,
+      _scheme,
+      widget.docType,
+    );
+    if (!mounted) return;
+    context.showSuccessToast('Colour scheme saved');
+    Navigator.pop(context);
   }
 
   @override
@@ -550,9 +1367,10 @@ class _CompanyColourEditorState extends State<_CompanyColourEditorScreen> {
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: TextButton(
-              onPressed: _isSaving ? null : _save,
-              child: const Text('Save'),
+            child: AnimatedSaveButton(
+              label: 'Save',
+              onPressed: _save,
+              outlined: true,
             ),
           ),
         ],
@@ -560,64 +1378,132 @@ class _CompanyColourEditorState extends State<_CompanyColourEditorScreen> {
       body: ListView(
         padding: const EdgeInsets.all(AppTheme.screenPadding),
         children: [
-          const Text(
-            'Primary Colour',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              Colors.blue,
-              AppTheme.primaryBlue,
-              Colors.indigo,
-              Colors.teal,
-              Colors.green,
-              Colors.orange,
-              Colors.red,
-              Colors.purple,
-              Colors.brown,
-              Colors.blueGrey,
-            ].map((color) {
-              final isSelected = _selectedColor.toARGB32() == color.toARGB32();
-              return GestureDetector(
-                onTap: () => setState(() => _selectedColor = color),
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: isSelected
-                        ? Border.all(
-                            color: isDark ? Colors.white : Colors.black,
-                            width: 3,
-                          )
-                        : null,
-                  ),
-                  child: isSelected
-                      ? const Icon(Icons.check, color: Colors.white, size: 24)
-                      : null,
-                ),
-              );
-            }).toList(),
-          ),
+          // Preview mockup
+          widget.docType == PdfDocumentType.invoice
+              ? _buildInvoicePreview()
+              : _buildJobsheetPreview(),
           const SizedBox(height: 24),
-          Container(
-            height: 60,
-            decoration: BoxDecoration(
-              color: _selectedColor,
-              borderRadius: BorderRadius.circular(12),
+
+          // Preset schemes
+          Text(
+            'Preset Schemes',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
             ),
-            alignment: Alignment.center,
-            child: const Text(
-              'Preview',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
+          ),
+          const SizedBox(height: 12),
+          _buildPresetGrid(isDark),
+          const SizedBox(height: 24),
+
+          // Custom colour picker button
+          OutlinedButton.icon(
+            onPressed: _openCustomPicker,
+            icon: Icon(AppIcons.colorSwatch),
+            label: const Text('Custom Colour'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── PREVIEWS ──────────────────────────────────────────────
+
+  Widget _buildJobsheetPreview() {
+    final primary = _primaryFlutterColor;
+    final light = _lightTint(primary);
+    final textColor = AppTheme.textPrimary;
+    final subtleText = AppTheme.textSecondary;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: primary, width: 2)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('YOUR COMPANY',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primary)),
+                      const SizedBox(height: 2),
+                      Text('Professional Services',
+                          style: TextStyle(fontSize: 9, color: subtleText)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text('JOBSHEET',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _mockSectionHeader('JOB INFORMATION', primary),
+                _mockFieldRow('Date:', '14/03/2026', light, false),
+                _mockFieldRow('Engineer:', 'John Smith', light, true),
+                _mockFieldRow('Job No:', 'JS-001', light, false),
+                const SizedBox(height: 10),
+                _mockSectionHeader('WORK DETAILS', primary),
+                _mockFieldRow('System Type:', 'Conventional', light, false),
+                _mockFieldRow('Panels Tested:', 'Yes', light, true),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    border: Border(
+                      left: BorderSide(color: primary, width: 4),
+                      top: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                      right: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                      bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('CERTIFICATION STATEMENT',
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: textColor)),
+                      const SizedBox(height: 2),
+                      Text('Work carried out in accordance with BS 5839-1.',
+                          style: TextStyle(fontSize: 8, color: subtleText)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _mockSignatureBox('Engineer', light)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _mockSignatureBox('Customer', light)),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
@@ -625,25 +1511,290 @@ class _CompanyColourEditorState extends State<_CompanyColourEditorScreen> {
     );
   }
 
-  Future<void> _save() async {
-    setState(() => _isSaving = true);
-    try {
-      final scheme = PdfColourScheme(primaryColorValue: _selectedColor.toARGB32());
+  Widget _buildInvoicePreview() {
+    final primary = _primaryFlutterColor;
+    final light = _lightTint(primary);
+    final textColor = AppTheme.textPrimary;
+    final subtleText = AppTheme.textSecondary;
 
-      await CompanyPdfConfigService.instance.saveColourScheme(
-        widget.companyId,
-        scheme,
-        widget.docType,
-      );
-
-      if (mounted) {
-        context.showSuccessToast('Colour scheme saved');
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) context.showErrorToast('Failed to save colour scheme');
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, 2))],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: primary, width: 2)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('YOUR COMPANY',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: primary)),
+                      const SizedBox(height: 2),
+                      Text('Professional Services',
+                          style: TextStyle(fontSize: 9, color: subtleText)),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text('INVOICE',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Invoice No: INV-001', style: TextStyle(fontSize: 9, color: textColor)),
+                      Text('Date: 01/01/2025', style: TextStyle(fontSize: 9, color: textColor)),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: _mediumTint(primary).withValues(alpha: 0.5)),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: primary,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(3),
+                            topRight: Radius.circular(3),
+                          ),
+                        ),
+                        child: Row(
+                          children: const [
+                            Expanded(flex: 3, child: Text('Description', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white))),
+                            Expanded(child: Text('Qty', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.center)),
+                            Expanded(child: Text('Total', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.white), textAlign: TextAlign.right)),
+                          ],
+                        ),
+                      ),
+                      _mockTableRow('Service item one', '1', '\u00A3250.00', textColor),
+                      _mockTableRow('Service item two', '2', '\u00A3500.00', textColor),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Text('TOTAL: \u00A3750.00',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: primary)),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: light,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Payment Details',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: primary)),
+                      const SizedBox(height: 2),
+                      Text('Bank: Example Bank | Sort Code: 12-34-56',
+                          style: TextStyle(fontSize: 8, color: subtleText)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
+
+  // ─── PREVIEW HELPERS ───────────────────────────────────────
+
+  Widget _mockSectionHeader(String title, Color primary) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.only(bottom: 2),
+      decoration: BoxDecoration(
+        color: primary,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(4),
+          topRight: Radius.circular(4),
+        ),
+      ),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _mockFieldRow(String label, String value, Color light, bool isAlternate) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: isAlternate ? light : null,
+        borderRadius: BorderRadius.circular(2),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 75,
+            child: Text(label,
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+          ),
+          Expanded(
+            child: Text(value, style: TextStyle(fontSize: 9, color: AppTheme.textPrimary)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mockSignatureBox(String label, Color light) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppTheme.textPrimary)),
+        const SizedBox(height: 4),
+        Container(
+          height: 28,
+          decoration: BoxDecoration(
+            color: light,
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: Center(
+            child: Text('Signature', style: TextStyle(fontSize: 7, color: Colors.grey.shade400)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _mockTableRow(String desc, String qty, String total, Color textColor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey.shade200, width: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Expanded(flex: 3, child: Text(desc, style: TextStyle(fontSize: 9, color: textColor))),
+          Expanded(child: Text(qty, style: TextStyle(fontSize: 9, color: textColor), textAlign: TextAlign.center)),
+          Expanded(child: Text(total, style: TextStyle(fontSize: 9, color: textColor), textAlign: TextAlign.right)),
+        ],
+      ),
+    );
+  }
+
+  // ─── PRESET GRID ───────────────────────────────────────────
+
+  Widget _buildPresetGrid(bool isDark) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 4,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.85,
+      ),
+      itemCount: PdfColourScheme.presets.length,
+      itemBuilder: (context, index) {
+        final preset = PdfColourScheme.presets[index];
+        final color = Color(preset.scheme.primaryColorValue);
+        final isSelected = _scheme.primaryColorValue == preset.scheme.primaryColorValue;
+
+        return GestureDetector(
+          onTap: () => _selectPreset(preset.scheme),
+          child: Column(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: isSelected
+                      ? Border.all(
+                          color: isDark ? Colors.white : AppTheme.textPrimary,
+                          width: 3,
+                        )
+                      : null,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: isSelected
+                    ? Icon(AppIcons.tickCircle, color: Colors.white, size: 22)
+                    : null,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                preset.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LineOption {
+  final String key;
+  final String label;
+  const _LineOption(this.key, this.label);
 }

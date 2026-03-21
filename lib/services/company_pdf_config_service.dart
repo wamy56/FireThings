@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/pdf_header_config.dart';
 import '../models/pdf_footer_config.dart';
 import '../models/pdf_colour_scheme.dart';
+import 'branding_service.dart';
 import 'pdf_header_config_service.dart';
 import 'pdf_footer_config_service.dart';
 import 'pdf_colour_scheme_service.dart';
@@ -20,6 +21,8 @@ class CompanyPdfConfigService {
   final Map<String, PdfHeaderConfig> _headerCache = {};
   final Map<String, PdfFooterConfig> _footerCache = {};
   final Map<String, PdfColourScheme> _colourCache = {};
+  Uint8List? _logoCache;
+  String? _logoCacheCompanyId;
 
   String _cacheKey(String companyId, PdfDocumentType type) =>
       '${companyId}_${type.name}';
@@ -124,11 +127,64 @@ class CompanyPdfConfigService {
     });
   }
 
+  // --- Company Logo ---
+
+  /// Upload logo bytes to Firestore at companies/{companyId}/pdf_config/logo
+  Future<void> saveCompanyLogo(String companyId, Uint8List bytes) async {
+    await _firestore.collection('companies').doc(companyId)
+      .collection('pdf_config').doc('logo')
+      .set({'bytes': Blob(bytes), 'updatedAt': FieldValue.serverTimestamp()});
+    _logoCache = bytes;
+    _logoCacheCompanyId = companyId;
+  }
+
+  /// Get company logo bytes (cached)
+  Future<Uint8List?> getCompanyLogoBytes(String companyId) async {
+    if (_logoCacheCompanyId == companyId && _logoCache != null) return _logoCache;
+    try {
+      final doc = await _firestore.collection('companies').doc(companyId)
+        .collection('pdf_config').doc('logo').get();
+      if (!doc.exists) return null;
+      final blob = doc.data()?['bytes'] as Blob?;
+      if (blob == null) return null;
+      _logoCache = blob.bytes;
+      _logoCacheCompanyId = companyId;
+      return _logoCache;
+    } catch (e) {
+      debugPrint('CompanyPdfConfigService: getCompanyLogoBytes failed: $e');
+      return null;
+    }
+  }
+
+  /// Remove company logo
+  Future<void> removeCompanyLogo(String companyId) async {
+    await _firestore.collection('companies').doc(companyId)
+      .collection('pdf_config').doc('logo').delete();
+    if (_logoCacheCompanyId == companyId) {
+      _logoCache = null;
+      _logoCacheCompanyId = null;
+    }
+  }
+
+  /// Resolve logo bytes: company first (if useCompanyBranding), then personal fallback
+  Future<Uint8List?> getEffectiveLogoBytes({bool useCompanyBranding = false}) async {
+    if (useCompanyBranding) {
+      final companyId = UserProfileService.instance.companyId;
+      if (companyId != null) {
+        final companyLogo = await getCompanyLogoBytes(companyId);
+        if (companyLogo != null) return companyLogo;
+      }
+    }
+    return BrandingService.getLogoBytes();
+  }
+
   /// Clear cached config (e.g. on company change)
   void clearCache() {
     _headerCache.clear();
     _footerCache.clear();
     _colourCache.clear();
+    _logoCache = null;
+    _logoCacheCompanyId = null;
   }
 
   // --- B2: Effective config resolution ---

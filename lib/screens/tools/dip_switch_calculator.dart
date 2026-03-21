@@ -316,9 +316,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
     final values = [1, 2, 4, 8, 16, 32, 64, 128];
     final positions = [1, 2, 3, 4, 5, 6, 7, 8];
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDark
-        ? AppTheme.darkPrimaryBlue
-        : AppTheme.primaryBlue;
+    final primaryColor = AppTheme.darkPrimaryBlue;
     final offBorderColor = isDark ? AppTheme.darkDivider : AppTheme.lightGrey;
     final offBgColor = isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite;
     final offTextColor = isDark
@@ -440,10 +438,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
   }
 
   Widget _buildResultPanel() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDark
-        ? AppTheme.darkPrimaryBlue
-        : AppTheme.primaryBlue;
+    final primaryColor = AppTheme.darkPrimaryBlue;
 
     String binaryString = '';
     for (int i = 7; i >= 0; i--) {
@@ -497,10 +492,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
   }
 
   Widget _buildAddressableChip() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDark
-        ? AppTheme.darkPrimaryBlue
-        : AppTheme.primaryBlue;
+    final primaryColor = AppTheme.darkPrimaryBlue;
 
     return SimpleCard(
       child: Column(
@@ -568,9 +560,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
   }) {
     final isOn = _switchStates[index];
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primaryColor = isDark
-        ? AppTheme.darkPrimaryBlue
-        : AppTheme.primaryBlue;
+    final primaryColor = AppTheme.darkPrimaryBlue;
     final offTextColor = isDark
         ? AppTheme.darkTextSecondary
         : AppTheme.mediumGrey;
@@ -712,10 +702,7 @@ class _DipSwitchCalculatorScreenState extends State<DipSwitchCalculatorScreen> {
       itemCount: _favorites.length,
       itemBuilder: (context, index) {
         final favorite = _favorites[index];
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final primaryColor = isDark
-            ? AppTheme.darkPrimaryBlue
-            : AppTheme.primaryBlue;
+        final primaryColor = AppTheme.darkPrimaryBlue;
 
         return Padding(
           padding: const EdgeInsets.only(bottom: AppTheme.listItemSpacing),

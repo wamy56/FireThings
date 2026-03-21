@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class DeclineJobDialog extends StatefulWidget {
   const DeclineJobDialog({super.key});
@@ -29,7 +30,8 @@ class _DeclineJobDialogState extends State<DeclineJobDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Decline Job'),
-      content: SingleChildScrollView(
+      content: KeyboardDismissWrapper(
+        child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,6 +67,7 @@ class _DeclineJobDialogState extends State<DeclineJobDialog> {
             ],
           ],
         ),
+      ),
       ),
       actions: [
         TextButton(

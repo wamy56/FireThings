@@ -6,6 +6,7 @@ import '../../services/analytics_service.dart';
 import '../../services/auth_service.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
+import '../../utils/adaptive_widgets.dart';
 import '../../widgets/widgets.dart';
 
 class SavedCustomersScreen extends StatefulWidget {
@@ -18,14 +19,23 @@ class SavedCustomersScreen extends StatefulWidget {
 class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
   final _dbHelper = DatabaseHelper.instance;
   final _authService = AuthService();
+  final _searchController = TextEditingController();
 
-  List<SavedCustomer> _customers = [];
+  List<SavedCustomer> _allCustomers = [];
+  List<SavedCustomer> _filteredCustomers = [];
   bool _isLoading = true;
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
     _loadCustomers();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCustomers() async {
@@ -36,7 +46,8 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
       if (user != null) {
         final customers = await _dbHelper.getSavedCustomersByEngineerId(user.uid);
         setState(() {
-          _customers = customers;
+          _allCustomers = customers;
+          _filterCustomers(_searchQuery);
           _isLoading = false;
         });
       }
@@ -48,20 +59,79 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
     }
   }
 
+  void _filterCustomers(String query) {
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _filteredCustomers = _allCustomers;
+      } else {
+        final q = query.toLowerCase();
+        _filteredCustomers = _allCustomers.where((c) {
+          return c.customerName.toLowerCase().contains(q) ||
+              c.customerAddress.toLowerCase().contains(q) ||
+              (c.email?.toLowerCase().contains(q) ?? false);
+        }).toList();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AdaptiveNavigationBar(
         title: 'Saved Customers',
       ),
-      body: KeyboardDismissWrapper(child: _isLoading
-          ? const Padding(
-              padding: EdgeInsets.all(16),
-              child: SkeletonList(itemCount: 5, showLeading: true),
-            )
-          : _customers.isEmpty
-              ? _buildEmptyState()
-              : _buildCustomerList()),
+      body: KeyboardDismissWrapper(child: Column(
+        children: [
+          // Search bar
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search customers...',
+                prefixIcon: const Icon(AppIcons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(AppIcons.close),
+                        onPressed: () {
+                          _searchController.clear();
+                          _filterCustomers('');
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: _filterCustomers,
+            ),
+          ),
+
+          // Customer count
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Text(
+                  '${_filteredCustomers.length} customer${_filteredCustomers.length == 1 ? '' : 's'}',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Customer list
+          Expanded(
+            child: _isLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: SkeletonList(itemCount: 5, showLeading: true),
+                  )
+                : _filteredCustomers.isEmpty
+                    ? _buildEmptyState()
+                    : _buildCustomerList(),
+          ),
+        ],
+      )),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showCustomerDialog(),
         child: const Icon(AppIcons.add),
@@ -70,48 +140,29 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(AppIcons.people, size: 80, color: Colors.grey[400]),
-            const SizedBox(height: 16),
-            Text(
-              'No Saved Customers',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add customers here for quick selection when creating invoices',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => _showCustomerDialog(),
-              icon: const Icon(AppIcons.add),
-              label: const Text('Add Customer'),
-            ),
-          ],
-        ),
-      ),
+    final hasSearchQuery = _searchQuery.isNotEmpty;
+    return EmptyState(
+      icon: hasSearchQuery ? AppIcons.searchOff : AppIcons.people,
+      title: hasSearchQuery ? 'No Results Found' : 'No Saved Customers',
+      message: hasSearchQuery
+          ? 'Try a different search term'
+          : 'Add customers here for quick selection when creating invoices',
+      buttonText: hasSearchQuery ? null : 'Add Customer',
+      onButtonPressed: hasSearchQuery ? null : () => _showCustomerDialog(),
     );
   }
 
   Widget _buildCustomerList() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _customers.length,
-      itemBuilder: (context, index) {
-        final customer = _customers[index];
-        return _buildCustomerCard(customer).animateListItem(index);
-      },
+    return AdaptiveRefreshIndicator(
+      onRefresh: _loadCustomers,
+      child: ListView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _filteredCustomers.length,
+        itemBuilder: (context, index) {
+          final customer = _filteredCustomers[index];
+          return _buildCustomerCard(customer).animateListItem(index);
+        },
+      ),
     );
   }
 

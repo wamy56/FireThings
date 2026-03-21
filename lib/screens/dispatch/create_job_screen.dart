@@ -14,6 +14,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 
 class CreateJobScreen extends StatefulWidget {
@@ -258,7 +259,8 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
           ),
         ],
       ),
-      body: Form(
+      body: KeyboardDismissWrapper(
+        child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(AppTheme.screenPadding),
@@ -471,6 +473,7 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
             const SizedBox(height: 40),
           ],
         ),
+      ),
       ),
     );
   }
