@@ -14,7 +14,9 @@ import '../../utils/adaptive_widgets.dart';
 import '../../widgets/keyboard_dismiss_wrapper.dart';
 
 class PdfHeaderDesignerScreen extends StatefulWidget {
-  const PdfHeaderDesignerScreen({super.key});
+  final PdfDocumentType? docType;
+
+  const PdfHeaderDesignerScreen({super.key, this.docType});
 
   @override
   State<PdfHeaderDesignerScreen> createState() =>
@@ -27,11 +29,12 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
   PdfHeaderConfig _config = PdfHeaderConfig.defaults();
   String? _logoPath;
   bool _isLoading = true;
-  PdfDocumentType _selectedDocType = PdfDocumentType.jobsheet;
+  late PdfDocumentType _selectedDocType;
 
   @override
   void initState() {
     super.initState();
+    _selectedDocType = widget.docType ?? PdfDocumentType.jobsheet;
     _tabController = TabController(length: 3, vsync: this);
     _loadData();
   }
@@ -157,28 +160,32 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
       ),
       body: KeyboardDismissWrapper(child: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
-          : Column(
+          : Center(
+            child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 750),
+            child: Column(
               children: [
                 // Document type toggle
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                  child: SegmentedButton<PdfDocumentType>(
-                    segments: [
-                      ButtonSegment(
-                        value: PdfDocumentType.jobsheet,
-                        label: const Text('Jobsheet'),
-                        icon: Icon(AppIcons.document),
-                      ),
-                      ButtonSegment(
-                        value: PdfDocumentType.invoice,
-                        label: const Text('Invoice'),
-                        icon: Icon(AppIcons.receipt),
-                      ),
-                    ],
-                    selected: {_selectedDocType},
-                    onSelectionChanged: (selection) => _switchDocType(selection.first),
+                if (widget.docType == null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: SegmentedButton<PdfDocumentType>(
+                      segments: [
+                        ButtonSegment(
+                          value: PdfDocumentType.jobsheet,
+                          label: const Text('Jobsheet'),
+                          icon: Icon(AppIcons.document),
+                        ),
+                        ButtonSegment(
+                          value: PdfDocumentType.invoice,
+                          label: const Text('Invoice'),
+                          icon: Icon(AppIcons.receipt),
+                        ),
+                      ],
+                      selected: {_selectedDocType},
+                      onSelectionChanged: (selection) => _switchDocType(selection.first),
+                    ),
                   ),
-                ),
                 // Live Preview
                 _buildPreview(),
                 // Tabs
@@ -201,6 +208,8 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
                   ),
                 ),
               ],
+            ),
+            ),
             )),
     );
   }

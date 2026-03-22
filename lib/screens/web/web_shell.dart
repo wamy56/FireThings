@@ -55,6 +55,18 @@ class _WebShellState extends State<WebShell> {
     } catch (_) {}
   }
 
+  Widget _buildSidebarLogo() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.asset(
+        'assets/images/firethings_logo_vertical.png',
+        width: 36,
+        height: 36,
+        fit: BoxFit.contain,
+      ),
+    );
+  }
+
   void _cycleTheme() {
     final current = themeNotifier.value;
     ThemeMode next;
@@ -244,19 +256,7 @@ class _WebShellState extends State<WebShell> {
             ? Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryBlue,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.local_fire_department,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
+                  _buildSidebarLogo(),
                   const SizedBox(width: 12),
                   Text(
                     'FireThings',
@@ -265,22 +265,11 @@ class _WebShellState extends State<WebShell> {
                       fontSize: 16,
                       color: isDark ? Colors.white : AppTheme.darkGrey,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               )
-            : Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppTheme.primaryBlue,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.local_fire_department,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
+            : _buildSidebarLogo(),
       ),
       trailing: Expanded(
         child: Align(

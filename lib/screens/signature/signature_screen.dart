@@ -6,6 +6,7 @@ import 'dart:convert';
 import '../../models/models.dart';
 import '../../services/database_helper.dart';
 import '../../services/dispatch_service.dart';
+import '../../services/firestore_sync_service.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/widgets.dart';
 import '../../services/analytics_service.dart';
@@ -218,6 +219,11 @@ class _SignatureScreenState extends State<SignatureScreen> {
             jobId: widget.dispatchedJob!.id,
             newStatus: DispatchedJobStatus.completed,
             linkedJobsheetId: updatedJobsheet.id,
+          );
+          // Copy completed jobsheet to company collection for dispatcher access
+          FirestoreSyncService.instance.copyJobsheetToCompany(
+            updatedJobsheet,
+            widget.dispatchedJob!.companyId,
           );
           AnalyticsService.instance.logDispatchJobsheetCreated(
             widget.dispatchedJob!.companyId,

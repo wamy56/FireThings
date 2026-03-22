@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/pdf_header_config.dart' show PdfDocumentType;
 import '../../utils/adaptive_widgets.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -8,153 +9,172 @@ import '../settings/pdf_colour_scheme_screen.dart';
 import '../../widgets/adaptive_app_bar.dart';
 
 class PdfDesignScreen extends StatelessWidget {
-  const PdfDesignScreen({super.key});
+  /// When null, shows both Jobsheet and Invoice sections (used from Settings).
+  /// When provided, shows only that document type's section (used from hubs).
+  final PdfDocumentType? docType;
+
+  const PdfDesignScreen({super.key, this.docType});
+
+  String get _title {
+    if (docType == null) return 'PDF Branding';
+    return docType == PdfDocumentType.jobsheet
+        ? 'Jobsheet PDF Design'
+        : 'Invoice PDF Design';
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite;
-    final shadow = isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow;
 
     return Scaffold(
-      appBar: AdaptiveNavigationBar(title: 'PDF Design'),
+      appBar: AdaptiveNavigationBar(title: _title),
       body: ListView(
         padding: const EdgeInsets.all(AppTheme.screenPadding),
         children: [
-          // Info banner
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: isDark ? Colors.blue.shade900.withValues(alpha: 0.3) : Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-              border: Border.all(
-                color: isDark ? Colors.blue.shade700 : Colors.blue.shade200,
+          if (docType == null) ...[
+            Text(
+              'Customise the PDF branding used for your jobsheets and invoices.',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
               ),
             ),
-            child: Row(
-              children: [
-                Icon(AppIcons.infoCircle, color: Colors.blue.shade600, size: 22),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Each designer lets you toggle between jobsheet and invoice styling, so you can customise them independently.',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      color: isDark ? Colors.blue.shade200 : Colors.blue.shade800,
-                    ),
-                  ),
+            const SizedBox(height: 24),
+          ],
+
+          // Jobsheet section
+          if (docType == null || docType == PdfDocumentType.jobsheet) ...[
+            _buildSectionTitle('Jobsheet PDF', isDark),
+            const SizedBox(height: 12),
+            _buildConfigCard(
+              context,
+              isDark,
+              'Header',
+              AppIcons.edit,
+              'Customise your jobsheet PDF header and logo',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfHeaderDesignerScreen(docType: PdfDocumentType.jobsheet),
                 ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-
-          // Header Designer tile
-          _buildTile(
-            context,
-            icon: AppIcons.edit,
-            title: 'Header Designer',
-            subtitle: 'Customise your PDF header and logo',
-            cardColor: cardColor,
-            shadow: shadow,
-            onTap: () => Navigator.push(
+            const SizedBox(height: 8),
+            _buildConfigCard(
               context,
-              adaptivePageRoute(builder: (_) => const PdfHeaderDesignerScreen()),
+              isDark,
+              'Footer',
+              AppIcons.edit,
+              'Customise your jobsheet PDF footer content',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfFooterDesignerScreen(docType: PdfDocumentType.jobsheet),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-
-          // Footer Designer tile
-          _buildTile(
-            context,
-            icon: AppIcons.edit,
-            title: 'Footer Designer',
-            subtitle: 'Customise your PDF footer content',
-            cardColor: cardColor,
-            shadow: shadow,
-            onTap: () => Navigator.push(
+            const SizedBox(height: 8),
+            _buildConfigCard(
               context,
-              adaptivePageRoute(builder: (_) => const PdfFooterDesignerScreen()),
+              isDark,
+              'Colour Scheme',
+              AppIcons.colorSwatch,
+              'Choose your jobsheet PDF colour theme',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfColourSchemeScreen(docType: PdfDocumentType.jobsheet),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+          ],
 
-          // Colour Scheme tile
-          _buildTile(
-            context,
-            icon: AppIcons.colorSwatch,
-            title: 'Colour Scheme',
-            subtitle: 'Choose your PDF colour theme',
-            cardColor: cardColor,
-            shadow: shadow,
-            onTap: () => Navigator.push(
+          if (docType == null) const SizedBox(height: 32),
+
+          // Invoice section
+          if (docType == null || docType == PdfDocumentType.invoice) ...[
+            _buildSectionTitle('Invoice PDF', isDark),
+            const SizedBox(height: 12),
+            _buildConfigCard(
               context,
-              adaptivePageRoute(builder: (_) => const PdfColourSchemeScreen()),
+              isDark,
+              'Header',
+              AppIcons.edit,
+              'Customise your invoice PDF header and logo',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfHeaderDesignerScreen(docType: PdfDocumentType.invoice),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(height: 8),
+            _buildConfigCard(
+              context,
+              isDark,
+              'Footer',
+              AppIcons.edit,
+              'Customise your invoice PDF footer content',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfFooterDesignerScreen(docType: PdfDocumentType.invoice),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildConfigCard(
+              context,
+              isDark,
+              'Colour Scheme',
+              AppIcons.colorSwatch,
+              'Choose your invoice PDF colour theme',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfColourSchemeScreen(docType: PdfDocumentType.invoice),
+                ),
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  Widget _buildTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color cardColor,
-    required List<BoxShadow> shadow,
-    required VoidCallback onTap,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  Widget _buildSectionTitle(String title, bool isDark) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+      ),
+    );
+  }
 
+  Widget _buildConfigCard(
+    BuildContext context,
+    bool isDark,
+    String title,
+    IconData icon,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
     return Container(
       decoration: BoxDecoration(
-        color: cardColor,
+        color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: shadow,
+        boxShadow: isDark ? null : AppTheme.cardShadow,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Icon(icon, color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue, size: 28),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  AppIcons.arrowRight,
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-                ),
-              ],
-            ),
-          ),
-        ),
+      child: ListTile(
+        leading: Icon(icon, color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(subtitle),
+        trailing: Icon(AppIcons.arrowRight),
+        onTap: onTap,
       ),
     );
   }

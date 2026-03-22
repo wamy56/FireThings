@@ -13,6 +13,7 @@ import '../tools/invoice_screen.dart';
 import '../saved_customers/saved_customers_screen.dart';
 import 'invoice_list_screen.dart';
 import 'bank_details_screen.dart';
+import '../../models/pdf_header_config.dart' show PdfDocumentType;
 import 'pdf_design_screen.dart';
 
 class InvoicingHubScreen extends StatefulWidget {
@@ -337,7 +338,7 @@ class _InvoicingHubScreenState extends State<InvoicingHubScreen> {
                           onTap: () => Navigator.push(
                             context,
                             adaptivePageRoute(
-                              builder: (_) => const PdfDesignScreen(),
+                              builder: (_) => const PdfDesignScreen(docType: PdfDocumentType.invoice),
                             ),
                           ),
                         ),

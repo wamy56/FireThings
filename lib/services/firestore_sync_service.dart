@@ -422,6 +422,25 @@ class FirestoreSyncService {
     }
   }
 
+  // ==================== COMPANY JOBSHEET SHARING ====================
+
+  /// Copy a completed jobsheet to the company collection so dispatchers can view it.
+  /// Only for completed jobsheets linked to a dispatched job.
+  Future<void> copyJobsheetToCompany(Jobsheet jobsheet, String companyId) async {
+    if (companyId.isEmpty) return;
+    try {
+      await _firestore
+          .collection('companies')
+          .doc(companyId)
+          .collection('completed_jobsheets')
+          .doc(jobsheet.id)
+          .set(jobsheet.toJson());
+      debugPrint('FirestoreSync: copied jobsheet ${jobsheet.id} to company $companyId');
+    } catch (e) {
+      debugPrint('FirestoreSync: failed to copy jobsheet to company: $e');
+    }
+  }
+
   // ==================== ACCOUNT DELETION ====================
 
   /// Delete all Firestore data for the current user (GDPR right-to-erasure).

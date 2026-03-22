@@ -40,9 +40,10 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Shared Sites')),
       floatingActionButton: _canEdit
-          ? FloatingActionButton(
+          ? FloatingActionButton.extended(
               onPressed: () => _showSiteDialog(),
-              child: Icon(AppIcons.add),
+              icon: Icon(AppIcons.add),
+              label: const Text('Add Site'),
             )
           : null,
       body: KeyboardDismissWrapper(
@@ -290,7 +291,9 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(isEdit ? 'Edit Site' : 'Add Site'),
-        content: KeyboardDismissWrapper(
+        content: SizedBox(
+          width: 500,
+          child: KeyboardDismissWrapper(
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -317,6 +320,7 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
               ],
             ),
           ),
+        ),
         ),
         actions: [
           TextButton(

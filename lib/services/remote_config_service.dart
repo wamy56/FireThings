@@ -46,7 +46,7 @@ class RemoteConfigService {
   /// Must be called after the user is authenticated so email is available.
   Future<void> refreshForUser(String? email) async {
     try {
-      const dispatchTesters = ['cscott93@hotmail.co.uk'];
+      const dispatchTesters = ['cscott93@hotmail.co.uk', 'test@test.com'];
       if (dispatchTesters.contains(email)) {
         await FirebaseAnalytics.instance.setUserProperty(
           name: 'dispatch_tester',

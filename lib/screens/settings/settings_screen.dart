@@ -26,9 +26,7 @@ import '../company/team_management_screen.dart';
 import 'profile_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'manage_permissions_screen.dart';
-import 'pdf_header_designer_screen.dart';
-import 'pdf_footer_designer_screen.dart';
-import 'pdf_colour_scheme_screen.dart';
+import '../invoicing/pdf_design_screen.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/tools_disclaimer_gate.dart';
 
@@ -214,40 +212,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             isApple: isApple,
             tiles: [
               _SettingsTileData(
-                title: 'PDF Header Designer',
-                subtitle: 'Design your PDF header layout and logo',
+                title: 'PDF Branding',
+                subtitle: 'Customise your jobsheet and invoice PDF design',
                 icon: AppIcons.designtools,
                 onTap: () {
                   Navigator.push(
                     context,
                     adaptivePageRoute(
-                      builder: (_) => const PdfHeaderDesignerScreen(),
-                    ),
-                  );
-                },
-              ),
-              _SettingsTileData(
-                title: 'PDF Footer Designer',
-                subtitle: 'Design your PDF footer layout and text',
-                icon: AppIcons.designtools,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    adaptivePageRoute(
-                      builder: (_) => const PdfFooterDesignerScreen(),
-                    ),
-                  );
-                },
-              ),
-              _SettingsTileData(
-                title: 'PDF Colour Scheme',
-                subtitle: 'Choose your PDF colour theme',
-                icon: AppIcons.colorSwatch,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    adaptivePageRoute(
-                      builder: (_) => const PdfColourSchemeScreen(),
+                      builder: (_) => const PdfDesignScreen(),
                     ),
                   );
                 },

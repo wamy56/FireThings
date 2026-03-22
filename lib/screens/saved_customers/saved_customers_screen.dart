@@ -132,9 +132,10 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
           ),
         ],
       )),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCustomerDialog(),
-        child: const Icon(AppIcons.add),
+        icon: const Icon(AppIcons.add),
+        label: const Text('Add Customer'),
       ),
     );
   }
@@ -234,7 +235,9 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
       child: Builder(
         builder: (context) => AlertDialog(
         title: Text(customer != null ? 'Edit Customer' : 'Add Customer'),
-        content: SingleChildScrollView(
+        content: SizedBox(
+          width: 500,
+          child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -269,6 +272,7 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
               ),
             ],
           ),
+        ),
         ),
         actions: [
           TextButton(

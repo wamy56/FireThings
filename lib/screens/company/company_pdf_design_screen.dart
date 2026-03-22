@@ -377,6 +377,9 @@ class _CompanyHeaderEditorState extends State<_CompanyHeaderEditorScreen>
         ],
       ),
       body: KeyboardDismissWrapper(
+        child: Center(
+        child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 750),
         child: Column(
           children: [
             _buildPreview(),
@@ -399,6 +402,8 @@ class _CompanyHeaderEditorState extends State<_CompanyHeaderEditorScreen>
               ),
             ),
           ],
+        ),
+        ),
         ),
       ),
     );
@@ -938,6 +943,9 @@ class _CompanyFooterEditorState extends State<_CompanyFooterEditorScreen>
         ],
       ),
       body: KeyboardDismissWrapper(
+        child: Center(
+        child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 750),
         child: Column(
           children: [
             _buildPreview(),
@@ -958,6 +966,8 @@ class _CompanyFooterEditorState extends State<_CompanyFooterEditorScreen>
               ),
             ),
           ],
+        ),
+        ),
         ),
       ),
     );
@@ -1375,7 +1385,10 @@ class _CompanyColourEditorState extends State<_CompanyColourEditorScreen> {
           ),
         ],
       ),
-      body: ListView(
+      body: Center(
+        child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 750),
+        child: ListView(
         padding: const EdgeInsets.all(AppTheme.screenPadding),
         children: [
           // Preview mockup
@@ -1404,6 +1417,8 @@ class _CompanyColourEditorState extends State<_CompanyColourEditorScreen> {
             label: const Text('Custom Colour'),
           ),
         ],
+      ),
+      ),
       ),
     );
   }
@@ -1733,8 +1748,8 @@ class _CompanyColourEditorState extends State<_CompanyColourEditorScreen> {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 80,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
         childAspectRatio: 0.85,

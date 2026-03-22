@@ -989,7 +989,11 @@ class PDFService {
       boldFontBytes: boldFontBytes,
     );
 
-    // ── Build phase (background isolate) ──
+    // ── Build phase ──
+    // Isolates are not available on web, so run directly on the main thread.
+    if (kIsWeb) {
+      return _buildJobsheetPdf(data);
+    }
     return compute(_buildJobsheetPdf, data);
   }
 

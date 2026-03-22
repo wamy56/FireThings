@@ -106,18 +106,10 @@ class _WebLoginScreenState extends State<WebLoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Logo
-                      Container(
+                      Image.asset(
+                        'assets/images/firethings_logo_vertical.png',
                         width: 72,
                         height: 72,
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryBlue,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Icons.local_fire_department,
-                          color: Colors.white,
-                          size: 40,
-                        ),
                       ),
                       const SizedBox(height: 16),
                       Text(

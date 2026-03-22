@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/dispatched_job.dart';
 import '../../models/company_member.dart';
@@ -13,7 +12,6 @@ import '../../services/user_profile_service.dart';
 import '../../services/analytics_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
-import '../../utils/adaptive_widgets.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
 
@@ -275,19 +273,7 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _isLoading ? null : _saveJob,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.primaryBlue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 16, height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Save'),
+                  child: Text(_isEdit ? 'Update Job' : 'Create Job'),
                 ),
               ],
             ),
@@ -299,15 +285,75 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
               key: _formKey,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Left column
-                    Expanded(child: _buildLeftColumn(isDark)),
-                    const SizedBox(width: 32),
-                    // Right column
-                    Expanded(child: _buildRightColumn(isDark)),
-                  ],
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 900),
+                    child: Column(
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Left column
+                            Expanded(child: _buildLeftColumn(isDark)),
+                            const SizedBox(width: 32),
+                            // Right column
+                            Expanded(child: _buildRightColumn(isDark)),
+                          ],
+                        ),
+                        const SizedBox(height: 32),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 48,
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  style: OutlinedButton.styleFrom(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: SizedBox(
+                                height: 48,
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : _saveJob,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primaryBlue,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          width: 20, height: 20,
+                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                        )
+                                      : Text(
+                                          _isEdit ? 'Update Job' : 'Create Job',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -321,80 +367,126 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('Job Details', isDark),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _titleController,
-          label: 'Job Title',
-          hint: 'e.g. Annual Inspection',
-          prefixIcon: Icon(AppIcons.clipboard),
-          validator: (v) => v == null || v.trim().isEmpty ? 'Title is required' : null,
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _jobTypeController,
-          label: 'Job Type',
-          hint: 'e.g. Inspection, Fault Call Out, Installation',
-          prefixIcon: Icon(AppIcons.category),
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _jobNumberController,
-          label: 'Job Number',
-          hint: 'Reference number (optional)',
-          prefixIcon: Icon(AppIcons.tag),
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _descriptionController,
-          label: 'Description',
-          hint: 'Detailed notes about the job',
-          prefixIcon: Icon(AppIcons.note),
-          maxLines: 3,
-        ),
-        const SizedBox(height: 24),
-
-        _sectionHeader('Priority', isDark),
-        const SizedBox(height: 12),
-        SegmentedButton<JobPriority>(
-          segments: const [
-            ButtonSegment(value: JobPriority.normal, label: Text('Normal')),
-            ButtonSegment(value: JobPriority.urgent, label: Text('Urgent')),
-            ButtonSegment(value: JobPriority.emergency, label: Text('Emergency')),
+        _sectionCard(
+          title: 'Job Details',
+          isDark: isDark,
+          children: [
+            CustomTextField(
+              controller: _titleController,
+              label: 'Job Title',
+              hint: 'e.g. Annual Inspection',
+              prefixIcon: Icon(AppIcons.clipboard),
+              validator: (v) => v == null || v.trim().isEmpty ? 'Title is required' : null,
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _jobTypeController,
+              label: 'Job Type',
+              hint: 'e.g. Inspection, Fault Call Out, Installation',
+              prefixIcon: Icon(AppIcons.category),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _jobNumberController,
+              label: 'Job Number',
+              hint: 'Reference number (optional)',
+              prefixIcon: Icon(AppIcons.tag),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _descriptionController,
+              label: 'Description',
+              hint: 'Detailed notes about the job',
+              prefixIcon: Icon(AppIcons.note),
+              maxLines: 3,
+            ),
           ],
-          selected: {_priority},
-          onSelectionChanged: (s) => setState(() => _priority = s.first),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
 
-        _sectionHeader('System Info', isDark),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _systemCategoryController,
-          label: 'System Category',
-          hint: 'e.g. L1, L2, M, P1',
-          prefixIcon: Icon(AppIcons.category),
+        _sectionCard(
+          title: 'Priority',
+          isDark: isDark,
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<JobPriority>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(value: JobPriority.normal, label: Text('Normal')),
+                  ButtonSegment(value: JobPriority.urgent, label: Text('Urgent')),
+                  ButtonSegment(value: JobPriority.emergency, label: Text('Emergency')),
+                ],
+                selected: {_priority},
+                onSelectionChanged: (s) => setState(() => _priority = s.first),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _panelMakeController,
-          label: 'Panel Make',
-          hint: 'e.g. Advanced, Kentec',
-          prefixIcon: Icon(AppIcons.element),
+        const SizedBox(height: 20),
+
+        _sectionCard(
+          title: 'System Info',
+          isDark: isDark,
+          children: [
+            CustomTextField(
+              controller: _systemCategoryController,
+              label: 'System Category',
+              hint: 'e.g. L1, L2, M, P1',
+              prefixIcon: Icon(AppIcons.category),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _panelMakeController,
+              label: 'Panel Make',
+              hint: 'e.g. Advanced, Kentec',
+              prefixIcon: Icon(AppIcons.element),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _panelLocationController,
+              label: 'Panel Location',
+              hint: 'Where is the panel?',
+              prefixIcon: Icon(AppIcons.location),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _numberOfZonesController,
+              label: 'Number of Zones',
+              prefixIcon: Icon(AppIcons.grid),
+              keyboardType: TextInputType.number,
+            ),
+          ],
         ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _panelLocationController,
-          label: 'Panel Location',
-          hint: 'Where is the panel?',
-          prefixIcon: Icon(AppIcons.location),
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _numberOfZonesController,
-          label: 'Number of Zones',
-          prefixIcon: Icon(AppIcons.grid),
-          keyboardType: TextInputType.number,
+        const SizedBox(height: 20),
+
+        _sectionCard(
+          title: 'Assign To',
+          isDark: isDark,
+          children: [
+            DropdownButtonFormField<String?>(
+              initialValue: _assignedToUid,
+              decoration: InputDecoration(
+                prefixIcon: Icon(AppIcons.user),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              hint: const Text('Unassigned'),
+              items: [
+                const DropdownMenuItem(value: null, child: Text('Unassigned')),
+                ..._members.map((m) => DropdownMenuItem(
+                  value: m.uid,
+                  child: Text('${m.displayName} (${m.role.name})'),
+                )),
+              ],
+              onChanged: (value) {
+                final member = _members.where((m) => m.uid == value).firstOrNull;
+                setState(() {
+                  _assignedToUid = value;
+                  _assignedToName = member?.displayName;
+                });
+              },
+            ),
+          ],
         ),
       ],
     );
@@ -404,121 +496,107 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('Site', isDark),
-        const SizedBox(height: 12),
-        _buildSiteAutocomplete(),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _siteAddressController,
-          label: 'Site Address',
-          hint: 'Full address',
-          prefixIcon: Icon(AppIcons.location),
-          maxLines: 2,
-          validator: (v) => v == null || v.trim().isEmpty ? 'Address is required' : null,
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _parkingNotesController,
-          label: 'Parking Notes',
-          hint: 'e.g. Park in rear car park, code 1234',
-          prefixIcon: Icon(AppIcons.routing),
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _accessNotesController,
-          label: 'Access Notes',
-          hint: 'e.g. Report to reception, ask for John',
-          prefixIcon: Icon(AppIcons.key),
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _siteNotesController,
-          label: 'Site Notes',
-          hint: 'Any other site information',
-          prefixIcon: Icon(AppIcons.note),
-          maxLines: 2,
-        ),
-        const SizedBox(height: 24),
-
-        _sectionHeader('Contact', isDark),
-        const SizedBox(height: 12),
-        _buildCustomerAutocomplete(),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _contactPhoneController,
-          label: 'Contact Phone',
-          prefixIcon: Icon(AppIcons.call),
-          keyboardType: TextInputType.phone,
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _contactEmailController,
-          label: 'Contact Email',
-          prefixIcon: Icon(AppIcons.sms),
-          keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: 24),
-
-        _sectionHeader('Scheduling', isDark),
-        const SizedBox(height: 12),
-        InkWell(
-          onTap: _pickDate,
-          borderRadius: BorderRadius.circular(12),
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: 'Scheduled Date',
-              prefixIcon: Icon(AppIcons.calendar),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        _sectionCard(
+          title: 'Site',
+          isDark: isDark,
+          children: [
+            _buildSiteAutocomplete(),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _siteAddressController,
+              label: 'Site Address',
+              hint: 'Full address',
+              prefixIcon: Icon(AppIcons.location),
+              maxLines: 2,
+              validator: (v) => v == null || v.trim().isEmpty ? 'Address is required' : null,
             ),
-            child: Text(
-              _scheduledDate != null
-                  ? '${_scheduledDate!.day}/${_scheduledDate!.month}/${_scheduledDate!.year}'
-                  : 'Select date',
-              style: TextStyle(
-                color: _scheduledDate != null ? null : AppTheme.mediumGrey,
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _parkingNotesController,
+              label: 'Parking Notes',
+              hint: 'e.g. Park in rear car park, code 1234',
+              prefixIcon: Icon(AppIcons.routing),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _accessNotesController,
+              label: 'Access Notes',
+              hint: 'e.g. Report to reception, ask for John',
+              prefixIcon: Icon(AppIcons.key),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _siteNotesController,
+              label: 'Site Notes',
+              hint: 'Any other site information',
+              prefixIcon: Icon(AppIcons.note),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        _sectionCard(
+          title: 'Contact',
+          isDark: isDark,
+          children: [
+            _buildCustomerAutocomplete(),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _contactPhoneController,
+              label: 'Contact Phone',
+              prefixIcon: Icon(AppIcons.call),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _contactEmailController,
+              label: 'Contact Email',
+              prefixIcon: Icon(AppIcons.sms),
+              keyboardType: TextInputType.emailAddress,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        _sectionCard(
+          title: 'Scheduling',
+          isDark: isDark,
+          children: [
+            InkWell(
+              onTap: _pickDate,
+              borderRadius: BorderRadius.circular(12),
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: 'Scheduled Date',
+                  prefixIcon: Icon(AppIcons.calendar),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  _scheduledDate != null
+                      ? '${_scheduledDate!.day}/${_scheduledDate!.month}/${_scheduledDate!.year}'
+                      : 'Select date',
+                  style: TextStyle(
+                    color: _scheduledDate != null ? null : AppTheme.mediumGrey,
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _scheduledTimeController,
-          label: 'Time',
-          hint: 'e.g. 09:00 or Morning',
-          prefixIcon: Icon(AppIcons.clock),
-        ),
-        const SizedBox(height: 12),
-        CustomTextField(
-          controller: _estimatedDurationController,
-          label: 'Estimated Duration',
-          hint: 'e.g. 2 hours, Half day',
-          prefixIcon: Icon(AppIcons.timer),
-        ),
-        const SizedBox(height: 24),
-
-        _sectionHeader('Assign To', isDark),
-        const SizedBox(height: 12),
-        DropdownButtonFormField<String?>(
-          value: _assignedToUid,
-          decoration: InputDecoration(
-            prefixIcon: Icon(AppIcons.user),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          hint: const Text('Unassigned'),
-          items: [
-            const DropdownMenuItem(value: null, child: Text('Unassigned')),
-            ..._members.map((m) => DropdownMenuItem(
-              value: m.uid,
-              child: Text('${m.displayName} (${m.role.name})'),
-            )),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _scheduledTimeController,
+              label: 'Time',
+              hint: 'e.g. 09:00 or Morning',
+              prefixIcon: Icon(AppIcons.clock),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: _estimatedDurationController,
+              label: 'Estimated Duration',
+              hint: 'e.g. 2 hours, Half day',
+              prefixIcon: Icon(AppIcons.timer),
+            ),
           ],
-          onChanged: (value) {
-            final member = _members.where((m) => m.uid == value).firstOrNull;
-            setState(() {
-              _assignedToUid = value;
-              _assignedToName = member?.displayName;
-            });
-          },
         ),
       ],
     );
@@ -646,9 +724,36 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
     return Text(
       title,
       style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.bold,
-        color: isDark ? AppTheme.darkTextSecondary : Colors.grey,
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+      ),
+    );
+  }
+
+  Widget _sectionCard({
+    required String title,
+    required bool isDark,
+    required List<Widget> children,
+  }) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isDark ? AppTheme.darkDivider : Colors.grey.shade300,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionHeader(title, isDark),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
       ),
     );
   }

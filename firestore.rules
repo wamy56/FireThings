@@ -72,6 +72,12 @@ service cloud.firestore {
         allow write: if isCompanyDispatcherOrAdmin(companyId);
       }
 
+      // Completed jobsheets shared with the company
+      match /completed_jobsheets/{jobsheetId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyMember(companyId);
+      }
+
       // Company PDF config
       match /pdf_config/{configId} {
         allow read: if isCompanyMember(companyId);

@@ -114,6 +114,7 @@ class AppIcons {
   static const IconData arrowRight = IconsaxPlusLinear.arrow_right_3;
   static const IconData arrowLeft = IconsaxPlusLinear.arrow_left_2;
   static const IconData arrowDown = IconsaxPlusLinear.arrow_down_1;
+  static const IconData download = IconsaxPlusLinear.document_download;
   static const IconData arrowUp = IconsaxPlusLinear.arrow_up_1;
   static const IconData more = IconsaxPlusLinear.more;
   static const IconData menu = IconsaxPlusLinear.menu;

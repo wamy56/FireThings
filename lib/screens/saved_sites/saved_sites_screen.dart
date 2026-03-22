@@ -83,7 +83,9 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
       child: Builder(
         builder: (context) => AlertDialog(
         title: const Text('Add Saved Site'),
-        content: SingleChildScrollView(
+        content: SizedBox(
+          width: 500,
+          child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -111,6 +113,7 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
               ),
             ],
           ),
+        ),
         ),
         actions: [
           TextButton(
@@ -269,9 +272,10 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
           ),
         ],
       )),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddSiteDialog,
-        child: const Icon(AppIcons.add),
+        icon: const Icon(AppIcons.add),
+        label: const Text('Add Site'),
       ),
     );
   }

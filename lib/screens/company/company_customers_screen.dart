@@ -40,9 +40,10 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Shared Customers')),
       floatingActionButton: _canEdit
-          ? FloatingActionButton(
+          ? FloatingActionButton.extended(
               onPressed: () => _showCustomerDialog(),
-              child: Icon(AppIcons.add),
+              icon: Icon(AppIcons.add),
+              label: const Text('Add Customer'),
             )
           : null,
       body: KeyboardDismissWrapper(child: Column(
@@ -313,7 +314,9 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(isEdit ? 'Edit Customer' : 'Add Customer'),
-        content: KeyboardDismissWrapper(
+        content: SizedBox(
+          width: 500,
+          child: KeyboardDismissWrapper(
           child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -353,6 +356,7 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
               ),
             ],
           ),
+        ),
         ),
         ),
         actions: [

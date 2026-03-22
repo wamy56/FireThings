@@ -12,7 +12,9 @@ import '../../widgets/adaptive_app_bar.dart';
 import '../../utils/adaptive_widgets.dart';
 
 class PdfColourSchemeScreen extends StatefulWidget {
-  const PdfColourSchemeScreen({super.key});
+  final PdfDocumentType? docType;
+
+  const PdfColourSchemeScreen({super.key, this.docType});
 
   @override
   State<PdfColourSchemeScreen> createState() => _PdfColourSchemeScreenState();
@@ -21,11 +23,12 @@ class PdfColourSchemeScreen extends StatefulWidget {
 class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
   PdfColourScheme _scheme = PdfColourScheme.defaults();
   bool _isLoading = true;
-  PdfDocumentType _selectedDocType = PdfDocumentType.jobsheet;
+  late PdfDocumentType _selectedDocType;
 
   @override
   void initState() {
     super.initState();
+    _selectedDocType = widget.docType ?? PdfDocumentType.jobsheet;
     _loadScheme();
   }
 
@@ -126,27 +129,32 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
       ),
       body: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
-          : ListView(
+          : Center(
+              child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 750),
+              child: ListView(
               padding: const EdgeInsets.all(AppTheme.screenPadding),
               children: [
                 // Document type toggle
-                SegmentedButton<PdfDocumentType>(
-                  segments: [
-                    ButtonSegment(
-                      value: PdfDocumentType.jobsheet,
-                      label: const Text('Jobsheet'),
-                      icon: Icon(AppIcons.document),
-                    ),
-                    ButtonSegment(
-                      value: PdfDocumentType.invoice,
-                      label: const Text('Invoice'),
-                      icon: Icon(AppIcons.receipt),
-                    ),
-                  ],
-                  selected: {_selectedDocType},
-                  onSelectionChanged: (selection) => _switchDocType(selection.first),
-                ),
-                const SizedBox(height: 16),
+                if (widget.docType == null) ...[
+                  SegmentedButton<PdfDocumentType>(
+                    segments: [
+                      ButtonSegment(
+                        value: PdfDocumentType.jobsheet,
+                        label: const Text('Jobsheet'),
+                        icon: Icon(AppIcons.document),
+                      ),
+                      ButtonSegment(
+                        value: PdfDocumentType.invoice,
+                        label: const Text('Invoice'),
+                        icon: Icon(AppIcons.receipt),
+                      ),
+                    ],
+                    selected: {_selectedDocType},
+                    onSelectionChanged: (selection) => _switchDocType(selection.first),
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 // Preview mockup
                 _selectedDocType == PdfDocumentType.invoice
                     ? _buildInvoicePreview()
@@ -173,6 +181,8 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
                   label: const Text('Custom Colour'),
                 ),
               ],
+            ),
+            ),
             ),
     );
   }
@@ -582,8 +592,8 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 80,
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
         childAspectRatio: 0.85,

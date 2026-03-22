@@ -4,6 +4,36 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-22 (Session 50)
+
+### Web Portal — Dispatcher Jobsheet Access (View, Download PDF, Email)
+
+- **Jobsheet copy to company**: Added `copyJobsheetToCompany()` to `lib/services/firestore_sync_service.dart` — copies completed jobsheet JSON to `companies/{companyId}/completed_jobsheets/{id}` in Firestore
+- **Signature screen integration**: Modified `lib/screens/signature/signature_screen.dart` to call `copyJobsheetToCompany()` after linking a completed jobsheet to a dispatched job
+- **Firestore security rules**: Added `completed_jobsheets` subcollection rule in `firestore.rules` — read+write for company members
+- **PDF generation web fix**: Added `kIsWeb` guard in `lib/services/pdf_service.dart` to skip `compute()` (isolates) on web and call `_buildJobsheetPdf()` directly
+- **Web file download**: Created `lib/utils/download_stub.dart` (no-op) and `lib/utils/download_web.dart` (browser download via `dart:html` Blob + AnchorElement)
+- **Jobsheet viewer**: Implemented `_buildLinkedJobsheetSection()` and `_buildJobsheetCard()` in `lib/screens/web/web_job_detail_panel.dart` — fetches jobsheet from Firestore, renders read-only view with form data (using field labels), notes, defects (red bullets), and engineer/customer signature images (base64 decoded)
+- **Download PDF button**: Generates PDF via `PDFService.generateJobsheetPDF()` and triggers browser download with filename `Jobsheet_{jobNumber}_{date}.pdf`
+- **Email to Client button**: Shows dialog with pre-filled recipient email (from dispatched job's `contactEmail`), opens `mailto:` link with pre-filled subject/body, includes "Download PDF" button in dialog for convenience
+- **Icon**: Added `AppIcons.download` (`document_download`) to `lib/utils/icon_map.dart`
+
+### Web Portal — Colour Scheme Layout + Company Logo
+
+- **Colour scheme layout fix**: Wrapped colour editor body in `Center` > `ConstrainedBox(maxWidth: 600)` in both `pdf_colour_scheme_screen.dart` and `company_pdf_design_screen.dart` — prevents preview and grid from stretching across full web viewport
+- **Responsive grid**: Changed preset colour grid from hardcoded `crossAxisCount: 4` to `SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 80)` — fits all 8 presets in fewer rows on wider screens, 4 columns on mobile
+- **Company logo in sidebar**: `web_shell.dart` now fetches company logo via `CompanyPdfConfigService.getCompanyLogoBytes()` and displays it in the sidebar leading widget. Falls back to fire icon if no logo uploaded. Also shows company name instead of "FireThings" when extended.
+- **Login screen logo**: Replaced hardcoded fire icon with `firethings_logo_vertical.png` asset on `web_login_screen.dart`
+
+### Cleanup & Fixes
+
+- **Firestore rules deployed**: `firebase deploy --only firestore:rules` — `completed_jobsheets` collection now accessible in production
+- **VSCode analysis**: Fixed all 9 analysis issues — removed unused imports (`company_member.dart`, `user_profile_service.dart`, `go_router.dart`, `adaptive_widgets.dart`), replaced deprecated `value:` with `initialValue:` on 3 `DropdownButtonFormField` widgets, fixed `BuildContext` async gap check, marked `_selectedJobIds` as `final`, suppressed `dart:html` deprecation warnings, fixed double underscore in separator builder
+
+**Build verified**: Both web (`flutter build web`) and Android (`flutter build appbundle --debug`) succeed. `flutter analyze` — 0 issues.
+
+---
+
 ## 2026-03-22 (Session 49)
 
 ### Web Portal — Phases 1-2 (Foundation + Dashboard)
@@ -55,7 +85,35 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 - **Notification bell**: Created `lib/screens/web/web_notification_feed.dart` — bell icon with unread count badge, dropdown overlay showing recently updated jobs (last 24h from Firestore), relative timestamps, click-to-navigate
 - **Bell in top bar**: Added `WebNotificationFeed` widget to `web_shell.dart` top bar (between Spacer and company name)
 - **Permission denied banner**: Added dismissible orange banner to `web_dashboard_screen.dart` when notification permission not granted
-- **Note**: VAPID key placeholder — requires Firebase Console setup to generate actual key. Cloud Functions must be deployed for notifications to fire.
+
+### Web Portal — Phase 4 Continued (Notification Polish)
+
+- **VAPID key**: Configured actual VAPID key in `web_notification_service.dart`
+- **Permission flow fix**: Split `initialize()` into two methods — `initialize()` (setup only, no prompt) and `requestPermission()` (must be called from user gesture). Browser requires user interaction to request notification permission; calling from GoRouter redirect was silently denied.
+- **Permission denied state**: Added `_permissionDenied` flag to track permanent browser denial. Dashboard banner shows "Enable" button when not yet prompted, or "blocked" message when permanently denied (must change in browser settings).
+- **Foreground toast notifications**: Created `lib/screens/web/web_notification_toast.dart` — slide-in card notifications from right side when FCM messages arrive while app is in focus. Auto-dismiss after 5s, max 3 stacked, orange accent bar, "View" button to navigate to job. Wired via `onForegroundMessage` callback in `web_shell.dart`.
+- **Notification feed polish**: Enlarged dropdown (width 360→420, maxHeight 400→500). Added "Clear" button with `_clearedAt` timestamp filtering to hide old notifications.
+
+### Web Portal — Phase 5 (Firebase Hosting)
+
+- **Firebase Hosting config**: Added `hosting` section to `firebase.json` — `public: "build/web"`, SPA rewrite (`**` → `/index.html` for GoRouter), ignore patterns for Firebase files
+
+### Web Portal — Phase 6 (Analytics Events)
+
+- **10 web analytics methods**: Added `logWebLogin`, `logWebDashboardViewed`, `logWebJobCreated`, `logWebJobEdited`, `logWebJobAssigned`, `logWebScheduleViewed`, `logWebJobDetailViewed`, `logWebBulkAssign`, `logWebSearchUsed`, `logWebPrintUsed` to `lib/services/analytics_service.dart`
+- **Events wired**: `web_router.dart` (login), `web_dashboard_screen.dart` (dashboard viewed, search, job detail viewed), `web_create_job_screen.dart` (job created/edited), `web_schedule_screen.dart` (schedule viewed), `web_job_detail_panel.dart` (reassign, print)
+
+### Web Portal — Dashboard & UI Polish
+
+- **Dismissible detail panel**: Added `GestureDetector` overlay behind job detail panel in `web_dashboard_screen.dart` — clicking outside closes the panel
+- **Create job button**: Moved save button from header to bottom of form as full-width prominent button ("Create Job"/"Update Job") in both `web_create_job_screen.dart` and mobile `create_job_screen.dart`
+- **Priority toggle fix**: Added `FittedBox(fit: BoxFit.scaleDown)` to all three `SegmentedButton` labels in mobile `create_job_screen.dart` — prevents "Emergency" text wrapping
+
+### Other Changes
+
+- **Codemagic YAML fix**: Changed iOS publishing from `auth: integration` to API key env vars (`$APP_STORE_CONNECT_PRIVATE_KEY`, `$APP_STORE_CONNECT_KEY_ID`, `$APP_STORE_CONNECT_ISSUER_ID`) in `codemagic.yaml` — `auth: integration` requires Teams account
+- **Codemagic web workflow**: Added `web-portal` workflow to `codemagic.yaml` (Linux instance, build web + deploy to Firebase Hosting)
+- **Dispatch tester**: Added `test@test.com` to `dispatchTesters` list in `lib/services/remote_config_service.dart`
 
 ---
 

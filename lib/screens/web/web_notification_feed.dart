@@ -19,6 +19,7 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
   final _overlayController = OverlayPortalController();
   final _layerLink = LayerLink();
   DateTime? _lastSeenAt;
+  DateTime? _clearedAt;
 
   String? get _companyId => UserProfileService.instance.companyId;
 
@@ -125,7 +126,12 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
     );
   }
 
-  Widget _buildOverlay(List<DispatchedJob> jobs, bool isDark) {
+  Widget _buildOverlay(List<DispatchedJob> allJobs, bool isDark) {
+    // Filter out cleared notifications
+    final jobs = _clearedAt != null
+        ? allJobs.where((j) => j.updatedAt.isAfter(_clearedAt!)).toList()
+        : allJobs;
+
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: () => _overlayController.hide(),
@@ -143,21 +149,43 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
                 borderRadius: BorderRadius.circular(12),
                 color: isDark ? AppTheme.darkSurface : Colors.white,
                 child: Container(
-                  width: 360,
-                  constraints: const BoxConstraints(maxHeight: 400),
+                  width: 420,
+                  constraints: const BoxConstraints(maxHeight: 500),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                        child: Text(
-                          'Recent Updates',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: isDark ? Colors.white : AppTheme.darkGrey,
-                          ),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Recent Updates',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: isDark ? Colors.white : AppTheme.darkGrey,
+                              ),
+                            ),
+                            const Spacer(),
+                            if (jobs.isNotEmpty)
+                              TextButton(
+                                onPressed: () {
+                                  setState(() => _clearedAt = DateTime.now());
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  minimumSize: const Size(0, 32),
+                                ),
+                                child: Text(
+                                  'Clear',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                       Divider(
@@ -183,7 +211,7 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
                             shrinkWrap: true,
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             itemCount: jobs.length,
-                            separatorBuilder: (_, __) => Divider(
+                            separatorBuilder: (_, _) => Divider(
                               height: 1,
                               indent: 48,
                               color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,

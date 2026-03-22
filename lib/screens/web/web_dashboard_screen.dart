@@ -33,7 +33,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen> {
   List<CompanyMember> _members = [];
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
-  Set<String> _selectedJobIds = {};
+  final Set<String> _selectedJobIds = {};
   bool _notificationBannerDismissed = false;
 
   String? get _companyId => UserProfileService.instance.companyId;
@@ -165,6 +165,14 @@ class _WebDashboardScreenState extends State<WebDashboardScreen> {
                 ),
               ],
             ),
+            // Dismiss overlay — click outside panel to close
+            if (_selectedJobId != null)
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedJobId = null),
+                  child: Container(color: Colors.black.withValues(alpha: 0.05)),
+                ),
+              ),
             // Detail panel overlay
             if (_selectedJobId != null)
               Positioned(
@@ -366,7 +374,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen> {
             constraints: const BoxConstraints(maxWidth: 160),
             child: DropdownButtonFormField<String?>(
               isExpanded: true,
-              value: _statusFilter,
+              initialValue: _statusFilter,
               decoration: InputDecoration(
                 labelText: 'Status',
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -399,7 +407,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen> {
             constraints: const BoxConstraints(maxWidth: 180),
             child: DropdownButtonFormField<String?>(
               isExpanded: true,
-              value: _engineerFilter,
+              initialValue: _engineerFilter,
               decoration: InputDecoration(
                 labelText: 'Engineer',
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -680,7 +688,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen> {
                               engineerName: selectedName!,
                             );
                           }
-                          if (mounted) {
+                          if (ctx.mounted) {
                             setState(() => _selectedJobIds.clear());
                             Navigator.of(ctx).pop();
                           }

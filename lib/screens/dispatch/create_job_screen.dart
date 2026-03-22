@@ -250,14 +250,6 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEdit ? 'Edit Job' : 'Create Job'),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _saveJob,
-            child: _isLoading
-                ? const AdaptiveLoadingIndicator(size: 16)
-                : const Text('Save'),
-          ),
-        ],
       ),
       body: KeyboardDismissWrapper(
         child: Form(
@@ -302,18 +294,18 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
             _sectionHeader('Priority'),
             const SizedBox(height: 8),
             SegmentedButton<JobPriority>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: JobPriority.normal,
-                  label: Text('Normal'),
+                  label: FittedBox(fit: BoxFit.scaleDown, child: Text('Normal')),
                 ),
                 ButtonSegment(
                   value: JobPriority.urgent,
-                  label: Text('Urgent'),
+                  label: FittedBox(fit: BoxFit.scaleDown, child: Text('Urgent')),
                 ),
                 ButtonSegment(
                   value: JobPriority.emergency,
-                  label: Text('Emergency'),
+                  label: FittedBox(fit: BoxFit.scaleDown, child: Text('Emergency')),
                 ),
               ],
               selected: {_priority},
@@ -469,6 +461,30 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
               label: 'Number of Zones',
               prefixIcon: Icon(AppIcons.grid),
               keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _isLoading ? null : _saveJob,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primaryBlue,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: _isLoading
+                    ? const AdaptiveLoadingIndicator(size: 20, color: Colors.white)
+                    : Text(
+                        _isEdit ? 'Update Job' : 'Create Job',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
             ),
             const SizedBox(height: 40),
           ],

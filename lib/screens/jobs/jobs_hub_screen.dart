@@ -279,7 +279,7 @@ class _JobsHubScreenState extends State<JobsHubScreen> {
                           onTap: () => Navigator.push(
                             context,
                             adaptivePageRoute(
-                              builder: (_) => const PdfDesignScreen(),
+                              builder: (_) => const PdfDesignScreen(docType: PdfDocumentType.jobsheet),
                             ),
                           ),
                         ),
