@@ -4,6 +4,61 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-22 (Session 49)
+
+### Web Portal — Phases 1-2 (Foundation + Dashboard)
+
+**Phase 1: Web Build Foundation**
+- Created `lib/utils/platform_io.dart` and `lib/utils/platform_web.dart` for conditional `dart:io` imports (web doesn't support `dart:io`)
+- Modified `lib/utils/adaptive_widgets.dart` to use conditional import pattern
+- Added `kIsWeb` guards in `lib/main.dart`: gated SQLite sync, WorkManager, FCM, local notifications, Crashlytics for web
+- Split `JobsheetApp` into web (`MaterialApp.router` with GoRouter) and mobile (`MaterialApp` with `AuthWrapper`) paths
+- Added `kIsWeb` guard in `lib/services/database_helper.dart` (SQLite unavailable on web)
+- Added `go_router: ^14.0.0` dependency to `pubspec.yaml`
+- Created `lib/screens/web/web_router.dart` — GoRouter config with auth redirect guards, ShellRoute for WebShell
+- Created `lib/screens/web/web_shell.dart` — sidebar NavigationRail + top bar, responsive (extended/icons-only/drawer/mobile-redirect)
+- Created `lib/screens/web/web_login_screen.dart` — centred card login, no registration
+- Created `lib/screens/web/web_access_denied_screen.dart` — error screen for engineers/no company
+
+**Phase 2: Dashboard & Job Management**
+- Created `lib/screens/web/web_dashboard_screen.dart` — summary cards, filter bar, sortable DataTable, checkbox bulk selection
+- Created `lib/screens/web/web_job_detail_panel.dart` — animated slide-in side panel (42% width), status timeline, action buttons
+- Created `lib/screens/web/web_create_job_screen.dart` — two-column desktop form with site/customer autocomplete
+- Created `lib/screens/web/web_settings_screen.dart` — profile, company info, sign out
+- Created `lib/screens/web/web_schedule_screen.dart` — placeholder for Phase 3
+
+**Build verified**: `flutter build web` succeeds. Mobile path unchanged (Android build has pre-existing sqlite3 native asset hash mismatch unrelated to these changes).
+
+### Web Portal — Bug Fixes & Theme Toggle
+
+- **Login fix**: Added `GoRouterRefreshStream` to `web_router.dart` so GoRouter re-evaluates redirect on auth state changes (fixes infinite spinner after login). Made redirect async to load user profile before role/company checks.
+- **Filter bar overflow fix**: Changed fixed-width `SizedBox` dropdowns to `Flexible` + `ConstrainedBox(maxWidth)` in `web_dashboard_screen.dart` so they shrink gracefully on narrow windows.
+- **Reassign gating**: Edit, Reassign, and Cancel buttons in `web_job_detail_panel.dart` now hidden for completed/declined jobs.
+- **Theme toggle**: Added light/dark/system theme cycling to web sidebar. Global `ValueNotifier<ThemeMode>` in `main.dart`, persisted via SharedPreferences. Converted `JobsheetApp` from StatelessWidget to StatefulWidget. Also works for mobile (themeNotifier shared).
+- **Icons**: Added `AppIcons.sun` and `AppIcons.moon` to `icon_map.dart` (from `IconsaxPlusLinear`).
+
+### Web Portal — Phase 3 (Schedule View & Polish)
+
+- **Schedule screen**: Full rewrite of `web_schedule_screen.dart` — weekly calendar grid with 7-day columns (Mon–Sun), job blocks colour-coded by engineer or status (toggle), today highlight, prev/next/today week navigation, unscheduled jobs section (horizontal scroll), click-to-open detail panel
+- **Dropdown overflow fix**: Added `isExpanded: true` to both `DropdownButtonFormField` widgets in `web_dashboard_screen.dart` filter bar (fixes internal Row overflow)
+- **Reassign for declined jobs**: Changed Reassign button guard to only hide for completed (not declined) in `web_job_detail_panel.dart` — dispatchers can reassign declined jobs
+- **Keyboard shortcuts**: Added `CallbackShortcuts` to dashboard — `N` opens create job, `/` focuses search, `Esc` closes detail panel
+- **Print button**: Added browser print button to job detail panel using conditional import (`print_stub.dart` / `print_web.dart`)
+- **Dependencies**: Added `table_calendar: ^3.1.0` to pubspec.yaml
+
+### Web Portal — Phase 4 (Web Push Notifications)
+
+- **Service worker**: Created `web/firebase-messaging-sw.js` with Firebase config, background message handler, notification click handler (focuses tab + navigates to job)
+- **Service worker registration**: Added `<script>` to `web/index.html` to register the service worker
+- **WebNotificationService**: Created `lib/services/web_notification_service.dart` — singleton, requests browser permission, stores web push token via `UserProfileService.updateFcmToken()`, listens for foreground messages, supports `onForegroundMessage` callback
+- **Auth integration**: Initialised `WebNotificationService` in GoRouter redirect after login and page refresh (in `web_router.dart`)
+- **Notification bell**: Created `lib/screens/web/web_notification_feed.dart` — bell icon with unread count badge, dropdown overlay showing recently updated jobs (last 24h from Firestore), relative timestamps, click-to-navigate
+- **Bell in top bar**: Added `WebNotificationFeed` widget to `web_shell.dart` top bar (between Spacer and company name)
+- **Permission denied banner**: Added dismissible orange banner to `web_dashboard_screen.dart` when notification permission not granted
+- **Note**: VAPID key placeholder — requires Firebase Console setup to generate actual key. Cloud Functions must be deployed for notifications to fire.
+
+---
+
 ## 2026-03-21 (Session 48)
 
 ### DIP Switch Calculator — Light Mode Toggle Visibility Fix

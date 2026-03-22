@@ -8,15 +8,25 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:workmanager/workmanager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
 import 'services/analytics_service.dart';
 import 'services/auth_service.dart';
 import 'services/remote_config_service.dart';
 import 'services/firestore_sync_service.dart';
+import 'services/user_profile_service.dart';
+import 'utils/theme.dart';
+import 'utils/responsive.dart';
+import 'utils/adaptive_widgets.dart';
+import 'utils/icon_map.dart';
+import 'widgets/adaptive_app_bar.dart';
+
+// Mobile-only imports — only used behind !kIsWeb guards at runtime.
+// On web builds, these files are included in the compile but the code
+// paths that reference them are dead-code eliminated via kIsWeb.
+import 'package:workmanager/workmanager.dart';
 import 'services/template_service.dart';
 import 'services/notification_service.dart';
-import 'services/user_profile_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -27,14 +37,39 @@ import 'screens/dispatch/dispatch_dashboard_screen.dart';
 import 'screens/dispatch/dispatched_job_detail_screen.dart';
 import 'screens/dispatch/engineer_job_detail_screen.dart';
 import 'screens/dispatch/engineer_jobs_screen.dart';
-import 'utils/theme.dart';
-import 'utils/responsive.dart';
-import 'utils/adaptive_widgets.dart';
-import 'utils/icon_map.dart';
-import 'widgets/adaptive_app_bar.dart';
 
-/// Global navigator key for notification-driven navigation.
+// Web-only imports
+import 'screens/web/web_router.dart';
+
+/// Global navigator key for notification-driven navigation (mobile only).
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+/// Global theme mode notifier — allows toggling light/dark/system from anywhere.
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
+
+/// Load persisted theme preference from SharedPreferences.
+Future<void> _loadThemePreference() async {
+  final prefs = await SharedPreferences.getInstance();
+  final value = prefs.getString('theme_mode');
+  if (value == 'light') {
+    themeNotifier.value = ThemeMode.light;
+  } else if (value == 'dark') {
+    themeNotifier.value = ThemeMode.dark;
+  }
+}
+
+/// Persist theme preference to SharedPreferences.
+Future<void> saveThemePreference(ThemeMode mode) async {
+  final prefs = await SharedPreferences.getInstance();
+  switch (mode) {
+    case ThemeMode.light:
+      await prefs.setString('theme_mode', 'light');
+    case ThemeMode.dark:
+      await prefs.setString('theme_mode', 'dark');
+    case ThemeMode.system:
+      await prefs.remove('theme_mode');
+  }
+}
 
 /// Handle FCM messages received while the app is in the background.
 /// Must be a top-level function.
@@ -71,52 +106,102 @@ void main() {
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
     );
 
-    // Register FCM background handler (must be before any FCM usage)
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-    // Request FCM notification permission (iOS primarily, Android 13+)
-    await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
     // Initialize Remote Config
     await RemoteConfigService.instance.initialize();
 
-    // Set up Crashlytics error handlers
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-    PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      return true;
-    };
+    // Load persisted theme preference
+    await _loadThemePreference();
 
-    // Load custom templates from database
-    await TemplateService.instance.loadCustomTemplates();
+    // Mobile-only initialization
+    if (!kIsWeb) {
+      // Register FCM background handler (must be before any FCM usage)
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // Initialize notifications
-    await NotificationService.instance.initialize();
+      // Request FCM notification permission (iOS primarily, Android 13+)
+      await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
-    // Register periodic background check
-    await Workmanager().initialize(callbackDispatcher);
-    await Workmanager().registerPeriodicTask(
-      'draft-reminder-check',
-      'checkDraftsAndOverdue',
-      frequency: const Duration(hours: 12),
-      constraints: Constraints(networkType: NetworkType.notRequired),
-    );
+      // Set up Crashlytics error handlers
+      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+      PlatformDispatcher.instance.onError = (error, stack) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+        return true;
+      };
+
+      // Load custom templates from database (SQLite)
+      await TemplateService.instance.loadCustomTemplates();
+
+      // Initialize notifications
+      await NotificationService.instance.initialize();
+
+      // Register periodic background check
+      await Workmanager().initialize(callbackDispatcher);
+      await Workmanager().registerPeriodicTask(
+        'draft-reminder-check',
+        'checkDraftsAndOverdue',
+        frequency: const Duration(hours: 12),
+        constraints: Constraints(networkType: NetworkType.notRequired),
+      );
+    }
 
     runApp(const JobsheetApp());
   }, (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    if (!kIsWeb) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    }
   });
 }
 
-class JobsheetApp extends StatelessWidget {
+class JobsheetApp extends StatefulWidget {
   const JobsheetApp({super.key});
 
   @override
+  State<JobsheetApp> createState() => _JobsheetAppState();
+}
+
+class _JobsheetAppState extends State<JobsheetApp> {
+  @override
+  void initState() {
+    super.initState();
+    themeNotifier.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    themeNotifier.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() => setState(() {});
+
+  @override
   Widget build(BuildContext context) {
+    // Web: use GoRouter for proper URL routing
+    if (kIsWeb) {
+      final router = createWebRouter();
+      return MaterialApp.router(
+        title: 'FireThings - Dispatcher Portal',
+        debugShowCheckedModeBanner: false,
+        routerConfig: router,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: themeNotifier.value,
+        builder: (context, child) {
+          final scale = AppTheme.responsiveTextScale(context.screenSize);
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(scale),
+            ),
+            child: child!,
+          );
+        },
+      );
+    }
+
+    // Mobile: use standard Navigator with AuthWrapper
     return MaterialApp(
       title: 'FireThings',
       navigatorKey: navigatorKey,
@@ -124,7 +209,7 @@ class JobsheetApp extends StatelessWidget {
       navigatorObservers: [AnalyticsService.instance.observer],
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      themeMode: themeNotifier.value,
       builder: (context, child) {
         final scale = AppTheme.responsiveTextScale(context.screenSize);
         return MediaQuery(
@@ -141,6 +226,7 @@ class JobsheetApp extends StatelessWidget {
 
 /// Wrapper that shows login or main screen based on auth state.
 /// Also manages FCM token registration and notification listeners.
+/// Used on mobile only — web uses GoRouter with auth redirect.
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
 
@@ -262,10 +348,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
   /// Run post-login setup once per user, then trigger rebuild so
   /// MainNavigationScreen picks up dispatch flag changes.
   Future<void> _runPostLoginSetup(User user) async {
-    FirestoreSyncService.instance.performFullSync(user.uid);
+    // FirestoreSyncService uses SQLite — skip on web
+    if (!kIsWeb) {
+      FirestoreSyncService.instance.performFullSync(user.uid);
+    }
     UserProfileService.instance.loadProfile(user.uid);
     await RemoteConfigService.instance.refreshForUser(user.email);
-    _setupFcm(user.uid);
+    if (!kIsWeb) {
+      _setupFcm(user.uid);
+    }
     if (mounted) setState(() {});
   }
 
@@ -304,7 +395,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 }
 
-/// Main screen with adaptive bottom navigation
+/// Main screen with adaptive bottom navigation (mobile only)
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
 
@@ -344,20 +435,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // Set up notification tap routing
-    NotificationService.onNotificationTap = _handleNotificationTap;
+    // Set up notification tap routing (mobile only)
+    if (!kIsWeb) {
+      NotificationService.onNotificationTap = _handleNotificationTap;
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    NotificationService.onNotificationTap = null;
+    if (!kIsWeb) {
+      NotificationService.onNotificationTap = null;
+    }
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed && !kIsWeb) {
       NotificationService.instance.checkAndNotify();
     }
   }

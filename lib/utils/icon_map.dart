@@ -97,6 +97,8 @@ class AppIcons {
   static const IconData flash = IconsaxPlusLinear.flash;
   static const IconData flashBold = IconsaxPlusBold.flash;
   static const IconData lamp = IconsaxPlusLinear.lamp;
+  static const IconData sun = IconsaxPlusLinear.sun;
+  static const IconData moon = IconsaxPlusLinear.moon;
   static const IconData ruler = IconsaxPlusLinear.ruler;
   static const IconData scanner = IconsaxPlusLinear.scanner;
   static const IconData camera = IconsaxPlusLinear.camera;

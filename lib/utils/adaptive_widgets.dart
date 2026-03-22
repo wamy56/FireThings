@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'dart:ui';
+import 'platform_io.dart' if (dart.library.html) 'platform_web.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';

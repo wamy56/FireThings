@@ -16,6 +16,9 @@ class DatabaseHelper {
 
   /// Get database instance (create if doesn't exist)
   Future<Database> get database async {
+    if (kIsWeb) {
+      throw UnsupportedError('SQLite is not available on web');
+    }
     if (_database != null) return _database!;
     _database = await _initDB('jobsheets.db');
     return _database!;

@@ -203,4 +203,36 @@ class AnalyticsService {
       _analytics.logEvent(name: 'dispatch_contact_called', parameters: {
         'company_id': companyId,
       });
+
+  // ── Web Portal Events ──
+
+  Future<void> logWebLogin() =>
+      _analytics.logEvent(name: 'web_login');
+
+  Future<void> logWebDashboardViewed() =>
+      _analytics.logEvent(name: 'web_dashboard_viewed');
+
+  Future<void> logWebJobCreated() =>
+      _analytics.logEvent(name: 'web_job_created');
+
+  Future<void> logWebJobEdited() =>
+      _analytics.logEvent(name: 'web_job_edited');
+
+  Future<void> logWebJobAssigned() =>
+      _analytics.logEvent(name: 'web_job_assigned');
+
+  Future<void> logWebScheduleViewed() =>
+      _analytics.logEvent(name: 'web_schedule_viewed');
+
+  Future<void> logWebJobDetailViewed() =>
+      _analytics.logEvent(name: 'web_job_detail_viewed');
+
+  Future<void> logWebBulkAssign() =>
+      _analytics.logEvent(name: 'web_bulk_assign');
+
+  Future<void> logWebSearchUsed() =>
+      _analytics.logEvent(name: 'web_search_used');
+
+  Future<void> logWebPrintUsed() =>
+      _analytics.logEvent(name: 'web_print_used');
 }
