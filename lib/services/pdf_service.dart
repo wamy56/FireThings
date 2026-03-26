@@ -960,6 +960,7 @@ class PDFService {
     final useCompanyBranding = jobsheet.dispatchedJobId != null;
     final logoBytes = await CompanyPdfConfigService.instance.getEffectiveLogoBytes(
       useCompanyBranding: useCompanyBranding,
+      type: PdfDocumentType.jobsheet,
     );
     final companyPdf = CompanyPdfConfigService.instance;
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(

@@ -155,6 +155,26 @@ class AppIcons {
   static const IconData userAdd = IconsaxPlusLinear.user_add;
 
   // ============================================
+  // Assets
+  // ============================================
+  static const IconData cpu = IconsaxPlusLinear.cpu;
+  static const IconData cpuBold = IconsaxPlusBold.cpu;
+  static const IconData radar = IconsaxPlusLinear.radar;
+  static const IconData radarBold = IconsaxPlusBold.radar;
+  static const IconData alarmBold = IconsaxPlusBold.alarm;
+  static const IconData securitySafe = IconsaxPlusLinear.security_safe;
+  static const IconData securitySafeBold = IconsaxPlusBold.security_safe;
+  static const IconData lampCharge = IconsaxPlusLinear.lamp_charge;
+  static const IconData lampChargeBold = IconsaxPlusBold.lamp_charge;
+  static const IconData drop = IconsaxPlusLinear.drop;
+  static const IconData dropBold = IconsaxPlusBold.drop;
+  static const IconData wind = IconsaxPlusLinear.wind;
+  static const IconData windBold = IconsaxPlusBold.wind;
+  static const IconData box = IconsaxPlusLinear.box;
+  static const IconData boxBold = IconsaxPlusBold.box;
+  static const IconData setting = IconsaxPlusLinear.setting;
+
+  // ============================================
   // Misc
   // ============================================
   static const IconData searchOff = IconsaxPlusLinear.search_zoom_out;

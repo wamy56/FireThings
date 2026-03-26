@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/branding_service.dart';
+import '../../models/pdf_header_config.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
@@ -26,7 +27,7 @@ class _BrandingScreenState extends State<BrandingScreen> {
   }
 
   Future<void> _loadLogo() async {
-    final path = await BrandingService.getLogoPath();
+    final path = await BrandingService.getLogoPath(PdfDocumentType.jobsheet);
     setState(() {
       _logoPath = path;
       _isLoading = false;
@@ -59,7 +60,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
     final picked = await picker.pickImage(source: source!, maxWidth: 512, maxHeight: 512);
     if (picked == null) return;
 
-    await BrandingService.saveLogo(picked.path);
+    await BrandingService.saveLogo(picked.path, PdfDocumentType.jobsheet);
+    await BrandingService.saveLogo(picked.path, PdfDocumentType.invoice);
     await _loadLogo();
 
     if (mounted) {
@@ -79,7 +81,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
 
     if (confirm != true) return;
 
-    await BrandingService.removeLogo();
+    await BrandingService.removeLogo(PdfDocumentType.jobsheet);
+    await BrandingService.removeLogo(PdfDocumentType.invoice);
     setState(() => _logoPath = null);
 
     if (mounted) {

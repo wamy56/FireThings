@@ -23,6 +23,7 @@ class RemoteConfigService {
     'dispatch_enabled': false,
     'dispatch_max_members': 25,
     'dispatch_notifications_enabled': true,
+    'asset_register_enabled': false,
   };
 
   Future<void> initialize() async {
@@ -95,4 +96,7 @@ class RemoteConfigService {
 
   bool get dispatchNotificationsEnabled =>
       _remoteConfig.getBool('dispatch_notifications_enabled');
+
+  bool get assetRegisterEnabled =>
+      _remoteConfig.getBool('asset_register_enabled');
 }

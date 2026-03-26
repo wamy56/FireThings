@@ -47,7 +47,7 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
 
   Future<void> _loadData() async {
     final config = await PdfHeaderConfigService.getConfig(_selectedDocType);
-    final logoPath = await BrandingService.getLogoPath();
+    final logoPath = await BrandingService.getLogoPath(_selectedDocType);
     setState(() {
       _config = config;
       _logoPath = logoPath;
@@ -62,8 +62,10 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
     _selectedDocType = type;
     setState(() => _isLoading = true);
     final config = await PdfHeaderConfigService.getConfig(type);
+    final logoPath = await BrandingService.getLogoPath(type);
     setState(() {
       _config = config;
+      _logoPath = logoPath;
       _isLoading = false;
     });
   }
@@ -112,8 +114,8 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
       imageCache.evict(FileImage(File(_logoPath!)));
     }
 
-    await BrandingService.saveLogo(picked.path);
-    final newPath = await BrandingService.getLogoPath();
+    await BrandingService.saveLogo(picked.path, _selectedDocType);
+    final newPath = await BrandingService.getLogoPath(_selectedDocType);
     setState(() => _logoPath = newPath);
 
     if (mounted) {
@@ -138,7 +140,7 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
       imageCache.evict(FileImage(File(_logoPath!)));
     }
 
-    await BrandingService.removeLogo();
+    await BrandingService.removeLogo(_selectedDocType);
     setState(() => _logoPath = null);
   }
 

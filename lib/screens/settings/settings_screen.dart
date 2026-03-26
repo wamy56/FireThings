@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../../services/auth_service.dart';
 import '../../services/branding_service.dart';
+import '../../models/pdf_header_config.dart';
 import '../../services/database_helper.dart';
 import '../../services/firestore_sync_service.dart';
 import '../../widgets/custom_text_field.dart';
@@ -632,7 +633,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await DatabaseHelper.instance.deleteAllData();
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
-      await BrandingService.removeLogo();
+      await BrandingService.removeLogo(PdfDocumentType.jobsheet);
+      await BrandingService.removeLogo(PdfDocumentType.invoice);
       await authService.deleteAccount();
       // Auth state change will redirect to login screen
     } catch (e) {

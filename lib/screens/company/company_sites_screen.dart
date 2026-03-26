@@ -11,6 +11,8 @@ import '../../widgets/custom_text_field.dart';
 import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../services/remote_config_service.dart';
+import '../assets/site_asset_register_screen.dart';
 
 class CompanySitesScreen extends StatefulWidget {
   final String companyId;
@@ -39,7 +41,7 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Shared Sites')),
-      floatingActionButton: _canEdit
+      floatingActionButton: _canEdit && MediaQuery.of(context).viewInsets.bottom == 0
           ? FloatingActionButton.extended(
               onPressed: () => _showSiteDialog(),
               icon: Icon(AppIcons.add),
@@ -240,16 +242,37 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
               ],
             ),
           ),
-          if (_canEdit)
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _showSiteDialog(site: site);
-                } else if (value == 'delete') {
-                  _confirmDelete(site);
-                }
-              },
-              itemBuilder: (_) => [
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'edit') {
+                _showSiteDialog(site: site);
+              } else if (value == 'delete') {
+                _confirmDelete(site);
+              } else if (value == 'assets') {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SiteAssetRegisterScreen(
+                      siteId: site.id,
+                      siteName: site.name,
+                      basePath: 'companies/${widget.companyId}',
+                    ),
+                  ),
+                );
+              }
+            },
+            itemBuilder: (_) => [
+              if (RemoteConfigService.instance.assetRegisterEnabled)
+                PopupMenuItem(
+                  value: 'assets',
+                  child: Row(
+                    children: [
+                      Icon(AppIcons.clipboardTick, size: 18),
+                      const SizedBox(width: 8),
+                      const Text('Assets'),
+                    ],
+                  ),
+                ),
+              if (_canEdit)
                 PopupMenuItem(
                   value: 'edit',
                   child: Row(
@@ -260,6 +283,7 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
                     ],
                   ),
                 ),
+              if (_canEdit)
                 PopupMenuItem(
                   value: 'delete',
                   child: Row(
@@ -274,8 +298,8 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
                     ],
                   ),
                 ),
-              ],
-            ),
+            ],
+          ),
         ],
       ),
     );

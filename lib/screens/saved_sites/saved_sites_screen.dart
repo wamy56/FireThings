@@ -9,6 +9,8 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../services/remote_config_service.dart';
+import '../assets/site_asset_register_screen.dart';
 
 class SavedSitesScreen extends StatefulWidget {
   const SavedSitesScreen({super.key});
@@ -272,11 +274,13 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
           ),
         ],
       )),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddSiteDialog,
-        icon: const Icon(AppIcons.add),
-        label: const Text('Add Site'),
-      ),
+      floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: _showAddSiteDialog,
+              icon: const Icon(AppIcons.add),
+              label: const Text('Add Site'),
+            ),
     );
   }
 
@@ -318,9 +322,32 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
             ],
           ],
         ),
-        trailing: IconButton(
-          icon: const Icon(AppIcons.trash, color: Colors.red),
-          onPressed: () => _deleteSite(site),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (RemoteConfigService.instance.assetRegisterEnabled)
+              IconButton(
+                icon: const Icon(AppIcons.clipboardTick),
+                tooltip: 'Assets',
+                onPressed: () {
+                  final user = _authService.currentUser;
+                  if (user == null) return;
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SiteAssetRegisterScreen(
+                        siteId: site.id,
+                        siteName: site.siteName,
+                        basePath: 'users/${user.uid}',
+                      ),
+                    ),
+                  );
+                },
+              ),
+            IconButton(
+              icon: const Icon(AppIcons.trash, color: Colors.red),
+              onPressed: () => _deleteSite(site),
+            ),
+          ],
         ),
       ),
     );

@@ -64,6 +64,32 @@ service cloud.firestore {
       match /sites/{siteId} {
         allow read: if isCompanyMember(companyId);
         allow write: if isCompanyDispatcherOrAdmin(companyId);
+
+        // Site assets
+        match /assets/{assetId} {
+          allow read: if isCompanyMember(companyId);
+          allow create, update: if isCompanyMember(companyId);
+          allow delete: if isCompanyDispatcherOrAdmin(companyId);
+        }
+
+        // Floor plans
+        match /floor_plans/{planId} {
+          allow read: if isCompanyMember(companyId);
+          allow create, update: if isCompanyMember(companyId);
+          allow delete: if isCompanyDispatcherOrAdmin(companyId);
+        }
+
+        // Asset service history (immutable audit trail)
+        match /asset_service_history/{recordId} {
+          allow read: if isCompanyMember(companyId);
+          allow create: if isCompanyMember(companyId);
+        }
+      }
+
+      // Asset type configuration
+      match /asset_type_config/{typeId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if isCompanyAdmin(companyId);
       }
 
       // Shared company customers

@@ -468,6 +468,7 @@ class InvoicePDFService {
     final companyPdf = CompanyPdfConfigService.instance;
     final logoBytes = await companyPdf.getEffectiveLogoBytes(
       useCompanyBranding: invoice.useCompanyBranding,
+      type: PdfDocumentType.invoice,
     );
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(
       PdfDocumentType.invoice,

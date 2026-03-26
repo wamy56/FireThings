@@ -39,7 +39,7 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Shared Customers')),
-      floatingActionButton: _canEdit
+      floatingActionButton: _canEdit && MediaQuery.of(context).viewInsets.bottom == 0
           ? FloatingActionButton.extended(
               onPressed: () => _showCustomerDialog(),
               icon: Icon(AppIcons.add),

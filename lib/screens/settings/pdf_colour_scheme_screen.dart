@@ -589,65 +589,60 @@ class _PdfColourSchemeScreenState extends State<PdfColourSchemeScreen> {
   }
 
   Widget _buildPresetGrid(bool isDark) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 80,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: PdfColourScheme.presets.length,
-      itemBuilder: (context, index) {
-        final preset = PdfColourScheme.presets[index];
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: PdfColourScheme.presets.map((preset) {
         final color = Color(preset.scheme.primaryColorValue);
         final isSelected = _scheme.primaryColorValue == preset.scheme.primaryColorValue;
 
         return GestureDetector(
           onTap: () => _selectPreset(preset.scheme),
-          child: Column(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: isSelected
-                      ? Border.all(
-                          color: isDark ? Colors.white : AppTheme.textPrimary,
-                          width: 3,
-                        )
+          child: SizedBox(
+            width: 68,
+            child: Column(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: isSelected
+                        ? Border.all(
+                            color: isDark ? Colors.white : AppTheme.textPrimary,
+                            width: 3,
+                          )
+                        : null,
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: isSelected
+                      ? Icon(AppIcons.tickCircle, color: Colors.white, size: 22)
                       : null,
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withValues(alpha: 0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
                 ),
-                child: isSelected
-                    ? Icon(AppIcons.tickCircle, color: Colors.white, size: 22)
-                    : null,
-              ),
-              const SizedBox(height: 6),
-              Text(
-                preset.label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                const SizedBox(height: 6),
+                Text(
+                  preset.label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+              ],
+            ),
           ),
         );
-      },
+      }).toList(),
     );
   }
 }

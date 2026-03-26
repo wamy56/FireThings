@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 13,
+      version: 14,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -85,6 +85,12 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE jobsheets ADD COLUMN dispatchedJobId TEXT');
       await db.execute('ALTER TABLE invoices ADD COLUMN useCompanyBranding INTEGER DEFAULT 0');
     }
+    if (oldVersion < 14) {
+      await _createAssetsTable(db);
+      await _createAssetTypeConfigTable(db);
+      await _createFloorPlansTable(db);
+      await _createAssetServiceHistoryTable(db);
+    }
   }
 
   /// Create database tables
@@ -125,6 +131,10 @@ class DatabaseHelper {
     await _createFilledTemplatesTable(db);
     await _createJobTemplatesTable(db);
     await _createSavedSitesTable(db);
+    await _createAssetsTable(db);
+    await _createAssetTypeConfigTable(db);
+    await _createFloorPlansTable(db);
+    await _createAssetServiceHistoryTable(db);
 
     debugPrint('Database tables created successfully');
   }
@@ -1031,6 +1041,166 @@ class DatabaseHelper {
     await deleteAllJobTemplates();
     await deleteAllPdfFormTemplates();
     await deleteAllFilledPdfForms();
+  }
+
+  // ==================== ASSET REGISTER TABLES ====================
+
+  Future<void> _createAssetsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS assets (
+        id TEXT PRIMARY KEY,
+        siteId TEXT NOT NULL,
+        assetTypeId TEXT NOT NULL,
+        variant TEXT,
+        make TEXT,
+        model TEXT,
+        serialNumber TEXT,
+        reference TEXT,
+        barcode TEXT,
+        floorPlanId TEXT,
+        xPercent REAL,
+        yPercent REAL,
+        locationDescription TEXT,
+        zone TEXT,
+        installDate TEXT,
+        warrantyExpiry TEXT,
+        expectedLifespanYears INTEGER,
+        decommissionDate TEXT,
+        decommissionReason TEXT,
+        complianceStatus TEXT NOT NULL DEFAULT 'untested',
+        lastServiceDate TEXT,
+        lastServiceBy TEXT,
+        lastServiceByName TEXT,
+        nextServiceDue TEXT,
+        photoUrl TEXT,
+        createdBy TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        notes TEXT,
+        lastModifiedAt TEXT
+      )
+    ''');
+    debugPrint('Assets table created successfully');
+  }
+
+  Future<void> _createAssetTypeConfigTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS asset_type_config (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT,
+        iconName TEXT NOT NULL,
+        defaultColor TEXT NOT NULL,
+        variants TEXT,
+        defaultLifespanYears INTEGER,
+        defaultChecklist TEXT,
+        isBuiltIn INTEGER NOT NULL DEFAULT 0,
+        lastModifiedAt TEXT
+      )
+    ''');
+    debugPrint('Asset type config table created successfully');
+  }
+
+  Future<void> _createFloorPlansTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS floor_plans (
+        id TEXT PRIMARY KEY,
+        siteId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        sortOrder INTEGER NOT NULL DEFAULT 0,
+        imageUrl TEXT NOT NULL,
+        imageWidth REAL NOT NULL,
+        imageHeight REAL NOT NULL,
+        createdBy TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL,
+        lastModifiedAt TEXT
+      )
+    ''');
+    debugPrint('Floor plans table created successfully');
+  }
+
+  Future<void> _createAssetServiceHistoryTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS asset_service_history (
+        id TEXT PRIMARY KEY,
+        assetId TEXT NOT NULL,
+        siteId TEXT NOT NULL,
+        jobsheetId TEXT,
+        dispatchedJobId TEXT,
+        engineerId TEXT NOT NULL,
+        engineerName TEXT NOT NULL,
+        serviceDate TEXT NOT NULL,
+        overallResult TEXT NOT NULL,
+        checklistResults TEXT,
+        defectNote TEXT,
+        defectPhotoUrls TEXT,
+        defectSeverity TEXT,
+        defectAction TEXT,
+        notes TEXT,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+    debugPrint('Asset service history table created successfully');
+  }
+
+  // ==================== ASSET CRUD ====================
+
+  /// Insert an asset (solo users)
+  Future<Asset> insertAsset(Asset asset) async {
+    final db = await database;
+    final stamped = asset.copyWith(lastModifiedAt: DateTime.now());
+
+    await db.insert(
+      'assets',
+      stamped.toJson(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    debugPrint('Asset inserted: ${stamped.id}');
+    return stamped;
+  }
+
+  /// Get all assets for a site (solo users)
+  Future<List<Asset>> getAssetsBySiteId(String siteId) async {
+    final db = await database;
+
+    final result = await db.query(
+      'assets',
+      where: 'siteId = ?',
+      whereArgs: [siteId],
+      orderBy: 'reference ASC',
+    );
+
+    return result.map((json) => Asset.fromJson(json)).toList();
+  }
+
+  /// Update an asset (solo users)
+  Future<int> updateAsset(Asset asset) async {
+    final db = await database;
+    final stamped = asset.copyWith(
+      updatedAt: DateTime.now(),
+      lastModifiedAt: DateTime.now(),
+    );
+
+    return await db.update(
+      'assets',
+      stamped.toJson(),
+      where: 'id = ?',
+      whereArgs: [stamped.id],
+    );
+  }
+
+  /// Delete an asset (solo users)
+  Future<int> deleteAsset(String id) async {
+    final db = await database;
+    return await db.delete('assets', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Delete all assets for a site (solo users)
+  Future<int> deleteAllAssets() async {
+    final db = await database;
+    return await db.delete('assets');
   }
 
   /// Close database connection

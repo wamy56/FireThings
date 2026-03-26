@@ -132,11 +132,13 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
           ),
         ],
       )),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCustomerDialog(),
-        icon: const Icon(AppIcons.add),
-        label: const Text('Add Customer'),
-      ),
+      floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _showCustomerDialog(),
+              icon: const Icon(AppIcons.add),
+              label: const Text('Add Customer'),
+            ),
     );
   }
 

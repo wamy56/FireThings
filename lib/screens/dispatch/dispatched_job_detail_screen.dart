@@ -11,6 +11,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
+import '../../widgets/premium_dialog.dart';
 import '../history/job_detail_screen.dart';
 import '../new_job/new_job_screen.dart';
 import 'create_job_screen.dart';
@@ -610,13 +611,37 @@ class _JobDetailContent extends StatelessWidget {
 
   void _openMaps(BuildContext context, String address) {
     final encodedAddress = Uri.encodeComponent(address);
-    _launchUrl('https://www.google.com/maps/search/?api=1&query=$encodedAddress');
+
+    final options = <ActionSheetOption>[
+      if (PlatformUtils.isApple)
+        ActionSheetOption(
+          label: 'Apple Maps',
+          icon: AppIcons.map,
+          onTap: () => _launchUrl('https://maps.apple.com/?daddr=$encodedAddress'),
+        ),
+      ActionSheetOption(
+        label: 'Google Maps',
+        icon: AppIcons.location,
+        onTap: () => _launchUrl('https://www.google.com/maps/search/?api=1&query=$encodedAddress'),
+      ),
+      ActionSheetOption(
+        label: 'Waze',
+        icon: AppIcons.routing,
+        onTap: () => _launchUrl('https://waze.com/ul?q=$encodedAddress&navigate=yes'),
+      ),
+    ];
+
+    showAdaptiveActionSheet(
+      context: context,
+      title: 'Open with',
+      options: options,
+    );
   }
 
   Future<void> _launchUrl(String url) async {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 

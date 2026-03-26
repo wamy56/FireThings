@@ -19,6 +19,7 @@ class KeyboardDoneBar extends StatefulWidget {
 
 class _KeyboardDoneBarState extends State<KeyboardDoneBar>
     with WidgetsBindingObserver {
+  OverlayEntry? _overlayEntry;
   bool _keyboardVisible = false;
 
   @override
@@ -29,8 +30,15 @@ class _KeyboardDoneBarState extends State<KeyboardDoneBar>
 
   @override
   void dispose() {
+    _removeOverlay();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry?.dispose();
+    _overlayEntry = null;
   }
 
   @override
@@ -39,26 +47,38 @@ class _KeyboardDoneBarState extends State<KeyboardDoneBar>
         MediaQueryData.fromView(View.of(context)).viewInsets;
     final visible = rawInsets.bottom > 0;
     if (visible != _keyboardVisible) {
-      setState(() => _keyboardVisible = visible);
+      _keyboardVisible = visible;
+      if (visible) {
+        _showOverlay();
+      } else {
+        _removeOverlay();
+      }
     }
+    // Update position when keyboard height changes
+    _overlayEntry?.markNeedsBuild();
+  }
+
+  void _showOverlay() {
+    if (!PlatformUtils.isApple) return;
+    _removeOverlay();
+    _overlayEntry = OverlayEntry(
+      builder: (overlayContext) {
+        final viewInsets =
+            MediaQueryData.fromView(View.of(context)).viewInsets;
+        return Positioned(
+          left: 0,
+          right: 0,
+          bottom: viewInsets.bottom,
+          child: _DoneBarContent(),
+        );
+      },
+    );
+    Overlay.of(context).insert(_overlayEntry!);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!PlatformUtils.isApple) return widget.child;
-
-    return Stack(
-      children: [
-        widget.child,
-        if (_keyboardVisible)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _DoneBarContent(),
-          ),
-      ],
-    );
+    return widget.child;
   }
 }
 

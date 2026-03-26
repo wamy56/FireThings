@@ -235,4 +235,63 @@ class AnalyticsService {
 
   Future<void> logWebPrintUsed() =>
       _analytics.logEvent(name: 'web_print_used');
+
+  // --- Asset Register ---
+
+  Future<void> logAssetCreated({
+    required String assetType,
+    required String siteId,
+    required bool hasBarcode,
+  }) =>
+      _analytics.logEvent(name: 'asset_created', parameters: {
+        'asset_type': assetType,
+        'site_id': siteId,
+        'has_barcode': hasBarcode,
+      });
+
+  Future<void> logAssetEdited({required String assetType}) =>
+      _analytics.logEvent(
+          name: 'asset_edited', parameters: {'asset_type': assetType});
+
+  Future<void> logAssetDeleted({required String assetType}) =>
+      _analytics.logEvent(
+          name: 'asset_deleted', parameters: {'asset_type': assetType});
+
+  // --- Floor Plans ---
+
+  Future<void> logFloorPlanUploaded({
+    required String siteId,
+    required String sourceType,
+  }) =>
+      _analytics.logEvent(name: 'floor_plan_uploaded', parameters: {
+        'site_id': siteId,
+        'source_type': sourceType,
+      });
+
+  Future<void> logFloorPlanViewed({
+    required String siteId,
+    required int assetCount,
+  }) =>
+      _analytics.logEvent(name: 'floor_plan_viewed', parameters: {
+        'site_id': siteId,
+        'asset_count': assetCount,
+      });
+
+  Future<void> logFloorPlanPinPlaced({
+    required String siteId,
+    required String assetType,
+  }) =>
+      _analytics.logEvent(name: 'floor_plan_pin_placed', parameters: {
+        'site_id': siteId,
+        'asset_type': assetType,
+      });
+
+  Future<void> logAssetRegisterViewed({
+    required String siteId,
+    required int assetCount,
+  }) =>
+      _analytics.logEvent(name: 'asset_register_viewed', parameters: {
+        'site_id': siteId,
+        'asset_count': assetCount,
+      });
 }
