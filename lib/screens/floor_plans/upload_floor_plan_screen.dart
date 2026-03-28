@@ -1,9 +1,10 @@
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image/image.dart' as img;
+import 'package:printing/printing.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/floor_plan.dart';
 import '../../services/floor_plan_service.dart';
@@ -30,8 +31,10 @@ class UploadFloorPlanScreen extends StatefulWidget {
 class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
   final _nameController = TextEditingController();
   final _authService = AuthService();
-  Uint8List? _imageBytes;
+  Uint8List? _fileBytes;
+  String? _fileName;
   String _sourceType = '';
+  bool _isPdf = false;
   bool _isSaving = false;
 
   @override
@@ -51,7 +54,9 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
     if (image != null) {
       final bytes = await image.readAsBytes();
       setState(() {
-        _imageBytes = bytes;
+        _fileBytes = bytes;
+        _fileName = image.name;
+        _isPdf = false;
         _sourceType = 'camera';
       });
     }
@@ -68,7 +73,9 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
     if (image != null) {
       final bytes = await image.readAsBytes();
       setState(() {
-        _imageBytes = bytes;
+        _fileBytes = bytes;
+        _fileName = image.name;
+        _isPdf = false;
         _sourceType = 'gallery';
       });
     }
@@ -76,14 +83,19 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
 
   Future<void> _pickFromFiles() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.image,
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'],
       withData: true,
     );
     if (result != null && result.files.isNotEmpty) {
-      final bytes = result.files.first.bytes;
+      final file = result.files.first;
+      final bytes = file.bytes;
       if (bytes != null) {
+        final ext = file.extension?.toLowerCase() ?? '';
         setState(() {
-          _imageBytes = bytes;
+          _fileBytes = bytes;
+          _fileName = file.name;
+          _isPdf = ext == 'pdf';
           _sourceType = 'file';
         });
       }
@@ -100,7 +112,7 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text(
-                'Choose Image Source',
+                'Choose File Source',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
               ),
             ),
@@ -123,7 +135,8 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
             ),
             ListTile(
               leading: const Icon(AppIcons.folder),
-              title: const Text('Upload Image File'),
+              title: const Text('Upload File'),
+              subtitle: const Text('Images or PDF documents'),
               onTap: () {
                 Navigator.pop(ctx);
                 _pickFromFiles();
@@ -137,17 +150,16 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
   }
 
   Future<Size> _getImageSize(Uint8List bytes) async {
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    final image = frame.image;
-    final size = Size(image.width.toDouble(), image.height.toDouble());
-    image.dispose();
-    return size;
+    final decoded = img.decodeImage(bytes);
+    if (decoded != null) {
+      return Size(decoded.width.toDouble(), decoded.height.toDouble());
+    }
+    throw Exception('Could not decode image dimensions');
   }
 
   Future<void> _save() async {
-    if (_imageBytes == null) {
-      context.showWarningToast('Please select an image first');
+    if (_fileBytes == null) {
+      context.showWarningToast('Please select a file first');
       return;
     }
 
@@ -166,16 +178,32 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
       final planId = const Uuid().v4();
       final now = DateTime.now();
 
+      // If PDF, rasterize first page to PNG
+      Uint8List uploadBytes = _fileBytes!;
+      String ext = 'jpg';
+      String contentType = 'image/jpeg';
+
+      if (_isPdf) {
+        final pages = Printing.raster(_fileBytes!, dpi: 200);
+        final firstPage = await pages.first;
+        final pngImage = await firstPage.toPng();
+        uploadBytes = pngImage;
+        ext = 'png';
+        contentType = 'image/png';
+      }
+
       // Upload image
       final imageUrl = await FloorPlanService.instance.uploadFloorPlanImage(
         widget.basePath,
         widget.siteId,
         planId,
-        _imageBytes!,
+        uploadBytes,
+        contentType: contentType,
+        extension: ext,
       );
 
-      // Get image dimensions
-      final size = await _getImageSize(_imageBytes!);
+      // Get image dimensions from the upload bytes (always an image at this point)
+      final size = await _getImageSize(uploadBytes);
 
       // Create Firestore document
       final plan = FloorPlan(
@@ -189,6 +217,7 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
         createdBy: user.uid,
         createdAt: now,
         updatedAt: now,
+        fileExtension: ext,
       );
 
       await FloorPlanService.instance
@@ -252,11 +281,45 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
                   ),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: _imageBytes != null
+                child: _fileBytes != null
                     ? Stack(
                         fit: StackFit.expand,
                         children: [
-                          Image.memory(_imageBytes!, fit: BoxFit.contain),
+                          if (_isPdf)
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(AppIcons.document,
+                                    size: 48, color: Colors.red),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'PDF Selected',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (_fileName != null) ...[
+                                  const SizedBox(height: 4),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 24),
+                                    child: Text(
+                                      _fileName!,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.grey[600],
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            )
+                          else
+                            Image.memory(_fileBytes!, fit: BoxFit.contain),
                           Positioned(
                             top: 8,
                             right: 8,
@@ -287,7 +350,7 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            'Tap to select an image',
+                            'Tap to select an image or PDF',
                             style: TextStyle(
                               fontSize: 15,
                               color: isDark
@@ -319,14 +382,38 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
               prefixIcon: const Icon(AppIcons.layer),
             ),
 
+            if (_isPdf && _fileBytes != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(AppIcons.infoCircle,
+                        size: 18, color: AppTheme.primaryBlue),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'PDF will be converted to an image for pin placement',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             if (_isSaving) ...[
               const SizedBox(height: 24),
-              const Center(
+              Center(
                 child: Column(
                   children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 12),
-                    Text('Uploading...'),
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 12),
+                    Text(_isPdf ? 'Converting PDF & uploading...' : 'Uploading...'),
                   ],
                 ),
               ),

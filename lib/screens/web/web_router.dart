@@ -152,7 +152,7 @@ GoRouter createWebRouter() {
               final companyId = UserProfileService.instance.companyId ?? '';
               final basePath = 'companies/$companyId';
               final siteId = state.pathParameters['siteId']!;
-              final extra = state.extra as Map<String, dynamic>?;
+              final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null;
               return _SiteDataLoader(
                 companyId: companyId,
                 siteId: siteId,
@@ -193,7 +193,7 @@ GoRouter createWebRouter() {
                   final companyId = UserProfileService.instance.companyId ?? '';
                   final basePath = 'companies/$companyId';
                   final siteId = state.pathParameters['siteId']!;
-                  final extra = state.extra as Map<String, dynamic>?;
+                  final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null;
                   return _SiteDataLoader(
                     companyId: companyId,
                     siteId: siteId,
@@ -250,7 +250,7 @@ GoRouter createWebRouter() {
               final companyId = UserProfileService.instance.companyId ?? '';
               final basePath = 'companies/$companyId';
               final siteId = state.pathParameters['siteId']!;
-              final extra = state.extra as Map<String, dynamic>?;
+              final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null;
               return _SiteDataLoader(
                 companyId: companyId,
                 siteId: siteId,

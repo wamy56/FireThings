@@ -61,6 +61,8 @@ class _BatchTestScreenState extends State<BatchTestScreen> {
       case 'wind': return AppIcons.wind;
       case 'drop': return AppIcons.drop;
       case 'box': return AppIcons.box;
+      case 'radar_heat': return AppIcons.radar;
+      case 'door': return AppIcons.securitySafe;
       default: return AppIcons.setting;
     }
   }

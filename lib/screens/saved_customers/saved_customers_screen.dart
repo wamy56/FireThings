@@ -150,8 +150,6 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
       message: hasSearchQuery
           ? 'Try a different search term'
           : 'Add customers here for quick selection when creating invoices',
-      buttonText: hasSearchQuery ? null : 'Add Customer',
-      onButtonPressed: hasSearchQuery ? null : () => _showCustomerDialog(),
     );
   }
 

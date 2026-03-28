@@ -59,12 +59,14 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
   DateTime? _warrantyExpiry;
   int? _expectedLifespan;
   bool _isSaving = false;
+  bool _refWasAutoFilled = false;
 
   bool get _isEditing => widget.asset != null;
 
   @override
   void initState() {
     super.initState();
+    _referenceController.addListener(_onReferenceChanged);
     _loadAssetTypes();
     if (_isEditing) {
       _populateFields(widget.asset!);
@@ -73,8 +75,15 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
     }
   }
 
+  void _onReferenceChanged() {
+    // If the user manually edits the reference, clear the auto-fill flag
+    // (the flag gets set back to true in _suggestReference after programmatic changes)
+    _refWasAutoFilled = false;
+  }
+
   @override
   void dispose() {
+    _referenceController.removeListener(_onReferenceChanged);
     _makeController.dispose();
     _modelController.dispose();
     _serialController.dispose();
@@ -147,7 +156,9 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
         _expectedLifespan = type.defaultLifespanYears;
       }
     });
-    if (!_isEditing) _suggestReference();
+    if (!_isEditing && (_referenceController.text.isEmpty || _refWasAutoFilled)) {
+      _suggestReference();
+    }
   }
 
   Future<void> _suggestReference() async {
@@ -155,8 +166,9 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
     final prefix = _getRefPrefix(_selectedTypeId!);
     final ref = await AssetService.instance
         .suggestNextReference(widget.basePath, widget.siteId, prefix);
-    if (mounted && _referenceController.text.isEmpty) {
+    if (mounted) {
       _referenceController.text = ref;
+      _refWasAutoFilled = true;
     }
   }
 
@@ -483,6 +495,8 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
       case 'wind': return AppIcons.wind;
       case 'drop': return AppIcons.drop;
       case 'box': return AppIcons.box;
+      case 'radar_heat': return AppIcons.radar;
+      case 'door': return AppIcons.securitySafe;
       default: return AppIcons.setting;
     }
   }

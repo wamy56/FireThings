@@ -23,36 +23,71 @@ class WebDashboardScreen extends StatefulWidget {
   State<WebDashboardScreen> createState() => _WebDashboardScreenState();
 }
 
-class _WebDashboardScreenState extends State<WebDashboardScreen> {
+class _WebDashboardScreenState extends State<WebDashboardScreen>
+    with SingleTickerProviderStateMixin {
   String? _statusFilter;
   String? _engineerFilter;
   String _searchQuery = '';
   int _sortColumnIndex = 0;
   bool _sortAscending = true;
   String? _selectedJobId;
+  bool _panelVisible = false;
+  bool _panelAnimateIn = true;
   List<CompanyMember> _members = [];
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
   final Set<String> _selectedJobIds = {};
   bool _notificationBannerDismissed = false;
 
+  late final AnimationController _overlayController;
+  late final Animation<double> _overlayOpacity;
+
   String? get _companyId => UserProfileService.instance.companyId;
 
   @override
   void initState() {
     super.initState();
-    _selectedJobId = widget.initialJobId;
+    _overlayController = AnimationController(
+      vsync: this,
+      duration: AppTheme.normalAnimation,
+    );
+    _overlayOpacity = CurvedAnimation(
+      parent: _overlayController,
+      curve: AppTheme.defaultCurve,
+    );
+    if (widget.initialJobId != null) {
+      _selectedJobId = widget.initialJobId;
+      _panelVisible = true;
+      _overlayController.value = 1.0;
+    }
     _loadMembers();
     AnalyticsService.instance.logWebDashboardViewed();
   }
 
   void _selectJob(String jobId) {
-    setState(() => _selectedJobId = jobId);
+    final wasAlreadyOpen = _panelVisible;
+    setState(() {
+      _selectedJobId = jobId;
+      _panelVisible = true;
+      _panelAnimateIn = !wasAlreadyOpen;
+    });
+    if (!wasAlreadyOpen) _overlayController.forward();
     AnalyticsService.instance.logWebJobDetailViewed();
+  }
+
+  void _dismissPanel() async {
+    await _overlayController.reverse();
+    if (mounted) {
+      setState(() {
+        _panelVisible = false;
+        _selectedJobId = null;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _overlayController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -133,7 +168,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen> {
       bindings: {
         const SingleActivator(LogicalKeyboardKey.keyN): () => context.push('/jobs/create'),
         const SingleActivator(LogicalKeyboardKey.slash): () => _searchFocusNode.requestFocus(),
-        const SingleActivator(LogicalKeyboardKey.escape): () => setState(() => _selectedJobId = null),
+        const SingleActivator(LogicalKeyboardKey.escape): () { if (_panelVisible) _dismissPanel(); },
       },
       child: Focus(
         autofocus: true,
@@ -166,24 +201,29 @@ class _WebDashboardScreenState extends State<WebDashboardScreen> {
               ],
             ),
             // Dismiss overlay — click outside panel to close
-            if (_selectedJobId != null)
+            if (_panelVisible)
               Positioned.fill(
-                child: GestureDetector(
-                  onTap: () => setState(() => _selectedJobId = null),
-                  child: Container(color: Colors.black.withValues(alpha: 0.05)),
+                child: FadeTransition(
+                  opacity: _overlayOpacity,
+                  child: GestureDetector(
+                    onTap: _dismissPanel,
+                    child: Container(color: Colors.black.withValues(alpha: 0.05)),
+                  ),
                 ),
               ),
             // Detail panel overlay
-            if (_selectedJobId != null)
+            if (_panelVisible && _selectedJobId != null)
               Positioned(
                 top: 0,
                 bottom: 0,
                 right: 0,
                 width: MediaQuery.of(context).size.width * 0.42,
                 child: WebJobDetailPanel(
+                  key: ValueKey(_selectedJobId),
                   companyId: companyId,
                   jobId: _selectedJobId!,
-                  onClose: () => setState(() => _selectedJobId = null),
+                  onClose: _dismissPanel,
+                  animateIn: _panelAnimateIn,
                   onEdit: (job) {
                     context.push('/jobs/create', extra: job);
                   },

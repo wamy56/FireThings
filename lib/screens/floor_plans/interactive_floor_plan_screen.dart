@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/asset.dart';
+import '../../models/asset_type.dart';
 import '../../models/floor_plan.dart';
 import '../../data/default_asset_types.dart';
 import '../../services/asset_service.dart';
+import '../../services/asset_type_service.dart';
+import '../../services/floor_plan_service.dart';
 import '../../services/analytics_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -39,11 +43,61 @@ class _InteractiveFloorPlanScreenState
   String? _filterType;
   String? _filterStatus;
   String? _draggingAssetId;
+  Offset? _dragPosition; // Current drag position in image coordinates
+  late double _pinScale;
+  late bool _showLabels;
+  Map<String, AssetType> _assetTypes = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _pinScale = widget.floorPlan.pinScale;
+    _showLabels = widget.floorPlan.showLabels;
+    _loadAssetTypes();
+  }
+
+  Future<void> _loadAssetTypes() async {
+    final types = await AssetTypeService.instance
+        .getAssetTypes(widget.basePath);
+    if (mounted) {
+      setState(() {
+        _assetTypes = {for (final t in types) t.id: t};
+      });
+    }
+  }
+
+  AssetType? _getAssetType(String typeId) {
+    return _assetTypes[typeId] ?? DefaultAssetTypes.getById(typeId);
+  }
 
   @override
   void dispose() {
     _transformController.dispose();
     super.dispose();
+  }
+
+  Future<void> _savePinScale() async {
+    try {
+      await FloorPlanService.instance.updateFloorPlan(
+        widget.basePath,
+        widget.siteId,
+        widget.floorPlan.copyWith(pinScale: _pinScale),
+      );
+    } catch (_) {
+      if (mounted) context.showErrorToast('Failed to save pin size');
+    }
+  }
+
+  Future<void> _saveShowLabels() async {
+    try {
+      await FloorPlanService.instance.updateFloorPlan(
+        widget.basePath,
+        widget.siteId,
+        widget.floorPlan.copyWith(showLabels: _showLabels),
+      );
+    } catch (_) {
+      if (mounted) context.showErrorToast('Failed to save label setting');
+    }
   }
 
   List<Asset> _filterAssets(List<Asset> assets) {
@@ -396,6 +450,18 @@ class _InteractiveFloorPlanScreenState
       appBar: AppBar(
         title: Text(widget.floorPlan.name),
         actions: [
+          // Label visibility toggle
+          IconButton(
+            icon: Icon(
+              AppIcons.tag,
+              color: _showLabels ? AppTheme.primaryBlue : null,
+            ),
+            tooltip: _showLabels ? 'Hide labels' : 'Show labels',
+            onPressed: () {
+              setState(() => _showLabels = !_showLabels);
+              _saveShowLabels();
+            },
+          ),
           // Placement mode toggle
           IconButton(
             icon: Icon(
@@ -436,6 +502,7 @@ class _InteractiveFloorPlanScreenState
                   transformationController: _transformController,
                   minScale: 0.3,
                   maxScale: 5.0,
+                  panEnabled: _draggingAssetId == null,
                   boundaryMargin:
                       const EdgeInsets.all(double.infinity),
                   child: SizedBox(
@@ -446,19 +513,32 @@ class _InteractiveFloorPlanScreenState
                       children: [
                         // Floor plan image
                         Positioned.fill(
-                          child: CachedNetworkImage(
-                            imageUrl: widget.floorPlan.imageUrl,
-                            fit: BoxFit.contain,
-                            placeholder: (_, _) =>
-                                const Center(child: AdaptiveLoadingIndicator()),
-                            errorWidget: (_, _, _) => Center(
-                              child: Icon(AppIcons.image,
-                                  size: 64,
-                                  color: isDark
-                                      ? AppTheme.darkTextSecondary
-                                      : AppTheme.textSecondary),
-                            ),
-                          ),
+                          child: kIsWeb
+                              ? Image.network(
+                                  widget.floorPlan.imageUrl,
+                                  fit: BoxFit.contain,
+                                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                                  errorBuilder: (_, _, _) => Center(
+                                    child: Icon(AppIcons.image,
+                                        size: 64,
+                                        color: isDark
+                                            ? AppTheme.darkTextSecondary
+                                            : AppTheme.textSecondary),
+                                  ),
+                                )
+                              : CachedNetworkImage(
+                                  imageUrl: widget.floorPlan.imageUrl,
+                                  fit: BoxFit.contain,
+                                  placeholder: (_, _) =>
+                                      const Center(child: AdaptiveLoadingIndicator()),
+                                  errorWidget: (_, _, _) => Center(
+                                    child: Icon(AppIcons.image,
+                                        size: 64,
+                                        color: isDark
+                                            ? AppTheme.darkTextSecondary
+                                            : AppTheme.textSecondary),
+                                  ),
+                                ),
                         ),
                         // Asset pins
                         ...assets.map((asset) {
@@ -466,55 +546,74 @@ class _InteractiveFloorPlanScreenState
                               asset.yPercent == null) {
                             return const SizedBox.shrink();
                           }
-                          final left = asset.xPercent! *
-                              widget.floorPlan.imageWidth -
-                              14; // center the 28px pin
-                          final top = asset.yPercent! *
-                              widget.floorPlan.imageHeight -
-                              14;
+                          final isDragging = _draggingAssetId == asset.id;
+                          final isSelected = _selectedAssetId == asset.id || isDragging;
+                          final pinSize = 28.0 * _pinScale;
+                          final actualSize = isSelected ? pinSize * 1.2 : pinSize;
+                          final halfPin = actualSize / 2;
+                          final type = _getAssetType(asset.assetTypeId);
 
-                          if (_draggingAssetId == asset.id) {
+                          // Use drag position if actively dragging this pin
+                          final displayX = isDragging && _dragPosition != null
+                              ? _dragPosition!.dx
+                              : asset.xPercent! * widget.floorPlan.imageWidth;
+                          final displayY = isDragging && _dragPosition != null
+                              ? _dragPosition!.dy
+                              : asset.yPercent! * widget.floorPlan.imageHeight;
+
+                          final left = displayX - halfPin;
+                          final top = displayY - halfPin;
+
+                          // In placement mode: pins are directly draggable
+                          if (_isPlacementMode) {
                             return Positioned(
                               left: left,
                               top: top,
-                              child: Draggable(
-                                feedback: AssetPin(
-                                    asset: asset, isSelected: true),
-                                childWhenDragging: Opacity(
-                                  opacity: 0.3,
-                                  child: AssetPin(asset: asset),
-                                ),
-                                onDragEnd: (details) {
-                                  // Calculate new position
-                                  final renderBox =
-                                      context.findRenderObject()
-                                          as RenderBox;
-                                  final local =
-                                      renderBox.globalToLocal(
-                                          details.offset);
-                                  final matrix =
-                                      _transformController.value;
-                                  final inverse =
-                                      Matrix4.inverted(matrix);
-                                  final transformed =
-                                      MatrixUtils.transformPoint(
-                                          inverse, local);
-                                  final newX = transformed.dx /
-                                      widget.floorPlan.imageWidth;
-                                  final newY = transformed.dy /
-                                      widget.floorPlan.imageHeight;
-                                  if (newX >= 0 &&
-                                      newX <= 1 &&
-                                      newY >= 0 &&
-                                      newY <= 1) {
-                                    _updateAssetPosition(
-                                        asset, newX, newY);
-                                  }
-                                  setState(
-                                      () => _draggingAssetId = null);
+                              child: GestureDetector(
+                                onPanStart: (_) {
+                                  setState(() {
+                                    _draggingAssetId = asset.id;
+                                    _dragPosition = Offset(
+                                      asset.xPercent! * widget.floorPlan.imageWidth,
+                                      asset.yPercent! * widget.floorPlan.imageHeight,
+                                    );
+                                  });
                                 },
-                                child: AssetPin(
-                                    asset: asset, isSelected: true),
+                                onPanUpdate: (details) {
+                                  if (_draggingAssetId != asset.id) return;
+                                  final scale = _transformController.value.getMaxScaleOnAxis();
+                                  setState(() {
+                                    _dragPosition = Offset(
+                                      (_dragPosition?.dx ?? 0) + details.delta.dx / scale,
+                                      (_dragPosition?.dy ?? 0) + details.delta.dy / scale,
+                                    );
+                                  });
+                                },
+                                onPanEnd: (_) {
+                                  if (_dragPosition != null) {
+                                    final newX = _dragPosition!.dx / widget.floorPlan.imageWidth;
+                                    final newY = _dragPosition!.dy / widget.floorPlan.imageHeight;
+                                    if (newX >= 0 && newX <= 1 && newY >= 0 && newY <= 1) {
+                                      _updateAssetPosition(asset, newX, newY);
+                                    }
+                                  }
+                                  setState(() {
+                                    _draggingAssetId = null;
+                                    _dragPosition = null;
+                                  });
+                                },
+                                onTap: () => _onPinTap(asset),
+                                child: MouseRegion(
+                                  cursor: SystemMouseCursors.grab,
+                                  child: AssetPin(
+                                    asset: asset,
+                                    assetType: type,
+                                    isSelected: isSelected,
+                                    pinScale: _pinScale,
+                                    showLabel: _showLabels,
+                                    label: asset.reference,
+                                  ),
+                                ),
                               ),
                             );
                           }
@@ -524,11 +623,15 @@ class _InteractiveFloorPlanScreenState
                             top: top,
                             child: AssetPin(
                               asset: asset,
-                              isSelected:
-                                  _selectedAssetId == asset.id,
+                              assetType: type,
+                              isSelected: isSelected,
+                              pinScale: _pinScale,
+                              showLabel: _showLabels,
+                              label: asset.reference,
                               onTap: () => _onPinTap(asset),
-                              onLongPress: () =>
-                                  _onPinLongPress(asset),
+                              onLongPress: _isPlacementMode
+                                  ? null
+                                  : () => _onPinLongPress(asset),
                             ),
                           );
                         }),
@@ -546,23 +649,54 @@ class _InteractiveFloorPlanScreenState
               top: 0,
               left: 0,
               right: 0,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                color: Colors.orange.withValues(alpha: 0.9),
-                child: const Row(
-                  children: [
-                    Icon(AppIcons.addCircle, color: Colors.white, size: 20),
-                    SizedBox(width: 8),
-                    Text(
-                      'Tap on the floor plan to place an asset',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
+              child: Column(
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    color: Colors.orange.withValues(alpha: 0.9),
+                    child: const Row(
+                      children: [
+                        Icon(AppIcons.addCircle, color: Colors.white, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Tap on the floor plan to place an asset',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    color: isDark
+                        ? AppTheme.darkSurfaceElevated.withValues(alpha: 0.95)
+                        : Colors.white.withValues(alpha: 0.95),
+                    child: Row(
+                      children: [
+                        Icon(AppIcons.setting, size: 16,
+                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary),
+                        const SizedBox(width: 6),
+                        Text('Pin Size', style: TextStyle(fontSize: 13,
+                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary)),
+                        Expanded(
+                          child: Slider(
+                            value: _pinScale,
+                            min: 0.5,
+                            max: 2.5,
+                            divisions: 20,
+                            label: '${(_pinScale * 100).round()}%',
+                            onChanged: (v) => setState(() => _pinScale = v),
+                            onChangeEnd: (_) => _savePinScale(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
 

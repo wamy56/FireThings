@@ -96,7 +96,10 @@ class _BrandingScreenState extends State<BrandingScreen> {
       appBar: AdaptiveNavigationBar(title: 'Company Logo'),
       body: _isLoading
           ? const Center(child: AdaptiveLoadingIndicator())
-          : ListView(
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 750),
+                child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 // Preview area
@@ -177,6 +180,8 @@ class _BrandingScreenState extends State<BrandingScreen> {
                   textAlign: TextAlign.center,
                 ),
               ],
+            ),
+              ),
             ),
     );
   }

@@ -118,7 +118,7 @@ class FloorPlanListScreen extends StatelessWidget {
     if (confirmed == true && context.mounted) {
       try {
         await FloorPlanService.instance
-            .deleteFloorPlan(basePath, siteId, plan.id);
+            .deleteFloorPlan(basePath, siteId, plan.id, extension: plan.fileExtension);
         if (context.mounted) context.showSuccessToast('Floor plan deleted');
       } catch (_) {
         if (context.mounted) context.showErrorToast('Failed to delete');
@@ -155,8 +155,6 @@ class FloorPlanListScreen extends StatelessWidget {
               title: 'No Floor Plans',
               message:
                   'Upload floor plan images to pin assets to their locations',
-              buttonText: 'Upload Floor Plan',
-              onButtonPressed: () => _navigateToUpload(context),
             );
           }
 
@@ -213,22 +211,36 @@ class _FloorPlanCard extends StatelessWidget {
             // Thumbnail
             SizedBox(
               height: 160,
-              child: CachedNetworkImage(
-                imageUrl: plan.imageUrl,
-                fit: BoxFit.cover,
-                placeholder: (_, _) => Container(
-                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-                  child: const Center(child: AdaptiveLoadingIndicator()),
-                ),
-                errorWidget: (_, _, _) => Container(
-                  color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-                  child: Icon(AppIcons.image,
-                      size: 40,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.textSecondary),
-                ),
-              ),
+              child: kIsWeb
+                  ? Image.network(
+                      plan.imageUrl,
+                      fit: BoxFit.cover,
+                      webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
+                      errorBuilder: (_, _, _) => Container(
+                        color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                        child: Icon(AppIcons.image,
+                            size: 40,
+                            color: isDark
+                                ? AppTheme.darkTextSecondary
+                                : AppTheme.textSecondary),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: plan.imageUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (_, _) => Container(
+                        color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                        child: const Center(child: AdaptiveLoadingIndicator()),
+                      ),
+                      errorWidget: (_, _, _) => Container(
+                        color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                        child: Icon(AppIcons.image,
+                            size: 40,
+                            color: isDark
+                                ? AppTheme.darkTextSecondary
+                                : AppTheme.textSecondary),
+                      ),
+                    ),
             ),
             // Info row
             Padding(

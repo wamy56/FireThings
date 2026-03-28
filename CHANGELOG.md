@@ -4,6 +4,46 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-28 (Session 52)
+
+### Floor Plan Improvements (Web)
+
+- **PDF upload support**: Upload screen now accepts PDF files, rasterises first page to PNG via `Printing.raster()` for pin placement
+- **Cross-platform image loading**: Replaced `dart:ui` codec with `image` package for dimension extraction (works on web)
+- **Web image display**: `CachedNetworkImage` replaced with `Image.network` + `webHtmlElementStrategy: WebHtmlElementStrategy.prefer` on web to bypass CORS — mobile keeps `CachedNetworkImage` for offline caching
+- **Web pin dragging**: Replaced `Draggable` widget with `GestureDetector` pan tracking in placement mode — disables `InteractiveViewer` panning during drag, divides delta by zoom scale for correct movement at any zoom level
+- **Pin size slider**: Changed from 8 divisions (25% increments) to 20 divisions (10% increments)
+- **Pin labels**: Added reference text labels above floor plan pins via `OverflowBox` in `AssetPin` widget — white pill with grey border, scales with pin size slider, toggle icon in app bar, persists per floor plan via `showLabels` field on `FloorPlan` model
+- **GoRouter safety**: Fixed 3 unsafe `state.extra as Map` casts in `web_router.dart` with safe type checks
+
+### Asset Register Discoverability
+
+- **Home screen**: Replaced 4-stat row (completed jobs, drafts, invoices) with full-width "Sites & Assets" card showing site count, navigates to SavedSitesScreen
+- **Site asset register**: Replaced 4 cryptic app bar icon buttons + popup menu with horizontally scrollable labeled action cards strip (Floor Plans, Batch Test, Scan Barcode, Report, Manage Types)
+
+### Web Layout — Max-Width Constraints
+
+- **4 screens constrained**: Team, Shared Sites, Shared Customers, Company Logo screens wrapped in `Center` + `ConstrainedBox(maxWidth: 750)` to match PDF editor screens on wide displays
+- **Pattern**: Same approach used in `pdf_colour_scheme_screen.dart` and `company_pdf_design_screen.dart`
+
+### Floor Plan Model
+
+- Added `fileExtension` field (default `'jpg'`) and `showLabels` field (default `true`) to `FloorPlan` model — constructor, toJson, fromJson, copyWith
+
+### Asset Reference Auto-Fill Fix
+
+- **add_edit_asset_screen**: Reference field now updates when asset type dropdown changes (was stuck on first auto-fill). Uses `_refWasAutoFilled` flag + controller listener pattern to distinguish auto-fill from manual edits.
+
+### Firebase Hosting
+
+- Built and deployed Flutter web app to Firebase Hosting
+
+### Compliance Report — Pin Labels
+
+- Floor plan section now renders reference labels above pin dots when `plan.showLabels` is true
+
+---
+
 ## 2026-03-28 (Session 51)
 
 ### Asset Register — Phase 9: Web Portal Integration

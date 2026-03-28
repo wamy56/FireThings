@@ -51,7 +51,10 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
             )
           : null,
       body: KeyboardDismissWrapper(
-        child: Column(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 750),
+            child: Column(
           children: [
             // Search bar
             Padding(
@@ -185,6 +188,8 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
               ),
             ),
           ],
+        ),
+          ),
         ),
       ),
     );

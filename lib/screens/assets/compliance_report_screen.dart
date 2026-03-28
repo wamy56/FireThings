@@ -8,6 +8,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/widgets.dart';
+import '../common/pdf_preview_screen.dart';
 
 class ComplianceReportScreen extends StatefulWidget {
   final String basePath;
@@ -318,11 +319,32 @@ class _ComplianceReportScreenState extends State<ComplianceReportScreen> {
         ),
         const Spacer(),
 
-        // Share button
+        // View report button
         SizedBox(
           width: double.infinity,
           height: 50,
           child: ElevatedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PdfPreviewScreen(
+                  pdfBytes: _pdfBytes!,
+                  title: 'Compliance Report',
+                  fileName:
+                      '${widget.siteName.replaceAll(' ', '_')}_compliance_report.pdf',
+                ),
+              ),
+            ),
+            icon: const Icon(AppIcons.document),
+            label: const Text('View Report'),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Share button
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: OutlinedButton.icon(
             onPressed: _shareReport,
             icon: const Icon(AppIcons.send),
             label: const Text('Share Report'),

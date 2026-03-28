@@ -21,6 +21,7 @@ class WebJobDetailPanel extends StatefulWidget {
   final String jobId;
   final VoidCallback onClose;
   final void Function(DispatchedJob job) onEdit;
+  final bool animateIn;
 
   const WebJobDetailPanel({
     super.key,
@@ -28,6 +29,7 @@ class WebJobDetailPanel extends StatefulWidget {
     required this.jobId,
     required this.onClose,
     required this.onEdit,
+    this.animateIn = true,
   });
 
   @override
@@ -53,7 +55,11 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
       parent: _slideController,
       curve: AppTheme.defaultCurve,
     ));
-    _slideController.forward();
+    if (widget.animateIn) {
+      _slideController.forward();
+    } else {
+      _slideController.value = 1.0;
+    }
   }
 
   @override
@@ -63,7 +69,7 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
   }
 
   Future<void> _closePanel() async {
-    await _slideController.reverse();
+    _slideController.reverse();
     widget.onClose();
   }
 

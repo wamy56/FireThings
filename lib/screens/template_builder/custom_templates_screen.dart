@@ -40,16 +40,6 @@ class _CustomTemplatesScreenState extends State<CustomTemplatesScreen> {
               icon: AppIcons.folder,
               title: 'No Custom Templates',
               message: 'Create your own custom templates for specific jobs',
-              buttonText: 'Create Template',
-              onButtonPressed: () async {
-                await Navigator.push(
-                  context,
-                  adaptivePageRoute(
-                    builder: (_) => const CustomTemplateBuilderScreen(),
-                  ),
-                );
-                _loadTemplates();
-              },
             )
           : ListView(
               padding: const EdgeInsets.all(16),

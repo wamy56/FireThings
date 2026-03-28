@@ -11,6 +11,9 @@ class FloorPlan {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? lastModifiedAt;
+  final double pinScale;
+  final String fileExtension;
+  final bool showLabels;
 
   FloorPlan({
     required this.id,
@@ -24,6 +27,9 @@ class FloorPlan {
     required this.createdAt,
     required this.updatedAt,
     this.lastModifiedAt,
+    this.pinScale = 1.0,
+    this.fileExtension = 'jpg',
+    this.showLabels = true,
   });
 
   Map<String, dynamic> toJson() {
@@ -39,6 +45,9 @@ class FloorPlan {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
       'lastModifiedAt': lastModifiedAt?.toIso8601String(),
+      'pinScale': pinScale,
+      'fileExtension': fileExtension,
+      'showLabels': showLabels,
     };
   }
 
@@ -57,6 +66,9 @@ class FloorPlan {
       lastModifiedAt: json['lastModifiedAt'] != null
           ? DateTime.tryParse(json['lastModifiedAt'] as String)
           : null,
+      pinScale: (json['pinScale'] as num?)?.toDouble() ?? 1.0,
+      fileExtension: json['fileExtension'] as String? ?? 'jpg',
+      showLabels: json['showLabels'] as bool? ?? true,
     );
   }
 
@@ -72,6 +84,9 @@ class FloorPlan {
     DateTime? createdAt,
     DateTime? updatedAt,
     DateTime? lastModifiedAt,
+    double? pinScale,
+    String? fileExtension,
+    bool? showLabels,
   }) {
     return FloorPlan(
       id: id ?? this.id,
@@ -85,6 +100,9 @@ class FloorPlan {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
+      pinScale: pinScale ?? this.pinScale,
+      fileExtension: fileExtension ?? this.fileExtension,
+      showLabels: showLabels ?? this.showLabels,
     );
   }
 

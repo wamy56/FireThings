@@ -46,7 +46,10 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
               label: const Text('Add Customer'),
             )
           : null,
-      body: KeyboardDismissWrapper(child: Column(
+      body: KeyboardDismissWrapper(child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: Column(
         children: [
           // Search bar
           Padding(
@@ -174,7 +177,9 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
             ),
           ),
         ],
-      )),
+      ),
+          ),
+        )),
     );
   }
 

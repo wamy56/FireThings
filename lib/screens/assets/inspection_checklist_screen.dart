@@ -253,6 +253,8 @@ class _InspectionChecklistScreenState extends State<InspectionChecklistScreen> {
       case 'wind': return AppIcons.wind;
       case 'drop': return AppIcons.drop;
       case 'box': return AppIcons.box;
+      case 'radar_heat': return AppIcons.radar;
+      case 'door': return AppIcons.securitySafe;
       default: return AppIcons.setting;
     }
   }

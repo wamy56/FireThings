@@ -4,8 +4,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
-import 'dart:io';
 import '../models/models.dart';
 import '../models/pdf_colour_scheme.dart';
 import 'auth_service.dart';
@@ -212,8 +210,32 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
           final planAssets =
               active.where((a) => a.floorPlanId == plan.id).toList();
 
+          // Calculate rendered image area within the container
+          // Container: full content width (~547pt) x 300pt, image uses BoxFit.contain
+          const containerHeight = 300.0;
+          const containerWidth = 547.0; // A4 (595.28) - 2*24 margins
+          final pinSize = 8.0 * plan.pinScale;
+
+          final imageAspect = plan.imageWidth / plan.imageHeight;
+          final containerAspect = containerWidth / containerHeight;
+
+          double renderW, renderH, offsetX, offsetY;
+          if (imageAspect > containerAspect) {
+            // Image wider than container — pillarboxed vertically
+            renderW = containerWidth;
+            renderH = containerWidth / imageAspect;
+            offsetX = 0;
+            offsetY = (containerHeight - renderH) / 2;
+          } else {
+            // Image taller — letterboxed horizontally
+            renderH = containerHeight;
+            renderW = containerHeight * imageAspect;
+            offsetX = (containerWidth - renderW) / 2;
+            offsetY = 0;
+          }
+
           widgets.add(pw.Container(
-            height: 300,
+            height: containerHeight,
             decoration: pw.BoxDecoration(
               border: pw.Border.all(color: _lightGray),
             ),
@@ -224,28 +246,62 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
                       fit: pw.BoxFit.contain),
                 ),
                 ...planAssets.map((a) {
-                  final type = getType(a.assetTypeId);
-                  final color = type != null
-                      ? PdfColor.fromHex(type.defaultColor)
-                      : primaryColor;
+                  if (a.xPercent == null || a.yPercent == null) {
+                    return pw.SizedBox();
+                  }
                   final statusColor = a.complianceStatus == Asset.statusPass
                       ? _passGreen
                       : a.complianceStatus == Asset.statusFail
                           ? _failRed
                           : _untestedAmber;
 
-                  return pw.Positioned(
-                    left: (a.xPercent ?? 0) / 100 * 500,
-                    top: (a.yPercent ?? 0) / 100 * 300,
-                    child: pw.Container(
-                      width: 8,
-                      height: 8,
-                      decoration: pw.BoxDecoration(
-                        color: color,
-                        shape: pw.BoxShape.circle,
-                        border: pw.Border.all(color: statusColor, width: 1.5),
-                      ),
+                  final pinDot = pw.Container(
+                    width: pinSize,
+                    height: pinSize,
+                    decoration: pw.BoxDecoration(
+                      color: statusColor,
+                      shape: pw.BoxShape.circle,
+                      border: pw.Border.all(
+                          color: PdfColors.white, width: 1.0),
                     ),
+                  );
+
+                  final hasLabel = plan.showLabels &&
+                      a.reference != null &&
+                      a.reference!.isNotEmpty;
+                  final labelFontSize = 5.0 * plan.pinScale;
+
+                  return pw.Positioned(
+                    left: offsetX + a.xPercent! * renderW - pinSize / 2,
+                    top: offsetY + a.yPercent! * renderH - pinSize / 2 -
+                        (hasLabel ? labelFontSize + 4 : 0),
+                    child: hasLabel
+                        ? pw.Column(
+                            mainAxisSize: pw.MainAxisSize.min,
+                            children: [
+                              pw.Container(
+                                padding: const pw.EdgeInsets.symmetric(
+                                    horizontal: 2, vertical: 1),
+                                decoration: pw.BoxDecoration(
+                                  color: PdfColors.white,
+                                  borderRadius:
+                                      pw.BorderRadius.circular(2),
+                                  border: pw.Border.all(
+                                      color: _lightGray, width: 0.5),
+                                ),
+                                child: pw.Text(
+                                  a.reference!,
+                                  style: pw.TextStyle(
+                                    fontSize: labelFontSize,
+                                    fontWeight: pw.FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              pw.SizedBox(height: 1),
+                              pinDot,
+                            ],
+                          )
+                        : pinDot,
                   );
                 }),
               ],
@@ -774,12 +830,10 @@ class ComplianceReportService {
 
   static Future<void> shareReport(
       Uint8List pdfBytes, String siteName) async {
-    final tempDir = Directory.systemTemp;
-    final file = File(
-        '${tempDir.path}/${siteName.replaceAll(' ', '_')}_compliance_report.pdf');
-    await file.writeAsBytes(pdfBytes);
-    await Share.shareXFiles([XFile(file.path)],
-        text: 'Site Compliance Report - $siteName');
+    await Printing.sharePdf(
+      bytes: pdfBytes,
+      filename: '${siteName.replaceAll(' ', '_')}_compliance_report.pdf',
+    );
   }
 
   static Future<void> printReport(Uint8List pdfBytes) async {

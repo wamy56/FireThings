@@ -5,7 +5,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_helper.dart';
 import '../../services/notification_service.dart';
-import '../../models/models.dart';
 import '../../utils/theme.dart';
 import '../../utils/responsive.dart';
 import '../../utils/icon_map.dart';
@@ -19,9 +18,7 @@ import '../tools/battery_load_test_screen.dart';
 import '../tools/bs5839_reference_screen.dart';
 import '../tools/detector_spacing_calculator_screen.dart';
 import '../tools/timestamp_camera/timestamp_camera_screen.dart';
-import '../new_job/jobsheet_drafts_screen.dart';
-import '../history/history_screen.dart';
-import '../invoicing/invoice_list_screen.dart';
+import '../saved_sites/saved_sites_screen.dart';
 import '../../services/analytics_service.dart';
 import '../../services/remote_config_service.dart';
 import '../../services/dispatch_service.dart';
@@ -42,10 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _authService = AuthService();
   final _dbHelper = DatabaseHelper.instance;
 
-  int _totalCompleted = 0;
-  List<Invoice> _outstandingInvoices = [];
-  List<Invoice> _draftInvoices = [];
-  List<Jobsheet> _draftJobsheets = [];
+  int _siteCount = 0;
   int _pendingDispatchCount = 0;
   bool _isLoading = true;
 
@@ -70,21 +64,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final user = _authService.currentUser;
       if (user == null) return;
 
-      final results = await Future.wait([
-        _dbHelper.getJobsheetsByEngineerId(user.uid),
-        _dbHelper.getOutstandingInvoicesByEngineerId(user.uid),
-        _dbHelper.getDraftJobsheetsByEngineerId(user.uid),
-        _dbHelper.getDraftInvoicesByEngineerId(user.uid),
-      ]);
-
-      final allJobsheets = results[0] as List<Jobsheet>;
-      final outstandingInvoices = results[1] as List<Invoice>;
-      final draftJobsheets = results[2] as List<Jobsheet>;
-      final draftInvoices = results[3] as List<Invoice>;
-
-      final completedJobsheets = allJobsheets
-          .where((j) => j.status == JobsheetStatus.completed)
-          .toList();
+      // Load saved sites count
+      final sites = await _dbHelper.getSavedSitesByEngineerId(user.uid);
 
       // Load pending dispatch count if user has a company
       int pendingCount = 0;
@@ -97,10 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       setState(() {
-        _totalCompleted = completedJobsheets.length;
-        _outstandingInvoices = outstandingInvoices;
-        _draftInvoices = draftInvoices;
-        _draftJobsheets = draftJobsheets;
+        _siteCount = sites.length;
         _pendingDispatchCount = pendingCount;
         _isLoading = false;
       });
@@ -128,8 +106,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       _buildWelcomeHeader(user).animateEntrance(),
                       const SizedBox(height: AppTheme.sectionGap),
 
-                      // Stats Row
-                      _buildStatsRow().animateEntrance(delay: 100.ms),
+                      // Sites & Assets
+                      if (RemoteConfigService.instance.assetRegisterEnabled)
+                        _buildSitesCard().animateEntrance(delay: 100.ms),
 
                       // Dispatched Jobs Card
                       if (_pendingDispatchCount > 0) ...[
@@ -157,13 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const SkeletonBox(height: 60, borderRadius: 12),
             const SizedBox(height: AppTheme.sectionGap),
-            Row(
-              children: const [
-                Expanded(child: SkeletonBox(height: 100, borderRadius: 16)),
-                SizedBox(width: 12),
-                Expanded(child: SkeletonBox(height: 100, borderRadius: 16)),
-              ],
-            ),
+            const SkeletonBox(height: 72, borderRadius: 16),
             const SizedBox(height: AppTheme.sectionGap),
             const SkeletonBox(height: 20, width: 120, borderRadius: 8),
             const SizedBox(height: 16),
@@ -407,171 +380,70 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildStatsRow() {
+  Widget _buildSitesCard() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      children: [
-        // Jobs card
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
-              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-              boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          adaptivePageRoute(builder: (_) => const SavedSitesScreen()),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppTheme.cardPadding),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
+          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          boxShadow: isDark ? null : AppTheme.cardShadow,
+          border: Border.all(
+            color: AppTheme.primaryBlue.withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                AppIcons.location,
+                color: AppTheme.primaryBlue,
+                size: 24,
+              ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+            const SizedBox(width: 16),
+            Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Jobs',
+                    'Sites & Assets',
                     style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textSecondary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatTile(
-                          AppIcons.tickCircle,
-                          AppTheme.successGreen,
-                          '$_totalCompleted',
-                          'Completed',
-                          onTap: () => Navigator.push(
-                            context,
-                            adaptivePageRoute(
-                              builder: (_) => const HistoryScreen(),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: _buildStatTile(
-                          AppIcons.editNote,
-                          Colors.purple,
-                          '${_draftJobsheets.length}',
-                          'Job Drafts',
-                          onTap: () => Navigator.push(
-                            context,
-                            adaptivePageRoute(
-                              builder: (_) => const JobsheetDraftsScreen(),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 2),
+                  Text(
+                    '$_siteCount saved ${_siteCount == 1 ? 'site' : 'sites'}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
+            Icon(AppIcons.arrowRight, color: AppTheme.textHint),
+          ],
         ),
-        const SizedBox(width: 12),
-        // Invoices card
-        Expanded(
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite,
-              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-              boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              child: Column(
-                children: [
-                  Text(
-                    'Invoices',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatTile(
-                          AppIcons.receipt,
-                          AppTheme.accentOrange,
-                          '${_outstandingInvoices.length}',
-                          'Unpaid',
-                          onTap: () => Navigator.push(
-                            context,
-                            adaptivePageRoute(
-                              builder: (_) => const InvoiceListScreen(
-                                statusFilter: InvoiceStatus.sent,
-                                title: 'Sent Invoices',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: _buildStatTile(
-                          AppIcons.editNote,
-                          Colors.blue,
-                          '${_draftInvoices.length}',
-                          'Inv. Drafts',
-                          onTap: () => Navigator.push(
-                            context,
-                            adaptivePageRoute(
-                              builder: (_) => const InvoiceListScreen(
-                                statusFilter: InvoiceStatus.draft,
-                                title: 'Draft Invoices',
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
+      ),
     );
-  }
-
-  Widget _buildStatTile(
-    IconData icon,
-    Color color,
-    String value,
-    String label, {
-    VoidCallback? onTap,
-  }) {
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-    if (onTap != null) {
-      return GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: content,
-      );
-    }
-    return content;
   }
 
   Widget _buildActionButton(

@@ -66,6 +66,10 @@ class _AssetTypeConfigScreenState extends State<AssetTypeConfigScreen> {
         return AppIcons.drop;
       case 'box':
         return AppIcons.box;
+      case 'radar_heat':
+        return AppIcons.radar;
+      case 'door':
+        return AppIcons.securitySafe;
       default:
         return AppIcons.setting;
     }
@@ -267,10 +271,12 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
   static const _iconOptions = [
     'cpu',
     'radar',
+    'radar_heat',
     'danger',
     'volumeHigh',
     'securitySafe',
     'lampCharge',
+    'door',
     'wind',
     'drop',
     'box',
@@ -338,6 +344,10 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
         return AppIcons.drop;
       case 'box':
         return AppIcons.box;
+      case 'radar_heat':
+        return AppIcons.radar;
+      case 'door':
+        return AppIcons.securitySafe;
       default:
         return AppIcons.setting;
     }

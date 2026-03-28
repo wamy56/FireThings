@@ -68,10 +68,11 @@ class FloorPlanService {
 
   /// Delete a floor plan document and its image from Storage.
   Future<void> deleteFloorPlan(
-      String basePath, String siteId, String planId) async {
+      String basePath, String siteId, String planId,
+      {String extension = 'jpg'}) async {
     try {
       await _plansCol(basePath, siteId).doc(planId).delete();
-      await deleteFloorPlanImage(basePath, siteId, planId);
+      await deleteFloorPlanImage(basePath, siteId, planId, extension: extension);
     } catch (e) {
       debugPrint('Error deleting floor plan: $e');
       rethrow;
@@ -81,11 +82,12 @@ class FloorPlanService {
   /// Upload a floor plan image to Firebase Storage.
   /// Returns the download URL.
   Future<String> uploadFloorPlanImage(
-      String basePath, String siteId, String planId, Uint8List bytes) async {
+      String basePath, String siteId, String planId, Uint8List bytes,
+      {String contentType = 'image/jpeg', String extension = 'jpg'}) async {
     try {
       final ref =
-          _storage.ref('$basePath/sites/$siteId/floor_plans/$planId.jpg');
-      await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+          _storage.ref('$basePath/sites/$siteId/floor_plans/$planId.$extension');
+      await ref.putData(bytes, SettableMetadata(contentType: contentType));
       return await ref.getDownloadURL();
     } catch (e) {
       debugPrint('Error uploading floor plan image: $e');
@@ -95,10 +97,11 @@ class FloorPlanService {
 
   /// Delete a floor plan image from Firebase Storage.
   Future<void> deleteFloorPlanImage(
-      String basePath, String siteId, String planId) async {
+      String basePath, String siteId, String planId,
+      {String extension = 'jpg'}) async {
     try {
       final ref =
-          _storage.ref('$basePath/sites/$siteId/floor_plans/$planId.jpg');
+          _storage.ref('$basePath/sites/$siteId/floor_plans/$planId.$extension');
       await ref.delete();
     } catch (e) {
       // Image may not exist — ignore

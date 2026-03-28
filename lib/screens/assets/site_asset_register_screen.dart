@@ -95,6 +95,10 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
         return AppIcons.drop;
       case 'box':
         return AppIcons.box;
+      case 'radar_heat':
+        return AppIcons.radar;
+      case 'door':
+        return AppIcons.securitySafe;
       default:
         return AppIcons.setting;
     }
@@ -226,104 +230,6 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.siteName),
-        actions: [
-          if (!kIsWeb)
-            IconButton(
-              icon: const Icon(AppIcons.scanner),
-              tooltip: 'Scan Barcode',
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => BarcodeScannerScreen(
-                      basePath: widget.basePath,
-                      siteId: widget.siteId,
-                    ),
-                  ),
-                );
-              },
-            ),
-          if (!kIsWeb)
-            IconButton(
-              icon: const Icon(AppIcons.clipboardTick),
-              tooltip: 'Batch Test',
-              onPressed: _navigateToBatchTest,
-            ),
-          IconButton(
-            icon: const Icon(AppIcons.map),
-            tooltip: 'Floor Plans',
-            onPressed: () {
-              if (kIsWeb) {
-                context.go('/sites/${widget.siteId}/floor-plans');
-              } else {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => FloorPlanListScreen(
-                      siteId: widget.siteId,
-                      siteName: widget.siteName,
-                      basePath: widget.basePath,
-                    ),
-                  ),
-                );
-              }
-            },
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'report' &&
-                  RemoteConfigService.instance.complianceReportEnabled) {
-                if (kIsWeb) {
-                  context.go('/sites/${widget.siteId}/assets/report');
-                } else {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ComplianceReportScreen(
-                        basePath: widget.basePath,
-                        siteId: widget.siteId,
-                        siteName: widget.siteName,
-                        siteAddress: widget.siteAddress,
-                      ),
-                    ),
-                  );
-                }
-              } else if (value == 'types') {
-                if (kIsWeb) {
-                  context.go('/sites/${widget.siteId}/assets/types');
-                } else {
-                  Navigator.of(context)
-                      .push(
-                    MaterialPageRoute(
-                      builder: (_) => AssetTypeConfigScreen(
-                        basePath: widget.basePath,
-                      ),
-                    ),
-                  )
-                      .then((_) => _loadAssetTypes());
-                }
-              }
-            },
-            itemBuilder: (_) => [
-              if (RemoteConfigService.instance.complianceReportEnabled)
-                const PopupMenuItem(
-                  value: 'report',
-                  child: ListTile(
-                    leading: Icon(AppIcons.document),
-                    title: Text('Compliance Report'),
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                  ),
-                ),
-              const PopupMenuItem(
-                value: 'types',
-                child: ListTile(
-                  leading: Icon(AppIcons.setting),
-                  title: Text('Manage Asset Types'),
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
       floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
           ? null
@@ -345,6 +251,10 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
                 onChanged: (value) => setState(() => _searchQuery = value),
               ),
             ),
+
+            // Action cards
+            _buildActionCards(isDark),
+            const SizedBox(height: 8),
 
             // Filter chips
             SingleChildScrollView(
@@ -426,8 +336,6 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
                       title: 'No Assets Registered',
                       message:
                           'Start building your asset register by adding fire safety devices for this site',
-                      buttonText: 'Add Asset',
-                      onButtonPressed: _navigateToAddAsset,
                     );
                   }
 
@@ -462,6 +370,142 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCards(bool isDark) {
+    final rc = RemoteConfigService.instance;
+
+    final cards = <Widget>[
+      _buildActionCard(
+        'Floor Plans', AppIcons.map, Colors.blue,
+        () {
+          if (kIsWeb) {
+            context.go('/sites/${widget.siteId}/floor-plans');
+          } else {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => FloorPlanListScreen(
+                  siteId: widget.siteId,
+                  siteName: widget.siteName,
+                  basePath: widget.basePath,
+                ),
+              ),
+            );
+          }
+        },
+        isDark,
+      ),
+      if (!kIsWeb)
+        _buildActionCard(
+          'Batch Test', AppIcons.clipboardTick, Colors.green,
+          _navigateToBatchTest,
+          isDark,
+        ),
+      if (!kIsWeb && rc.barcodeScanningEnabled)
+        _buildActionCard(
+          'Scan Barcode', AppIcons.scanner, Colors.purple,
+          () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => BarcodeScannerScreen(
+                  basePath: widget.basePath,
+                  siteId: widget.siteId,
+                ),
+              ),
+            );
+          },
+          isDark,
+        ),
+      if (rc.complianceReportEnabled)
+        _buildActionCard(
+          'Report', AppIcons.document, Colors.orange,
+          () {
+            if (kIsWeb) {
+              context.go('/sites/${widget.siteId}/assets/report');
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ComplianceReportScreen(
+                    basePath: widget.basePath,
+                    siteId: widget.siteId,
+                    siteName: widget.siteName,
+                    siteAddress: widget.siteAddress,
+                  ),
+                ),
+              );
+            }
+          },
+          isDark,
+        ),
+      _buildActionCard(
+        'Manage Types', AppIcons.setting, Colors.grey,
+        () {
+          if (kIsWeb) {
+            context.go('/sites/${widget.siteId}/assets/types');
+          } else {
+            Navigator.of(context)
+                .push(
+              MaterialPageRoute(
+                builder: (_) => AssetTypeConfigScreen(
+                  basePath: widget.basePath,
+                ),
+              ),
+            )
+                .then((_) => _loadAssetTypes());
+          }
+        },
+        isDark,
+      ),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          for (int i = 0; i < cards.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            cards[i],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionCard(
+    String label, IconData icon, Color color, VoidCallback onTap, bool isDark,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isDark
+                ? color.withValues(alpha: 0.12)
+                : color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white70 : Colors.black87,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

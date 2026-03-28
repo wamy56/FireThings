@@ -255,10 +255,6 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
                     message: _searchQuery.isEmpty
                         ? 'Save frequently visited sites for quick access'
                         : 'Try a different search term',
-                    buttonText: _searchQuery.isEmpty ? 'Add Site' : null,
-                    onButtonPressed: _searchQuery.isEmpty
-                        ? _showAddSiteDialog
-                        : null,
                   )
                 : AdaptiveRefreshIndicator(
                     onRefresh: _loadSavedSites,

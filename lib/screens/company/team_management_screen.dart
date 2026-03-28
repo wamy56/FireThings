@@ -43,7 +43,10 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Team')),
-      body: Column(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: Column(
         children: [
           // Search bar
           Padding(
@@ -155,6 +158,8 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
             ),
           ),
         ],
+      ),
+        ),
       ),
     );
   }
