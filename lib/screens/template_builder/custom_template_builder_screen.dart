@@ -62,6 +62,8 @@ class _CustomTemplateBuilderScreenState
         return 'Compliance Statement';
       case PdfSectionId.signatures:
         return 'Signatures';
+      case PdfSectionId.assetSummary:
+        return 'Asset Inspection Summary';
     }
   }
 

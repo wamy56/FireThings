@@ -89,6 +89,22 @@ class AssetService {
     }
   }
 
+  /// Find an asset by its barcode value. Returns null if not found.
+  Future<Asset?> findByBarcode(
+      String basePath, String siteId, String barcode) async {
+    try {
+      final snapshot = await _assetsCol(basePath, siteId)
+          .where('barcode', isEqualTo: barcode)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isEmpty) return null;
+      return Asset.fromJson(snapshot.docs.first.data());
+    } catch (e) {
+      debugPrint('Error finding asset by barcode: $e');
+      return null;
+    }
+  }
+
   /// Get the next suggested reference for an asset type at a site.
   /// E.g. if site has SD-001, SD-002, returns "SD-003".
   Future<String> suggestNextReference(

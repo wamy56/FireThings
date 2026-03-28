@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/company_site.dart';
 import '../../services/company_service.dart';
@@ -249,15 +251,20 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
               } else if (value == 'delete') {
                 _confirmDelete(site);
               } else if (value == 'assets') {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SiteAssetRegisterScreen(
-                      siteId: site.id,
-                      siteName: site.name,
-                      basePath: 'companies/${widget.companyId}',
+                if (kIsWeb) {
+                  context.go('/sites/${site.id}/assets');
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => SiteAssetRegisterScreen(
+                        siteId: site.id,
+                        siteName: site.name,
+                        siteAddress: site.address,
+                        basePath: 'companies/${widget.companyId}',
+                      ),
                     ),
-                  ),
-                );
+                  );
+                }
               }
             },
             itemBuilder: (_) => [

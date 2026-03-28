@@ -20,6 +20,42 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
+    // Solo user asset photos: users/{uid}/sites/{siteId}/assets/{assetId}/{filename}
+    match /users/{userId}/sites/{siteId}/assets/{assetId}/{filename} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Solo user defect photos: users/{uid}/sites/{siteId}/assets/{assetId}/defects/{filename}
+    match /users/{userId}/sites/{siteId}/assets/{assetId}/defects/{filename} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Company asset photos: companies/{companyId}/sites/{siteId}/assets/{assetId}/{filename}
+    match /companies/{companyId}/sites/{siteId}/assets/{assetId}/{filename} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // Company defect photos: companies/{companyId}/sites/{siteId}/assets/{assetId}/defects/{filename}
+    match /companies/{companyId}/sites/{siteId}/assets/{assetId}/defects/{filename} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
     // Company logos: companies/{companyId}/logo/{filename}
     match /companies/{companyId}/logo/{filename} {
       allow read: if request.auth != null;

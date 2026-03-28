@@ -88,7 +88,9 @@ class _DoneBarContent extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final accentColor = isDark ? const Color(0xFF0A84FF) : const Color(0xFF007AFF);
 
-    return Container(
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
       height: 44,
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFD1D1D6),
@@ -130,6 +132,7 @@ class _DoneBarContent extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

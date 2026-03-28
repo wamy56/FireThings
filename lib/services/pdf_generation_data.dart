@@ -14,6 +14,7 @@ class JobsheetPdfData {
   final String settingsPhone;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
+  final List<Map<String, dynamic>>? assetServiceRecords;
 
   JobsheetPdfData({
     required this.jobsheetJson,
@@ -27,6 +28,7 @@ class JobsheetPdfData {
     required this.settingsPhone,
     this.regularFontBytes,
     this.boldFontBytes,
+    this.assetServiceRecords,
   });
 }
 
@@ -93,5 +95,46 @@ class TemplateOverlayPdfData {
     required this.debugMode,
     required this.basePdfBytes,
     required this.resolvedFileBytes,
+  });
+}
+
+/// DTO for passing compliance report data into a background isolate.
+class ComplianceReportPdfData {
+  final String siteName;
+  final String siteAddress;
+  final String engineerName;
+  final String companyName;
+  final String reportDate;
+  final Uint8List? logoBytes;
+  final Map<String, dynamic> headerConfigJson;
+  final Map<String, dynamic> footerConfigJson;
+  final int colourSchemeValue;
+  final Uint8List? regularFontBytes;
+  final Uint8List? boldFontBytes;
+  final List<Map<String, dynamic>> assetsJson;
+  final List<Map<String, dynamic>> assetTypesJson;
+  final List<Map<String, dynamic>> serviceRecordsJson;
+  final List<Map<String, dynamic>> floorPlansJson;
+  final Map<String, Uint8List> floorPlanImages;
+  final Map<String, Uint8List> defectPhotos;
+
+  ComplianceReportPdfData({
+    required this.siteName,
+    required this.siteAddress,
+    required this.engineerName,
+    required this.companyName,
+    required this.reportDate,
+    this.logoBytes,
+    required this.headerConfigJson,
+    required this.footerConfigJson,
+    required this.colourSchemeValue,
+    this.regularFontBytes,
+    this.boldFontBytes,
+    required this.assetsJson,
+    required this.assetTypesJson,
+    required this.serviceRecordsJson,
+    required this.floorPlansJson,
+    required this.floorPlanImages,
+    required this.defectPhotos,
   });
 }

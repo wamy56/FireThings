@@ -10,6 +10,7 @@ class CompanyMember {
   final String? fcmToken;
   final DateTime joinedAt;
   final bool isActive;
+  final bool canManageAssetTypes;
 
   CompanyMember({
     required this.uid,
@@ -19,6 +20,7 @@ class CompanyMember {
     this.fcmToken,
     required this.joinedAt,
     this.isActive = true,
+    this.canManageAssetTypes = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -30,6 +32,7 @@ class CompanyMember {
       'fcmToken': fcmToken,
       'joinedAt': joinedAt.toIso8601String(),
       'isActive': isActive,
+      'canManageAssetTypes': canManageAssetTypes,
     };
   }
 
@@ -45,6 +48,7 @@ class CompanyMember {
       fcmToken: json['fcmToken'] as String?,
       joinedAt: DateTime.parse(json['joinedAt'] as String),
       isActive: json['isActive'] as bool? ?? true,
+      canManageAssetTypes: json['canManageAssetTypes'] as bool? ?? false,
     );
   }
 
@@ -56,6 +60,7 @@ class CompanyMember {
     String? fcmToken,
     DateTime? joinedAt,
     bool? isActive,
+    bool? canManageAssetTypes,
   }) {
     return CompanyMember(
       uid: uid ?? this.uid,
@@ -65,6 +70,7 @@ class CompanyMember {
       fcmToken: fcmToken ?? this.fcmToken,
       joinedAt: joinedAt ?? this.joinedAt,
       isActive: isActive ?? this.isActive,
+      canManageAssetTypes: canManageAssetTypes ?? this.canManageAssetTypes,
     );
   }
 

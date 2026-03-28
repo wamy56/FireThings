@@ -4,6 +4,45 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-28 (Session 51)
+
+### Asset Register — Phase 9: Web Portal Integration
+
+- **CompanyService**: Added `getSite()` one-shot lookup method for route builders
+- **Web routes**: Added 9 new GoRouter routes under `/sites/:siteId/assets/*` and `/sites/:siteId/floor-plans/*` in `web_router.dart`
+- **Page refresh resilience**: Created `_SiteDataLoader` and `_FloorPlanLoader` helper widgets that check `state.extra` cache then fall back to Firestore lookup
+- **Feature flag gating**: Asset routes redirect to `/sites` when `assetRegisterEnabled` is false
+- **kIsWeb guards**: Hidden barcode scanner and batch test buttons on web (site_asset_register_screen), hidden "Scan Barcode" menu item on web (asset_detail_screen), hidden "Take Photo" option on web (upload_floor_plan_screen)
+- **Web navigation**: CompanySitesScreen uses `context.go('/sites/{id}/assets')` on web instead of `Navigator.push`
+- **URL-aware inner navigation**: All sub-navigations in site_asset_register_screen, asset_detail_screen, and floor_plan_list_screen use `context.go()` on web for proper URL bar updates and deep-linking
+- **Analytics**: Added `logWebAssetRegisterViewed()` and `logWebFloorPlanViewed()` events
+
+### Asset Register — Phase 8A: Compliance Report PDF
+
+- **Remote Config flag**: Added `compliance_report_enabled` (default `false`) to `lib/services/remote_config_service.dart`
+- **Analytics events**: Added `logComplianceReportGenerated`, `logAssetTypeCreated`, `logAssetTypeChecklistModified` to `lib/services/analytics_service.dart`
+- **DTO**: Added `ComplianceReportPdfData` class to `lib/services/pdf_generation_data.dart` with all isolate-safe fields for report generation
+- **Service**: Created `lib/services/compliance_report_service.dart` — singleton with gather→compute pattern, generates 7-section PDF (cover, compliance summary, floor plans, asset register table, defect summary, lifecycle alerts, service history)
+- **Screen**: Created `lib/screens/assets/compliance_report_screen.dart` — pre-generate view showing site info + report contents list, generate button with loading state, post-generate view with share/print/regenerate
+- **Navigation**: Added `siteAddress` parameter to `SiteAssetRegisterScreen`, wired through all 4 callers (saved_sites, company_sites, dispatched_job_detail, engineer_job_detail)
+- **App bar**: Replaced standalone compliance report icon with `PopupMenuButton` in site asset register screen (report + manage types)
+
+### Asset Register — Phase 8B: Asset Type Config
+
+- **Model**: Added `canManageAssetTypes` (bool, default false) to `CompanyMember` — field, constructor, toJson, fromJson, copyWith
+- **Screen**: Created `lib/screens/assets/asset_type_config_screen.dart` — list view of all types (built-in + custom) with icon/colour/variant/checklist counts, "Default" badge for built-in types
+- **Edit screen**: Inline `_AssetTypeEditScreen` with name/category/lifespan fields, icon picker, colour picker, variant management, reorderable checklist editor with add/remove
+- **Permissions**: `canEdit` parameter gates all editing UI; built-in types show read-only core fields but allow checklist modification
+- **Navigation**: Added "Manage Asset Types" option to site asset register PopupMenuButton, reloads types on return
+
+### Fixes
+
+- Removed unused `_decommissionedGrey` constant and `pdf_header_builder.dart` import from compliance report service
+- Removed unused `headerConfig` local variable in compliance report isolate function
+- Fixed non-nullable `siteAddress` on `DispatchedJob` — removed unnecessary `?? ''` in dispatch detail screens
+
+---
+
 ## 2026-03-22 (Session 50)
 
 ### Web Portal — Dispatcher Jobsheet Access (View, Download PDF, Email)

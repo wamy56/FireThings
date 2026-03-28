@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../models/dispatched_job.dart';
+import '../../models/asset.dart';
 import '../../services/dispatch_service.dart';
 import '../../services/user_profile_service.dart';
+import '../../services/asset_service.dart';
+import '../../services/remote_config_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -16,8 +19,22 @@ class DispatchDashboardScreen extends StatefulWidget {
       _DispatchDashboardScreenState();
 }
 
+class _ComplianceSnapshot {
+  final int pass;
+  final int fail;
+  final int untested;
+  _ComplianceSnapshot({required this.pass, required this.fail, required this.untested});
+
+  Color get dotColor {
+    if (fail > 0) return AppTheme.errorRed;
+    if (untested > 0) return AppTheme.accentOrange;
+    return AppTheme.successGreen;
+  }
+}
+
 class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
   String? _statusFilter;
+  final Map<String, _ComplianceSnapshot> _complianceCache = {};
 
   String? get _companyId => UserProfileService.instance.companyId;
 
@@ -43,6 +60,7 @@ class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
                 }
 
                 final allJobs = snapshot.data ?? [];
+                _loadComplianceData(allJobs, companyId);
                 final jobs = _statusFilter == null
                     ? allJobs
                     : allJobs
@@ -223,6 +241,35 @@ class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
     );
   }
 
+  void _loadComplianceData(List<DispatchedJob> jobs, String companyId) {
+    if (!RemoteConfigService.instance.assetRegisterEnabled) return;
+
+    final basePath = 'companies/$companyId';
+    final siteIds = jobs
+        .where((j) => j.companySiteId != null)
+        .map((j) => j.companySiteId!)
+        .toSet();
+
+    for (final siteId in siteIds) {
+      if (_complianceCache.containsKey(siteId)) continue;
+
+      AssetService.instance
+          .getAssetsStream(basePath, siteId)
+          .first
+          .then((assets) {
+        if (!mounted) return;
+        final active = assets.where(
+            (a) => a.complianceStatus != Asset.statusDecommissioned);
+        final snap = _ComplianceSnapshot(
+          pass: active.where((a) => a.complianceStatus == Asset.statusPass).length,
+          fail: active.where((a) => a.complianceStatus == Asset.statusFail).length,
+          untested: active.where((a) => a.complianceStatus == Asset.statusUntested).length,
+        );
+        setState(() => _complianceCache[siteId] = snap);
+      }).catchError((_) {});
+    }
+  }
+
   Widget _buildJobCard(DispatchedJob job, bool isDark) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -287,6 +334,24 @@ class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
               Row(
                 children: [
                   _statusBadge(job.status),
+                  if (job.companySiteId != null &&
+                      _complianceCache.containsKey(job.companySiteId)) ...[
+                    const SizedBox(width: 8),
+                    Tooltip(
+                      message: () {
+                        final snap = _complianceCache[job.companySiteId]!;
+                        return '${snap.pass} pass, ${snap.fail} fail, ${snap.untested} untested';
+                      }(),
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: _complianceCache[job.companySiteId]!.dotColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ),
+                  ],
                   const Spacer(),
                   if (job.assignedToName != null)
                     Row(

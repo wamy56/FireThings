@@ -4,11 +4,17 @@ import '../../utils/icon_map.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
 import '../../services/auth_service.dart';
+import '../../services/asset_service.dart';
+import '../../services/asset_type_service.dart';
 import '../../services/database_helper.dart';
+import '../../services/remote_config_service.dart';
+import '../../services/service_history_service.dart';
 import '../../widgets/widgets.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../utils/theme.dart';
+import '../../data/default_asset_types.dart';
 import '../saved_sites/site_picker_screen.dart';
+import '../assets/batch_test_screen.dart';
 import '../../services/analytics_service.dart';
 import '../signature/signature_screen.dart';
 
@@ -59,6 +65,8 @@ class _JobFormScreenState extends State<JobFormScreen> {
   bool _isLoading = false;
   bool _isEditingDraft = false;
   String? _draftId;
+  String? _selectedSiteId;
+  final List<Map<String, dynamic>> _testedAssets = [];
 
   @override
   void initState() {
@@ -123,6 +131,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
     _jobNumberController.text = draft.jobNumber;
     _systemCategoryController.text = draft.systemCategory;
     _notesController.text = draft.notes;
+    _selectedSiteId = draft.siteId;
 
     // Load dynamic form data
     _formData.addAll(draft.formData);
@@ -197,6 +206,15 @@ class _JobFormScreenState extends State<JobFormScreen> {
               const SizedBox(height: 16),
               _buildDynamicFields(),
 
+              // Site Assets Section (conditional)
+              if (_selectedSiteId != null &&
+                  RemoteConfigService.instance.assetRegisterEnabled) ...[
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 24),
+                _buildSiteAssetsSection(),
+              ],
+
               const SizedBox(height: 24),
               const Divider(),
               const SizedBox(height: 24),
@@ -239,6 +257,155 @@ class _JobFormScreenState extends State<JobFormScreen> {
         Text(title, style: Theme.of(context).textTheme.headlineSmall),
       ],
     );
+  }
+
+  Widget _buildSiteAssetsSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final passCount = _testedAssets.where((a) => a['result'] == 'pass').length;
+    final failCount = _testedAssets.where((a) => a['result'] == 'fail').length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildSectionHeader('Site Assets', AppIcons.clipboard),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: _testSiteAssets,
+          icon: Icon(AppIcons.setting),
+          label: Text(_testedAssets.isEmpty
+              ? 'Test Assets'
+              : 'Test More Assets'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppTheme.accentOrange,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        if (_testedAssets.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text(
+            '${_testedAssets.length} assets tested: $passCount pass, $failCount fail',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ..._testedAssets.map((a) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: a['result'] == 'pass'
+                        ? AppTheme.successGreen
+                        : AppTheme.errorRed,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${a['reference'] ?? 'No ref'} — ${a['typeName'] ?? 'Unknown'}',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+                Text(
+                  (a['result'] as String).toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: a['result'] == 'pass'
+                        ? AppTheme.successGreen
+                        : AppTheme.errorRed,
+                  ),
+                ),
+              ],
+            ),
+          )),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _testSiteAssets() async {
+    final user = _authService.currentUser;
+    if (user == null || _selectedSiteId == null) return;
+
+    final basePath = 'users/${user.uid}';
+    final siteId = _selectedSiteId!;
+
+    // Fetch assets and types for the site
+    final assets = await AssetService.instance
+        .getAssetsStream(basePath, siteId).first;
+    final assetTypes = await AssetTypeService.instance
+        .getAssetTypes(basePath);
+
+    if (!mounted) return;
+
+    if (assets.isEmpty) {
+      context.showErrorToast('No assets found for this site');
+      return;
+    }
+
+    // Filter to only active (non-decommissioned) assets
+    final activeAssets = assets
+        .where((a) => a.complianceStatus != 'decommissioned')
+        .toList();
+
+    if (activeAssets.isEmpty) {
+      context.showErrorToast('No active assets at this site');
+      return;
+    }
+
+    // Generate a temporary jobsheet ID for tagging records
+    // Use the draft ID if editing, otherwise create one
+    final jobsheetId = _isEditingDraft ? _draftId! : const Uuid().v4();
+
+    final result = await Navigator.of(context).push<bool>(
+      adaptivePageRoute(
+        builder: (_) => BatchTestScreen(
+          basePath: basePath,
+          siteId: siteId,
+          assets: activeAssets,
+          assetTypes: assetTypes,
+          jobsheetId: jobsheetId,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      // Refresh tested assets list from service history
+      final records = await ServiceHistoryService.instance
+          .getRecordsForJobsheet(basePath, siteId, jobsheetId);
+
+      setState(() {
+        _testedAssets.clear();
+        for (final record in records) {
+          // Find the asset to get reference and type info
+          final asset = assets.where((a) => a.id == record.assetId).firstOrNull;
+          final assetType = asset != null
+              ? (assetTypes.where((t) => t.id == asset.assetTypeId).firstOrNull
+                  ?? DefaultAssetTypes.getById(asset.assetTypeId))
+              : null;
+
+          _testedAssets.add({
+            'assetId': record.assetId,
+            'reference': asset?.reference ?? 'Unknown',
+            'typeName': assetType?.name ?? 'Unknown',
+            'location': asset?.locationDescription ?? '',
+            'zone': asset?.zone ?? '',
+            'result': record.overallResult,
+          });
+        }
+      });
+    }
   }
 
   Widget _buildStandardFields() {
@@ -535,6 +702,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
       AnalyticsService.instance.logSiteSelected();
       setState(() {
         _siteAddressController.text = selected.address;
+        _selectedSiteId = selected.id;
       });
     }
   }
@@ -595,6 +763,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
         status: JobsheetStatus.draft,
         sectionLayout: widget.template.sectionLayout,
         dispatchedJobId: widget.dispatchedJob?.id,
+        siteId: _selectedSiteId,
       );
 
       if (_isEditingDraft) {
@@ -684,6 +853,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
         createdAt: DateTime.now(),
         sectionLayout: widget.template.sectionLayout,
         dispatchedJobId: widget.dispatchedJob?.id,
+        siteId: _selectedSiteId,
       );
 
       // Save to database (without signatures yet)

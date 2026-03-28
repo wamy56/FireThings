@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -103,14 +104,15 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
               ),
             ),
-            ListTile(
-              leading: const Icon(AppIcons.camera),
-              title: const Text('Take Photo'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickFromCamera();
-              },
-            ),
+            if (!kIsWeb)
+              ListTile(
+                leading: const Icon(AppIcons.camera),
+                title: const Text('Take Photo'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _pickFromCamera();
+                },
+              ),
             ListTile(
               leading: const Icon(AppIcons.gallery),
               title: const Text('Choose from Gallery'),

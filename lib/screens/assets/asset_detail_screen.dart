@@ -1,10 +1,14 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../models/asset.dart';
 import '../../models/asset_type.dart';
+import '../../models/service_record.dart';
 import '../../data/default_asset_types.dart';
 import '../../services/asset_service.dart';
 import '../../services/asset_type_service.dart';
+import '../../services/service_history_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
@@ -13,6 +17,8 @@ import '../../utils/adaptive_widgets.dart';
 import '../../widgets/widgets.dart';
 import '../../services/floor_plan_service.dart';
 import 'add_edit_asset_screen.dart';
+import 'barcode_scanner_screen.dart';
+import 'inspection_checklist_screen.dart';
 import '../floor_plans/interactive_floor_plan_screen.dart';
 
 class AssetDetailScreen extends StatefulWidget {
@@ -101,16 +107,23 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
   Future<void> _navigateToEdit() async {
     if (_asset == null) return;
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => AddEditAssetScreen(
-          basePath: widget.basePath,
-          siteId: widget.siteId,
-          asset: _asset,
+    if (kIsWeb) {
+      context.go(
+        '/sites/${widget.siteId}/assets/${widget.assetId}/edit',
+        extra: _asset,
+      );
+    } else {
+      final result = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => AddEditAssetScreen(
+            basePath: widget.basePath,
+            siteId: widget.siteId,
+            asset: _asset,
+          ),
         ),
-      ),
-    );
-    if (result == true) _loadAsset();
+      );
+      if (result == true) _loadAsset();
+    }
   }
 
   Future<void> _confirmDelete() async {
@@ -158,6 +171,133 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     }
   }
 
+  Future<void> _showDecommissionDialog() async {
+    if (_asset == null) return;
+    String? reason;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Decommission Asset'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('This asset will be marked as decommissioned '
+                      'and excluded from active compliance counts.'),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    initialValue: reason,
+                    decoration: const InputDecoration(
+                      labelText: 'Reason',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'end_of_life', child: Text('End of Life')),
+                      DropdownMenuItem(value: 'replaced', child: Text('Replaced')),
+                      DropdownMenuItem(value: 'damaged', child: Text('Damaged')),
+                      DropdownMenuItem(value: 'removed', child: Text('Removed')),
+                      DropdownMenuItem(value: 'other', child: Text('Other')),
+                    ],
+                    onChanged: (val) => setDialogState(() => reason = val),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: reason == null
+                      ? null
+                      : () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentOrange,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Decommission'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed == true && reason != null && mounted) {
+      try {
+        await AssetService.instance.updateAsset(
+          widget.basePath,
+          widget.siteId,
+          _asset!.copyWith(
+            complianceStatus: Asset.statusDecommissioned,
+            decommissionDate: DateTime.now(),
+            decommissionReason: reason,
+          ),
+        );
+        AnalyticsService.instance.logAssetDecommissioned(
+          assetType: _asset!.assetTypeId,
+          reason: reason!,
+          siteId: widget.siteId,
+        );
+        if (mounted) {
+          context.showSuccessToast('Asset decommissioned');
+          _loadAsset();
+        }
+      } catch (e) {
+        if (mounted) context.showErrorToast('Failed to decommission asset');
+      }
+    }
+  }
+
+  Future<void> _scanBarcode() async {
+    if (_asset == null) return;
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => BarcodeScannerScreen(
+          basePath: widget.basePath,
+          siteId: widget.siteId,
+          mode: ScannerMode.capture,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      try {
+        await AssetService.instance.updateAsset(
+          widget.basePath,
+          widget.siteId,
+          _asset!.copyWith(barcode: result),
+        );
+        AnalyticsService.instance.logBarcodeScan(
+          result: 'assigned',
+          siteId: widget.siteId,
+        );
+        if (mounted) context.showSuccessToast('Barcode assigned');
+        _loadAsset();
+      } catch (e) {
+        if (mounted) context.showErrorToast('Failed to assign barcode');
+      }
+    }
+  }
+
+  Future<void> _navigateToInspection() async {
+    if (_asset == null || _assetType == null) return;
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => InspectionChecklistScreen(
+          basePath: widget.basePath,
+          siteId: widget.siteId,
+          asset: _asset!,
+          assetType: _assetType!,
+        ),
+      ),
+    );
+    if (result == true) _loadAsset();
+  }
+
   bool get _canDelete {
     final profile = UserProfileService.instance;
     // Solo users can always delete their own. Company: dispatchers/admins only.
@@ -198,17 +338,29 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             icon: const Icon(AppIcons.edit),
             onPressed: _navigateToEdit,
           ),
-          if (_canDelete)
-            PopupMenuButton<String>(
+          PopupMenuButton<String>(
               icon: const Icon(AppIcons.more),
               onSelected: (value) {
                 if (value == 'delete') _confirmDelete();
+                if (value == 'scan_barcode' && !kIsWeb) _scanBarcode();
+                if (value == 'decommission') _showDecommissionDialog();
               },
               itemBuilder: (_) => [
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Text('Delete', style: TextStyle(color: Colors.red)),
-                ),
+                if (!kIsWeb)
+                  const PopupMenuItem(
+                    value: 'scan_barcode',
+                    child: Text('Scan Barcode'),
+                  ),
+                if (asset.complianceStatus != Asset.statusDecommissioned)
+                  const PopupMenuItem(
+                    value: 'decommission',
+                    child: Text('Decommission'),
+                  ),
+                if (_canDelete)
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Text('Delete', style: TextStyle(color: Colors.red)),
+                  ),
               ],
             ),
         ],
@@ -275,6 +427,27 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
               ],
             ),
           ),
+
+          // Test button
+          if (asset.complianceStatus != Asset.statusDecommissioned) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _navigateToInspection,
+                icon: Icon(AppIcons.clipboardTick),
+                label: const Text('Test This Asset'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentOrange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
 
           const SizedBox(height: AppTheme.sectionGap),
 
@@ -364,6 +537,31 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                 if (asset.expectedLifespanYears != null)
                   _DetailRow('Expected Lifespan',
                       '${asset.expectedLifespanYears} years', isDark),
+                // Lifecycle progress bar
+                if (asset.installDate != null &&
+                    asset.expectedLifespanYears != null)
+                  _LifecycleProgressBar(asset: asset, isDark: isDark),
+                // Warranty badge
+                if (asset.warrantyExpiry != null)
+                  _WarrantyBadge(
+                      warrantyExpiry: asset.warrantyExpiry!, isDark: isDark),
+              ],
+            ),
+          ],
+          // Decommission info
+          if (asset.complianceStatus == Asset.statusDecommissioned) ...[
+            const SizedBox(height: AppTheme.sectionGap),
+            _SectionHeader('Decommissioned'),
+            const SizedBox(height: 8),
+            _DetailCard(
+              isDark: isDark,
+              children: [
+                if (asset.decommissionDate != null)
+                  _DetailRow('Date',
+                      dateFormat.format(asset.decommissionDate!), isDark),
+                if (asset.decommissionReason != null)
+                  _DetailRow('Reason',
+                      asset.decommissionReason!.replaceAll('_', ' '), isDark),
               ],
             ),
           ],
@@ -389,37 +587,62 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             ),
           ],
 
-          // Service History placeholder
+          // Service History
           const SizedBox(height: AppTheme.sectionGap),
           _SectionHeader('Service History'),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(AppTheme.cardPadding),
-            decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
-              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-              boxShadow: AppTheme.cardShadow,
-            ),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(AppIcons.clipboardTick,
-                      size: 32,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.textSecondary),
-                  const SizedBox(height: 8),
-                  Text(
-                    'No service history yet',
-                    style: TextStyle(
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.textSecondary,
+          StreamBuilder<List<ServiceRecord>>(
+            stream: ServiceHistoryService.instance.getRecordsForAsset(
+                widget.basePath, widget.siteId, asset.id),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                    child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: AdaptiveLoadingIndicator(),
+                ));
+              }
+              final records = snapshot.data ?? [];
+              if (records.isEmpty) {
+                return Container(
+                  padding: const EdgeInsets.all(AppTheme.cardPadding),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppTheme.darkSurfaceElevated
+                        : Colors.white,
+                    borderRadius:
+                        BorderRadius.circular(AppTheme.cardRadius),
+                    boxShadow: AppTheme.cardShadow,
+                  ),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(AppIcons.clipboardTick,
+                            size: 32,
+                            color: isDark
+                                ? AppTheme.darkTextSecondary
+                                : AppTheme.textSecondary),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No service history yet',
+                          style: TextStyle(
+                            color: isDark
+                                ? AppTheme.darkTextSecondary
+                                : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                );
+              }
+              return Column(
+                children: records
+                    .map((r) =>
+                        _ServiceRecordCard(record: r, isDark: isDark))
+                    .toList(),
+              );
+            },
           ),
 
           const SizedBox(height: 40),
@@ -468,6 +691,160 @@ class _DetailCard extends StatelessWidget {
   }
 }
 
+class _LifecycleProgressBar extends StatelessWidget {
+  final Asset asset;
+  final bool isDark;
+
+  const _LifecycleProgressBar({required this.asset, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final ageYears =
+        now.difference(asset.installDate!).inDays / 365.25;
+    final lifespan = asset.expectedLifespanYears!.toDouble();
+    final progress = (ageYears / lifespan).clamp(0.0, 1.0);
+    final remaining = lifespan - ageYears;
+
+    Color barColor;
+    if (progress < 0.7) {
+      barColor = const Color(0xFF4CAF50);
+    } else if (progress < 0.9) {
+      barColor = const Color(0xFFF59E0B);
+    } else {
+      barColor = const Color(0xFFD32F2F);
+    }
+
+    String statusText;
+    if (remaining <= 0) {
+      statusText = '${(-remaining).toStringAsFixed(1)} years past end of life';
+    } else if (remaining < 1) {
+      statusText = 'Approaching end of life (${(remaining * 12).round()} months remaining)';
+    } else {
+      statusText = '${ageYears.toStringAsFixed(1)} of ${lifespan.toInt()} years';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Age',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark
+                      ? AppTheme.darkTextSecondary
+                      : AppTheme.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                statusText,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: barColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: isDark
+                  ? Colors.grey.shade800
+                  : Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(barColor),
+            ),
+          ),
+          if (remaining <= 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(AppIcons.danger, size: 14, color: const Color(0xFFD32F2F)),
+                const SizedBox(width: 4),
+                Text(
+                  'Past end of life',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFD32F2F),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (remaining < 1) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(AppIcons.danger, size: 14, color: const Color(0xFFF59E0B)),
+                const SizedBox(width: 4),
+                Text(
+                  'Approaching end of life',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFFF59E0B),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WarrantyBadge extends StatelessWidget {
+  final DateTime warrantyExpiry;
+  final bool isDark;
+
+  const _WarrantyBadge({required this.warrantyExpiry, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final active = DateTime.now().isBefore(warrantyExpiry);
+    final color = active ? const Color(0xFF4CAF50) : Colors.grey;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              active ? AppIcons.tickCircle : AppIcons.close,
+              size: 14,
+              color: color,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              active ? 'Under Warranty' : 'Warranty Expired',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _DetailRow extends StatelessWidget {
   final String label;
   final String value;
@@ -505,6 +882,252 @@ class _DetailRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ServiceRecordCard extends StatefulWidget {
+  final ServiceRecord record;
+  final bool isDark;
+
+  const _ServiceRecordCard({required this.record, required this.isDark});
+
+  @override
+  State<_ServiceRecordCard> createState() => _ServiceRecordCardState();
+}
+
+class _ServiceRecordCardState extends State<_ServiceRecordCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.record;
+    final isDark = widget.isDark;
+    final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
+    final isPass = r.overallResult == 'pass';
+    final resultColor =
+        isPass ? const Color(0xFF4CAF50) : const Color(0xFFD32F2F);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: () => setState(() => _expanded = !_expanded),
+        child: AnimatedContainer(
+          duration: AppTheme.fastAnimation,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
+            borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+            boxShadow: AppTheme.cardShadow,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Summary row
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: resultColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      isPass ? AppIcons.tickCircle : AppIcons.close,
+                      color: resultColor,
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          dateFormat.format(r.serviceDate),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          r.engineerName,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? AppTheme.darkTextSecondary
+                                : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: resultColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      isPass ? 'Pass' : 'Fail',
+                      style: TextStyle(
+                        color: resultColor,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _expanded ? AppIcons.arrowUp : AppIcons.arrowDown,
+                    size: 16,
+                    color: isDark
+                        ? AppTheme.darkTextSecondary
+                        : AppTheme.textSecondary,
+                  ),
+                ],
+              ),
+
+              // Expanded details
+              if (_expanded) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                // Checklist results
+                if (r.checklistResults.isNotEmpty) ...[
+                  ...r.checklistResults.map((cr) {
+                    final crPass = cr.result == 'pass' || cr.result == 'yes';
+                    final crFail = cr.result == 'fail' || cr.result == 'no';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Icon(
+                            crPass
+                                ? AppIcons.tickCircle
+                                : crFail
+                                    ? AppIcons.close
+                                    : AppIcons.note,
+                            size: 14,
+                            color: crPass
+                                ? const Color(0xFF4CAF50)
+                                : crFail
+                                    ? const Color(0xFFD32F2F)
+                                    : isDark
+                                        ? AppTheme.darkTextSecondary
+                                        : AppTheme.textSecondary,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              cr.label,
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                          Text(
+                            cr.result,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: crPass
+                                  ? const Color(0xFF4CAF50)
+                                  : crFail
+                                      ? const Color(0xFFD32F2F)
+                                      : isDark
+                                          ? Colors.white
+                                          : AppTheme.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+                // Defect info
+                if (r.defectSeverity != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(AppIcons.danger,
+                          size: 14, color: const Color(0xFFD32F2F)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Defect: ${r.defectSeverity}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFD32F2F),
+                        ),
+                      ),
+                      if (r.defectAction != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          '(${r.defectAction!.replaceAll('_', ' ')})',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? AppTheme.darkTextSecondary
+                                : AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+                if (r.defectNote != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    r.defectNote!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark
+                          ? AppTheme.darkTextSecondary
+                          : AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+                // Defect photos
+                if (r.defectPhotoUrls.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 60,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: r.defectPhotoUrls.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 6),
+                      itemBuilder: (_, i) => ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.network(
+                          r.defectPhotoUrls[i],
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                // General notes
+                if (r.notes != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    r.notes!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontStyle: FontStyle.italic,
+                      color: isDark
+                          ? AppTheme.darkTextSecondary
+                          : AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

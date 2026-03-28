@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:uuid/uuid.dart';
 import '../../models/asset.dart';
 import '../../models/asset_type.dart';
@@ -10,6 +11,7 @@ import '../../services/auth_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/widgets.dart';
+import 'barcode_scanner_screen.dart';
 
 class AddEditAssetScreen extends StatefulWidget {
   final String basePath;
@@ -18,6 +20,7 @@ class AddEditAssetScreen extends StatefulWidget {
   final String? presetFloorPlanId;
   final double? presetXPercent;
   final double? presetYPercent;
+  final String? prefilledBarcode;
 
   const AddEditAssetScreen({
     super.key,
@@ -27,6 +30,7 @@ class AddEditAssetScreen extends StatefulWidget {
     this.presetFloorPlanId,
     this.presetXPercent,
     this.presetYPercent,
+    this.prefilledBarcode,
   });
 
   @override
@@ -64,6 +68,8 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
     _loadAssetTypes();
     if (_isEditing) {
       _populateFields(widget.asset!);
+    } else if (widget.prefilledBarcode != null) {
+      _barcodeController.text = widget.prefilledBarcode!;
     }
   }
 
@@ -94,6 +100,21 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
     _installDate = asset.installDate;
     _warrantyExpiry = asset.warrantyExpiry;
     _expectedLifespan = asset.expectedLifespanYears;
+  }
+
+  Future<void> _scanBarcode() async {
+    final result = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => BarcodeScannerScreen(
+          basePath: widget.basePath,
+          siteId: widget.siteId,
+          mode: ScannerMode.capture,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() => _barcodeController.text = result);
+    }
   }
 
   Future<void> _loadAssetTypes() async {
@@ -375,6 +396,12 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
                 controller: _barcodeController,
                 label: 'Barcode / QR Code',
                 prefixIcon: const Icon(AppIcons.scanner),
+                suffixIcon: kIsWeb
+                    ? null
+                    : IconButton(
+                        icon: const Icon(AppIcons.scanner),
+                        onPressed: _scanBarcode,
+                      ),
               ),
 
               const SizedBox(height: AppTheme.sectionGap),

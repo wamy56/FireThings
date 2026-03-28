@@ -337,6 +337,7 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
                       builder: (_) => SiteAssetRegisterScreen(
                         siteId: site.id,
                         siteName: site.siteName,
+                        siteAddress: site.address,
                         basePath: 'users/${user.uid}',
                       ),
                     ),

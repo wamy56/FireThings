@@ -10,6 +10,9 @@ import '../../services/dispatch_service.dart';
 import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/asset_service.dart';
+import '../../services/remote_config_service.dart';
+import '../../models/asset.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -69,6 +72,7 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
   // Autocomplete data
   List<CompanySite> _companySites = [];
   List<CompanyCustomer> _companyCustomers = [];
+  String? _selectedSiteId;
   StreamSubscription? _sitesSubscription;
   StreamSubscription? _customersSubscription;
 
@@ -125,6 +129,7 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
     _priority = job.priority;
     _assignedToUid = job.assignedTo;
     _assignedToName = job.assignedToName;
+    _selectedSiteId = job.companySiteId;
   }
 
   Future<void> _loadMembers() async {
@@ -185,6 +190,7 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
         jobType: _nullIfEmpty(_jobTypeController.text),
         siteName: _siteNameController.text.trim(),
         siteAddress: _siteAddressController.text.trim(),
+        companySiteId: _selectedSiteId,
         parkingNotes: _nullIfEmpty(_parkingNotesController.text),
         accessNotes: _nullIfEmpty(_accessNotesController.text),
         siteNotes: _nullIfEmpty(_siteNotesController.text),
@@ -318,6 +324,11 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
             _sectionHeader('Site'),
             const SizedBox(height: 8),
             _buildSiteAutocomplete(),
+            if (_selectedSiteId != null &&
+                RemoteConfigService.instance.assetRegisterEnabled) ...[
+              const SizedBox(height: 8),
+              _buildComplianceSummary(),
+            ],
             const SizedBox(height: 12),
             CustomTextField(
               controller: _siteAddressController,
@@ -504,11 +515,14 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
             (s) => s.name.toLowerCase().contains(query));
       },
       onSelected: (site) {
-        _siteNameController.text = site.name;
-        _siteAddressController.text = site.address;
-        if (site.notes != null && site.notes!.isNotEmpty) {
-          _siteNotesController.text = site.notes!;
-        }
+        setState(() {
+          _siteNameController.text = site.name;
+          _siteAddressController.text = site.address;
+          if (site.notes != null && site.notes!.isNotEmpty) {
+            _siteNotesController.text = site.notes!;
+          }
+          _selectedSiteId = site.id;
+        });
       },
       fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
         // Sync with our own controller
@@ -517,6 +531,14 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
         }
         controller.addListener(() {
           _siteNameController.text = controller.text;
+          // Clear site ID if user manually edits the field
+          if (_selectedSiteId != null) {
+            final matchesSite = _companySites.any(
+                (s) => s.id == _selectedSiteId && s.name == controller.text);
+            if (!matchesSite) {
+              setState(() => _selectedSiteId = null);
+            }
+          }
         });
         return CustomTextField(
           controller: controller,
@@ -557,6 +579,103 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
                 },
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildComplianceSummary() {
+    final companyId = UserProfileService.instance.companyId;
+    if (companyId == null || _selectedSiteId == null) {
+      return const SizedBox.shrink();
+    }
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final basePath = 'companies/$companyId';
+
+    return FutureBuilder<List<Asset>>(
+      future: AssetService.instance
+          .getAssetsStream(basePath, _selectedSiteId!)
+          .first,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: LinearProgressIndicator(
+              backgroundColor: isDark ? AppTheme.darkSurfaceElevated : Colors.grey[200],
+            ),
+          );
+        }
+
+        final assets = snapshot.data ?? [];
+        if (assets.isEmpty) return const SizedBox.shrink();
+
+        final active = assets.where((a) => a.complianceStatus != Asset.statusDecommissioned).toList();
+        final pass = active.where((a) => a.complianceStatus == Asset.statusPass).length;
+        final fail = active.where((a) => a.complianceStatus == Asset.statusFail).length;
+        final untested = active.where((a) => a.complianceStatus == Asset.statusUntested).length;
+        final hasWarning = fail > 0 || untested > 0;
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: hasWarning
+                ? (fail > 0
+                    ? AppTheme.errorRed.withValues(alpha: 0.08)
+                    : AppTheme.accentOrange.withValues(alpha: 0.08))
+                : AppTheme.successGreen.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: hasWarning
+                  ? (fail > 0
+                      ? AppTheme.errorRed.withValues(alpha: 0.3)
+                      : AppTheme.accentOrange.withValues(alpha: 0.3))
+                  : AppTheme.successGreen.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                AppIcons.clipboard,
+                size: 18,
+                color: hasWarning
+                    ? (fail > 0 ? AppTheme.errorRed : AppTheme.accentOrange)
+                    : AppTheme.successGreen,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    style: const TextStyle(fontSize: 13),
+                    children: [
+                      TextSpan(
+                        text: '${active.length} assets: ',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      TextSpan(
+                        text: '$pass pass',
+                        style: TextStyle(color: AppTheme.successGreen, fontWeight: FontWeight.w600),
+                      ),
+                      if (fail > 0) ...[
+                        const TextSpan(text: ', '),
+                        TextSpan(
+                          text: '$fail fail',
+                          style: TextStyle(color: AppTheme.errorRed, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                      if (untested > 0) ...[
+                        const TextSpan(text: ', '),
+                        TextSpan(
+                          text: '$untested untested',
+                          style: TextStyle(color: AppTheme.accentOrange, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },

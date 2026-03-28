@@ -14,6 +14,7 @@ import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/animated_save_button.dart';
+import '../../widgets/preset_colour_grid.dart';
 
 class CompanyPdfDesignScreen extends StatefulWidget {
   final String companyId;
@@ -1745,60 +1746,10 @@ class _CompanyColourEditorState extends State<_CompanyColourEditorScreen> {
   // ─── PRESET GRID ───────────────────────────────────────────
 
   Widget _buildPresetGrid(bool isDark) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: PdfColourScheme.presets.map((preset) {
-        final color = Color(preset.scheme.primaryColorValue);
-        final isSelected = _scheme.primaryColorValue == preset.scheme.primaryColorValue;
-
-        return GestureDetector(
-          onTap: () => _selectPreset(preset.scheme),
-          child: SizedBox(
-            width: 68,
-            child: Column(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
-                    border: isSelected
-                        ? Border.all(
-                            color: isDark ? Colors.white : AppTheme.textPrimary,
-                            width: 3,
-                          )
-                        : null,
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: isSelected
-                      ? Icon(AppIcons.tickCircle, color: Colors.white, size: 22)
-                      : null,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  preset.label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-                  ),
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
+    return PresetColourGrid(
+      selectedPrimaryColorValue: _scheme.primaryColorValue,
+      isDark: isDark,
+      onPresetSelected: _selectPreset,
     );
   }
 }

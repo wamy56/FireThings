@@ -7,12 +7,15 @@ import '../../services/company_service.dart';
 import '../../services/database_helper.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/asset_service.dart';
+import '../../services/remote_config_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 import '../history/job_detail_screen.dart';
+import '../assets/site_asset_register_screen.dart';
 import '../new_job/new_job_screen.dart';
 import 'create_job_screen.dart';
 import 'decline_job_dialog.dart';
@@ -120,6 +123,14 @@ class _JobDetailContent extends StatelessWidget {
             label: const Text('Get Directions'),
           ),
         ),
+
+        // Site Assets section (conditional)
+        if (job.companySiteId != null &&
+            RemoteConfigService.instance.assetRegisterEnabled) ...[
+          _buildSiteAssetsSection(context),
+          const SizedBox(height: 8),
+        ],
+
         const SizedBox(height: 8),
 
         // Contact
@@ -395,6 +406,103 @@ class _JobDetailContent extends StatelessWidget {
         context.showErrorToast('Failed to decline job');
       }
     }
+  }
+
+  Widget _buildSiteAssetsSection(BuildContext context) {
+    final basePath = 'companies/${job.companyId}';
+    final siteId = job.companySiteId!;
+
+    return FutureBuilder<List<Asset>>(
+      future: AssetService.instance.getAssetsStream(basePath, siteId).first,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Center(child: AdaptiveLoadingIndicator()),
+          );
+        }
+
+        final assets = snapshot.data ?? [];
+        if (assets.isEmpty) return const SizedBox.shrink();
+
+        final active = assets.where((a) => a.complianceStatus != Asset.statusDecommissioned).toList();
+        final pass = active.where((a) => a.complianceStatus == Asset.statusPass).length;
+        final fail = active.where((a) => a.complianceStatus == Asset.statusFail).length;
+        final untested = active.where((a) => a.complianceStatus == Asset.statusUntested).length;
+
+        final now = DateTime.now();
+        final lifecycleWarnings = active.where((a) {
+          if (a.installDate == null || a.expectedLifespanYears == null) return false;
+          final age = now.difference(a.installDate!).inDays / 365.25;
+          return (a.expectedLifespanYears! - age) < 1;
+        }).length;
+
+        return _section('Site Assets', [
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 14),
+              children: [
+                TextSpan(
+                  text: '${active.length} assets: ',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                TextSpan(
+                  text: '$pass pass',
+                  style: TextStyle(color: AppTheme.successGreen, fontWeight: FontWeight.w600),
+                ),
+                if (fail > 0) ...[
+                  const TextSpan(text: ', '),
+                  TextSpan(
+                    text: '$fail fail',
+                    style: TextStyle(color: AppTheme.errorRed, fontWeight: FontWeight.w600),
+                  ),
+                ],
+                if (untested > 0) ...[
+                  const TextSpan(text: ', '),
+                  TextSpan(
+                    text: '$untested untested',
+                    style: TextStyle(color: AppTheme.accentOrange, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (lifecycleWarnings > 0) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(AppIcons.danger, size: 14, color: AppTheme.accentOrange),
+                const SizedBox(width: 4),
+                Text(
+                  '$lifecycleWarnings asset${lifecycleWarnings == 1 ? '' : 's'} approaching end of life',
+                  style: TextStyle(fontSize: 13, color: AppTheme.accentOrange, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SiteAssetRegisterScreen(
+                      siteId: siteId,
+                      siteName: job.siteName,
+                      siteAddress: job.siteAddress,
+                      basePath: basePath,
+                    ),
+                  ),
+                );
+              },
+              icon: Icon(AppIcons.clipboard),
+              label: const Text('View Asset Register'),
+            ),
+          ),
+        ]);
+      },
+    );
   }
 
   Widget _section(String title, List<Widget> children) {

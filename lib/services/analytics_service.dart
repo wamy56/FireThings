@@ -236,6 +236,12 @@ class AnalyticsService {
   Future<void> logWebPrintUsed() =>
       _analytics.logEvent(name: 'web_print_used');
 
+  Future<void> logWebAssetRegisterViewed() =>
+      _analytics.logEvent(name: 'web_asset_register_viewed');
+
+  Future<void> logWebFloorPlanViewed() =>
+      _analytics.logEvent(name: 'web_floor_plan_viewed');
+
   // --- Asset Register ---
 
   Future<void> logAssetCreated({
@@ -256,6 +262,50 @@ class AnalyticsService {
   Future<void> logAssetDeleted({required String assetType}) =>
       _analytics.logEvent(
           name: 'asset_deleted', parameters: {'asset_type': assetType});
+
+  Future<void> logAssetTested({
+    required String assetType,
+    required String result,
+    required String siteId,
+  }) =>
+      _analytics.logEvent(name: 'asset_tested', parameters: {
+        'asset_type': assetType,
+        'result': result,
+        'site_id': siteId,
+      });
+
+  Future<void> logBatchTestingCompleted({
+    required String siteId,
+    required int passCount,
+    required int failCount,
+    required int skippedCount,
+  }) =>
+      _analytics.logEvent(name: 'batch_testing_completed', parameters: {
+        'site_id': siteId,
+        'pass_count': passCount,
+        'fail_count': failCount,
+        'skipped_count': skippedCount,
+      });
+
+  Future<void> logAssetDecommissioned({
+    required String assetType,
+    required String reason,
+    required String siteId,
+  }) =>
+      _analytics.logEvent(name: 'asset_decommissioned', parameters: {
+        'asset_type': assetType,
+        'reason': reason,
+        'site_id': siteId,
+      });
+
+  Future<void> logBarcodeScan({
+    required String result,
+    required String siteId,
+  }) =>
+      _analytics.logEvent(name: 'barcode_scan', parameters: {
+        'result': result,
+        'site_id': siteId,
+      });
 
   // --- Floor Plans ---
 
@@ -294,4 +344,46 @@ class AnalyticsService {
         'site_id': siteId,
         'asset_count': assetCount,
       });
+
+  Future<void> logDispatchComplianceViewed({
+    required String siteId,
+    required int assetCount,
+    required double passRate,
+  }) =>
+      _analytics.logEvent(name: 'dispatch_compliance_viewed', parameters: {
+        'site_id': siteId,
+        'asset_count': assetCount,
+        'pass_rate': passRate,
+      });
+
+  Future<void> logComplianceReportGenerated({
+    required String siteId,
+    required int assetCount,
+    required double passRate,
+  }) =>
+      _analytics.logEvent(name: 'compliance_report_generated', parameters: {
+        'site_id': siteId,
+        'asset_count': assetCount,
+        'pass_rate': passRate,
+      });
+
+  Future<void> logAssetTypeCreated({
+    required String typeName,
+    required bool isCustom,
+  }) =>
+      _analytics.logEvent(name: 'asset_type_created', parameters: {
+        'type_name': typeName,
+        'is_custom': isCustom,
+      });
+
+  Future<void> logAssetTypeChecklistModified({
+    required String typeId,
+    required int itemCount,
+  }) =>
+      _analytics.logEvent(
+          name: 'asset_type_checklist_modified',
+          parameters: {
+            'type_id': typeId,
+            'item_count': itemCount,
+          });
 }

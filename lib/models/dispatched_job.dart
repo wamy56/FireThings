@@ -26,6 +26,7 @@ class DispatchedJob {
   // Site information
   final String siteName;
   final String siteAddress;
+  final String? companySiteId;
   final double? latitude;
   final double? longitude;
   final String? parkingNotes;
@@ -76,6 +77,7 @@ class DispatchedJob {
     this.jobType,
     required this.siteName,
     required this.siteAddress,
+    this.companySiteId,
     this.latitude,
     this.longitude,
     this.parkingNotes,
@@ -140,6 +142,7 @@ class DispatchedJob {
       'jobType': jobType,
       'siteName': siteName,
       'siteAddress': siteAddress,
+      'companySiteId': companySiteId,
       'latitude': latitude,
       'longitude': longitude,
       'parkingNotes': parkingNotes,
@@ -179,6 +182,7 @@ class DispatchedJob {
       jobType: json['jobType'] as String?,
       siteName: json['siteName'] as String,
       siteAddress: json['siteAddress'] as String,
+      companySiteId: json['companySiteId'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       parkingNotes: json['parkingNotes'] as String?,
@@ -223,6 +227,7 @@ class DispatchedJob {
     String? jobType,
     String? siteName,
     String? siteAddress,
+    String? companySiteId,
     double? latitude,
     double? longitude,
     String? parkingNotes,
@@ -259,6 +264,7 @@ class DispatchedJob {
       jobType: jobType ?? this.jobType,
       siteName: siteName ?? this.siteName,
       siteAddress: siteAddress ?? this.siteAddress,
+      companySiteId: companySiteId ?? this.companySiteId,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       parkingNotes: parkingNotes ?? this.parkingNotes,

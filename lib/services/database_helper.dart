@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 14,
+      version: 15,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -91,6 +91,9 @@ class DatabaseHelper {
       await _createFloorPlansTable(db);
       await _createAssetServiceHistoryTable(db);
     }
+    if (oldVersion < 15) {
+      await db.execute('ALTER TABLE jobsheets ADD COLUMN siteId TEXT');
+    }
   }
 
   /// Create database tables
@@ -121,7 +124,8 @@ class DatabaseHelper {
         createdAt $textType,
         sectionLayout $textTypeNullable,
         lastModifiedAt $textTypeNullable,
-        dispatchedJobId $textTypeNullable
+        dispatchedJobId $textTypeNullable,
+        siteId $textTypeNullable
       )
     ''');
 

@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/floor_plan.dart';
 import '../../services/floor_plan_service.dart';
@@ -28,26 +30,34 @@ class FloorPlanListScreen extends StatelessWidget {
   }
 
   void _navigateToUpload(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => UploadFloorPlanScreen(
-          siteId: siteId,
-          basePath: basePath,
+    if (kIsWeb) {
+      context.go('/sites/$siteId/floor-plans/upload');
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => UploadFloorPlanScreen(
+            siteId: siteId,
+            basePath: basePath,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   void _navigateToView(BuildContext context, FloorPlan plan) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => InteractiveFloorPlanScreen(
-          basePath: basePath,
-          siteId: siteId,
-          floorPlan: plan,
+    if (kIsWeb) {
+      context.go('/sites/$siteId/floor-plans/${plan.id}', extra: plan);
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => InteractiveFloorPlanScreen(
+            basePath: basePath,
+            siteId: siteId,
+            floorPlan: plan,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   Future<void> _renamePlan(

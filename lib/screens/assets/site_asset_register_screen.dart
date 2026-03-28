@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/asset.dart';
 import '../../models/asset_type.dart';
 import '../../data/default_asset_types.dart';
@@ -9,19 +11,26 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/widgets.dart';
+import '../../services/remote_config_service.dart';
 import 'add_edit_asset_screen.dart';
 import 'asset_detail_screen.dart';
+import 'barcode_scanner_screen.dart';
+import 'batch_test_screen.dart';
+import 'asset_type_config_screen.dart';
+import 'compliance_report_screen.dart';
 import '../floor_plans/floor_plan_list_screen.dart';
 
 class SiteAssetRegisterScreen extends StatefulWidget {
   final String siteId;
   final String siteName;
+  final String siteAddress;
   final String basePath;
 
   const SiteAssetRegisterScreen({
     super.key,
     required this.siteId,
     required this.siteName,
+    this.siteAddress = '',
     required this.basePath,
   });
 
@@ -35,7 +44,9 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
   String _searchQuery = '';
   String? _filterType;
   String? _filterStatus;
+  String? _filterLifecycle; // 'approaching' or 'past'
   List<AssetType> _assetTypes = [];
+  List<Asset> _latestAssets = [];
 
   @override
   void initState() {
@@ -138,30 +149,74 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
           filtered.where((a) => a.complianceStatus == _filterStatus).toList();
     }
 
+    if (_filterLifecycle != null) {
+      filtered = filtered.where((a) {
+        if (a.installDate == null || a.expectedLifespanYears == null) {
+          return false;
+        }
+        final remaining = a.expectedLifespanYears! -
+            DateTime.now().difference(a.installDate!).inDays / 365.25;
+        if (_filterLifecycle == 'approaching') {
+          return remaining > 0 && remaining < 1;
+        }
+        return remaining <= 0; // 'past'
+      }).toList();
+    }
+
     return filtered;
   }
 
   void _navigateToAddAsset() {
+    if (kIsWeb) {
+      context.go('/sites/${widget.siteId}/assets/add');
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AddEditAssetScreen(
+            basePath: widget.basePath,
+            siteId: widget.siteId,
+          ),
+        ),
+      );
+    }
+  }
+
+  void _navigateToBatchTest() {
+    final testableAssets = _latestAssets
+        .where((a) => a.complianceStatus != Asset.statusDecommissioned)
+        .toList();
+
+    if (testableAssets.isEmpty) {
+      context.showErrorToast('No testable assets');
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => AddEditAssetScreen(
+        builder: (_) => BatchTestScreen(
           basePath: widget.basePath,
           siteId: widget.siteId,
+          assets: testableAssets,
+          assetTypes: _assetTypes,
         ),
       ),
     );
   }
 
   void _navigateToAssetDetail(Asset asset) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AssetDetailScreen(
-          basePath: widget.basePath,
-          siteId: widget.siteId,
-          assetId: asset.id,
+    if (kIsWeb) {
+      context.go('/sites/${widget.siteId}/assets/${asset.id}');
+    } else {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => AssetDetailScreen(
+            basePath: widget.basePath,
+            siteId: widget.siteId,
+            assetId: asset.id,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -172,20 +227,101 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
       appBar: AppBar(
         title: Text(widget.siteName),
         actions: [
+          if (!kIsWeb)
+            IconButton(
+              icon: const Icon(AppIcons.scanner),
+              tooltip: 'Scan Barcode',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => BarcodeScannerScreen(
+                      basePath: widget.basePath,
+                      siteId: widget.siteId,
+                    ),
+                  ),
+                );
+              },
+            ),
+          if (!kIsWeb)
+            IconButton(
+              icon: const Icon(AppIcons.clipboardTick),
+              tooltip: 'Batch Test',
+              onPressed: _navigateToBatchTest,
+            ),
           IconButton(
             icon: const Icon(AppIcons.map),
             tooltip: 'Floor Plans',
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => FloorPlanListScreen(
-                    siteId: widget.siteId,
-                    siteName: widget.siteName,
-                    basePath: widget.basePath,
+              if (kIsWeb) {
+                context.go('/sites/${widget.siteId}/floor-plans');
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FloorPlanListScreen(
+                      siteId: widget.siteId,
+                      siteName: widget.siteName,
+                      basePath: widget.basePath,
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'report' &&
+                  RemoteConfigService.instance.complianceReportEnabled) {
+                if (kIsWeb) {
+                  context.go('/sites/${widget.siteId}/assets/report');
+                } else {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ComplianceReportScreen(
+                        basePath: widget.basePath,
+                        siteId: widget.siteId,
+                        siteName: widget.siteName,
+                        siteAddress: widget.siteAddress,
+                      ),
+                    ),
+                  );
+                }
+              } else if (value == 'types') {
+                if (kIsWeb) {
+                  context.go('/sites/${widget.siteId}/assets/types');
+                } else {
+                  Navigator.of(context)
+                      .push(
+                    MaterialPageRoute(
+                      builder: (_) => AssetTypeConfigScreen(
+                        basePath: widget.basePath,
+                      ),
+                    ),
+                  )
+                      .then((_) => _loadAssetTypes());
+                }
+              }
+            },
+            itemBuilder: (_) => [
+              if (RemoteConfigService.instance.complianceReportEnabled)
+                const PopupMenuItem(
+                  value: 'report',
+                  child: ListTile(
+                    leading: Icon(AppIcons.document),
+                    title: Text('Compliance Report'),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
                   ),
                 ),
-              );
-            },
+              const PopupMenuItem(
+                value: 'types',
+                child: ListTile(
+                  leading: Icon(AppIcons.setting),
+                  title: Text('Manage Asset Types'),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -241,6 +377,20 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
                             ? () => setState(() => _filterType = null)
                             : null,
                   ),
+                  const SizedBox(width: 8),
+                  // Lifecycle filter
+                  _FilterChip(
+                    label: _filterLifecycle == 'approaching'
+                        ? 'Approaching EOL'
+                        : _filterLifecycle == 'past'
+                            ? 'Past EOL'
+                            : 'Lifecycle',
+                    selected: _filterLifecycle != null,
+                    onTap: () => _showLifecycleFilter(context),
+                    onClear: _filterLifecycle != null
+                        ? () => setState(() => _filterLifecycle = null)
+                        : null,
+                  ),
                 ],
               ),
             ),
@@ -257,6 +407,7 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
                   }
 
                   final allAssets = snapshot.data ?? [];
+                  _latestAssets = allAssets;
 
                   // Log analytics on first load
                   if (snapshot.connectionState == ConnectionState.active &&
@@ -418,6 +569,27 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
                 ],
               ),
             ),
+            // Lifecycle warning
+            if (asset.installDate != null &&
+                asset.expectedLifespanYears != null)
+              Builder(builder: (_) {
+                final remaining = asset.expectedLifespanYears! -
+                    DateTime.now()
+                            .difference(asset.installDate!)
+                            .inDays /
+                        365.25;
+                if (remaining >= 1) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Icon(
+                    AppIcons.danger,
+                    size: 16,
+                    color: remaining <= 0
+                        ? const Color(0xFFD32F2F)
+                        : const Color(0xFFF59E0B),
+                  ),
+                );
+              }),
             // Status badge
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -472,6 +644,46 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
                   Navigator.pop(context);
                 },
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLifecycleFilter(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('All'),
+              onTap: () {
+                setState(() => _filterLifecycle = null);
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(AppIcons.danger, color: const Color(0xFFF59E0B)),
+              title: const Text('Approaching End of Life'),
+              subtitle: const Text('Less than 1 year remaining'),
+              selected: _filterLifecycle == 'approaching',
+              onTap: () {
+                setState(() => _filterLifecycle = 'approaching');
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(AppIcons.danger, color: const Color(0xFFD32F2F)),
+              title: const Text('Past End of Life'),
+              subtitle: const Text('Exceeded expected lifespan'),
+              selected: _filterLifecycle == 'past',
+              onTap: () {
+                setState(() => _filterLifecycle = 'past');
+                Navigator.pop(context);
+              },
+            ),
           ],
         ),
       ),

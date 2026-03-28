@@ -392,6 +392,17 @@ class CompanyService {
         .delete();
   }
 
+  /// One-shot fetch of a single company site by ID.
+  Future<CompanySite?> getSite(String companyId, String siteId) async {
+    final doc = await _companiesCol
+        .doc(companyId)
+        .collection('sites')
+        .doc(siteId)
+        .get();
+    if (!doc.exists) return null;
+    return CompanySite.fromJson(doc.data()!);
+  }
+
   /// Stream of all company sites (real-time).
   Stream<List<CompanySite>> getSitesStream(String companyId) {
     return _companiesCol

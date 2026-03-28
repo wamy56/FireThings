@@ -10,6 +10,11 @@ import 'pdf_header_builder.dart';
 import 'pdf_footer_builder.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
+import 'auth_service.dart';
+import 'service_history_service.dart';
+import 'asset_service.dart';
+import 'asset_type_service.dart';
+import '../data/default_asset_types.dart';
 import '../models/pdf_colour_scheme.dart';
 
 /// Top-level function for compute() — builds the jobsheet PDF in a background isolate.
@@ -54,7 +59,7 @@ Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
         pagesCount: context.pagesCount,
         primaryColor: primaryColor,
       ),
-      build: (context) => _buildDynamicSections(jobsheet, primaryColor, primaryLight, primaryMedium),
+      build: (context) => _buildDynamicSections(jobsheet, primaryColor, primaryLight, primaryMedium, data),
     ),
   );
 
@@ -150,7 +155,7 @@ pw.Widget _buildHeader(Jobsheet jobsheet, pw.Context context, _JobsheetSettings 
   );
 }
 
-List<pw.Widget> _buildDynamicSections(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight, PdfColor primaryMedium) {
+List<pw.Widget> _buildDynamicSections(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight, PdfColor primaryMedium, JobsheetPdfData data) {
   final layout = jobsheet.sectionLayout ?? PdfSectionLayoutConfig.defaults();
   final visibleSections = layout.sections.where((s) => s.visible).toList();
   final widgets = <pw.Widget>[pw.SizedBox(height: 4)];
@@ -177,7 +182,7 @@ List<pw.Widget> _buildDynamicSections(Jobsheet jobsheet, PdfColor primaryColor, 
       continue;
     }
 
-    final section = _buildSection(entry.id, jobsheet, primaryColor, primaryLight, primaryMedium);
+    final section = _buildSection(entry.id, jobsheet, primaryColor, primaryLight, primaryMedium, data);
     if (section != null) {
       widgets.add(section);
       widgets.add(pw.SizedBox(height: 6));
@@ -187,7 +192,7 @@ List<pw.Widget> _buildDynamicSections(Jobsheet jobsheet, PdfColor primaryColor, 
   return widgets;
 }
 
-pw.Widget? _buildSection(PdfSectionId id, Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight, PdfColor primaryMedium) {
+pw.Widget? _buildSection(PdfSectionId id, Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight, PdfColor primaryMedium, JobsheetPdfData data) {
   switch (id) {
     case PdfSectionId.jobInfo:
       return _buildJobInfoOnly(jobsheet, primaryColor, primaryLight);
@@ -203,6 +208,8 @@ pw.Widget? _buildSection(PdfSectionId id, Jobsheet jobsheet, PdfColor primaryCol
       return _buildComplianceStatement(primaryColor);
     case PdfSectionId.signatures:
       return _buildSignaturesSection(jobsheet, primaryColor, primaryLight);
+    case PdfSectionId.assetSummary:
+      return _buildAssetSummarySection(data, primaryColor, primaryLight);
   }
 }
 
@@ -942,6 +949,83 @@ Uint8List _extractFontBytes(pw.Font font) {
   );
 }
 
+/// Builds the "Asset Inspection Summary" table from pre-fetched service records.
+pw.Widget? _buildAssetSummarySection(
+    JobsheetPdfData data, PdfColor primaryColor, PdfColor primaryLight) {
+  final records = data.assetServiceRecords;
+  if (records == null || records.isEmpty) return null;
+
+  final passCount = records.where((r) => r['result'] == 'pass').length;
+  final failCount = records.where((r) => r['result'] == 'fail').length;
+  final defectCount =
+      records.where((r) => r['defectNote'] != null && (r['defectNote'] as String).isNotEmpty).length;
+
+  return pw.Container(
+    decoration: pw.BoxDecoration(
+      border: pw.Border.all(color: _lightGray),
+      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+    ),
+    child: pw.Column(
+      children: [
+        _buildSectionHeader('Asset Inspection Summary', primaryColor),
+        // Table header
+        pw.Container(
+          color: primaryLight,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: pw.Row(
+            children: [
+              pw.Expanded(flex: 2, child: pw.Text('Ref', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(flex: 3, child: pw.Text('Type', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(flex: 3, child: pw.Text('Location', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(flex: 2, child: pw.Text('Zone', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(flex: 2, child: pw.Text('Result', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+              pw.Expanded(flex: 2, child: pw.Text('Defects', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
+            ],
+          ),
+        ),
+        // Table rows
+        ...records.asMap().entries.map((entry) {
+          final r = entry.value;
+          final isAlt = entry.key.isOdd;
+          final hasDefect = r['defectNote'] != null && (r['defectNote'] as String).isNotEmpty;
+          return pw.Container(
+            color: isAlt ? primaryLight : null,
+            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            child: pw.Row(
+              children: [
+                pw.Expanded(flex: 2, child: pw.Text(r['reference'] ?? '-', style: const pw.TextStyle(fontSize: 8))),
+                pw.Expanded(flex: 3, child: pw.Text(r['typeName'] ?? '-', style: const pw.TextStyle(fontSize: 8))),
+                pw.Expanded(flex: 3, child: pw.Text(r['location'] ?? '-', style: const pw.TextStyle(fontSize: 8))),
+                pw.Expanded(flex: 2, child: pw.Text(r['zone'] ?? '-', style: const pw.TextStyle(fontSize: 8))),
+                pw.Expanded(
+                  flex: 2,
+                  child: pw.Text(
+                    (r['result'] as String? ?? '-').toUpperCase(),
+                    style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                      color: r['result'] == 'pass' ? PdfColors.green800 : PdfColors.red,
+                    ),
+                  ),
+                ),
+                pw.Expanded(flex: 2, child: pw.Text(hasDefect ? 'Yes' : '-', style: const pw.TextStyle(fontSize: 8))),
+              ],
+            ),
+          );
+        }),
+        // Summary line
+        pw.Container(
+          padding: const pw.EdgeInsets.all(8),
+          child: pw.Text(
+            '${records.length} assets tested: $passCount pass, $failCount fail. $defectCount defect${defectCount == 1 ? '' : 's'} logged.',
+            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 class PDFService {
   static Future<Uint8List> generateJobsheetPDF(Jobsheet jobsheet) async {
     // ── Gather phase (main thread) ──
@@ -976,6 +1060,47 @@ class PDFService {
       useCompanyBranding: useCompanyBranding,
     );
 
+    // ── Fetch asset inspection records if jobsheet has a linked site ──
+    List<Map<String, dynamic>>? assetServiceRecords;
+    if (jobsheet.siteId != null) {
+      try {
+        final user = AuthService().currentUser;
+        if (user != null) {
+          final basePath = 'users/${user.uid}';
+          final siteId = jobsheet.siteId!;
+          final records = await ServiceHistoryService.instance
+              .getRecordsForJobsheet(basePath, siteId, jobsheet.id);
+
+          if (records.isNotEmpty) {
+            // Fetch assets and types to enrich the records
+            final assets = await AssetService.instance
+                .getAssetsStream(basePath, siteId).first;
+            final assetTypes = await AssetTypeService.instance
+                .getAssetTypes(basePath);
+
+            assetServiceRecords = records.map((record) {
+              final asset = assets.where((a) => a.id == record.assetId).firstOrNull;
+              final assetType = asset != null
+                  ? (assetTypes.where((t) => t.id == asset.assetTypeId).firstOrNull
+                      ?? DefaultAssetTypes.getById(asset.assetTypeId))
+                  : null;
+
+              return {
+                'reference': asset?.reference ?? '-',
+                'typeName': assetType?.name ?? '-',
+                'location': asset?.locationDescription ?? '-',
+                'zone': asset?.zone ?? '-',
+                'result': record.overallResult,
+                'defectNote': record.defectNote ?? '',
+              };
+            }).toList();
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching asset records for PDF: $e');
+      }
+    }
+
     final data = JobsheetPdfData(
       jobsheetJson: jobsheet.toJson(),
       logoBytes: logoBytes,
@@ -988,6 +1113,7 @@ class PDFService {
       settingsPhone: settings.phone,
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
+      assetServiceRecords: assetServiceRecords,
     );
 
     // ── Build phase ──

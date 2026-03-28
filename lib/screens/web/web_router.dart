@@ -6,7 +6,20 @@ import '../../services/user_profile_service.dart';
 import '../../services/remote_config_service.dart';
 import '../../services/web_notification_service.dart';
 import '../../services/analytics_service.dart';
+import '../../models/asset.dart';
 import '../../models/dispatched_job.dart';
+import '../../models/company_site.dart';
+import '../../models/floor_plan.dart';
+import '../../services/company_service.dart';
+import '../../services/floor_plan_service.dart';
+import '../assets/site_asset_register_screen.dart';
+import '../assets/add_edit_asset_screen.dart';
+import '../assets/asset_detail_screen.dart';
+import '../assets/asset_type_config_screen.dart';
+import '../assets/compliance_report_screen.dart';
+import '../floor_plans/floor_plan_list_screen.dart';
+import '../floor_plans/upload_floor_plan_screen.dart';
+import '../floor_plans/interactive_floor_plan_screen.dart';
 import 'web_login_screen.dart';
 import 'web_access_denied_screen.dart';
 import 'web_shell.dart';
@@ -128,6 +141,164 @@ GoRouter createWebRouter() {
             builder: (context, state) => CompanySitesScreen(companyId: UserProfileService.instance.companyId ?? ''),
           ),
           GoRoute(
+            path: '/sites/:siteId/assets',
+            redirect: (context, state) {
+              if (!RemoteConfigService.instance.assetRegisterEnabled) {
+                return '/sites';
+              }
+              return null;
+            },
+            builder: (context, state) {
+              final companyId = UserProfileService.instance.companyId ?? '';
+              final basePath = 'companies/$companyId';
+              final siteId = state.pathParameters['siteId']!;
+              final extra = state.extra as Map<String, dynamic>?;
+              return _SiteDataLoader(
+                companyId: companyId,
+                siteId: siteId,
+                cachedName: extra?['siteName'] as String?,
+                cachedAddress: extra?['siteAddress'] as String?,
+                builder: (site) => SiteAssetRegisterScreen(
+                  siteId: siteId,
+                  siteName: site?.name ?? 'Site',
+                  siteAddress: site?.address ?? '',
+                  basePath: basePath,
+                ),
+              );
+            },
+            routes: [
+              GoRoute(
+                path: 'add',
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  return AddEditAssetScreen(
+                    basePath: basePath,
+                    siteId: siteId,
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'types',
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  return AssetTypeConfigScreen(basePath: basePath);
+                },
+              ),
+              GoRoute(
+                path: 'report',
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  final extra = state.extra as Map<String, dynamic>?;
+                  return _SiteDataLoader(
+                    companyId: companyId,
+                    siteId: siteId,
+                    cachedName: extra?['siteName'] as String?,
+                    cachedAddress: extra?['siteAddress'] as String?,
+                    builder: (site) => ComplianceReportScreen(
+                      basePath: basePath,
+                      siteId: siteId,
+                      siteName: site?.name ?? 'Site',
+                      siteAddress: site?.address ?? '',
+                    ),
+                  );
+                },
+              ),
+              GoRoute(
+                path: ':assetId',
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  final assetId = state.pathParameters['assetId']!;
+                  return AssetDetailScreen(
+                    basePath: basePath,
+                    siteId: siteId,
+                    assetId: assetId,
+                  );
+                },
+              ),
+              GoRoute(
+                path: ':assetId/edit',
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  final asset = state.extra as Asset?;
+                  return AddEditAssetScreen(
+                    basePath: basePath,
+                    siteId: siteId,
+                    asset: asset,
+                  );
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/sites/:siteId/floor-plans',
+            redirect: (context, state) {
+              if (!RemoteConfigService.instance.assetRegisterEnabled) {
+                return '/sites';
+              }
+              return null;
+            },
+            builder: (context, state) {
+              final companyId = UserProfileService.instance.companyId ?? '';
+              final basePath = 'companies/$companyId';
+              final siteId = state.pathParameters['siteId']!;
+              final extra = state.extra as Map<String, dynamic>?;
+              return _SiteDataLoader(
+                companyId: companyId,
+                siteId: siteId,
+                cachedName: extra?['siteName'] as String?,
+                builder: (site) => FloorPlanListScreen(
+                  siteId: siteId,
+                  siteName: site?.name ?? 'Site',
+                  basePath: basePath,
+                ),
+              );
+            },
+            routes: [
+              GoRoute(
+                path: 'upload',
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  return UploadFloorPlanScreen(
+                    siteId: siteId,
+                    basePath: basePath,
+                  );
+                },
+              ),
+              GoRoute(
+                path: ':planId',
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  final planId = state.pathParameters['planId']!;
+                  final floorPlan = state.extra as FloorPlan?;
+                  return _FloorPlanLoader(
+                    basePath: basePath,
+                    siteId: siteId,
+                    planId: planId,
+                    cachedPlan: floorPlan,
+                    builder: (plan) => InteractiveFloorPlanScreen(
+                      basePath: basePath,
+                      siteId: siteId,
+                      floorPlan: plan,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          GoRoute(
             path: '/customers',
             builder: (context, state) => CompanyCustomersScreen(companyId: UserProfileService.instance.companyId ?? ''),
           ),
@@ -143,4 +314,90 @@ GoRouter createWebRouter() {
       ),
     ],
   );
+}
+
+/// Loads site data from cache or Firestore for route builders.
+class _SiteDataLoader extends StatelessWidget {
+  final String companyId;
+  final String siteId;
+  final String? cachedName;
+  final String? cachedAddress;
+  final Widget Function(CompanySite?) builder;
+
+  const _SiteDataLoader({
+    required this.companyId,
+    required this.siteId,
+    this.cachedName,
+    this.cachedAddress,
+    required this.builder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // If we have cached data, use it immediately
+    if (cachedName != null) {
+      return builder(CompanySite(
+        id: siteId,
+        name: cachedName!,
+        address: cachedAddress ?? '',
+        createdBy: '',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      ));
+    }
+
+    // Otherwise load from Firestore
+    return FutureBuilder<CompanySite?>(
+      future: CompanyService.instance.getSite(companyId, siteId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return builder(snapshot.data);
+      },
+    );
+  }
+}
+
+/// Loads a floor plan from cache or Firestore for route builders.
+class _FloorPlanLoader extends StatelessWidget {
+  final String basePath;
+  final String siteId;
+  final String planId;
+  final FloorPlan? cachedPlan;
+  final Widget Function(FloorPlan plan) builder;
+
+  const _FloorPlanLoader({
+    required this.basePath,
+    required this.siteId,
+    required this.planId,
+    this.cachedPlan,
+    required this.builder,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (cachedPlan != null) {
+      return builder(cachedPlan!);
+    }
+
+    return FutureBuilder<FloorPlan?>(
+      future: FloorPlanService.instance.getFloorPlan(basePath, siteId, planId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.data == null) {
+          return const Scaffold(
+            body: Center(child: Text('Floor plan not found')),
+          );
+        }
+        return builder(snapshot.data!);
+      },
+    );
+  }
 }

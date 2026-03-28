@@ -24,6 +24,9 @@ class RemoteConfigService {
     'dispatch_max_members': 25,
     'dispatch_notifications_enabled': true,
     'asset_register_enabled': false,
+    'barcode_scanning_enabled': false,
+    'lifecycle_tracking_enabled': false,
+    'compliance_report_enabled': false,
   };
 
   Future<void> initialize() async {
@@ -99,4 +102,13 @@ class RemoteConfigService {
 
   bool get assetRegisterEnabled =>
       _remoteConfig.getBool('asset_register_enabled');
+
+  bool get barcodeScanningEnabled =>
+      _remoteConfig.getBool('barcode_scanning_enabled');
+
+  bool get lifecycleTrackingEnabled =>
+      _remoteConfig.getBool('lifecycle_tracking_enabled');
+
+  bool get complianceReportEnabled =>
+      _remoteConfig.getBool('compliance_report_enabled');
 }
