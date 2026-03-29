@@ -227,23 +227,14 @@ class _InteractiveFloorPlanScreenState
     );
   }
 
-  void _onFloorPlanTap(TapDownDetails details, BoxConstraints constraints) {
+  void _onFloorPlanTap(TapDownDetails details) {
     if (!_isPlacementMode) return;
 
-    // Get the tap position relative to the image
-    final renderBox = context.findRenderObject() as RenderBox;
-    final localPosition = renderBox.globalToLocal(details.globalPosition);
+    // localPosition is already in image-space coordinates because
+    // the GestureDetector is inside the InteractiveViewer's child
+    final xPercent = details.localPosition.dx / widget.floorPlan.imageWidth;
+    final yPercent = details.localPosition.dy / widget.floorPlan.imageHeight;
 
-    // Account for the transformation
-    final matrix = _transformController.value;
-    final inverseMatrix = Matrix4.inverted(matrix);
-    final transformedPoint = MatrixUtils.transformPoint(
-        inverseMatrix, localPosition);
-
-    final xPercent = transformedPoint.dx / widget.floorPlan.imageWidth;
-    final yPercent = transformedPoint.dy / widget.floorPlan.imageHeight;
-
-    // Clamp to valid range
     if (xPercent < 0 || xPercent > 1 || yPercent < 0 || yPercent > 1) return;
 
     _showPlacementOptions(xPercent, yPercent);
@@ -456,15 +447,7 @@ class _InteractiveFloorPlanScreenState
                 assetCount: assets.length,
               );
 
-              return GestureDetector(
-                onTapDown: (details) => _onFloorPlanTap(
-                  details,
-                  BoxConstraints(
-                    maxWidth: widget.floorPlan.imageWidth,
-                    maxHeight: widget.floorPlan.imageHeight,
-                  ),
-                ),
-                child: InteractiveViewer(
+              return InteractiveViewer(
                   transformationController: _transformController,
                   minScale: 0.3,
                   maxScale: 5.0,
@@ -474,8 +457,11 @@ class _InteractiveFloorPlanScreenState
                   child: SizedBox(
                     width: widget.floorPlan.imageWidth,
                     height: widget.floorPlan.imageHeight,
-                    child: Stack(
-                      clipBehavior: Clip.none,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTapDown: _onFloorPlanTap,
+                      child: Stack(
+                        clipBehavior: Clip.none,
                       children: [
                         // Floor plan image
                         Positioned.fill(

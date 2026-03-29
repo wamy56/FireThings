@@ -154,55 +154,62 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
   Widget _buildCustomerCard(SavedCustomer customer) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
-          child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
-        ),
-        title: Text(
-          customer.customerName,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
           children: [
-            const SizedBox(height: 4),
-            Text(
-              customer.customerAddress,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            CircleAvatar(
+              backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+              child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
             ),
-            if (customer.email != null && customer.email!.isNotEmpty) ...[
-              const SizedBox(height: 2),
-              Text(
-                customer.email!,
-                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    customer.customerName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    customer.customerAddress,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                  if (customer.email != null && customer.email!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      customer.email!,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                    ),
+                  ],
+                  if (customer.notes != null && customer.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      customer.notes!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ],
-            if (customer.notes != null && customer.notes!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                customer.notes!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
+            ),
+            const SizedBox(width: 8),
+            Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _ActionButton(
                   label: 'Edit',
                   onPressed: () => _showCustomerDialog(customer: customer),
                 ),
+                const SizedBox(height: 6),
                 _ActionButton(
                   label: 'Delete',
                   onPressed: () => _confirmDelete(customer),
@@ -359,14 +366,17 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isDestructive ? Colors.red : AppTheme.primaryBlue;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = isDestructive
+        ? (isDark ? Colors.red[300]! : Colors.red)
+        : (isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue);
     return SizedBox(
       height: 30,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: color,
-          side: BorderSide(color: color.withValues(alpha: 0.4)),
+          side: BorderSide(color: color.withValues(alpha: isDark ? 0.6 : 0.4)),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

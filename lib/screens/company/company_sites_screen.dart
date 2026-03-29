@@ -152,60 +152,69 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
   Widget _buildSiteCard(CompanySite site) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
-          child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
-        ),
-        title: Text(
-          site.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
           children: [
-            const SizedBox(height: 4),
-            Text(
-              site.address,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            CircleAvatar(
+              backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+              child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
             ),
-            if (site.notes != null && site.notes!.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                site.notes!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                  fontStyle: FontStyle.italic,
-                ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    site.name,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    site.address,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                  ),
+                  if (site.notes != null && site.notes!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      site.notes!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[500],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
               ),
-            ],
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
+            ),
+            const SizedBox(width: 8),
+            Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (RemoteConfigService.instance.assetRegisterEnabled)
+                if (RemoteConfigService.instance.assetRegisterEnabled) ...[
                   _ActionButton(
                     label: 'View Assets',
                     onPressed: () => _viewAssets(site),
                   ),
-                if (_canEdit)
+                  const SizedBox(height: 6),
+                ],
+                if (_canEdit) ...[
                   _ActionButton(
                     label: 'Edit',
                     onPressed: () => _showSiteDialog(site: site),
                   ),
-                if (_canEdit)
+                  const SizedBox(height: 6),
                   _ActionButton(
                     label: 'Delete',
                     onPressed: () => _confirmDelete(site),
                     isDestructive: true,
                   ),
+                ],
               ],
             ),
           ],
@@ -360,14 +369,17 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isDestructive ? Colors.red : AppTheme.primaryBlue;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = isDestructive
+        ? (isDark ? Colors.red[300]! : Colors.red)
+        : (isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue);
     return SizedBox(
       height: 30,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
           foregroundColor: color,
-          side: BorderSide(color: color.withValues(alpha: 0.4)),
+          side: BorderSide(color: color.withValues(alpha: isDark ? 0.6 : 0.4)),
           padding: const EdgeInsets.symmetric(horizontal: 12),
           textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
