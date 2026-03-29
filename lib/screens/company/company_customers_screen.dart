@@ -6,11 +6,13 @@ import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
-import '../../utils/adaptive_widgets.dart';
+import '../../utils/animate_helpers.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/loading_indicator.dart';
 
 class CompanyCustomersScreen extends StatefulWidget {
   final String companyId;
@@ -35,8 +37,6 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       appBar: AppBar(title: const Text('Shared Customers')),
       floatingActionButton: _canEdit && MediaQuery.of(context).viewInsets.bottom == 0
@@ -51,7 +51,6 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
           constraints: const BoxConstraints(maxWidth: 750),
           child: Column(
         children: [
-          // Search bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -72,14 +71,12 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
               onChanged: (val) => setState(() => _searchQuery = val),
             ),
           ),
-
-          // Stream content
           Expanded(
             child: StreamBuilder<List<CompanyCustomer>>(
               stream: CompanyService.instance.getCustomersStream(widget.companyId),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: AdaptiveLoadingIndicator());
+                  return const LoadingIndicator();
                 }
 
                 final customers = snapshot.data ?? [];
@@ -93,7 +90,6 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
                             (c.phone?.toLowerCase().contains(q) ?? false);
                       }).toList();
 
-                // Count label
                 return Column(
                   children: [
                     Padding(
@@ -110,64 +106,25 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
                     const SizedBox(height: 8),
                     Expanded(
                       child: filtered.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    _searchQuery.isNotEmpty
-                                        ? AppIcons.searchOff
-                                        : AppIcons.user,
-                                    size: 64,
-                                    color: isDark
-                                        ? AppTheme.darkTextSecondary
-                                        : AppTheme.mediumGrey,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _searchQuery.isNotEmpty
-                                        ? 'No Results Found'
-                                        : 'No shared customers yet',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      color: isDark
-                                          ? AppTheme.darkTextSecondary
-                                          : AppTheme.mediumGrey,
-                                    ),
-                                  ),
-                                  if (_searchQuery.isNotEmpty) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Try a different search term',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: isDark
-                                            ? AppTheme.darkTextSecondary
-                                            : AppTheme.textHint,
-                                      ),
-                                    ),
-                                  ] else if (_canEdit) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Tap + to add a customer',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: isDark
-                                            ? AppTheme.darkTextSecondary
-                                            : AppTheme.textHint,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
+                          ? EmptyState(
+                              icon: _searchQuery.isNotEmpty
+                                  ? AppIcons.searchOff
+                                  : AppIcons.people,
+                              title: _searchQuery.isNotEmpty
+                                  ? 'No Results Found'
+                                  : 'No Shared Customers',
+                              message: _searchQuery.isNotEmpty
+                                  ? 'Try a different search term'
+                                  : _canEdit
+                                      ? 'Tap + to add a customer'
+                                      : 'No customers have been added yet',
                             )
-                          : ListView.separated(
-                              padding: const EdgeInsets.all(AppTheme.screenPadding),
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
                               itemCount: filtered.length,
-                              separatorBuilder: (_, _) => const SizedBox(height: 12),
                               itemBuilder: (context, index) {
                                 final customer = filtered[index];
-                                return _buildCustomerCard(customer, isDark);
+                                return _buildCustomerCard(customer).animateListItem(index);
                               },
                             ),
                     ),
@@ -183,124 +140,78 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
     );
   }
 
-  Widget _buildCustomerCard(CompanyCustomer customer, bool isDark) {
-    return Container(
-      padding: const EdgeInsets.all(AppTheme.cardPadding),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: isDark ? null : AppTheme.cardShadow,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            AppIcons.user,
-            size: 20,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  customer.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+  Widget _buildCustomerCard(CompanyCustomer customer) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(12),
+        leading: CircleAvatar(
+          backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+          child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
+        ),
+        title: Text(
+          customer.name,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (customer.address != null && customer.address!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                customer.address!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+              ),
+            ],
+            if (customer.email != null && customer.email!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                customer.email!,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+            if (customer.phone != null && customer.phone!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                customer.phone!,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+            if (customer.notes != null && customer.notes!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                customer.notes!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                  fontStyle: FontStyle.italic,
                 ),
-                if (customer.address != null &&
-                    customer.address!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    customer.address!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.mediumGrey,
-                    ),
+              ),
+            ],
+            if (_canEdit) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  _ActionButton(
+                    label: 'Edit',
+                    onPressed: () => _showCustomerDialog(customer: customer),
+                  ),
+                  _ActionButton(
+                    label: 'Delete',
+                    onPressed: () => _confirmDelete(customer),
+                    isDestructive: true,
                   ),
                 ],
-                if (customer.email != null && customer.email!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    customer.email!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.mediumGrey,
-                    ),
-                  ),
-                ],
-                if (customer.phone != null && customer.phone!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    customer.phone!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.mediumGrey,
-                    ),
-                  ),
-                ],
-                if (customer.notes != null && customer.notes!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    customer.notes!,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontStyle: FontStyle.italic,
-                      color: isDark
-                          ? AppTheme.darkTextSecondary
-                          : AppTheme.textHint,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (_canEdit)
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _showCustomerDialog(customer: customer);
-                } else if (value == 'delete') {
-                  _confirmDelete(customer);
-                }
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(AppIcons.edit, size: 18),
-                      const SizedBox(width: 8),
-                      const Text('Edit'),
-                    ],
-                  ),
-                ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.delete_outline,
-                        size: 18,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-        ],
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -448,5 +359,36 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
     } catch (e) {
       if (mounted) context.showErrorToast('Failed to delete customer');
     }
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+  final bool isDestructive;
+
+  const _ActionButton({
+    required this.label,
+    required this.onPressed,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDestructive ? Colors.red : AppTheme.primaryBlue;
+    return SizedBox(
+      height: 30,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color,
+          side: BorderSide(color: color.withValues(alpha: 0.4)),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Text(label),
+      ),
+    );
   }
 }

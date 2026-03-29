@@ -75,16 +75,17 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
     });
   }
 
-  Future<void> _showAddSiteDialog() async {
-    final nameController = TextEditingController();
-    final addressController = TextEditingController();
-    final notesController = TextEditingController();
+  Future<void> _showSiteDialog({SavedSite? site}) async {
+    final nameController = TextEditingController(text: site?.siteName ?? '');
+    final addressController = TextEditingController(text: site?.address ?? '');
+    final notesController = TextEditingController(text: site?.notes ?? '');
+    final isEdit = site != null;
 
     final result = await showPremiumDialog<bool>(
       context: context,
       child: Builder(
         builder: (context) => AlertDialog(
-        title: const Text('Add Saved Site'),
+        title: Text(isEdit ? 'Edit Site' : 'Add Site'),
         content: SizedBox(
           width: 500,
           child: SingleChildScrollView(
@@ -131,45 +132,45 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
               }
               Navigator.pop(context, true);
             },
-            child: const Text('Save'),
+            child: Text(isEdit ? 'Save' : 'Add'),
           ),
         ],
       )),
     );
 
     if (result == true) {
-      await _addSite(
-        nameController.text.trim(),
-        addressController.text.trim(),
-        notesController.text.trim(),
-      );
-    }
-  }
-
-  Future<void> _addSite(String name, String address, String notes) async {
-    try {
       final user = _authService.currentUser;
       if (user == null) return;
 
-      final site = SavedSite(
-        id: const Uuid().v4(),
-        engineerId: user.uid,
-        siteName: name,
-        address: address,
-        notes: notes.isEmpty ? null : notes,
-        createdAt: DateTime.now(),
-      );
-
-      await _dbHelper.insertSavedSite(site);
-      AnalyticsService.instance.logSiteSaved();
-
-      if (!mounted) return;
-      context.showSuccessToast('Site saved successfully');
-
-      _loadSavedSites();
-    } catch (e) {
-      if (!mounted) return;
-      context.showErrorToast('Error saving site: $e');
+      try {
+        if (isEdit) {
+          final updated = site.copyWith(
+            siteName: nameController.text.trim(),
+            address: addressController.text.trim(),
+            notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+          );
+          await _dbHelper.updateSavedSite(updated);
+          if (!mounted) return;
+          context.showSuccessToast('Site updated');
+        } else {
+          final newSite = SavedSite(
+            id: const Uuid().v4(),
+            engineerId: user.uid,
+            siteName: nameController.text.trim(),
+            address: addressController.text.trim(),
+            notes: notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+            createdAt: DateTime.now(),
+          );
+          await _dbHelper.insertSavedSite(newSite);
+          AnalyticsService.instance.logSiteSaved();
+          if (!mounted) return;
+          context.showSuccessToast('Site saved successfully');
+        }
+        _loadSavedSites();
+      } catch (e) {
+        if (!mounted) return;
+        context.showErrorToast('Error saving site: $e');
+      }
     }
   }
 
@@ -198,13 +199,27 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
     }
   }
 
+  void _viewAssets(SavedSite site) {
+    final user = _authService.currentUser;
+    if (user == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SiteAssetRegisterScreen(
+          siteId: site.id,
+          siteName: site.siteName,
+          siteAddress: site.address,
+          basePath: 'users/${user.uid}',
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AdaptiveNavigationBar(title: 'Saved Sites'),
       body: KeyboardDismissWrapper(child: Column(
         children: [
-          // Search bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -225,8 +240,6 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
               onChanged: _filterSites,
             ),
           ),
-
-          // Site count
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -239,8 +252,6 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
             ),
           ),
           const SizedBox(height: 8),
-
-          // Sites list
           Expanded(
             child: _isLoading
                 ? const LoadingIndicator()
@@ -273,7 +284,7 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
       floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
           ? null
           : FloatingActionButton.extended(
-              onPressed: _showAddSiteDialog,
+              onPressed: () => _showSiteDialog(),
               icon: const Icon(AppIcons.add),
               label: const Text('Add Site'),
             ),
@@ -286,8 +297,8 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
         leading: CircleAvatar(
-          backgroundColor: AppTheme.primaryBlue.withValues(alpha:0.1),
-          child: Icon(AppIcons.location, color: AppTheme.primaryBlue),
+          backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+          child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
         ),
         title: Text(
           site.siteName,
@@ -316,36 +327,60 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
                 ),
               ),
             ],
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (RemoteConfigService.instance.assetRegisterEnabled)
-              IconButton(
-                icon: const Icon(AppIcons.clipboardTick),
-                tooltip: 'Assets',
-                onPressed: () {
-                  final user = _authService.currentUser;
-                  if (user == null) return;
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => SiteAssetRegisterScreen(
-                        siteId: site.id,
-                        siteName: site.siteName,
-                        siteAddress: site.address,
-                        basePath: 'users/${user.uid}',
-                      ),
-                    ),
-                  );
-                },
-              ),
-            IconButton(
-              icon: const Icon(AppIcons.trash, color: Colors.red),
-              onPressed: () => _deleteSite(site),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (RemoteConfigService.instance.assetRegisterEnabled)
+                  _ActionButton(
+                    label: 'View Assets',
+                    onPressed: () => _viewAssets(site),
+                  ),
+                _ActionButton(
+                  label: 'Edit',
+                  onPressed: () => _showSiteDialog(site: site),
+                ),
+                _ActionButton(
+                  label: 'Delete',
+                  onPressed: () => _deleteSite(site),
+                  isDestructive: true,
+                ),
+              ],
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+  final bool isDestructive;
+
+  const _ActionButton({
+    required this.label,
+    required this.onPressed,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDestructive ? Colors.red : AppTheme.primaryBlue;
+    return SizedBox(
+      height: 30,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color,
+          side: BorderSide(color: color.withValues(alpha: 0.4)),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Text(label),
       ),
     );
   }

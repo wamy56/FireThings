@@ -4,6 +4,7 @@ import '../../models/models.dart';
 import '../../services/database_helper.dart';
 import '../../services/analytics_service.dart';
 import '../../services/auth_service.dart';
+import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -83,7 +84,6 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
       ),
       body: KeyboardDismissWrapper(child: Column(
         children: [
-          // Search bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -104,8 +104,6 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
               onChanged: _filterCustomers,
             ),
           ),
-
-          // Customer count
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -118,17 +116,28 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
             ),
           ),
           const SizedBox(height: 8),
-
-          // Customer list
           Expanded(
             child: _isLoading
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: SkeletonList(itemCount: 5, showLeading: true),
-                  )
+                ? const LoadingIndicator()
                 : _filteredCustomers.isEmpty
-                    ? _buildEmptyState()
-                    : _buildCustomerList(),
+                    ? EmptyState(
+                        icon: _searchQuery.isNotEmpty ? AppIcons.searchOff : AppIcons.people,
+                        title: _searchQuery.isNotEmpty ? 'No Results Found' : 'No Saved Customers',
+                        message: _searchQuery.isNotEmpty
+                            ? 'Try a different search term'
+                            : 'Add customers here for quick selection when creating invoices',
+                      )
+                    : AdaptiveRefreshIndicator(
+                        onRefresh: _loadCustomers,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filteredCustomers.length,
+                          itemBuilder: (context, index) {
+                            final customer = _filteredCustomers[index];
+                            return _buildCustomerCard(customer).animateListItem(index);
+                          },
+                        ),
+                      ),
           ),
         ],
       )),
@@ -142,86 +151,69 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
-    final hasSearchQuery = _searchQuery.isNotEmpty;
-    return EmptyState(
-      icon: hasSearchQuery ? AppIcons.searchOff : AppIcons.people,
-      title: hasSearchQuery ? 'No Results Found' : 'No Saved Customers',
-      message: hasSearchQuery
-          ? 'Try a different search term'
-          : 'Add customers here for quick selection when creating invoices',
-    );
-  }
-
-  Widget _buildCustomerList() {
-    return AdaptiveRefreshIndicator(
-      onRefresh: _loadCustomers,
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _filteredCustomers.length,
-        itemBuilder: (context, index) {
-          final customer = _filteredCustomers[index];
-          return _buildCustomerCard(customer).animateListItem(index);
-        },
-      ),
-    );
-  }
-
   Widget _buildCustomerCard(SavedCustomer customer) {
     return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-              child: Text(
-                customer.customerName[0].toUpperCase(),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(12),
+        leading: CircleAvatar(
+          backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+          child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
+        ),
+        title: Text(
+          customer.customerName,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              customer.customerAddress,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+            if (customer.email != null && customer.email!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                customer.email!,
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+            ],
+            if (customer.notes != null && customer.notes!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                customer.notes!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Theme.of(context).primaryColor,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: Colors.grey[500],
+                  fontStyle: FontStyle.italic,
                 ),
               ),
-            ),
-            title: Text(
-              customer.customerName,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            ],
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
               children: [
-                Text(
-                  customer.customerAddress,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                _ActionButton(
+                  label: 'Edit',
+                  onPressed: () => _showCustomerDialog(customer: customer),
                 ),
-                if (customer.email != null && customer.email!.isNotEmpty)
-                  Text(
-                    customer.email!,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                  ),
+                _ActionButton(
+                  label: 'Delete',
+                  onPressed: () => _confirmDelete(customer),
+                  isDestructive: true,
+                ),
               ],
             ),
-            isThreeLine: true,
-            trailing: IconButton(
-              icon: Icon(AppIcons.more),
-              onPressed: () => showAdaptiveActionSheet(
-                context: context,
-                options: [
-                  ActionSheetOption(
-                    label: 'Edit',
-                    icon: AppIcons.edit,
-                    onTap: () => _showCustomerDialog(customer: customer),
-                  ),
-                  ActionSheetOption(
-                    label: 'Delete',
-                    icon: AppIcons.trash,
-                    isDestructive: true,
-                    onTap: () => _confirmDelete(customer),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+          ],
+        ),
+      ),
+    );
   }
 
   void _showCustomerDialog({SavedCustomer? customer}) {
@@ -300,7 +292,6 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
                 createdAt: customer?.createdAt ?? DateTime.now(),
               );
 
-              // Capture navigator before async gap
               final navigator = Navigator.of(context);
 
               try {
@@ -352,5 +343,36 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
         }
       }
     }
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+  final bool isDestructive;
+
+  const _ActionButton({
+    required this.label,
+    required this.onPressed,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDestructive ? Colors.red : AppTheme.primaryBlue;
+    return SizedBox(
+      height: 30,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color,
+          side: BorderSide(color: color.withValues(alpha: 0.4)),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Text(label),
+      ),
+    );
   }
 }

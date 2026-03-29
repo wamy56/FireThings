@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../models/asset.dart';
 import '../../models/asset_type.dart';
 import '../../models/service_record.dart';
@@ -21,7 +22,6 @@ import '../../widgets/widgets.dart';
 import '../../services/floor_plan_service.dart';
 import 'add_edit_asset_screen.dart';
 import 'barcode_scanner_screen.dart';
-import 'inspection_checklist_screen.dart';
 import '../floor_plans/interactive_floor_plan_screen.dart';
 
 class AssetDetailScreen extends StatefulWidget {
@@ -288,17 +288,67 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     }
   }
 
-  Future<void> _navigateToInspection() async {
-    if (_asset == null || _assetType == null) return;
-    final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => InspectionChecklistScreen(
-          basePath: widget.basePath,
-          siteId: widget.siteId,
-          asset: _asset!,
-          assetType: _assetType!,
+  bool _isTestSaving = false;
+
+  Future<void> _passAsset() async {
+    if (_asset == null || _isTestSaving) return;
+    setState(() => _isTestSaving = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Not signed in');
+      final now = DateTime.now();
+      final record = ServiceRecord(
+        id: const Uuid().v4(),
+        assetId: _asset!.id,
+        siteId: widget.siteId,
+        engineerId: user.uid,
+        engineerName: user.displayName ?? 'Unknown',
+        serviceDate: now,
+        overallResult: 'pass',
+        createdAt: now,
+      );
+      await ServiceHistoryService.instance
+          .createRecord(widget.basePath, widget.siteId, record);
+      await AssetService.instance.updateAsset(
+        widget.basePath,
+        widget.siteId,
+        _asset!.copyWith(
+          complianceStatus: Asset.statusPass,
+          lastServiceDate: now,
+          lastServiceBy: user.uid,
+          lastServiceByName: user.displayName ?? 'Unknown',
+          nextServiceDue: DateTime(now.year + 1, now.month, now.day),
         ),
-      ),
+      );
+      await DefectService.instance.rectifyAllForAsset(
+        widget.basePath,
+        widget.siteId,
+        _asset!.id,
+        rectifiedBy: user.uid,
+        rectifiedByName: user.displayName ?? 'Unknown',
+      );
+      AnalyticsService.instance.logAssetTested(
+        assetType: _asset!.assetTypeId,
+        result: 'pass',
+        siteId: widget.siteId,
+      );
+      if (mounted) context.showSuccessToast('Asset passed');
+      _loadAsset();
+    } catch (e) {
+      if (mounted) context.showErrorToast('Failed to save');
+    } finally {
+      if (mounted) setState(() => _isTestSaving = false);
+    }
+  }
+
+  Future<void> _failAsset() async {
+    if (_asset == null) return;
+    final result = await showDefectBottomSheet(
+      context: context,
+      basePath: widget.basePath,
+      siteId: widget.siteId,
+      asset: _asset!,
+      assetType: _assetType,
     );
     if (result == true) _loadAsset();
   }
@@ -433,25 +483,52 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             ),
           ),
 
-          // Test button
+          // Test buttons
           if (asset.complianceStatus != Asset.statusDecommissioned) ...[
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _navigateToInspection,
-                icon: Icon(AppIcons.clipboardTick),
-                label: const Text('Test This Asset'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.accentOrange,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+            if (_isTestSaving)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  child: CircularProgressIndicator(),
                 ),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _passAsset,
+                      icon: const Icon(AppIcons.tickCircle),
+                      label: const Text('Pass'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4CAF50),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _failAsset,
+                      icon: Icon(AppIcons.close),
+                      label: const Text('Fail'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFD32F2F),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
           ],
 
           const SizedBox(height: AppTheme.sectionGap),

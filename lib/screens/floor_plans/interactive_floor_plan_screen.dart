@@ -1,13 +1,19 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../models/asset.dart';
 import '../../models/asset_type.dart';
 import '../../models/floor_plan.dart';
+import '../../models/service_record.dart';
 import '../../data/default_asset_types.dart';
 import '../../services/asset_service.dart';
 import '../../services/asset_type_service.dart';
+import '../../services/defect_service.dart';
 import '../../services/floor_plan_service.dart';
+import '../../services/service_history_service.dart';
 import '../../services/analytics_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -123,118 +129,102 @@ class _InteractiveFloorPlanScreenState
   void _showAssetBottomSheet(Asset asset) {
     final type = DefaultAssetTypes.getById(asset.assetTypeId);
     final statusColor = _colorForStatus(asset.complianceStatus);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          asset.reference ?? type?.name ?? 'Asset',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          [
-                            type?.name,
-                            if (asset.variant != null) asset.variant,
-                          ].whereType<String>().join(' · '),
-                          style: TextStyle(
-                            color:
-                                Theme.of(ctx).brightness == Brightness.dark
-                                    ? AppTheme.darkTextSecondary
-                                    : AppTheme.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      _statusLabel(asset.complianceStatus),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (asset.lastServiceDate != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Last service: ${_formatDate(asset.lastServiceDate!)}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(ctx).brightness == Brightness.dark
-                        ? AppTheme.darkTextSecondary
-                        : AppTheme.textSecondary,
+          child: _FloorPlanAssetSheet(
+            asset: asset,
+            assetType: type,
+            statusColor: statusColor,
+            isDark: isDark,
+            basePath: widget.basePath,
+            siteId: widget.siteId,
+            onViewDetails: () {
+              Navigator.pop(ctx);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => AssetDetailScreen(
+                    basePath: widget.basePath,
+                    siteId: widget.siteId,
+                    assetId: asset.id,
                   ),
                 ),
-              ],
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => AssetDetailScreen(
-                              basePath: widget.basePath,
-                              siteId: widget.siteId,
-                              assetId: asset.id,
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(AppIcons.eye, size: 18),
-                      label: const Text('View Details'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        // Placeholder — Phase 3 will implement testing
-                        context.showWarningToast(
-                            'Testing coming in next update');
-                      },
-                      icon: const Icon(AppIcons.clipboardTick, size: 18),
-                      label: const Text('Test Now'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              );
+            },
+            onPass: () async {
+              Navigator.pop(ctx);
+              await _passAssetFromFloorPlan(asset);
+            },
+            onFail: () async {
+              Navigator.pop(ctx);
+              await _failAssetFromFloorPlan(asset, type);
+            },
           ),
         ),
       ),
     ).then((_) {
       if (mounted) setState(() => _selectedAssetId = null);
     });
+  }
+
+  Future<void> _passAssetFromFloorPlan(Asset asset) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+      final now = DateTime.now();
+      final record = ServiceRecord(
+        id: const Uuid().v4(),
+        assetId: asset.id,
+        siteId: widget.siteId,
+        engineerId: user.uid,
+        engineerName: user.displayName ?? 'Unknown',
+        serviceDate: now,
+        overallResult: 'pass',
+        createdAt: now,
+      );
+      await ServiceHistoryService.instance
+          .createRecord(widget.basePath, widget.siteId, record);
+      await AssetService.instance.updateAsset(
+        widget.basePath,
+        widget.siteId,
+        asset.copyWith(
+          complianceStatus: Asset.statusPass,
+          lastServiceDate: now,
+          lastServiceBy: user.uid,
+          lastServiceByName: user.displayName ?? 'Unknown',
+          nextServiceDue: DateTime(now.year + 1, now.month, now.day),
+        ),
+      );
+      await DefectService.instance.rectifyAllForAsset(
+        widget.basePath,
+        widget.siteId,
+        asset.id,
+        rectifiedBy: user.uid,
+        rectifiedByName: user.displayName ?? 'Unknown',
+      );
+      AnalyticsService.instance.logAssetTested(
+        assetType: asset.assetTypeId,
+        result: 'pass',
+        siteId: widget.siteId,
+      );
+      if (mounted) context.showSuccessToast('Asset passed');
+    } catch (e) {
+      if (mounted) context.showErrorToast('Failed to save');
+    }
+  }
+
+  Future<void> _failAssetFromFloorPlan(Asset asset, AssetType? type) async {
+    await showDefectBottomSheet(
+      context: context,
+      basePath: widget.basePath,
+      siteId: widget.siteId,
+      asset: asset,
+      assetType: type,
+    );
   }
 
   void _onFloorPlanTap(TapDownDetails details, BoxConstraints constraints) {
@@ -250,12 +240,8 @@ class _InteractiveFloorPlanScreenState
     final transformedPoint = MatrixUtils.transformPoint(
         inverseMatrix, localPosition);
 
-    // Account for AppBar offset (roughly 56 + status bar)
-    final appBarHeight = MediaQuery.of(context).padding.top + kToolbarHeight;
-    final adjustedY = transformedPoint.dy - appBarHeight;
-
     final xPercent = transformedPoint.dx / widget.floorPlan.imageWidth;
-    final yPercent = adjustedY / widget.floorPlan.imageHeight;
+    final yPercent = transformedPoint.dy / widget.floorPlan.imageHeight;
 
     // Clamp to valid range
     if (xPercent < 0 || xPercent > 1 || yPercent < 0 || yPercent > 1) return;
@@ -421,22 +407,6 @@ class _InteractiveFloorPlanScreenState
         return const Color(0xFF9E9E9E);
     }
   }
-
-  String _statusLabel(String status) {
-    switch (status) {
-      case Asset.statusPass:
-        return 'Pass';
-      case Asset.statusFail:
-        return 'Fail';
-      case Asset.statusDecommissioned:
-        return 'Decommissioned';
-      default:
-        return 'Untested';
-    }
-  }
-
-  String _formatDate(DateTime date) =>
-      '${date.day}/${date.month}/${date.year}';
 
   @override
   Widget build(BuildContext context) {
@@ -832,6 +802,252 @@ class _PinFilterChip extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Floor Plan Asset Sheet ────────────────────────────────────────
+
+class _FloorPlanAssetSheet extends StatefulWidget {
+  final Asset asset;
+  final AssetType? assetType;
+  final Color statusColor;
+  final bool isDark;
+  final String basePath;
+  final String siteId;
+  final VoidCallback onViewDetails;
+  final Future<void> Function() onPass;
+  final Future<void> Function() onFail;
+
+  const _FloorPlanAssetSheet({
+    required this.asset,
+    this.assetType,
+    required this.statusColor,
+    required this.isDark,
+    required this.basePath,
+    required this.siteId,
+    required this.onViewDetails,
+    required this.onPass,
+    required this.onFail,
+  });
+
+  @override
+  State<_FloorPlanAssetSheet> createState() => _FloorPlanAssetSheetState();
+}
+
+class _FloorPlanAssetSheetState extends State<_FloorPlanAssetSheet> {
+  int _openDefectCount = 0;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDefectCount();
+  }
+
+  Future<void> _loadDefectCount() async {
+    final defects = await DefectService.instance.getOpenDefectsForAsset(
+      widget.basePath,
+      widget.siteId,
+      widget.asset.id,
+    );
+    if (mounted) setState(() => _openDefectCount = defects.length);
+  }
+
+  String _statusLabel(String? status) {
+    switch (status) {
+      case Asset.statusPass: return 'Pass';
+      case Asset.statusFail: return 'Fail';
+      case Asset.statusDecommissioned: return 'Decommissioned';
+      default: return 'Untested';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final asset = widget.asset;
+    final type = widget.assetType;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header: name + status
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    asset.reference ?? type?.name ?? 'Asset',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    [
+                      type?.name,
+                      if (asset.variant != null) asset.variant,
+                    ].whereType<String>().join(' · '),
+                    style: TextStyle(
+                      color: widget.isDark
+                          ? AppTheme.darkTextSecondary
+                          : AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: widget.statusColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                _statusLabel(asset.complianceStatus),
+                style: TextStyle(
+                  color: widget.statusColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        // Details row
+        if (asset.locationDescription != null ||
+            asset.zone != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            [
+              if (asset.zone != null) 'Zone ${asset.zone}',
+              if (asset.locationDescription != null)
+                asset.locationDescription,
+            ].join(' · '),
+            style: TextStyle(
+              fontSize: 13,
+              color: widget.isDark
+                  ? AppTheme.darkTextSecondary
+                  : AppTheme.textSecondary,
+            ),
+          ),
+        ],
+
+        if (asset.lastServiceDate != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Last service: ${DateFormat('dd MMM yyyy').format(asset.lastServiceDate!)}',
+            style: TextStyle(
+              fontSize: 12,
+              color: widget.isDark
+                  ? AppTheme.darkTextSecondary
+                  : AppTheme.textSecondary,
+            ),
+          ),
+        ],
+
+        if (_openDefectCount > 0) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD32F2F).withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '$_openDefectCount open defect${_openDefectCount == 1 ? '' : 's'}',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFFD32F2F),
+              ),
+            ),
+          ),
+        ],
+
+        // Pass / Fail buttons
+        if (asset.complianceStatus != Asset.statusDecommissioned) ...[
+          const SizedBox(height: 16),
+          if (_isSaving)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      setState(() => _isSaving = true);
+                      await widget.onPass();
+                    },
+                    icon: const Icon(AppIcons.tickCircle, size: 18),
+                    label: const Text('Pass'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4CAF50),
+                      foregroundColor: Colors.white,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      await widget.onFail();
+                    },
+                    icon: Icon(AppIcons.close, size: 18),
+                    label: const Text('Fail'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD32F2F),
+                      foregroundColor: Colors.white,
+                      padding:
+                          const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        ],
+
+        // View Details link
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton(
+            onPressed: widget.onViewDetails,
+            child: Text(
+              'View Details',
+              style: TextStyle(
+                fontSize: 14,
+                color: widget.isDark
+                    ? AppTheme.accentOrange
+                    : AppTheme.primaryBlue,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

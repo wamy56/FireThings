@@ -4,9 +4,24 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-29 (Session 54)
+
+### Unified Site & Customer List Screens
+
+- **Unified card layout** across all four list screens (saved sites, saved customers, company sites, company customers) — all now use `Card > ListTile` with consistent structure
+- **Consistent leading indicator** — all screens now use `CircleAvatar` with `AppIcons.building` icon in `AppTheme.primaryBlue`
+- **Action buttons replace menus** — removed 3-dot popup menus, cupertino action sheets, and bare icon buttons. All actions now use small labeled `OutlinedButton` widgets (View Assets, Edit, Delete) in a `Wrap`
+- **Added edit to saved sites** — `_showSiteDialog` now supports edit mode, new `DatabaseHelper.updateSavedSite()` method added
+- **Added animations to company screens** — company sites and customers now use `animateListItem` stagger animations matching the personal screens
+- **Standardised loading/empty states** — company screens now use `LoadingIndicator` and `EmptyState` widgets (matching personal screens) instead of inline `AdaptiveLoadingIndicator` and manual Column-based empty states
+- **Pull-to-refresh on personal screens** — already had `AdaptiveRefreshIndicator`, confirmed working
+- **Permission gating preserved** — company screens still gate Edit/Delete buttons behind `_canEdit` (dispatcher/admin only)
+
+---
+
 ## 2026-03-29 (Session 53)
 
-### Defect Tracking & Batch Test Rework
+### Testing UX Rework, Defect Tracking & Floor Plan Fix
 
 - **New `Defect` model** (`lib/models/defect.dart`) — standalone entity with full lifecycle (open/rectified), severity, description, common fault ID, photos, rectification metadata. Firestore path: `{basePath}/sites/{siteId}/defects/`
 - **New `DefectService`** (`lib/services/defect_service.dart`) — singleton with CRUD, streams, batch rectification (`rectifyAllForAsset`), photo upload, rectified-count-since queries, and last-report-date tracking
@@ -19,6 +34,12 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 - **Asset detail defect rectification** (`lib/screens/assets/asset_detail_screen.dart`) — new "Active Defects" section with StreamBuilder, severity badges, "Mark Rectified" button with optional note dialog
 - **Compliance report fix** (`lib/services/compliance_report_service.dart`) — Section 5 now queries the Defect collection, shows only open defects, adds "X defects rectified since [date]" line, stores last report date for tracking. Legacy fallback for sites without defect entities.
 - **`ComplianceReportPdfData`** — added `defectsJson`, `rectifiedCount`, `lastReportDateStr` fields
+- **Deleted `InspectionChecklistScreen`** — full per-item checklist removed, replaced by simpler pass/fail + defect workflow everywhere
+- **Shared `DefectBottomSheet` widget** (`lib/widgets/defect_bottom_sheet.dart`) — extracted from batch test, reused by asset detail, batch test, and floor plan screens
+- **Asset detail inline Pass/Fail** — replaced "Test This Asset" button with side-by-side Pass/Fail buttons. Pass auto-rectifies open defects.
+- **Batch test scrollable list** — replaced one-at-a-time wizard with scrollable card list. Filter chips by asset type and zone. Tested assets move to collapsible "Completed" section with result badges.
+- **Floor plan testing** — tapping an asset pin now shows full details (type, variant, zone, status, defect count, last service) with Pass/Fail buttons and "View Details" link. Replaces the placeholder "coming soon" toast.
+- **Floor plan pin position fix** — removed erroneous AppBar Y-offset double-subtraction in `_onFloorPlanTap`. Pins placed on mobile were stored with incorrect Y coordinates, appearing in wrong positions on web and in compliance report PDFs. New placements will be accurate; existing pins can be dragged to correct.
 
 ---
 

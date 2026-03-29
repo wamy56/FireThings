@@ -975,6 +975,21 @@ class DatabaseHelper {
     return stamped;
   }
 
+  /// Update a saved site
+  Future<int> updateSavedSite(SavedSite site) async {
+    final db = await database;
+    final stamped = site.copyWith(lastModifiedAt: DateTime.now());
+
+    final result = await db.update(
+      'saved_sites',
+      stamped.toJson(),
+      where: 'id = ?',
+      whereArgs: [stamped.id],
+    );
+    FirestoreSyncService.instance.upsertSavedSite(stamped);
+    return result;
+  }
+
   /// Get all saved sites for an engineer
   Future<List<SavedSite>> getSavedSitesByEngineerId(String engineerId) async {
     final db = await database;
