@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,8 +7,10 @@ import '../../models/asset.dart';
 import '../../models/asset_type.dart';
 import '../../models/service_record.dart';
 import '../../data/default_asset_types.dart';
+import '../../models/defect.dart';
 import '../../services/asset_service.dart';
 import '../../services/asset_type_service.dart';
+import '../../services/defect_service.dart';
 import '../../services/service_history_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/user_profile_service.dart';
@@ -589,6 +592,33 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             ),
           ],
 
+          // Active Defects
+          StreamBuilder<List<Defect>>(
+            stream: DefectService.instance.getDefectsForAsset(
+                widget.basePath, widget.siteId, asset.id),
+            builder: (context, snapshot) {
+              final allDefects = snapshot.data ?? [];
+              final openDefects = allDefects
+                  .where((d) => d.status == Defect.statusOpen)
+                  .toList();
+              if (openDefects.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: AppTheme.sectionGap),
+                  _SectionHeader('Active Defects'),
+                  const SizedBox(height: 8),
+                  ...openDefects.map((defect) => _ActiveDefectCard(
+                        defect: defect,
+                        isDark: isDark,
+                        basePath: widget.basePath,
+                        siteId: widget.siteId,
+                      )),
+                ],
+              );
+            },
+          ),
+
           // Service History
           const SizedBox(height: AppTheme.sectionGap),
           _SectionHeader('Service History'),
@@ -1130,6 +1160,203 @@ class _ServiceRecordCardState extends State<_ServiceRecordCard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─── Active Defect Card ────────────────────────────────────────────
+
+class _ActiveDefectCard extends StatelessWidget {
+  final Defect defect;
+  final bool isDark;
+  final String basePath;
+  final String siteId;
+
+  const _ActiveDefectCard({
+    required this.defect,
+    required this.isDark,
+    required this.basePath,
+    required this.siteId,
+  });
+
+  Color get _severityColor {
+    switch (defect.severity) {
+      case Defect.severityCritical:
+        return const Color(0xFFD32F2F);
+      case Defect.severityMajor:
+        return const Color(0xFFF59E0B);
+      default:
+        return Colors.grey;
+    }
+  }
+
+  void _showRectifyDialog(BuildContext context) {
+    final noteController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark as Rectified'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              defect.description,
+              style: TextStyle(
+                fontSize: 13,
+                color: isDark
+                    ? AppTheme.darkTextSecondary
+                    : AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            CustomTextField(
+              controller: noteController,
+              label: 'Rectification Note',
+              hint: 'Optional',
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final nav = Navigator.of(ctx);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+              try {
+                final user =
+                    FirebaseAuth.instance.currentUser;
+                if (user == null) return;
+
+                await DefectService.instance.rectifyDefect(
+                  basePath,
+                  siteId,
+                  defect.id,
+                  rectifiedBy: user.uid,
+                  rectifiedByName:
+                      user.displayName ?? 'Unknown',
+                  rectifiedNote:
+                      noteController.text.trim().isNotEmpty
+                          ? noteController.text.trim()
+                          : null,
+                );
+                nav.pop();
+              } catch (e) {
+                nav.pop();
+                scaffoldMessenger.showSnackBar(
+                  const SnackBar(
+                      content: Text('Failed to rectify defect')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr = DateFormat('dd MMM yyyy').format(defect.createdAt);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        boxShadow: AppTheme.cardShadow,
+        border: Border.all(
+          color: _severityColor.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _severityColor,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  defect.severity.toUpperCase(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                dateStr,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark
+                      ? AppTheme.darkTextSecondary
+                      : AppTheme.textSecondary,
+                ),
+              ),
+              const Spacer(),
+              SizedBox(
+                height: 30,
+                child: OutlinedButton(
+                  onPressed: () => _showRectifyDialog(context),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    side: const BorderSide(color: Color(0xFF4CAF50)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Mark Rectified',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF4CAF50),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            defect.description,
+            style: TextStyle(
+              fontSize: 14,
+              color: isDark ? Colors.white : AppTheme.textPrimary,
+            ),
+          ),
+          if (defect.createdByName.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Reported by ${defect.createdByName}',
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark
+                    ? AppTheme.darkTextSecondary
+                    : AppTheme.textSecondary,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

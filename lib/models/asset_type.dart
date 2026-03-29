@@ -10,6 +10,7 @@ class AssetType {
   final List<String> variants;
   final int? defaultLifespanYears;
   final List<ChecklistItem> defaultChecklist;
+  final List<String> commonFaults;
   final bool isBuiltIn;
 
   AssetType({
@@ -21,6 +22,7 @@ class AssetType {
     this.variants = const [],
     this.defaultLifespanYears,
     this.defaultChecklist = const [],
+    this.commonFaults = const [],
     this.isBuiltIn = false,
   });
 
@@ -34,6 +36,7 @@ class AssetType {
       'variants': variants,
       'defaultLifespanYears': defaultLifespanYears,
       'defaultChecklist': defaultChecklist.map((c) => c.toJson()).toList(),
+      'commonFaults': commonFaults,
       'isBuiltIn': isBuiltIn,
     };
   }
@@ -54,6 +57,10 @@ class AssetType {
               ?.map((c) => ChecklistItem.fromJson(c as Map<String, dynamic>))
               .toList() ??
           [],
+      commonFaults: (json['commonFaults'] as List<dynamic>?)
+              ?.map((f) => f as String)
+              .toList() ??
+          [],
       isBuiltIn: json['isBuiltIn'] as bool? ?? false,
     );
   }
@@ -67,6 +74,7 @@ class AssetType {
     List<String>? variants,
     int? defaultLifespanYears,
     List<ChecklistItem>? defaultChecklist,
+    List<String>? commonFaults,
     bool? isBuiltIn,
   }) {
     return AssetType(
@@ -78,6 +86,7 @@ class AssetType {
       variants: variants ?? this.variants,
       defaultLifespanYears: defaultLifespanYears ?? this.defaultLifespanYears,
       defaultChecklist: defaultChecklist ?? this.defaultChecklist,
+      commonFaults: commonFaults ?? this.commonFaults,
       isBuiltIn: isBuiltIn ?? this.isBuiltIn,
     );
   }

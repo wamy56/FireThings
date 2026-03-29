@@ -9,6 +9,7 @@ import '../models/pdf_colour_scheme.dart';
 import 'auth_service.dart';
 import 'asset_service.dart';
 import 'asset_type_service.dart';
+import 'defect_service.dart';
 import 'service_history_service.dart';
 import 'floor_plan_service.dart';
 import 'jobsheet_settings_service.dart';
@@ -235,15 +236,23 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
           }
 
           widgets.add(pw.Container(
+            width: containerWidth,
             height: containerHeight,
             decoration: pw.BoxDecoration(
               border: pw.Border.all(color: _lightGray),
             ),
             child: pw.Stack(
               children: [
-                pw.Positioned.fill(
-                  child: pw.Image(pw.MemoryImage(imageBytes),
-                      fit: pw.BoxFit.contain),
+                // Position image explicitly at calculated render area
+                pw.Positioned(
+                  left: offsetX,
+                  top: offsetY,
+                  child: pw.SizedBox(
+                    width: renderW,
+                    height: renderH,
+                    child: pw.Image(pw.MemoryImage(imageBytes),
+                        fit: pw.BoxFit.fill),
+                  ),
                 ),
                 ...planAssets.map((a) {
                   if (a.xPercent == null || a.yPercent == null) {
@@ -391,26 +400,26 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
         widgets.add(pw.SizedBox(height: 16));
 
         // ── Section 5: Defect Summary ──
-        final failedRecords = records
-            .where((r) =>
-                r.overallResult == 'fail' &&
-                r.defectNote != null &&
-                r.defectNote!.isNotEmpty)
+        final defects = data.defectsJson
+            .map((j) => Defect.fromJson(j))
             .toList();
+        final openDefects =
+            defects.where((d) => d.status == Defect.statusOpen).toList();
 
-        if (failedRecords.isNotEmpty) {
+        // Use new defect entities if available, otherwise fall back to legacy
+        if (openDefects.isNotEmpty) {
           widgets.add(_sectionHeader('Defect Summary', primaryColor));
           widgets.add(pw.SizedBox(height: 4));
 
-          for (final record in failedRecords) {
+          for (final defect in openDefects) {
             final asset =
-                assets.where((a) => a.id == record.assetId).firstOrNull;
+                assets.where((a) => a.id == defect.assetId).firstOrNull;
             final type = asset != null ? getType(asset.assetTypeId) : null;
 
-            final severityLabel = record.defectSeverity?.toUpperCase() ?? 'N/A';
-            final severityColor = record.defectSeverity == 'critical'
+            final severityLabel = defect.severity.toUpperCase();
+            final severityColor = defect.severity == 'critical'
                 ? _failRed
-                : record.defectSeverity == 'major'
+                : defect.severity == 'major'
                     ? _untestedAmber
                     : PdfColors.grey600;
 
@@ -451,12 +460,12 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
                     ],
                   ),
                   pw.SizedBox(height: 4),
-                  pw.Text(record.defectNote ?? '',
+                  pw.Text(defect.description,
                       style: const pw.TextStyle(fontSize: 8)),
-                  if (record.defectAction != null) ...[
+                  if (defect.action != null) ...[
                     pw.SizedBox(height: 2),
                     pw.Text(
-                      'Action: ${record.defectAction!.replaceAll('_', ' ')}',
+                      'Action: ${defect.action!.replaceAll('_', ' ')}',
                       style: pw.TextStyle(
                           fontSize: 8,
                           fontWeight: pw.FontWeight.bold,
@@ -464,10 +473,10 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
                     ),
                   ],
                   // Defect photos
-                  if (record.defectPhotoUrls.isNotEmpty) ...[
+                  if (defect.photoUrls.isNotEmpty) ...[
                     pw.SizedBox(height: 4),
                     pw.Row(
-                      children: record.defectPhotoUrls
+                      children: defect.photoUrls
                           .take(3)
                           .map((url) {
                         final photoBytes =
@@ -485,7 +494,130 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
               ),
             ));
           }
+
+          // Rectified count line
+          if (data.rectifiedCount > 0) {
+            final sinceStr = data.lastReportDateStr != null
+                ? DateFormat('dd/MM/yyyy')
+                    .format(DateTime.parse(data.lastReportDateStr!))
+                : 'previous report';
+            widgets.add(pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 4),
+              child: pw.Text(
+                '${data.rectifiedCount} defect${data.rectifiedCount == 1 ? '' : 's'} rectified since $sinceStr.',
+                style: pw.TextStyle(
+                    fontSize: 8,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.grey700),
+              ),
+            ));
+          }
+
           widgets.add(pw.SizedBox(height: 16));
+        } else if (defects.isEmpty) {
+          // Legacy fallback: no defect entities exist, use service records
+          final failedRecords = records
+              .where((r) =>
+                  r.overallResult == 'fail' &&
+                  r.defectNote != null &&
+                  r.defectNote!.isNotEmpty)
+              .toList();
+
+          if (failedRecords.isNotEmpty) {
+            widgets.add(_sectionHeader('Defect Summary', primaryColor));
+            widgets.add(pw.SizedBox(height: 4));
+
+            for (final record in failedRecords) {
+              final asset =
+                  assets.where((a) => a.id == record.assetId).firstOrNull;
+              final type =
+                  asset != null ? getType(asset.assetTypeId) : null;
+
+              final severityLabel =
+                  record.defectSeverity?.toUpperCase() ?? 'N/A';
+              final severityColor = record.defectSeverity == 'critical'
+                  ? _failRed
+                  : record.defectSeverity == 'major'
+                      ? _untestedAmber
+                      : PdfColors.grey600;
+
+              widgets.add(pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 6),
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(
+                  border: pw.Border.all(color: _lightGray),
+                  borderRadius:
+                      const pw.BorderRadius.all(pw.Radius.circular(4)),
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Row(
+                      children: [
+                        pw.Expanded(
+                          child: pw.Text(
+                            '${asset?.reference ?? '-'} — ${type?.name ?? 'Unknown'}',
+                            style: pw.TextStyle(
+                                fontSize: 9,
+                                fontWeight: pw.FontWeight.bold),
+                          ),
+                        ),
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: pw.BoxDecoration(
+                            color: severityColor,
+                            borderRadius: const pw.BorderRadius.all(
+                                pw.Radius.circular(4)),
+                          ),
+                          child: pw.Text(severityLabel,
+                              style: pw.TextStyle(
+                                  fontSize: 7,
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _white)),
+                        ),
+                      ],
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(record.defectNote ?? '',
+                        style: const pw.TextStyle(fontSize: 8)),
+                    if (record.defectAction != null) ...[
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        'Action: ${record.defectAction!.replaceAll('_', ' ')}',
+                        style: pw.TextStyle(
+                            fontSize: 8,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.grey700),
+                      ),
+                    ],
+                    if (record.defectPhotoUrls.isNotEmpty) ...[
+                      pw.SizedBox(height: 4),
+                      pw.Row(
+                        children: record.defectPhotoUrls
+                            .take(3)
+                            .map((url) {
+                          final photoBytes =
+                              data.defectPhotos[url.hashCode.toString()];
+                          if (photoBytes == null) {
+                            return pw.SizedBox.shrink();
+                          }
+                          return pw.Padding(
+                            padding: const pw.EdgeInsets.only(right: 4),
+                            child: pw.Image(pw.MemoryImage(photoBytes),
+                                width: 60,
+                                height: 45,
+                                fit: pw.BoxFit.cover),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ));
+            }
+            widgets.add(pw.SizedBox(height: 16));
+          }
         }
 
         // ── Section 6: Lifecycle Alerts ──
@@ -771,7 +903,7 @@ class ComplianceReportService {
     for (final plan in floorPlans) {
       try {
         final ref =
-            _storage.ref('$basePath/sites/$siteId/floor_plans/${plan.id}.jpg');
+            _storage.ref('$basePath/sites/$siteId/floor_plans/${plan.id}.${plan.fileExtension}');
         final bytes = await ref.getData(5 * 1024 * 1024); // 5MB max
         if (bytes != null) {
           floorPlanImages[plan.id] = bytes;
@@ -781,14 +913,26 @@ class ComplianceReportService {
       }
     }
 
-    // Download defect photos (limit to 1 per failed record, max 10 total)
+    // Fetch defects from the new Defect collection
+    final allDefects =
+        await DefectService.instance.getDefectsForSite(basePath, siteId);
+    final lastReportDate =
+        await DefectService.instance.getLastReportDate(basePath, siteId);
+    final rectifiedCount = lastReportDate != null
+        ? await DefectService.instance
+            .getRectifiedCountSince(basePath, siteId, lastReportDate)
+        : allDefects
+            .where((d) => d.status == Defect.statusRectified)
+            .length;
+
+    // Download defect photos from Defect entities (open defects only, max 10)
     final defectPhotos = <String, Uint8List>{};
-    final failedRecords = records
-        .where((r) =>
-            r.overallResult == 'fail' && r.defectPhotoUrls.isNotEmpty)
+    final openDefectsWithPhotos = allDefects
+        .where(
+            (d) => d.status == Defect.statusOpen && d.photoUrls.isNotEmpty)
         .take(10);
-    for (final record in failedRecords) {
-      for (final url in record.defectPhotoUrls.take(1)) {
+    for (final defect in openDefectsWithPhotos) {
+      for (final url in defect.photoUrls.take(1)) {
         try {
           final ref = _storage.refFromURL(url);
           final bytes = await ref.getData(2 * 1024 * 1024);
@@ -797,6 +941,27 @@ class ComplianceReportService {
           }
         } catch (e) {
           debugPrint('Failed to download defect photo: $e');
+        }
+      }
+    }
+
+    // If no defects in new collection, fall back to legacy service record photos
+    if (allDefects.isEmpty) {
+      final failedRecords = records
+          .where((r) =>
+              r.overallResult == 'fail' && r.defectPhotoUrls.isNotEmpty)
+          .take(10);
+      for (final record in failedRecords) {
+        for (final url in record.defectPhotoUrls.take(1)) {
+          try {
+            final ref = _storage.refFromURL(url);
+            final bytes = await ref.getData(2 * 1024 * 1024);
+            if (bytes != null) {
+              defectPhotos[url.hashCode.toString()] = bytes;
+            }
+          } catch (e) {
+            debugPrint('Failed to download defect photo: $e');
+          }
         }
       }
     }
@@ -819,7 +984,14 @@ class ComplianceReportService {
       floorPlansJson: floorPlans.map((p) => p.toJson()).toList(),
       floorPlanImages: floorPlanImages,
       defectPhotos: defectPhotos,
+      defectsJson: allDefects.map((d) => d.toJson()).toList(),
+      rectifiedCount: rectifiedCount,
+      lastReportDateStr: lastReportDate?.toIso8601String(),
     );
+
+    // Store last report date for rectified-count tracking
+    await DefectService.instance
+        .setLastReportDate(basePath, siteId, DateTime.now());
 
     // ── Build phase ──
     if (kIsWeb) {

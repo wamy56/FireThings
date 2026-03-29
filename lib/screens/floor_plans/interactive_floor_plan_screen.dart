@@ -120,10 +120,6 @@ class _InteractiveFloorPlanScreenState
     _showAssetBottomSheet(asset);
   }
 
-  void _onPinLongPress(Asset asset) {
-    setState(() => _draggingAssetId = asset.id);
-  }
-
   void _showAssetBottomSheet(Asset asset) {
     final type = DefaultAssetTypes.getById(asset.assetTypeId);
     final statusColor = _colorForStatus(asset.complianceStatus);
@@ -621,17 +617,50 @@ class _InteractiveFloorPlanScreenState
                           return Positioned(
                             left: left,
                             top: top,
-                            child: AssetPin(
-                              asset: asset,
-                              assetType: type,
-                              isSelected: isSelected,
-                              pinScale: _pinScale,
-                              showLabel: _showLabels,
-                              label: asset.reference,
+                            child: GestureDetector(
                               onTap: () => _onPinTap(asset),
-                              onLongPress: _isPlacementMode
-                                  ? null
-                                  : () => _onPinLongPress(asset),
+                              onLongPressStart: (_) {
+                                setState(() {
+                                  _draggingAssetId = asset.id;
+                                  _dragPosition = Offset(
+                                    asset.xPercent! * widget.floorPlan.imageWidth,
+                                    asset.yPercent! * widget.floorPlan.imageHeight,
+                                  );
+                                });
+                              },
+                              onLongPressMoveUpdate: (details) {
+                                if (_draggingAssetId != asset.id) return;
+                                final scale = _transformController.value.getMaxScaleOnAxis();
+                                final startX = asset.xPercent! * widget.floorPlan.imageWidth;
+                                final startY = asset.yPercent! * widget.floorPlan.imageHeight;
+                                setState(() {
+                                  _dragPosition = Offset(
+                                    startX + details.offsetFromOrigin.dx / scale,
+                                    startY + details.offsetFromOrigin.dy / scale,
+                                  );
+                                });
+                              },
+                              onLongPressEnd: (_) {
+                                if (_dragPosition != null) {
+                                  final newX = _dragPosition!.dx / widget.floorPlan.imageWidth;
+                                  final newY = _dragPosition!.dy / widget.floorPlan.imageHeight;
+                                  if (newX >= 0 && newX <= 1 && newY >= 0 && newY <= 1) {
+                                    _updateAssetPosition(asset, newX, newY);
+                                  }
+                                }
+                                setState(() {
+                                  _draggingAssetId = null;
+                                  _dragPosition = null;
+                                });
+                              },
+                              child: AssetPin(
+                                asset: asset,
+                                assetType: type,
+                                isSelected: isSelected,
+                                pinScale: _pinScale,
+                                showLabel: _showLabels,
+                                label: asset.reference,
+                              ),
                             ),
                           );
                         }),

@@ -19,10 +19,12 @@ import '../tools/bs5839_reference_screen.dart';
 import '../tools/detector_spacing_calculator_screen.dart';
 import '../tools/timestamp_camera/timestamp_camera_screen.dart';
 import '../saved_sites/saved_sites_screen.dart';
+import '../company/company_sites_screen.dart';
 import '../../services/analytics_service.dart';
 import '../../services/remote_config_service.dart';
 import '../../services/dispatch_service.dart';
 import '../../services/user_profile_service.dart';
+import '../../services/company_service.dart';
 import '../../widgets/background_decoration.dart';
 import '../../widgets/tools_disclaimer_gate.dart';
 
@@ -64,13 +66,24 @@ class _HomeScreenState extends State<HomeScreen> {
       final user = _authService.currentUser;
       if (user == null) return;
 
-      // Load saved sites count
-      final sites = await _dbHelper.getSavedSitesByEngineerId(user.uid);
+      // Load site count — company sites if in a company, personal sites otherwise
+      final companyId = UserProfileService.instance.companyId;
+      final hasCompany = companyId != null && RemoteConfigService.instance.dispatchEnabled;
+
+      int siteCount = 0;
+      if (hasCompany) {
+        final companySites = await CompanyService.instance
+            .getSitesStream(companyId)
+            .first;
+        siteCount = companySites.length;
+      } else {
+        final sites = await _dbHelper.getSavedSitesByEngineerId(user.uid);
+        siteCount = sites.length;
+      }
 
       // Load pending dispatch count if user has a company
       int pendingCount = 0;
-      final companyId = UserProfileService.instance.companyId;
-      if (companyId != null && RemoteConfigService.instance.dispatchEnabled) {
+      if (hasCompany) {
         pendingCount = await DispatchService.instance.getPendingJobCount(
           companyId,
           user.uid,
@@ -78,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       setState(() {
-        _siteCount = sites.length;
+        _siteCount = siteCount;
         _pendingDispatchCount = pendingCount;
         _isLoading = false;
       });
@@ -382,12 +395,22 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSitesCard() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final companyId = UserProfileService.instance.companyId;
+    final isCompanyUser = companyId != null && RemoteConfigService.instance.dispatchEnabled;
+
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          adaptivePageRoute(builder: (_) => const SavedSitesScreen()),
-        );
+        if (isCompanyUser) {
+          Navigator.push(
+            context,
+            adaptivePageRoute(builder: (_) => CompanySitesScreen(companyId: companyId)),
+          );
+        } else {
+          Navigator.push(
+            context,
+            adaptivePageRoute(builder: (_) => const SavedSitesScreen()),
+          );
+        }
       },
       child: Container(
         width: double.infinity,
@@ -430,7 +453,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '$_siteCount saved ${_siteCount == 1 ? 'site' : 'sites'}',
+                    isCompanyUser
+                        ? '$_siteCount company ${_siteCount == 1 ? 'site' : 'sites'}'
+                        : '$_siteCount saved ${_siteCount == 1 ? 'site' : 'sites'}',
                     style: TextStyle(
                       fontSize: 13,
                       color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,

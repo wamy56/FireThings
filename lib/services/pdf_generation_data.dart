@@ -117,6 +117,9 @@ class ComplianceReportPdfData {
   final List<Map<String, dynamic>> floorPlansJson;
   final Map<String, Uint8List> floorPlanImages;
   final Map<String, Uint8List> defectPhotos;
+  final List<Map<String, dynamic>> defectsJson;
+  final int rectifiedCount;
+  final String? lastReportDateStr;
 
   ComplianceReportPdfData({
     required this.siteName,
@@ -136,5 +139,8 @@ class ComplianceReportPdfData {
     required this.floorPlansJson,
     required this.floorPlanImages,
     required this.defectPhotos,
+    this.defectsJson = const [],
+    this.rectifiedCount = 0,
+    this.lastReportDateStr,
   });
 }

@@ -50,6 +50,16 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'fap_sounder', label: 'Sounder/beacon activation', isRequired: true),
       ChecklistItem(id: 'fap_isolations', label: 'Check zone isolations removed', isRequired: true),
     ],
+    commonFaults: [
+      'Logged faults',
+      'Battery low/failed',
+      'Earth fault',
+      'Charger failure',
+      'Zone fault',
+      'Sounder circuit fault',
+      'PSU failure',
+      'Display/LED fault',
+    ],
   );
 
   // ─── Smoke Detector ──────────────────────────────────────────
@@ -70,6 +80,15 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'sd_sounder', label: 'Sounder/beacon activation', isRequired: true),
       ChecklistItem(id: 'sd_sensitivity', label: 'Sensitivity check', isRequired: false),
     ],
+    commonFaults: [
+      'Head dirty/contaminated',
+      'Base fault',
+      'Drift compensation exceeded',
+      'No response to test',
+      'Damaged/painted over',
+      'Incorrect type for environment',
+      'Loose in base',
+    ],
   );
 
   // ─── Heat Detector ───────────────────────────────────────────
@@ -88,6 +107,13 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'hd_functional', label: 'Functional test', isRequired: true),
       ChecklistItem(id: 'hd_panel', label: 'Panel indication', isRequired: true),
       ChecklistItem(id: 'hd_sounder', label: 'Sounder/beacon activation', isRequired: true),
+    ],
+    commonFaults: [
+      'No response to test',
+      'Head dirty/contaminated',
+      'Damaged',
+      'Incorrect type for environment',
+      'Loose in base',
     ],
   );
 
@@ -109,6 +135,14 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'cp_reset', label: 'Reset correctly', isRequired: true),
       ChecklistItem(id: 'cp_frangible', label: 'Frangible element intact (if break glass)', isRequired: false),
     ],
+    commonFaults: [
+      'Damaged frangible element',
+      'Stuck/jammed',
+      'No panel indication',
+      'Obstructed/inaccessible',
+      'Missing signage',
+      'Failed to reset',
+    ],
   );
 
   // ─── Sounder / Beacon / Visual Alarm ─────────────────────────
@@ -127,6 +161,13 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'sb_functional', label: 'Functional test', isRequired: true),
       ChecklistItem(id: 'sb_adequate', label: 'Sound level adequate', isRequired: true),
       ChecklistItem(id: 'sb_db', label: 'dB reading at 1m', resultType: 'number', isRequired: false),
+    ],
+    commonFaults: [
+      'Not functioning',
+      'Low output',
+      'Damaged',
+      'Incorrect tone/flash pattern',
+      'Wiring fault',
     ],
   );
 
@@ -151,6 +192,16 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'fe_weight', label: 'Weight check (kg)', resultType: 'number', isRequired: false),
       ChecklistItem(id: 'fe_discharge', label: 'Last discharge test date', resultType: 'text', isRequired: false),
     ],
+    commonFaults: [
+      'Low pressure',
+      'Damaged/corroded',
+      'Seal broken',
+      'Missing pin/tamper seal',
+      'Out of date',
+      'Obstructed/inaccessible',
+      'Missing signage',
+      'Wrong type for location',
+    ],
   );
 
   // ─── Emergency Lighting ──────────────────────────────────────
@@ -170,6 +221,14 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'el_duration', label: '3-hour duration test (annual)', resultType: 'pass_fail', isRequired: false),
       ChecklistItem(id: 'el_output', label: 'Light output adequate', isRequired: true),
       ChecklistItem(id: 'el_charging', label: 'Charging indicator active', isRequired: true),
+    ],
+    commonFaults: [
+      'Battery failure',
+      'Lamp failure',
+      'Charging fault',
+      'Damaged lens/diffuser',
+      'Insufficient light output',
+      'Failed duration test',
     ],
   );
 
@@ -193,6 +252,16 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'fd_signage', label: 'Signage correct', isRequired: true),
       ChecklistItem(id: 'fd_holdopen', label: 'Hold-open device (if fitted)', isRequired: false),
     ],
+    commonFaults: [
+      'Damaged intumescent seals',
+      'Self-closer not functioning',
+      'Gaps too large',
+      'Hold-open device fault',
+      'Missing signage',
+      'Door leaf damaged',
+      'Smoke seals missing/damaged',
+      'Hinges loose/damaged',
+    ],
   );
 
   // ─── AOV / Smoke Vent ────────────────────────────────────────
@@ -214,6 +283,14 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'av_fullopen', label: 'Full open achieved', isRequired: true),
       ChecklistItem(id: 'av_reclose', label: 'Re-close correctly', isRequired: true),
     ],
+    commonFaults: [
+      'Fails to open',
+      'Fails to close',
+      'Slow operation',
+      'Actuator fault',
+      'Control panel fault',
+      'Obstructed',
+    ],
   );
 
   // ─── Sprinkler Head ──────────────────────────────────────────
@@ -234,6 +311,14 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'sh_temp', label: 'Correct temperature rating', isRequired: true),
       ChecklistItem(id: 'sh_escutcheon', label: 'Escutcheon/cover plate intact', isRequired: true),
     ],
+    commonFaults: [
+      'Corroded',
+      'Painted over',
+      'Loaded/obstructed',
+      'Wrong temperature rating',
+      'Damaged escutcheon/cover',
+      'Leaking',
+    ],
   );
 
   // ─── Fire Blanket ────────────────────────────────────────────
@@ -253,6 +338,13 @@ class DefaultAssetTypes {
       ChecklistItem(id: 'fb_blanket', label: 'Blanket undamaged/clean', isRequired: true),
       ChecklistItem(id: 'fb_signage', label: 'Signage visible', isRequired: true),
       ChecklistItem(id: 'fb_fixings', label: 'Wall fixings secure', isRequired: true),
+    ],
+    commonFaults: [
+      'Damaged blanket',
+      'Container broken/damaged',
+      'Missing/obstructed',
+      'Wall fixings loose',
+      'Missing signage',
     ],
   );
 

@@ -110,6 +110,8 @@ class AssetPin extends StatelessWidget {
           )
         : symbolWidget;
 
+    if (onTap == null && onLongPress == null) return child;
+
     return GestureDetector(
       onTap: onTap,
       onLongPress: onLongPress,

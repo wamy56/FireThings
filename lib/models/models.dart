@@ -21,3 +21,4 @@ export 'asset_type.dart';
 export 'checklist_item.dart';
 export 'floor_plan.dart';
 export 'service_record.dart';
+export 'defect.dart';

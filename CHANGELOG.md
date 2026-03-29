@@ -4,7 +4,39 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-29 (Session 53)
+
+### Defect Tracking & Batch Test Rework
+
+- **New `Defect` model** (`lib/models/defect.dart`) — standalone entity with full lifecycle (open/rectified), severity, description, common fault ID, photos, rectification metadata. Firestore path: `{basePath}/sites/{siteId}/defects/`
+- **New `DefectService`** (`lib/services/defect_service.dart`) — singleton with CRUD, streams, batch rectification (`rectifyAllForAsset`), photo upload, rectified-count-since queries, and last-report-date tracking
+- **`commonFaults` field on `AssetType`** — new `List<String>` field with pre-populated common faults for all 12 built-in asset types (e.g. smoke detector: "Head dirty/contaminated", "Base fault", "Drift compensation exceeded", etc.)
+- **Batch test screen rewrite** (`lib/screens/assets/batch_test_screen.dart`) — replaced full-checklist wizard with single-tap Pass/Fail per asset:
+  - **Pass**: creates service record, updates asset compliance, auto-rectifies all open defects
+  - **Fail**: opens defect bottom sheet with severity picker (minor/major/critical), common faults dropdown, description field, photo capture
+  - **Defect badge**: red "X open" badge on asset cards with existing open defects
+  - Summary screen now shows defect count
+- **Asset detail defect rectification** (`lib/screens/assets/asset_detail_screen.dart`) — new "Active Defects" section with StreamBuilder, severity badges, "Mark Rectified" button with optional note dialog
+- **Compliance report fix** (`lib/services/compliance_report_service.dart`) — Section 5 now queries the Defect collection, shows only open defects, adds "X defects rectified since [date]" line, stores last report date for tracking. Legacy fallback for sites without defect entities.
+- **`ComplianceReportPdfData`** — added `defectsJson`, `rectifiedCount`, `lastReportDateStr` fields
+
+---
+
 ## 2026-03-28 (Session 52)
+
+### Fixes
+
+- **Mobile floor plan drag restored** — Long-press-to-drag pins on mobile was broken after the web drag refactor. The `GestureDetector` with `onPanStart/onPanUpdate/onPanEnd` only existed in placement mode, leaving non-placement-mode pins with `onLongPress` that set state but had no drag handler. Fixed by replacing with `onLongPressStart` / `onLongPressMoveUpdate` / `onLongPressEnd` on the parent `GestureDetector`, which properly handles the entire long-press-then-drag gesture sequence. Works in both placement and normal mode on mobile.
+- **Compliance report floor plan pin alignment** — Pins on generated compliance report PDFs clustered in the wrong position instead of matching user-placed locations. Root cause: `pw.Positioned.fill` + `pw.BoxFit.contain` on the floor plan image created ambiguity about where the image actually renders within the container. Fixed by explicitly positioning the image at the calculated render area (`pw.Positioned` with `left`/`top`/`width`/`height`) using `BoxFit.fill`, and adding explicit `width` to the container. Pins now align with the image coordinates exactly.
+- **Compliance report floor plan file extension** — Report image download was hardcoded to `.jpg`, failing for PDF-converted floor plans (stored as `.png`). Now uses `plan.fileExtension`.
+- **AssetPin gesture passthrough** — `AssetPin` widget's internal `GestureDetector` with `HitTestBehavior.opaque` was consuming gestures even when no callbacks were set, blocking parent gesture handlers. Now conditionally wraps only when `onTap` or `onLongPress` is provided.
+
+### FEATURES.md — Complete Rewrite
+
+- **Full rewrite** of `FEATURES.md` to cover every feature in the app (was severely outdated, missing dispatch, asset register, and web portal)
+- Document now covers: navigation, home screen, 6 tools, jobsheets, invoicing, PDF certificates, custom templates, saved data, PDF design, dispatch system (full detail), asset register (12 types, floor plans, inspection, barcode, lifecycle, compliance report, type config), web portal, settings, backend infrastructure (61 analytics events, 18 remote config flags, Firestore structure, Cloud Functions, Storage structure)
+- Includes "Future Enhancements" section for tester-requested features
+- Designed to be self-contained for handoff to another Claude chat to re-evaluate launch plan
 
 ### Floor Plan Improvements (Web)
 
