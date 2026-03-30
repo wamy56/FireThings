@@ -1,9 +1,9 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:image/image.dart' as img;
 import 'package:printing/printing.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/floor_plan.dart';
@@ -150,11 +150,18 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
   }
 
   Future<Size> _getImageSize(Uint8List bytes) async {
-    final decoded = img.decodeImage(bytes);
-    if (decoded != null) {
-      return Size(decoded.width.toDouble(), decoded.height.toDouble());
-    }
-    throw Exception('Could not decode image dimensions');
+    // Use Flutter's own codec to get dimensions — this respects EXIF rotation
+    // and matches exactly what Image.memory() / CachedNetworkImage will render,
+    // ensuring stored dimensions always match the displayed image.
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final size = Size(
+      frame.image.width.toDouble(),
+      frame.image.height.toDouble(),
+    );
+    frame.image.dispose();
+    codec.dispose();
+    return size;
   }
 
   Future<void> _save() async {

@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -56,6 +57,10 @@ class _InteractiveFloorPlanScreenState
   late bool _showLabels;
   Map<String, AssetType> _assetTypes = {};
 
+  // Corrected image dimensions (may differ from stored values due to EXIF rotation)
+  late double _imageWidth;
+  late double _imageHeight;
+
   // Web: load image bytes to render on canvas (not as HTML platform view)
   // so that image and pins share the same rendering layer inside InteractiveViewer.
   Uint8List? _webImageBytes;
@@ -64,10 +69,16 @@ class _InteractiveFloorPlanScreenState
   @override
   void initState() {
     super.initState();
+    _imageWidth = widget.floorPlan.imageWidth;
+    _imageHeight = widget.floorPlan.imageHeight;
     _pinScale = widget.floorPlan.pinScale;
     _showLabels = widget.floorPlan.showLabels;
     _loadAssetTypes();
-    if (kIsWeb) _loadWebImageBytes();
+    if (kIsWeb) {
+      _loadWebImageBytes();
+    } else {
+      _verifyImageDimensions();
+    }
   }
 
   Future<void> _loadWebImageBytes() async {
@@ -77,14 +88,73 @@ class _InteractiveFloorPlanScreenState
       );
       final bytes = await ref.getData(10 * 1024 * 1024); // 10MB max
       if (mounted && bytes != null) {
-        setState(() {
-          _webImageBytes = bytes;
-          _webImageLoading = false;
-        });
+        await _correctDimensionsFromBytes(bytes);
+        if (mounted) {
+          setState(() {
+            _webImageBytes = bytes;
+            _webImageLoading = false;
+          });
+        }
       }
     } catch (e) {
       debugPrint('Failed to load floor plan image bytes: $e');
       if (mounted) setState(() => _webImageLoading = false);
+    }
+  }
+
+  /// Verify stored dimensions match what Flutter actually renders.
+  /// Fixes existing floor plans that were saved with EXIF-unaware dimensions.
+  Future<void> _verifyImageDimensions() async {
+    try {
+      final ref = FirebaseStorage.instance.ref(
+        '${widget.basePath}/sites/${widget.siteId}/floor_plans/${widget.floorPlan.id}.${widget.floorPlan.fileExtension}',
+      );
+      final bytes = await ref.getData(10 * 1024 * 1024);
+      if (bytes == null || !mounted) return;
+      await _correctDimensionsFromBytes(bytes);
+    } catch (e) {
+      debugPrint('Failed to verify floor plan dimensions: $e');
+    }
+  }
+
+  /// Decode image bytes with Flutter's codec (EXIF-aware) and update
+  /// stored dimensions if they don't match.
+  Future<void> _correctDimensionsFromBytes(Uint8List bytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final actualWidth = frame.image.width.toDouble();
+      final actualHeight = frame.image.height.toDouble();
+      frame.image.dispose();
+      codec.dispose();
+
+      final storedW = widget.floorPlan.imageWidth;
+      final storedH = widget.floorPlan.imageHeight;
+
+      if ((actualWidth - storedW).abs() > 1 ||
+          (actualHeight - storedH).abs() > 1) {
+        debugPrint(
+          'Floor plan dimension mismatch: stored ${storedW}x$storedH, '
+          'actual ${actualWidth}x$actualHeight — correcting',
+        );
+        // Update Firestore so this only happens once
+        await FloorPlanService.instance.updateFloorPlan(
+          widget.basePath,
+          widget.siteId,
+          widget.floorPlan.copyWith(
+            imageWidth: actualWidth,
+            imageHeight: actualHeight,
+          ),
+        );
+        if (mounted) {
+          setState(() {
+            _imageWidth = actualWidth;
+            _imageHeight = actualHeight;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to correct floor plan dimensions: $e');
     }
   }
 
@@ -258,8 +328,8 @@ class _InteractiveFloorPlanScreenState
 
     // localPosition is already in image-space coordinates because
     // the GestureDetector is inside the InteractiveViewer's child
-    final xPercent = details.localPosition.dx / widget.floorPlan.imageWidth;
-    final yPercent = details.localPosition.dy / widget.floorPlan.imageHeight;
+    final xPercent = details.localPosition.dx / _imageWidth;
+    final yPercent = details.localPosition.dy / _imageHeight;
 
     if (xPercent < 0 || xPercent > 1 || yPercent < 0 || yPercent > 1) return;
 
@@ -481,8 +551,8 @@ class _InteractiveFloorPlanScreenState
                   boundaryMargin:
                       const EdgeInsets.all(double.infinity),
                   child: SizedBox(
-                    width: widget.floorPlan.imageWidth,
-                    height: widget.floorPlan.imageHeight,
+                    width: _imageWidth,
+                    height: _imageHeight,
                     child: GestureDetector(
                       behavior: HitTestBehavior.translucent,
                       onTapDown: _onFloorPlanTap,
@@ -546,10 +616,10 @@ class _InteractiveFloorPlanScreenState
                           // Use drag position if actively dragging this pin
                           final displayX = isDragging && _dragPosition != null
                               ? _dragPosition!.dx
-                              : asset.xPercent! * widget.floorPlan.imageWidth;
+                              : asset.xPercent! * _imageWidth;
                           final displayY = isDragging && _dragPosition != null
                               ? _dragPosition!.dy
-                              : asset.yPercent! * widget.floorPlan.imageHeight;
+                              : asset.yPercent! * _imageHeight;
 
                           final left = displayX - halfPin;
                           final top = displayY - halfPin;
@@ -564,8 +634,8 @@ class _InteractiveFloorPlanScreenState
                                   setState(() {
                                     _draggingAssetId = asset.id;
                                     _dragPosition = Offset(
-                                      asset.xPercent! * widget.floorPlan.imageWidth,
-                                      asset.yPercent! * widget.floorPlan.imageHeight,
+                                      asset.xPercent! * _imageWidth,
+                                      asset.yPercent! * _imageHeight,
                                     );
                                   });
                                 },
@@ -581,8 +651,8 @@ class _InteractiveFloorPlanScreenState
                                 },
                                 onPanEnd: (_) {
                                   if (_dragPosition != null) {
-                                    final newX = _dragPosition!.dx / widget.floorPlan.imageWidth;
-                                    final newY = _dragPosition!.dy / widget.floorPlan.imageHeight;
+                                    final newX = _dragPosition!.dx / _imageWidth;
+                                    final newY = _dragPosition!.dy / _imageHeight;
                                     if (newX >= 0 && newX <= 1 && newY >= 0 && newY <= 1) {
                                       _updateAssetPosition(asset, newX, newY);
                                     }
@@ -617,16 +687,16 @@ class _InteractiveFloorPlanScreenState
                                 setState(() {
                                   _draggingAssetId = asset.id;
                                   _dragPosition = Offset(
-                                    asset.xPercent! * widget.floorPlan.imageWidth,
-                                    asset.yPercent! * widget.floorPlan.imageHeight,
+                                    asset.xPercent! * _imageWidth,
+                                    asset.yPercent! * _imageHeight,
                                   );
                                 });
                               },
                               onLongPressMoveUpdate: (details) {
                                 if (_draggingAssetId != asset.id) return;
                                 final scale = _transformController.value.getMaxScaleOnAxis();
-                                final startX = asset.xPercent! * widget.floorPlan.imageWidth;
-                                final startY = asset.yPercent! * widget.floorPlan.imageHeight;
+                                final startX = asset.xPercent! * _imageWidth;
+                                final startY = asset.yPercent! * _imageHeight;
                                 setState(() {
                                   _dragPosition = Offset(
                                     startX + details.offsetFromOrigin.dx / scale,
@@ -636,8 +706,8 @@ class _InteractiveFloorPlanScreenState
                               },
                               onLongPressEnd: (_) {
                                 if (_dragPosition != null) {
-                                  final newX = _dragPosition!.dx / widget.floorPlan.imageWidth;
-                                  final newY = _dragPosition!.dy / widget.floorPlan.imageHeight;
+                                  final newX = _dragPosition!.dx / _imageWidth;
+                                  final newY = _dragPosition!.dy / _imageHeight;
                                   if (newX >= 0 && newX <= 1 && newY >= 0 && newY <= 1) {
                                     _updateAssetPosition(asset, newX, newY);
                                   }
