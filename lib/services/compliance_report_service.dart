@@ -243,16 +243,17 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
             ),
             child: pw.Stack(
               children: [
-                // Position image explicitly at calculated render area
+                // Position image explicitly at calculated render area.
+                // Use explicit width/height on pw.Image rather than relying
+                // on SizedBox + BoxFit, which doesn't constrain correctly in
+                // the pdf package — the image renders at intrinsic pixel size
+                // instead of the SizedBox dimensions, causing pins to cluster
+                // in the top-left corner.
                 pw.Positioned(
                   left: offsetX,
                   top: offsetY,
-                  child: pw.SizedBox(
-                    width: renderW,
-                    height: renderH,
-                    child: pw.Image(pw.MemoryImage(imageBytes),
-                        fit: pw.BoxFit.fill),
-                  ),
+                  child: pw.Image(pw.MemoryImage(imageBytes),
+                      width: renderW, height: renderH),
                 ),
                 ...planAssets.map((a) {
                   if (a.xPercent == null || a.yPercent == null) {

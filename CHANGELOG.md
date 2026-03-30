@@ -4,6 +4,18 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-03-30 (Session 55)
+
+### Floor Plan Pin Positioning Fix (Web)
+
+- **Root cause identified**: `webHtmlElementStrategy: WebHtmlElementStrategy.prefer` rendered the floor plan image as an HTML `<img>` DOM element in a separate rendering layer from the Flutter canvas where asset pins are painted. Inside `InteractiveViewer`, the CSS transform on the HTML element desynced from the canvas transform, causing pins to appear displaced from the image on web.
+- **Fix**: On web, floor plan image bytes are now loaded via Firebase Storage SDK and rendered using `Image.memory()` on the Flutter canvas, ensuring image and pins share the same rendering layer and transform pipeline.
+- **BoxFit change**: Switched from `BoxFit.contain` to `BoxFit.fill` for the floor plan image on all platforms (equivalent since SizedBox matches image dimensions, but more explicit).
+- **Compliance report fix**: `pw.Image` inside `pw.SizedBox` with `pw.BoxFit.fill` was not constraining the image — it rendered at intrinsic pixel size (e.g. 2048x1536) instead of the calculated render area (~450x300). Pins positioned at `xPercent * renderW` appeared clustered in the top-left corner. Fixed by passing explicit `width`/`height` directly to `pw.Image`.
+- **Files changed**: `lib/screens/floor_plans/interactive_floor_plan_screen.dart`, `lib/services/compliance_report_service.dart`
+
+---
+
 ## 2026-03-29 (Session 54)
 
 ### Unified Site & Customer List Screens

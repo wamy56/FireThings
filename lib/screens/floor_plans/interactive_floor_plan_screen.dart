@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -54,12 +56,36 @@ class _InteractiveFloorPlanScreenState
   late bool _showLabels;
   Map<String, AssetType> _assetTypes = {};
 
+  // Web: load image bytes to render on canvas (not as HTML platform view)
+  // so that image and pins share the same rendering layer inside InteractiveViewer.
+  Uint8List? _webImageBytes;
+  bool _webImageLoading = kIsWeb;
+
   @override
   void initState() {
     super.initState();
     _pinScale = widget.floorPlan.pinScale;
     _showLabels = widget.floorPlan.showLabels;
     _loadAssetTypes();
+    if (kIsWeb) _loadWebImageBytes();
+  }
+
+  Future<void> _loadWebImageBytes() async {
+    try {
+      final ref = FirebaseStorage.instance.ref(
+        '${widget.basePath}/sites/${widget.siteId}/floor_plans/${widget.floorPlan.id}.${widget.floorPlan.fileExtension}',
+      );
+      final bytes = await ref.getData(10 * 1024 * 1024); // 10MB max
+      if (mounted && bytes != null) {
+        setState(() {
+          _webImageBytes = bytes;
+          _webImageLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load floor plan image bytes: $e');
+      if (mounted) setState(() => _webImageLoading = false);
+    }
   }
 
   Future<void> _loadAssetTypes() async {
@@ -464,23 +490,35 @@ class _InteractiveFloorPlanScreenState
                         clipBehavior: Clip.none,
                       children: [
                         // Floor plan image
+                        // Render image on the Flutter canvas (not as an HTML
+                        // platform view) so it shares the same rendering layer
+                        // as asset pins inside InteractiveViewer.
                         Positioned.fill(
                           child: kIsWeb
-                              ? Image.network(
-                                  widget.floorPlan.imageUrl,
-                                  fit: BoxFit.contain,
-                                  webHtmlElementStrategy: WebHtmlElementStrategy.prefer,
-                                  errorBuilder: (_, _, _) => Center(
-                                    child: Icon(AppIcons.image,
-                                        size: 64,
-                                        color: isDark
-                                            ? AppTheme.darkTextSecondary
-                                            : AppTheme.textSecondary),
-                                  ),
-                                )
+                              ? (_webImageBytes != null
+                                  ? Image.memory(
+                                      _webImageBytes!,
+                                      fit: BoxFit.fill,
+                                      errorBuilder: (_, _, _) => Center(
+                                        child: Icon(AppIcons.image,
+                                            size: 64,
+                                            color: isDark
+                                                ? AppTheme.darkTextSecondary
+                                                : AppTheme.textSecondary),
+                                      ),
+                                    )
+                                  : _webImageLoading
+                                      ? const Center(child: AdaptiveLoadingIndicator())
+                                      : Center(
+                                          child: Icon(AppIcons.image,
+                                              size: 64,
+                                              color: isDark
+                                                  ? AppTheme.darkTextSecondary
+                                                  : AppTheme.textSecondary),
+                                        ))
                               : CachedNetworkImage(
                                   imageUrl: widget.floorPlan.imageUrl,
-                                  fit: BoxFit.contain,
+                                  fit: BoxFit.fill,
                                   placeholder: (_, _) =>
                                       const Center(child: AdaptiveLoadingIndicator()),
                                   errorWidget: (_, _, _) => Center(

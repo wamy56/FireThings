@@ -13,6 +13,7 @@ import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/loading_indicator.dart';
+import '../../widgets/card_action_button.dart';
 
 class CompanyCustomersScreen extends StatefulWidget {
   final String companyId;
@@ -201,20 +202,23 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
             ),
             if (_canEdit) ...[
               const SizedBox(width: 8),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _ActionButton(
-                    label: 'Edit',
-                    onPressed: () => _showCustomerDialog(customer: customer),
-                  ),
-                  const SizedBox(height: 6),
-                  _ActionButton(
-                    label: 'Delete',
-                    onPressed: () => _confirmDelete(customer),
-                    isDestructive: true,
-                  ),
-                ],
+              IntrinsicWidth(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    CardActionButton(
+                      label: 'Edit',
+                      onPressed: () => _showCustomerDialog(customer: customer),
+                    ),
+                    const SizedBox(height: 6),
+                    CardActionButton(
+                      label: 'Delete',
+                      onPressed: () => _confirmDelete(customer),
+                      isDestructive: true,
+                    ),
+                  ],
+                ),
               ),
             ],
           ],
@@ -366,39 +370,5 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
     } catch (e) {
       if (mounted) context.showErrorToast('Failed to delete customer');
     }
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onPressed;
-  final bool isDestructive;
-
-  const _ActionButton({
-    required this.label,
-    required this.onPressed,
-    this.isDestructive = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = isDestructive
-        ? (isDark ? Colors.red[300]! : Colors.red)
-        : (isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue);
-    return SizedBox(
-      height: 30,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: color,
-          side: BorderSide(color: color.withValues(alpha: isDark ? 0.6 : 0.4)),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: Text(label),
-      ),
-    );
   }
 }

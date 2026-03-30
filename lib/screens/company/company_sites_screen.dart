@@ -15,6 +15,7 @@ import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/loading_indicator.dart';
+import '../../widgets/card_action_button.dart';
 import '../../services/remote_config_service.dart';
 import '../assets/site_asset_register_screen.dart';
 
@@ -193,29 +194,32 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
               ),
             ),
             const SizedBox(width: 8),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (RemoteConfigService.instance.assetRegisterEnabled) ...[
-                  _ActionButton(
-                    label: 'View Assets',
-                    onPressed: () => _viewAssets(site),
-                  ),
-                  const SizedBox(height: 6),
+            IntrinsicWidth(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (RemoteConfigService.instance.assetRegisterEnabled) ...[
+                    CardActionButton(
+                      label: 'Assets',
+                      onPressed: () => _viewAssets(site),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                  if (_canEdit) ...[
+                    CardActionButton(
+                      label: 'Edit',
+                      onPressed: () => _showSiteDialog(site: site),
+                    ),
+                    const SizedBox(height: 6),
+                    CardActionButton(
+                      label: 'Delete',
+                      onPressed: () => _confirmDelete(site),
+                      isDestructive: true,
+                    ),
+                  ],
                 ],
-                if (_canEdit) ...[
-                  _ActionButton(
-                    label: 'Edit',
-                    onPressed: () => _showSiteDialog(site: site),
-                  ),
-                  const SizedBox(height: 6),
-                  _ActionButton(
-                    label: 'Delete',
-                    onPressed: () => _confirmDelete(site),
-                    isDestructive: true,
-                  ),
-                ],
-              ],
+              ),
             ),
           ],
         ),
@@ -353,39 +357,5 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
     } catch (e) {
       if (mounted) context.showErrorToast('Failed to delete site');
     }
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onPressed;
-  final bool isDestructive;
-
-  const _ActionButton({
-    required this.label,
-    required this.onPressed,
-    this.isDestructive = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final color = isDestructive
-        ? (isDark ? Colors.red[300]! : Colors.red)
-        : (isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue);
-    return SizedBox(
-      height: 30,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: color,
-          side: BorderSide(color: color.withValues(alpha: isDark ? 0.6 : 0.4)),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: Text(label),
-      ),
-    );
   }
 }
