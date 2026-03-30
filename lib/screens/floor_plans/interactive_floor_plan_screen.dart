@@ -88,13 +88,12 @@ class _InteractiveFloorPlanScreenState
       );
       final bytes = await ref.getData(10 * 1024 * 1024); // 10MB max
       if (mounted && bytes != null) {
-        await _correctDimensionsFromBytes(bytes);
-        if (mounted) {
-          setState(() {
-            _webImageBytes = bytes;
-            _webImageLoading = false;
-          });
-        }
+        setState(() {
+          _webImageBytes = bytes;
+          _webImageLoading = false;
+        });
+        // Verify dimensions in background after image is already displayed
+        _correctDimensionsFromBytes(bytes);
       }
     } catch (e) {
       debugPrint('Failed to load floor plan image bytes: $e');
@@ -545,7 +544,8 @@ class _InteractiveFloorPlanScreenState
 
               return InteractiveViewer(
                   transformationController: _transformController,
-                  minScale: 0.3,
+                  constrained: false,
+                  minScale: 0.1,
                   maxScale: 5.0,
                   panEnabled: _draggingAssetId == null,
                   boundaryMargin:
