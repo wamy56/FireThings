@@ -60,6 +60,7 @@ class _InteractiveFloorPlanScreenState
   // Corrected image dimensions (may differ from stored values due to EXIF rotation)
   late double _imageWidth;
   late double _imageHeight;
+  bool _initialScaleSet = false;
 
   // Web: load image bytes to render on canvas (not as HTML platform view)
   // so that image and pins share the same rendering layer inside InteractiveViewer.
@@ -92,8 +93,6 @@ class _InteractiveFloorPlanScreenState
           _webImageBytes = bytes;
           _webImageLoading = false;
         });
-        // Verify dimensions in background after image is already displayed
-        _correctDimensionsFromBytes(bytes);
       }
     } catch (e) {
       debugPrint('Failed to load floor plan image bytes: $e');
@@ -542,7 +541,22 @@ class _InteractiveFloorPlanScreenState
                 assetCount: assets.length,
               );
 
-              return InteractiveViewer(
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  // Auto-fit image to viewport on first build
+                  if (!_initialScaleSet && constraints.maxWidth > 0 && constraints.maxHeight > 0) {
+                    _initialScaleSet = true;
+                    final scaleX = constraints.maxWidth / _imageWidth;
+                    final scaleY = constraints.maxHeight / _imageHeight;
+                    final fitScale = scaleX < scaleY ? scaleX : scaleY;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        _transformController.value = Matrix4.diagonal3Values(fitScale, fitScale, 1.0);
+                      }
+                    });
+                  }
+
+                  return InteractiveViewer(
                   transformationController: _transformController,
                   constrained: false,
                   minScale: 0.1,
@@ -732,6 +746,8 @@ class _InteractiveFloorPlanScreenState
                     ),
                   ),
                 ),
+              );
+                },
               );
             },
           ),
