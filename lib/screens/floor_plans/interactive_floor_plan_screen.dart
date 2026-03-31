@@ -62,11 +62,6 @@ class _InteractiveFloorPlanScreenState
   late double _imageHeight;
   bool _initialScaleSet = false;
 
-  // Web: load image bytes to render on canvas (not as HTML platform view)
-  // so that image and pins share the same rendering layer inside InteractiveViewer.
-  Uint8List? _webImageBytes;
-  bool _webImageLoading = kIsWeb;
-
   @override
   void initState() {
     super.initState();
@@ -76,27 +71,55 @@ class _InteractiveFloorPlanScreenState
     _showLabels = widget.floorPlan.showLabels;
     _loadAssetTypes();
     if (kIsWeb) {
-      _loadWebImageBytes();
+      _verifyWebImageDimensions();
     } else {
       _verifyImageDimensions();
     }
   }
 
-  Future<void> _loadWebImageBytes() async {
+  /// Web: verify dimensions using NetworkImage (no raw byte fetch needed,
+  /// avoids CORS issues with ref.getData()).
+  Future<void> _verifyWebImageDimensions() async {
     try {
-      final ref = FirebaseStorage.instance.ref(
-        '${widget.basePath}/sites/${widget.siteId}/floor_plans/${widget.floorPlan.id}.${widget.floorPlan.fileExtension}',
-      );
-      final bytes = await ref.getData(10 * 1024 * 1024); // 10MB max
-      if (mounted && bytes != null) {
-        setState(() {
-          _webImageBytes = bytes;
-          _webImageLoading = false;
-        });
-      }
+      final imageProvider = NetworkImage(widget.floorPlan.imageUrl);
+      final stream = imageProvider.resolve(ImageConfiguration.empty);
+      stream.addListener(ImageStreamListener(
+        (ImageInfo info, bool _) {
+          final actualWidth = info.image.width.toDouble();
+          final actualHeight = info.image.height.toDouble();
+          info.image.dispose();
+
+          if (!mounted) return;
+
+          final storedW = widget.floorPlan.imageWidth;
+          final storedH = widget.floorPlan.imageHeight;
+          if ((actualWidth - storedW).abs() > 1 ||
+              (actualHeight - storedH).abs() > 1) {
+            debugPrint(
+              'Floor plan dimension mismatch (web): stored ${storedW}x$storedH, '
+              'actual ${actualWidth}x$actualHeight — correcting',
+            );
+            FloorPlanService.instance.updateFloorPlan(
+              widget.basePath,
+              widget.siteId,
+              widget.floorPlan.copyWith(
+                imageWidth: actualWidth,
+                imageHeight: actualHeight,
+              ),
+            );
+            setState(() {
+              _imageWidth = actualWidth;
+              _imageHeight = actualHeight;
+              _initialScaleSet = false; // recalculate scale
+            });
+          }
+        },
+        onError: (exception, stackTrace) {
+          debugPrint('Failed to verify web image dimensions: $exception');
+        },
+      ));
     } catch (e) {
-      debugPrint('Failed to load floor plan image bytes: $e');
-      if (mounted) setState(() => _webImageLoading = false);
+      debugPrint('Failed to verify web image dimensions: $e');
     }
   }
 
@@ -579,27 +602,21 @@ class _InteractiveFloorPlanScreenState
                         // as asset pins inside InteractiveViewer.
                         Positioned.fill(
                           child: kIsWeb
-                              ? (_webImageBytes != null
-                                  ? Image.memory(
-                                      _webImageBytes!,
-                                      fit: BoxFit.fill,
-                                      errorBuilder: (_, _, _) => Center(
-                                        child: Icon(AppIcons.image,
-                                            size: 64,
-                                            color: isDark
-                                                ? AppTheme.darkTextSecondary
-                                                : AppTheme.textSecondary),
-                                      ),
-                                    )
-                                  : _webImageLoading
-                                      ? const Center(child: AdaptiveLoadingIndicator())
-                                      : Center(
-                                          child: Icon(AppIcons.image,
-                                              size: 64,
-                                              color: isDark
-                                                  ? AppTheme.darkTextSecondary
-                                                  : AppTheme.textSecondary),
-                                        ))
+                              ? Image.network(
+                                  widget.floorPlan.imageUrl,
+                                  fit: BoxFit.fill,
+                                  loadingBuilder: (_, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(child: AdaptiveLoadingIndicator());
+                                  },
+                                  errorBuilder: (_, _, _) => Center(
+                                    child: Icon(AppIcons.image,
+                                        size: 64,
+                                        color: isDark
+                                            ? AppTheme.darkTextSecondary
+                                            : AppTheme.textSecondary),
+                                  ),
+                                )
                               : CachedNetworkImage(
                                   imageUrl: widget.floorPlan.imageUrl,
                                   fit: BoxFit.fill,
