@@ -230,6 +230,12 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.siteName),
+        leading: kIsWeb
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/sites'),
+              )
+            : null,
       ),
       floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
           ? null
@@ -239,8 +245,11 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
               label: const Text('Add Asset'),
             ),
       body: KeyboardDismissWrapper(
-        child: Column(
-          children: [
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 750),
+            child: Column(
+              children: [
             // Search bar
             Padding(
               padding: const EdgeInsets.all(16),
@@ -370,6 +379,8 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
               ),
             ),
           ],
+            ),
+          ),
         ),
       ),
     );

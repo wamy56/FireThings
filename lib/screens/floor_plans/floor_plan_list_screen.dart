@@ -131,7 +131,15 @@ class FloorPlanListScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: Text('$siteName — Floor Plans')),
+      appBar: AppBar(
+        title: Text('$siteName — Floor Plans'),
+        leading: kIsWeb
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/sites/$siteId/assets'),
+              )
+            : null,
+      ),
       floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
           ? null
           : FloatingActionButton.extended(
@@ -139,7 +147,10 @@ class FloorPlanListScreen extends StatelessWidget {
               icon: const Icon(AppIcons.add),
               label: const Text('Add Floor Plan'),
             ),
-      body: StreamBuilder<List<FloorPlan>>(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: StreamBuilder<List<FloorPlan>>(
         stream: FloorPlanService.instance
             .getFloorPlansStream(basePath, siteId),
         builder: (context, snapshot) {
@@ -174,6 +185,8 @@ class FloorPlanListScreen extends StatelessWidget {
             },
           );
         },
+          ),
+        ),
       ),
     );
   }

@@ -184,7 +184,8 @@ GoRouter createWebRouter() {
                 builder: (context, state) {
                   final companyId = UserProfileService.instance.companyId ?? '';
                   final basePath = 'companies/$companyId';
-                  return AssetTypeConfigScreen(basePath: basePath);
+                  final siteId = state.pathParameters['siteId']!;
+                  return AssetTypeConfigScreen(basePath: basePath, siteId: siteId);
                 },
               ),
               GoRoute(

@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/asset_type.dart';
 import '../../models/checklist_item.dart';
@@ -13,11 +15,13 @@ import '../../widgets/widgets.dart';
 class AssetTypeConfigScreen extends StatefulWidget {
   final String basePath;
   final bool canEdit;
+  final String? siteId;
 
   const AssetTypeConfigScreen({
     super.key,
     required this.basePath,
     this.canEdit = true,
+    this.siteId,
   });
 
   @override
@@ -119,6 +123,12 @@ class _AssetTypeConfigScreenState extends State<AssetTypeConfigScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Asset Types'),
+        leading: kIsWeb && widget.siteId != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/sites/${widget.siteId}/assets'),
+              )
+            : null,
       ),
       floatingActionButton: widget.canEdit
           ? FloatingActionButton.extended(
@@ -127,9 +137,12 @@ class _AssetTypeConfigScreenState extends State<AssetTypeConfigScreen> {
               label: const Text('Add Type'),
             )
           : null,
-      body: _loading
-          ? const Center(child: AdaptiveLoadingIndicator())
-          : ListView.separated(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: _loading
+              ? const AdaptiveLoadingIndicator()
+              : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: _types.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
@@ -235,6 +248,8 @@ class _AssetTypeConfigScreenState extends State<AssetTypeConfigScreen> {
                 );
               },
             ),
+        ),
+      ),
     );
   }
 }

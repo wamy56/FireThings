@@ -73,10 +73,13 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
     return Scaffold(
       appBar: AdaptiveNavigationBar(title: 'Company PDF Branding'),
       body: KeyboardDismissWrapper(
-        child: _isLoading
-          ? const Center(child: AdaptiveLoadingIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(AppTheme.screenPadding),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 750),
+            child: _isLoading
+              ? const AdaptiveLoadingIndicator()
+              : ListView(
+                  padding: const EdgeInsets.all(AppTheme.screenPadding),
               children: [
                 Text(
                   'Configure the PDF branding used for jobsheets and invoices created from dispatched jobs.',
@@ -146,6 +149,8 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
                 const SizedBox(height: 40),
               ],
             ),
+          ),
+        ),
       ),
     );
   }

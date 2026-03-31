@@ -16,6 +16,8 @@ class AssetPin extends StatelessWidget {
   final AssetType? assetType;
   final bool isSelected;
   final double pinScale;
+  /// When set, overrides the default `28.0 * pinScale` base size.
+  final double? basePinSize;
   final bool showLabel;
   final String? label;
   final VoidCallback? onTap;
@@ -27,6 +29,7 @@ class AssetPin extends StatelessWidget {
     this.assetType,
     this.isSelected = false,
     this.pinScale = 1.0,
+    this.basePinSize,
     this.showLabel = false,
     this.label,
     this.onTap,
@@ -56,7 +59,7 @@ class AssetPin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final baseSize = 28.0 * pinScale;
+    final baseSize = basePinSize ?? (28.0 * pinScale);
     final size = isSelected ? baseSize * 1.2 : baseSize;
 
     final symbolWidget = CustomPaint(

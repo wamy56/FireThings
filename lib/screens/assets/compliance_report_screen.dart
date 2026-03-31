@@ -1,5 +1,7 @@
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/compliance_report_service.dart';
 import '../../services/analytics_service.dart';
 import '../../models/asset.dart';
@@ -99,12 +101,23 @@ class _ComplianceReportScreenState extends State<ComplianceReportScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Compliance Report'),
+        leading: kIsWeb
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => context.go('/sites/${widget.siteId}/assets'),
+              )
+            : null,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(AppTheme.screenPadding),
-        child: _pdfBytes != null
-            ? _buildReportReady(isDark)
-            : _buildPreGenerate(isDark),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: Padding(
+            padding: const EdgeInsets.all(AppTheme.screenPadding),
+            child: _pdfBytes != null
+                ? _buildReportReady(isDark)
+                : _buildPreGenerate(isDark),
+          ),
+        ),
       ),
     );
   }

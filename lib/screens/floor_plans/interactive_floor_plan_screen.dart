@@ -70,56 +70,10 @@ class _InteractiveFloorPlanScreenState
     _pinScale = widget.floorPlan.pinScale;
     _showLabels = widget.floorPlan.showLabels;
     _loadAssetTypes();
-    if (kIsWeb) {
-      _verifyWebImageDimensions();
-    } else {
+    // Dimension verification only needed on native (EXIF rotation).
+    // Web dimensions are always correct from upload (codec-decoded).
+    if (!kIsWeb) {
       _verifyImageDimensions();
-    }
-  }
-
-  /// Web: verify dimensions using NetworkImage (no raw byte fetch needed,
-  /// avoids CORS issues with ref.getData()).
-  Future<void> _verifyWebImageDimensions() async {
-    try {
-      final imageProvider = NetworkImage(widget.floorPlan.imageUrl);
-      final stream = imageProvider.resolve(ImageConfiguration.empty);
-      stream.addListener(ImageStreamListener(
-        (ImageInfo info, bool _) {
-          final actualWidth = info.image.width.toDouble();
-          final actualHeight = info.image.height.toDouble();
-          info.image.dispose();
-
-          if (!mounted) return;
-
-          final storedW = widget.floorPlan.imageWidth;
-          final storedH = widget.floorPlan.imageHeight;
-          if ((actualWidth - storedW).abs() > 1 ||
-              (actualHeight - storedH).abs() > 1) {
-            debugPrint(
-              'Floor plan dimension mismatch (web): stored ${storedW}x$storedH, '
-              'actual ${actualWidth}x$actualHeight — correcting',
-            );
-            FloorPlanService.instance.updateFloorPlan(
-              widget.basePath,
-              widget.siteId,
-              widget.floorPlan.copyWith(
-                imageWidth: actualWidth,
-                imageHeight: actualHeight,
-              ),
-            );
-            setState(() {
-              _imageWidth = actualWidth;
-              _imageHeight = actualHeight;
-              _initialScaleSet = false; // recalculate scale
-            });
-          }
-        },
-        onError: (exception, stackTrace) {
-          debugPrint('Failed to verify web image dimensions: $exception');
-        },
-      ));
-    } catch (e) {
-      debugPrint('Failed to verify web image dimensions: $e');
     }
   }
 
@@ -639,7 +593,9 @@ class _InteractiveFloorPlanScreenState
                           }
                           final isDragging = _draggingAssetId == asset.id;
                           final isSelected = _selectedAssetId == asset.id || isDragging;
-                          final pinSize = 28.0 * _pinScale;
+                          // Proportional pin size: ~2.7% of image height at 1.0x scale
+                          // (matches compliance report PDF ratio)
+                          final pinSize = (_imageHeight * 0.027) * _pinScale;
                           final actualSize = isSelected ? pinSize * 1.2 : pinSize;
                           final halfPin = actualSize / 2;
                           final type = _getAssetType(asset.assetTypeId);
@@ -701,6 +657,7 @@ class _InteractiveFloorPlanScreenState
                                     assetType: type,
                                     isSelected: isSelected,
                                     pinScale: _pinScale,
+                                    basePinSize: pinSize,
                                     showLabel: _showLabels,
                                     label: asset.reference,
                                   ),
@@ -753,6 +710,7 @@ class _InteractiveFloorPlanScreenState
                                 assetType: type,
                                 isSelected: isSelected,
                                 pinScale: _pinScale,
+                                basePinSize: pinSize,
                                 showLabel: _showLabels,
                                 label: asset.reference,
                               ),
