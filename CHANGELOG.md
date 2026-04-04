@@ -4,6 +4,35 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-04 (Session 56)
+
+### Web Dispatcher Jobs Tab Upgrade
+
+**Bug Fixes:**
+- **Fixed Active/Urgent filter bug** — clicking "Active" or "Urgent/Emergency" summary cards or dropdown values now correctly filters jobs (previously showed zero results because composite filter values were never matched in `_filterJobs()`)
+- **Fixed `companySiteId` not captured on web create** — site autocomplete now stores the selected site's ID, enabling asset register lookups and compliance dots for web-created jobs
+- **Fixed cancel with reasons** — replaced hardcoded "Cancelled by dispatcher" with a `CancelJobDialog` offering dispatcher-appropriate reasons (Customer cancelled, Scheduling conflict, Job no longer needed, Duplicate job, Other)
+
+**New Features:**
+- **Pagination** — rows-per-page selector (25/50/100), page navigation controls, "Showing X–Y of Z" display. All filters reset to page 1
+- **Date range filter** — chip presets (Today, This Week, This Month, Overdue) plus Custom date range picker, rendered below the existing filter bar
+- **Column visibility toggle** — settings button to show/hide table columns. New optional columns: Job #, Type, Contact. Sort works with dynamic column layout via key-based sorting
+- **Bulk actions toolbar** — Gmail-style bar when rows selected: Assign, Change Status, Change Priority, Set Date, Delete. All backed by Firestore batch writes. Select-all checkbox for current page
+- **Asset register integration** — detail panel now shows compliance summary (pass/fail/untested counts, lifecycle warnings) and "View Asset Register" link when a job has a linked site with assets
+- **Job duplication** — "Duplicate" button on detail panel pre-fills create form with job data (new ID, cleared status/dates/assignment, title appended "(Copy)")
+- **CSV export** — "Export" button downloads currently filtered jobs as CSV with all visible columns plus site address, contact details, and creation info
+- **Create job UX** — Ctrl+Enter to save, "Create another job after saving" checkbox that resets the form but keeps site & contact pre-filled for batch creation
+
+**Files changed:**
+- `lib/screens/web/web_dashboard_screen.dart` — major rewrite: key-based sorting, pagination, column visibility, bulk toolbar integration, date filter, CSV export
+- `lib/screens/web/web_job_detail_panel.dart` — asset register section, duplicate button, cancel dialog
+- `lib/screens/web/web_create_job_screen.dart` — companySiteId fix, duplication support, Ctrl+Enter, create-another flow
+- `lib/services/dispatch_service.dart` — bulk operations (bulkUpdateStatus, bulkUpdatePriority, bulkUpdateDate, bulkDelete)
+- `lib/utils/download_web.dart` / `download_stub.dart` — added optional mimeType parameter
+- **New files:** `lib/screens/web/cancel_job_dialog.dart`, `lib/screens/web/dashboard/job_helpers.dart`, `lib/screens/web/dashboard/date_range_filter.dart`, `lib/screens/web/dashboard/bulk_actions_toolbar.dart`, `lib/screens/web/dashboard/csv_export.dart`
+
+---
+
 ## 2026-03-30 (Session 55)
 
 ### Floor Plan Pin Positioning Fix (Web)

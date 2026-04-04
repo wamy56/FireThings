@@ -12,9 +12,15 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
+import '../../widgets/site_map_preview.dart';
 import '../../services/analytics_service.dart';
 import '../../utils/print_stub.dart' if (dart.library.html) '../../utils/print_web.dart';
 import '../../utils/download_stub.dart' if (dart.library.html) '../../utils/download_web.dart';
+import 'cancel_job_dialog.dart';
+import '../../models/asset.dart';
+import '../../services/asset_service.dart';
+import '../../services/remote_config_service.dart';
+import 'package:go_router/go_router.dart';
 
 class WebJobDetailPanel extends StatefulWidget {
   final String companyId;
@@ -73,6 +79,16 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
     widget.onClose();
   }
 
+  Future<void> _openDirections(String address) async {
+    final encodedAddress = Uri.encodeComponent(address);
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$encodedAddress',
+    );
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -129,6 +145,28 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                         if (job.accessNotes != null) _detailRow('Access', job.accessNotes!, isDark),
                         if (job.siteNotes != null) _detailRow('Notes', job.siteNotes!, isDark),
                       ], isDark),
+                      const SizedBox(height: 12),
+                      SiteMapPreview(
+                        address: job.siteAddress,
+                        latitude: job.latitude,
+                        longitude: job.longitude,
+                        height: 200,
+                        onTap: () => _openDirections(job.siteAddress),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openDirections(job.siteAddress),
+                          icon: Icon(AppIcons.map, size: 18),
+                          label: const Text('Get Directions'),
+                        ),
+                      ),
+                      if (job.companySiteId != null &&
+                          RemoteConfigService.instance.assetRegisterEnabled) ...[
+                        const SizedBox(height: 16),
+                        _buildSiteAssetsSection(job, isDark),
+                      ],
                       const SizedBox(height: 16),
                       if (job.contactName != null || job.contactPhone != null || job.contactEmail != null)
                         ...[
@@ -290,6 +328,97 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
     );
   }
 
+  Widget _buildSiteAssetsSection(DispatchedJob job, bool isDark) {
+    final basePath = 'companies/${job.companyId}';
+    final siteId = job.companySiteId!;
+
+    return FutureBuilder<List<Asset>>(
+      future: AssetService.instance.getAssetsStream(basePath, siteId).first,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+
+        final assets = snapshot.data ?? [];
+        if (assets.isEmpty) return const SizedBox.shrink();
+
+        final active = assets.where((a) => a.complianceStatus != Asset.statusDecommissioned).toList();
+        final pass = active.where((a) => a.complianceStatus == Asset.statusPass).length;
+        final fail = active.where((a) => a.complianceStatus == Asset.statusFail).length;
+        final untested = active.where((a) => a.complianceStatus == Asset.statusUntested).length;
+
+        final now = DateTime.now();
+        final lifecycleWarnings = active.where((a) {
+          if (a.installDate == null || a.expectedLifespanYears == null) return false;
+          final age = now.difference(a.installDate!).inDays / 365.25;
+          return (a.expectedLifespanYears! - age) < 1;
+        }).length;
+
+        return _buildSection('Site Assets', [
+          Text.rich(
+            TextSpan(
+              style: const TextStyle(fontSize: 14),
+              children: [
+                TextSpan(
+                  text: '${active.length} assets: ',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                TextSpan(
+                  text: '$pass pass',
+                  style: TextStyle(color: AppTheme.successGreen, fontWeight: FontWeight.w600),
+                ),
+                if (fail > 0) ...[
+                  const TextSpan(text: ', '),
+                  TextSpan(
+                    text: '$fail fail',
+                    style: TextStyle(color: AppTheme.errorRed, fontWeight: FontWeight.w600),
+                  ),
+                ],
+                if (untested > 0) ...[
+                  const TextSpan(text: ', '),
+                  TextSpan(
+                    text: '$untested untested',
+                    style: TextStyle(color: AppTheme.accentOrange, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (lifecycleWarnings > 0) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Icon(AppIcons.danger, size: 14, color: AppTheme.accentOrange),
+                const SizedBox(width: 4),
+                Text(
+                  '$lifecycleWarnings asset${lifecycleWarnings == 1 ? '' : 's'} approaching end of life',
+                  style: TextStyle(fontSize: 13, color: AppTheme.accentOrange, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                context.push('/sites/$siteId/assets', extra: {
+                  'siteName': job.siteName,
+                  'siteAddress': job.siteAddress,
+                });
+              },
+              icon: Icon(AppIcons.clipboard, size: 18),
+              label: const Text('View Asset Register'),
+            ),
+          ),
+        ], isDark);
+      },
+    );
+  }
+
   Widget _buildSection(String title, List<Widget> children, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,6 +472,11 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
             icon: Icon(AppIcons.edit, size: 16),
             label: const Text('Edit'),
           ),
+        OutlinedButton.icon(
+          onPressed: () => _duplicateJob(job),
+          icon: Icon(AppIcons.copy, size: 16),
+          label: const Text('Duplicate'),
+        ),
         if (job.status != DispatchedJobStatus.completed)
           OutlinedButton.icon(
             onPressed: () => _showReassignDialog(job),
@@ -372,6 +506,44 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
         ),
       ],
     );
+  }
+
+  void _duplicateJob(DispatchedJob job) {
+    final duplicate = DispatchedJob(
+      id: '',
+      companyId: job.companyId,
+      title: '${job.title} (Copy)',
+      description: job.description,
+      jobNumber: null,
+      jobType: job.jobType,
+      siteName: job.siteName,
+      siteAddress: job.siteAddress,
+      companySiteId: job.companySiteId,
+      latitude: job.latitude,
+      longitude: job.longitude,
+      parkingNotes: job.parkingNotes,
+      accessNotes: job.accessNotes,
+      siteNotes: job.siteNotes,
+      contactName: job.contactName,
+      contactPhone: job.contactPhone,
+      contactEmail: job.contactEmail,
+      assignedTo: null,
+      assignedToName: null,
+      createdBy: '',
+      createdByName: '',
+      scheduledDate: null,
+      scheduledTime: null,
+      estimatedDuration: job.estimatedDuration,
+      status: DispatchedJobStatus.created,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      priority: job.priority,
+      systemCategory: job.systemCategory,
+      panelMake: job.panelMake,
+      panelLocation: job.panelLocation,
+      numberOfZones: job.numberOfZones,
+    );
+    context.push('/jobs/create', extra: duplicate);
   }
 
   Future<void> _showReassignDialog(DispatchedJob job) async {
@@ -438,28 +610,17 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
   }
 
   Future<void> _cancelJob(DispatchedJob job) async {
-    final confirmed = await showDialog<bool>(
+    final reason = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cancel Job?'),
-        content: Text('Are you sure you want to cancel "${job.title}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('No')),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Cancel Job'),
-          ),
-        ],
-      ),
+      builder: (_) => const CancelJobDialog(),
     );
 
-    if (confirmed == true) {
+    if (reason != null) {
       await DispatchService.instance.updateJobStatus(
         companyId: widget.companyId,
         jobId: job.id,
         newStatus: DispatchedJobStatus.declined,
-        declineReason: 'Cancelled by dispatcher',
+        declineReason: reason,
       );
     }
   }

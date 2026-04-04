@@ -731,7 +731,9 @@ class _InteractiveFloorPlanScreenState
                                 },
                                 onPanUpdate: (details) {
                                   if (_draggingAssetId != asset.id) return;
-                                  final scale = _transformController.value.entry(0, 0);
+                                  final scale = kIsWeb
+                                      ? _transformController.value.getMaxScaleOnAxis()
+                                      : _transformController.value.entry(0, 0);
                                   setState(() {
                                     _dragPosition = Offset(
                                       (_dragPosition?.dx ?? 0) + details.delta.dx / scale,
@@ -788,7 +790,9 @@ class _InteractiveFloorPlanScreenState
                               },
                               onLongPressMoveUpdate: (details) {
                                 if (_draggingAssetId != asset.id) return;
-                                final scale = _transformController.value.entry(0, 0);
+                                final scale = kIsWeb
+                                    ? _transformController.value.getMaxScaleOnAxis()
+                                    : _transformController.value.entry(0, 0);
                                 final startX = asset.xPercent! * _imageWidth;
                                 final startY = asset.yPercent! * _imageHeight;
                                 setState(() {
@@ -892,33 +896,6 @@ class _InteractiveFloorPlanScreenState
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    color: isDark
-                        ? AppTheme.darkSurfaceElevated.withValues(alpha: 0.95)
-                        : Colors.white.withValues(alpha: 0.95),
-                    child: Row(
-                      children: [
-                        Icon(AppIcons.setting, size: 16,
-                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary),
-                        const SizedBox(width: 6),
-                        Text('Pin Size', style: TextStyle(fontSize: 13,
-                            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary)),
-                        Expanded(
-                          child: Slider(
-                            value: _pinScale,
-                            min: 0.5,
-                            max: 2.5,
-                            divisions: 20,
-                            label: '${(_pinScale * 100).round()}%',
-                            onChanged: (v) => setState(() => _pinScale = v),
-                            onChangeEnd: (_) => _savePinScale(),
                           ),
                         ),
                       ],

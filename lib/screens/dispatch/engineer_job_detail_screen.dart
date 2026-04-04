@@ -11,6 +11,7 @@ import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/site_map_preview.dart';
 import '../new_job/new_job_screen.dart';
 import '../history/job_detail_screen.dart';
 import '../assets/site_asset_register_screen.dart';
@@ -92,6 +93,14 @@ class _EngineerJobContent extends StatelessWidget {
           if (job.parkingNotes != null) _infoRow('Parking', job.parkingNotes!),
           if (job.accessNotes != null) _infoRow('Access', job.accessNotes!),
           if (job.siteNotes != null) _infoRow('Notes', job.siteNotes!),
+          const SizedBox(height: 12),
+          SiteMapPreview(
+            address: job.siteAddress,
+            latitude: job.latitude,
+            longitude: job.longitude,
+            height: 180,
+            onTap: () => _openMaps(context, job.siteAddress),
+          ),
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,

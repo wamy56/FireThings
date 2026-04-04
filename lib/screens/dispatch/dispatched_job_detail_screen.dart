@@ -14,6 +14,7 @@ import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/site_map_preview.dart';
 import '../history/job_detail_screen.dart';
 import '../assets/site_asset_register_screen.dart';
 import '../new_job/new_job_screen.dart';
@@ -114,9 +115,21 @@ class _JobDetailContent extends StatelessWidget {
             _detailRow(AppIcons.note, 'Notes', job.siteNotes!),
         ]),
 
-        // Get Directions button
+        // Map preview
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
+          child: SiteMapPreview(
+            address: job.siteAddress,
+            latitude: job.latitude,
+            longitude: job.longitude,
+            height: 180,
+            onTap: () => _openMaps(context, job.siteAddress),
+          ),
+        ),
+
+        // Get Directions button
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
           child: OutlinedButton.icon(
             onPressed: () => _openMaps(context, job.siteAddress),
             icon: Icon(AppIcons.map),

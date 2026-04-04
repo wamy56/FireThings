@@ -13,6 +13,12 @@ import '../../utils/adaptive_widgets.dart';
 import 'web_job_detail_panel.dart';
 import '../../services/web_notification_service.dart';
 import '../../services/analytics_service.dart';
+import 'dashboard/job_helpers.dart';
+import 'dashboard/date_range_filter.dart';
+import 'dashboard/bulk_actions_toolbar.dart';
+import 'dashboard/csv_export.dart';
+import 'dart:convert';
+import '../../utils/download_stub.dart' if (dart.library.html) '../../utils/download_web.dart';
 
 class WebDashboardScreen extends StatefulWidget {
   final String? initialJobId;
@@ -28,8 +34,12 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
   String? _statusFilter;
   String? _engineerFilter;
   String _searchQuery = '';
-  int _sortColumnIndex = 0;
+  String _sortColumnKey = 'title';
   bool _sortAscending = true;
+  int _rowsPerPage = 25;
+  int _currentPage = 0;
+  DateRangePreset? _datePreset;
+  DateTimeRange? _customRange;
   String? _selectedJobId;
   bool _panelVisible = false;
   bool _panelAnimateIn = true;
@@ -104,7 +114,18 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
     var filtered = jobs;
 
     if (_statusFilter != null) {
-      filtered = filtered.where((j) => _statusToString(j.status) == _statusFilter).toList();
+      if (_statusFilter == 'active') {
+        filtered = filtered.where((j) =>
+            j.status == DispatchedJobStatus.accepted ||
+            j.status == DispatchedJobStatus.enRoute ||
+            j.status == DispatchedJobStatus.onSite).toList();
+      } else if (_statusFilter == 'urgent') {
+        filtered = filtered.where((j) =>
+            j.priority != JobPriority.normal &&
+            j.status != DispatchedJobStatus.completed).toList();
+      } else {
+        filtered = filtered.where((j) => jobStatusToString(j.status) == _statusFilter).toList();
+      }
     }
 
     if (_engineerFilter != null) {
@@ -127,6 +148,34 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
       }).toList();
     }
 
+    if (_datePreset != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      filtered = filtered.where((j) {
+        if (j.scheduledDate == null) {
+          return _datePreset == DateRangePreset.overdue;
+        }
+        final d = DateTime(j.scheduledDate!.year, j.scheduledDate!.month, j.scheduledDate!.day);
+        switch (_datePreset!) {
+          case DateRangePreset.today:
+            return d == today;
+          case DateRangePreset.thisWeek:
+            final weekStart = today.subtract(Duration(days: today.weekday - 1));
+            final weekEnd = weekStart.add(const Duration(days: 7));
+            return !d.isBefore(weekStart) && d.isBefore(weekEnd);
+          case DateRangePreset.thisMonth:
+            return d.year == today.year && d.month == today.month;
+          case DateRangePreset.overdue:
+            return d.isBefore(today) && j.status != DispatchedJobStatus.completed;
+          case DateRangePreset.custom:
+            if (_customRange == null) return true;
+            final start = DateTime(_customRange!.start.year, _customRange!.start.month, _customRange!.start.day);
+            final end = DateTime(_customRange!.end.year, _customRange!.end.month, _customRange!.end.day).add(const Duration(days: 1));
+            return !d.isBefore(start) && d.isBefore(end);
+        }
+      }).toList();
+    }
+
     return filtered;
   }
 
@@ -134,19 +183,25 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
     final sorted = List<DispatchedJob>.from(jobs);
     sorted.sort((a, b) {
       int cmp;
-      switch (_sortColumnIndex) {
-        case 0:
+      switch (_sortColumnKey) {
+        case 'title':
           cmp = a.title.compareTo(b.title);
-        case 1:
+        case 'site':
           cmp = a.siteName.compareTo(b.siteName);
-        case 2:
+        case 'engineer':
           cmp = (a.assignedToName ?? '').compareTo(b.assignedToName ?? '');
-        case 3:
+        case 'date':
           cmp = (a.scheduledDate ?? DateTime(2099)).compareTo(b.scheduledDate ?? DateTime(2099));
-        case 4:
+        case 'priority':
           cmp = a.priority.index.compareTo(b.priority.index);
-        case 5:
+        case 'status':
           cmp = a.status.index.compareTo(b.status.index);
+        case 'jobNumber':
+          cmp = (a.jobNumber ?? '').compareTo(b.jobNumber ?? '');
+        case 'jobType':
+          cmp = (a.jobType ?? '').compareTo(b.jobType ?? '');
+        case 'contactName':
+          cmp = (a.contactName ?? '').compareTo(b.contactName ?? '');
         default:
           cmp = 0;
       }
@@ -181,6 +236,11 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
 
         final allJobs = snapshot.data ?? [];
         final filteredJobs = _sortJobs(_filterJobs(allJobs));
+        final totalPages = (filteredJobs.length / _rowsPerPage).ceil();
+        final safePage = _currentPage.clamp(0, totalPages > 0 ? totalPages - 1 : 0);
+        final startIndex = safePage * _rowsPerPage;
+        final endIndex = (startIndex + _rowsPerPage).clamp(0, filteredJobs.length);
+        final pageJobs = filteredJobs.sublist(startIndex, endIndex);
 
         return Stack(
           children: [
@@ -190,14 +250,43 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
                 if (!_notificationBannerDismissed &&
                     !WebNotificationService.instance.permissionGranted)
                   _buildNotificationBanner(isDark),
-                _buildHeader(isDark),
+                _buildHeader(isDark, filteredJobs),
                 _buildSummaryCards(allJobs, isDark),
                 _buildFilterBar(isDark),
+                DateRangeFilterBar(
+                  activePreset: _datePreset,
+                  customRange: _customRange,
+                  onPresetChanged: (preset) {
+                    setState(() {
+                      _datePreset = preset;
+                      _currentPage = 0;
+                    });
+                  },
+                  onCustomRangeSelected: (range) {
+                    setState(() {
+                      _customRange = range;
+                      _datePreset = DateRangePreset.custom;
+                      _currentPage = 0;
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                if (_selectedJobIds.isNotEmpty)
+                  BulkActionsToolbar(
+                    selectedJobIds: _selectedJobIds,
+                    pageJobIds: pageJobs.map((j) => j.id).toList(),
+                    members: _members,
+                    companyId: companyId,
+                    onClearSelection: () => setState(() => _selectedJobIds.clear()),
+                    onSelectionChanged: () => setState(() {}),
+                  ),
                 Expanded(
                   child: filteredJobs.isEmpty
                       ? _buildEmptyState(isDark)
-                      : _buildJobTable(filteredJobs, isDark),
+                      : _buildJobTable(pageJobs, isDark),
                 ),
+                if (filteredJobs.isNotEmpty)
+                  _buildPaginationBar(isDark, filteredJobs.length, safePage, totalPages),
               ],
             ),
             // Dismiss overlay — click outside panel to close
@@ -281,7 +370,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
     );
   }
 
-  Widget _buildHeader(bool isDark) {
+  Widget _buildHeader(bool isDark, List<DispatchedJob> filteredJobs) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
       child: Row(
@@ -293,15 +382,23 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
             ),
           ),
           const Spacer(),
-          if (_selectedJobIds.isNotEmpty) ...[
-            Text(
-              '${_selectedJobIds.length} selected',
-              style: TextStyle(color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey),
-            ),
-            const SizedBox(width: 12),
-            _buildBulkAssignButton(isDark),
-            const SizedBox(width: 12),
-          ],
+          OutlinedButton.icon(
+            onPressed: filteredJobs.isEmpty ? null : () {
+              final csv = generateJobsCsv(filteredJobs, _columnVisibility);
+              final bytes = utf8.encode(csv);
+              downloadFile(
+                Uint8List.fromList(bytes),
+                'jobs_export_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv',
+                'text/csv',
+              );
+              // Analytics: CSV export tracked via Firebase
+            },
+            icon: Icon(AppIcons.download, size: 16),
+            label: const Text('Export'),
+          ),
+          const SizedBox(width: 8),
+          _buildColumnsButton(isDark),
+          const SizedBox(width: 8),
           ElevatedButton.icon(
             onPressed: () => context.push('/jobs/create'),
             icon: Icon(AppIcons.add, size: 18),
@@ -319,14 +416,6 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
     );
   }
 
-  Widget _buildBulkAssignButton(bool isDark) {
-    return OutlinedButton.icon(
-      onPressed: () => _showBulkAssignDialog(),
-      icon: Icon(AppIcons.userAdd, size: 16),
-      label: const Text('Assign Selected'),
-    );
-  }
-
   Widget _buildSummaryCards(List<DispatchedJob> allJobs, bool isDark) {
     final total = allJobs.length;
     final unassigned = allJobs.where((j) => j.status == DispatchedJobStatus.created).length;
@@ -337,7 +426,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
     final completedToday = allJobs.where((j) =>
         j.status == DispatchedJobStatus.completed &&
         j.completedAt != null &&
-        _isToday(j.completedAt!)).length;
+        isToday(j.completedAt!)).length;
     final urgent = allJobs.where((j) =>
         j.priority != JobPriority.normal &&
         j.status != DispatchedJobStatus.completed).length;
@@ -368,6 +457,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
         onTap: () {
           setState(() {
             _statusFilter = isSelected ? null : filterValue;
+            _currentPage = 0;
           });
         },
         child: Container(
@@ -435,7 +525,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
                 DropdownMenuItem(value: 'active', child: Text('Active')),
                 DropdownMenuItem(value: 'urgent', child: Text('Urgent/Emergency')),
               ],
-              onChanged: (v) => setState(() => _statusFilter = v),
+              onChanged: (v) => setState(() { _statusFilter = v; _currentPage = 0; }),
             ),
           ),
           ),
@@ -464,7 +554,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
                   child: Text(m.displayName, overflow: TextOverflow.ellipsis),
                 )),
               ],
-              onChanged: (v) => setState(() => _engineerFilter = v),
+              onChanged: (v) => setState(() { _engineerFilter = v; _currentPage = 0; }),
             ),
           ),
           ),
@@ -499,7 +589,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
                   if (_searchQuery.isEmpty && v.isNotEmpty) {
                     AnalyticsService.instance.logWebSearchUsed();
                   }
-                  setState(() => _searchQuery = v);
+                  setState(() { _searchQuery = v; _currentPage = 0; });
                 },
               ),
             ),
@@ -533,13 +623,72 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
     );
   }
 
+  Widget _buildColumnsButton(bool isDark) {
+    return PopupMenuButton<String>(
+      icon: Icon(AppIcons.setting, size: 18),
+      tooltip: 'Toggle columns',
+      itemBuilder: (context) => _allColumns.map((col) {
+        return PopupMenuItem<String>(
+          value: col.key,
+          enabled: !col.alwaysVisible,
+          child: StatefulBuilder(
+            builder: (context, setMenuState) {
+              return CheckboxListTile(
+                value: _columnVisibility[col.key] ?? false,
+                onChanged: col.alwaysVisible ? null : (v) {
+                  setState(() => _columnVisibility[col.key] = v ?? false);
+                  setMenuState(() {});
+                },
+                title: Text(col.label, style: const TextStyle(fontSize: 14)),
+                dense: true,
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+              );
+            },
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // Column definitions for dynamic visibility
+  static const _allColumns = [
+    _ColumnDef(key: 'title', label: 'Title', alwaysVisible: true),
+    _ColumnDef(key: 'jobNumber', label: 'Job #'),
+    _ColumnDef(key: 'jobType', label: 'Type'),
+    _ColumnDef(key: 'site', label: 'Site'),
+    _ColumnDef(key: 'engineer', label: 'Engineer'),
+    _ColumnDef(key: 'date', label: 'Date'),
+    _ColumnDef(key: 'priority', label: 'Priority'),
+    _ColumnDef(key: 'status', label: 'Status'),
+    _ColumnDef(key: 'contactName', label: 'Contact'),
+  ];
+
+  final Map<String, bool> _columnVisibility = {
+    'title': true,
+    'jobNumber': false,
+    'jobType': false,
+    'site': true,
+    'engineer': true,
+    'date': true,
+    'priority': true,
+    'status': true,
+    'contactName': false,
+  };
+
+  List<_ColumnDef> get _visibleColumns =>
+      _allColumns.where((c) => _columnVisibility[c.key] == true).toList();
+
   Widget _buildJobTable(List<DispatchedJob> jobs, bool isDark) {
+    final visible = _visibleColumns;
+    final sortIndex = visible.indexWhere((c) => c.key == _sortColumnKey);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       child: SizedBox(
         width: double.infinity,
         child: DataTable(
-          sortColumnIndex: _sortColumnIndex,
+          sortColumnIndex: sortIndex >= 0 ? sortIndex : null,
           sortAscending: _sortAscending,
           showCheckboxColumn: true,
           headingRowColor: WidgetStateProperty.all(
@@ -553,32 +702,13 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
             }
             return null;
           }),
-          columns: [
-            DataColumn(
-              label: const Text('Title', style: TextStyle(fontWeight: FontWeight.w600)),
-              onSort: (i, asc) => setState(() { _sortColumnIndex = i; _sortAscending = asc; }),
-            ),
-            DataColumn(
-              label: const Text('Site', style: TextStyle(fontWeight: FontWeight.w600)),
-              onSort: (i, asc) => setState(() { _sortColumnIndex = i; _sortAscending = asc; }),
-            ),
-            DataColumn(
-              label: const Text('Engineer', style: TextStyle(fontWeight: FontWeight.w600)),
-              onSort: (i, asc) => setState(() { _sortColumnIndex = i; _sortAscending = asc; }),
-            ),
-            DataColumn(
-              label: const Text('Date', style: TextStyle(fontWeight: FontWeight.w600)),
-              onSort: (i, asc) => setState(() { _sortColumnIndex = i; _sortAscending = asc; }),
-            ),
-            DataColumn(
-              label: const Text('Priority', style: TextStyle(fontWeight: FontWeight.w600)),
-              onSort: (i, asc) => setState(() { _sortColumnIndex = i; _sortAscending = asc; }),
-            ),
-            DataColumn(
-              label: const Text('Status', style: TextStyle(fontWeight: FontWeight.w600)),
-              onSort: (i, asc) => setState(() { _sortColumnIndex = i; _sortAscending = asc; }),
-            ),
-          ],
+          columns: visible.map((col) => DataColumn(
+            label: Text(col.label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            onSort: (_, asc) => setState(() {
+              _sortColumnKey = col.key;
+              _sortAscending = asc;
+            }),
+          )).toList(),
           rows: jobs.map((job) {
             final isSelected = _selectedJobIds.contains(job.id);
             return DataRow(
@@ -592,50 +722,10 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
                   }
                 });
               },
-              cells: [
-                DataCell(
-                  Text(
-                    job.title,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () => _selectJob(job.id),
-                ),
-                DataCell(
-                  Text(
-                    job.siteName,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  onTap: () => _selectJob(job.id),
-                ),
-                DataCell(
-                  Text(
-                    job.assignedToName ?? '\u2014',
-                    style: TextStyle(
-                      color: job.assignedToName == null
-                          ? (isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey)
-                          : null,
-                    ),
-                  ),
-                  onTap: () => _selectJob(job.id),
-                ),
-                DataCell(
-                  Text(
-                    job.scheduledDate != null
-                        ? DateFormat('dd MMM yyyy').format(job.scheduledDate!)
-                        : '\u2014',
-                  ),
-                  onTap: () => _selectJob(job.id),
-                ),
-                DataCell(
-                  _priorityBadge(job.priority),
-                  onTap: () => _selectJob(job.id),
-                ),
-                DataCell(
-                  _statusBadge(job.status),
-                  onTap: () => _selectJob(job.id),
-                ),
-              ],
+              cells: visible.map((col) => DataCell(
+                _cellContent(col.key, job, isDark),
+                onTap: () => _selectJob(job.id),
+              )).toList(),
             );
           }).toList(),
         ),
@@ -643,144 +733,141 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
     );
   }
 
-  Widget _statusBadge(DispatchedJobStatus status) {
-    final color = _statusColor(status);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        _statusLabel(status),
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
-      ),
-    );
-  }
-
-  Widget _priorityBadge(JobPriority priority) {
-    if (priority == JobPriority.normal) {
-      return Text(
-        'Normal',
-        style: TextStyle(fontSize: 12, color: AppTheme.mediumGrey),
-      );
-    }
-    final isEmergency = priority == JobPriority.emergency;
-    final color = isEmergency ? Colors.red : Colors.orange;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        isEmergency ? 'EMERGENCY' : 'URGENT',
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
-      ),
-    );
-  }
-
-  void _showBulkAssignDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        String? selectedUid;
-        String? selectedName;
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return AlertDialog(
-              title: Text('Assign ${_selectedJobIds.length} Jobs'),
-              content: DropdownButtonFormField<String?>(
-                decoration: InputDecoration(
-                  labelText: 'Engineer',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                items: _members.map((m) => DropdownMenuItem(
-                  value: m.uid,
-                  child: Text(m.displayName),
-                )).toList(),
-                onChanged: (v) {
-                  final member = _members.where((m) => m.uid == v).firstOrNull;
-                  setDialogState(() {
-                    selectedUid = v;
-                    selectedName = member?.displayName;
-                  });
-                },
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: selectedUid == null
-                      ? null
-                      : () async {
-                          final companyId = _companyId;
-                          if (companyId == null) return;
-                          for (final jobId in _selectedJobIds) {
-                            await DispatchService.instance.assignJob(
-                              companyId: companyId,
-                              jobId: jobId,
-                              engineerUid: selectedUid!,
-                              engineerName: selectedName!,
-                            );
-                          }
-                          if (ctx.mounted) {
-                            setState(() => _selectedJobIds.clear());
-                            Navigator.of(ctx).pop();
-                          }
-                        },
-                  child: const Text('Assign'),
-                ),
-              ],
-            );
-          },
+  Widget _cellContent(String key, DispatchedJob job, bool isDark) {
+    switch (key) {
+      case 'title':
+        return Text(
+          job.title,
+          style: const TextStyle(fontWeight: FontWeight.w500),
+          overflow: TextOverflow.ellipsis,
         );
-      },
+      case 'jobNumber':
+        return Text(job.jobNumber ?? '\u2014', overflow: TextOverflow.ellipsis);
+      case 'jobType':
+        return Text(job.jobType ?? '\u2014', overflow: TextOverflow.ellipsis);
+      case 'site':
+        return Text(job.siteName, overflow: TextOverflow.ellipsis);
+      case 'engineer':
+        return Text(
+          job.assignedToName ?? '\u2014',
+          style: TextStyle(
+            color: job.assignedToName == null
+                ? (isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey)
+                : null,
+          ),
+        );
+      case 'date':
+        return Text(
+          job.scheduledDate != null
+              ? DateFormat('dd MMM yyyy').format(job.scheduledDate!)
+              : '\u2014',
+        );
+      case 'priority':
+        return jobPriorityBadge(job.priority);
+      case 'status':
+        return jobStatusBadge(job.status);
+      case 'contactName':
+        return Text(job.contactName ?? '\u2014', overflow: TextOverflow.ellipsis);
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildPaginationBar(bool isDark, int totalItems, int currentPage, int totalPages) {
+    final startItem = totalItems == 0 ? 0 : currentPage * _rowsPerPage + 1;
+    final endItem = ((currentPage + 1) * _rowsPerPage).clamp(0, totalItems);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: isDark ? Colors.white12 : Colors.grey.shade200,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Rows per page
+          Text('Rows per page:', style: TextStyle(
+            fontSize: 13,
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
+          )),
+          const SizedBox(width: 8),
+          DropdownButton<int>(
+            value: _rowsPerPage,
+            underline: const SizedBox.shrink(),
+            isDense: true,
+            items: const [
+              DropdownMenuItem(value: 25, child: Text('25')),
+              DropdownMenuItem(value: 50, child: Text('50')),
+              DropdownMenuItem(value: 100, child: Text('100')),
+            ],
+            onChanged: (v) {
+              if (v != null) setState(() { _rowsPerPage = v; _currentPage = 0; });
+            },
+          ),
+          const Spacer(),
+          // Range text
+          Text(
+            'Showing $startItem–$endItem of $totalItems',
+            style: TextStyle(
+              fontSize: 13,
+              color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Page navigation
+          IconButton(
+            icon: const Icon(Icons.first_page, size: 20),
+            onPressed: currentPage > 0 ? () => setState(() => _currentPage = 0) : null,
+            iconSize: 20,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_left, size: 20),
+            onPressed: currentPage > 0 ? () => setState(() => _currentPage--) : null,
+            iconSize: 20,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              '${currentPage + 1} / $totalPages',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right, size: 20),
+            onPressed: currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
+            iconSize: 20,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+          IconButton(
+            icon: const Icon(Icons.last_page, size: 20),
+            onPressed: currentPage < totalPages - 1 ? () => setState(() => _currentPage = totalPages - 1) : null,
+            iconSize: 20,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+        ],
+      ),
     );
   }
 
-  Color _statusColor(DispatchedJobStatus status) {
-    switch (status) {
-      case DispatchedJobStatus.created: return Colors.orange;
-      case DispatchedJobStatus.assigned: return Colors.blue;
-      case DispatchedJobStatus.accepted: return Colors.teal;
-      case DispatchedJobStatus.enRoute: return Colors.indigo;
-      case DispatchedJobStatus.onSite: return Colors.purple;
-      case DispatchedJobStatus.completed: return AppTheme.successGreen;
-      case DispatchedJobStatus.declined: return Colors.red;
-    }
-  }
+}
 
-  String _statusLabel(DispatchedJobStatus status) {
-    switch (status) {
-      case DispatchedJobStatus.created: return 'Unassigned';
-      case DispatchedJobStatus.assigned: return 'Assigned';
-      case DispatchedJobStatus.accepted: return 'Accepted';
-      case DispatchedJobStatus.enRoute: return 'En Route';
-      case DispatchedJobStatus.onSite: return 'On Site';
-      case DispatchedJobStatus.completed: return 'Completed';
-      case DispatchedJobStatus.declined: return 'Declined';
-    }
-  }
+class _ColumnDef {
+  final String key;
+  final String label;
+  final bool alwaysVisible;
 
-  String _statusToString(DispatchedJobStatus status) {
-    switch (status) {
-      case DispatchedJobStatus.created: return 'created';
-      case DispatchedJobStatus.assigned: return 'assigned';
-      case DispatchedJobStatus.accepted: return 'accepted';
-      case DispatchedJobStatus.enRoute: return 'en_route';
-      case DispatchedJobStatus.onSite: return 'on_site';
-      case DispatchedJobStatus.completed: return 'completed';
-      case DispatchedJobStatus.declined: return 'declined';
-    }
-  }
-
-  bool _isToday(DateTime date) {
-    final now = DateTime.now();
-    return date.year == now.year && date.month == now.month && date.day == now.day;
-  }
+  const _ColumnDef({
+    required this.key,
+    required this.label,
+    this.alwaysVisible = false,
+  });
 }

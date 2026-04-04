@@ -84,12 +84,12 @@ class AssetPin extends StatelessWidget {
                 children: [
                   Container(
                     padding: EdgeInsets.symmetric(
-                      horizontal: 4 * pinScale,
-                      vertical: 1 * pinScale,
+                      horizontal: baseSize * 0.15,
+                      vertical: baseSize * 0.04,
                     ),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(baseSize * 0.12),
                       border: Border.all(
                         color: Colors.grey.shade400,
                         width: 0.5,
@@ -98,14 +98,14 @@ class AssetPin extends StatelessWidget {
                     child: Text(
                       label!,
                       style: TextStyle(
-                        fontSize: 9 * pinScale,
+                        fontSize: baseSize * 0.4,
                         color: Colors.black87,
                         fontWeight: FontWeight.w600,
                         height: 1.1,
                       ),
                     ),
                   ),
-                  SizedBox(height: 2 * pinScale),
+                  SizedBox(height: baseSize * 0.08),
                   symbolWidget,
                 ],
               ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/dispatched_job.dart';
@@ -28,6 +29,7 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isEdit = false;
+  bool _createAnother = false;
 
   // Job details
   final _titleController = TextEditingController();
@@ -64,6 +66,9 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
   String? _assignedToName;
   List<CompanyMember> _members = [];
 
+  // Site ID tracking
+  String? _selectedSiteId;
+
   // Autocomplete
   List<CompanySite> _companySites = [];
   List<CompanyCustomer> _companyCustomers = [];
@@ -76,7 +81,9 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
     _loadMembers();
     _loadSharedData();
     if (widget.editJob != null) {
-      _isEdit = true;
+      if (widget.editJob!.id.isNotEmpty) {
+        _isEdit = true;
+      }
       _populateFromJob(widget.editJob!);
     }
   }
@@ -119,6 +126,7 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
     _priority = job.priority;
     _assignedToUid = job.assignedTo;
     _assignedToName = job.assignedToName;
+    _selectedSiteId = job.companySiteId;
   }
 
   Future<void> _loadMembers() async {
@@ -175,6 +183,7 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
         jobType: _nullIfEmpty(_jobTypeController.text),
         siteName: _siteNameController.text.trim(),
         siteAddress: _siteAddressController.text.trim(),
+        companySiteId: _selectedSiteId,
         parkingNotes: _nullIfEmpty(_parkingNotesController.text),
         accessNotes: _nullIfEmpty(_accessNotesController.text),
         siteNotes: _nullIfEmpty(_siteNotesController.text),
@@ -218,8 +227,26 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
       }
 
       if (mounted) {
-        context.showSuccessToast(_isEdit ? 'Job updated' : 'Job created');
-        Navigator.of(context).pop(true);
+        if (!_isEdit && _createAnother) {
+          context.showSuccessToast('Job created — ready for next job');
+          setState(() {
+            _isLoading = false;
+            _titleController.clear();
+            _descriptionController.clear();
+            _jobNumberController.clear();
+            _jobTypeController.clear();
+            _scheduledDate = null;
+            _scheduledTimeController.clear();
+            _estimatedDurationController.clear();
+            _assignedToUid = null;
+            _assignedToName = null;
+            _priority = JobPriority.normal;
+            // Keep site + contact pre-filled for batch creation
+          });
+        } else {
+          context.showSuccessToast(_isEdit ? 'Job updated' : 'Job created');
+          Navigator.of(context).pop(true);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -238,7 +265,15 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Scaffold(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
+          if (!_isLoading) _saveJob();
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       body: Column(
         children: [
           // Header
@@ -300,7 +335,22 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
                             Expanded(child: _buildRightColumn(isDark)),
                           ],
                         ),
-                        const SizedBox(height: 32),
+                        if (!_isEdit) ...[
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: _createAnother,
+                                onChanged: (v) => setState(() => _createAnother = v ?? false),
+                              ),
+                              GestureDetector(
+                                onTap: () => setState(() => _createAnother = !_createAnother),
+                                child: const Text('Create another job after saving (keeps site & contact)'),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 16),
                         Row(
                           children: [
                             Expanded(
@@ -359,6 +409,8 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
             ),
           ),
         ],
+      ),
+    ),
       ),
     );
   }
@@ -613,6 +665,7 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
       onSelected: (site) {
         _siteNameController.text = site.name;
         _siteAddressController.text = site.address;
+        _selectedSiteId = site.id;
         if (site.notes != null && site.notes!.isNotEmpty) {
           _siteNotesController.text = site.notes!;
         }
@@ -621,7 +674,14 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
         if (controller.text.isEmpty && _siteNameController.text.isNotEmpty) {
           controller.text = _siteNameController.text;
         }
-        controller.addListener(() => _siteNameController.text = controller.text);
+        controller.addListener(() {
+          _siteNameController.text = controller.text;
+          // Clear site ID if user manually edits away from autocomplete match
+          if (_selectedSiteId != null) {
+            final matchesSite = _companySites.any((s) => s.name == controller.text);
+            if (!matchesSite) _selectedSiteId = null;
+          }
+        });
         return CustomTextField(
           controller: controller,
           focusNode: focusNode,

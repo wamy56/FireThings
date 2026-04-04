@@ -156,6 +156,82 @@ class DispatchService {
     }
   }
 
+  /// Bulk update status for multiple jobs.
+  Future<void> bulkUpdateStatus({
+    required String companyId,
+    required Set<String> jobIds,
+    required DispatchedJobStatus newStatus,
+  }) async {
+    final batch = _firestore.batch();
+    final now = DateTime.now().toIso8601String();
+    for (final jobId in jobIds) {
+      final updates = <String, dynamic>{
+        'status': _statusToFirestore(newStatus),
+        'updatedAt': now,
+      };
+      if (newStatus == DispatchedJobStatus.completed) {
+        updates['completedAt'] = now;
+      }
+      if (newStatus == DispatchedJobStatus.declined) {
+        updates['assignedTo'] = null;
+        updates['assignedToName'] = null;
+      }
+      batch.update(_jobsCol(companyId).doc(jobId), updates);
+    }
+    await batch.commit();
+  }
+
+  /// Bulk update priority for multiple jobs.
+  Future<void> bulkUpdatePriority({
+    required String companyId,
+    required Set<String> jobIds,
+    required JobPriority newPriority,
+  }) async {
+    final batch = _firestore.batch();
+    final now = DateTime.now().toIso8601String();
+    final priorityStr = newPriority == JobPriority.normal
+        ? 'normal'
+        : newPriority == JobPriority.urgent
+            ? 'urgent'
+            : 'emergency';
+    for (final jobId in jobIds) {
+      batch.update(_jobsCol(companyId).doc(jobId), {
+        'priority': priorityStr,
+        'updatedAt': now,
+      });
+    }
+    await batch.commit();
+  }
+
+  /// Bulk update scheduled date for multiple jobs.
+  Future<void> bulkUpdateDate({
+    required String companyId,
+    required Set<String> jobIds,
+    required DateTime newDate,
+  }) async {
+    final batch = _firestore.batch();
+    final now = DateTime.now().toIso8601String();
+    for (final jobId in jobIds) {
+      batch.update(_jobsCol(companyId).doc(jobId), {
+        'scheduledDate': newDate.toIso8601String(),
+        'updatedAt': now,
+      });
+    }
+    await batch.commit();
+  }
+
+  /// Bulk delete multiple jobs.
+  Future<void> bulkDelete({
+    required String companyId,
+    required Set<String> jobIds,
+  }) async {
+    final batch = _firestore.batch();
+    for (final jobId in jobIds) {
+      batch.delete(_jobsCol(companyId).doc(jobId));
+    }
+    await batch.commit();
+  }
+
   String _statusToFirestore(DispatchedJobStatus status) {
     switch (status) {
       case DispatchedJobStatus.created:
