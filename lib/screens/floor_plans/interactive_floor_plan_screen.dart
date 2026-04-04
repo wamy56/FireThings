@@ -55,7 +55,15 @@ class _InteractiveFloorPlanScreenState
   Offset? _dragPosition; // Current drag position in image coordinates
   late double _pinScale;
   late bool _showLabels;
+  bool _showPinSizeControl = false;
+  bool _isRelocatingMode = false;
+  String? _relocatingAssetId;
   Map<String, AssetType> _assetTypes = {};
+
+  // Undo state for last pin move
+  Asset? _lastMovedAsset;
+  double? _lastMovedOldX;
+  double? _lastMovedOldY;
 
   // Corrected image dimensions (may differ from stored values due to EXIF rotation)
   late double _imageWidth;
@@ -234,6 +242,7 @@ class _InteractiveFloorPlanScreenState
               Navigator.pop(ctx);
               await _failAssetFromFloorPlan(asset, type);
             },
+            onRelocate: () => _startRelocate(asset),
           ),
         ),
       ),
@@ -299,14 +308,19 @@ class _InteractiveFloorPlanScreenState
   }
 
   void _onFloorPlanTap(TapDownDetails details) {
-    if (!_isPlacementMode) return;
-
     // localPosition is already in image-space coordinates because
     // the GestureDetector is inside the InteractiveViewer's child
     final xPercent = details.localPosition.dx / _imageWidth;
     final yPercent = details.localPosition.dy / _imageHeight;
 
     if (xPercent < 0 || xPercent > 1 || yPercent < 0 || yPercent > 1) return;
+
+    if (_isRelocatingMode && _relocatingAssetId != null) {
+      _completeRelocate(xPercent, yPercent);
+      return;
+    }
+
+    if (!_isPlacementMode) return;
 
     _showPlacementOptions(xPercent, yPercent);
   }
@@ -457,6 +471,77 @@ class _InteractiveFloorPlanScreenState
     }
   }
 
+  void _startRelocate(Asset asset) {
+    Navigator.pop(context); // close bottom sheet
+    setState(() {
+      _isRelocatingMode = true;
+      _relocatingAssetId = asset.id;
+      _isPlacementMode = false;
+      _selectedAssetId = null;
+    });
+  }
+
+  Future<void> _completeRelocate(double xPercent, double yPercent) async {
+    final assetId = _relocatingAssetId;
+    setState(() {
+      _isRelocatingMode = false;
+      _relocatingAssetId = null;
+    });
+    if (assetId == null) return;
+
+    try {
+      final assets = await AssetService.instance
+          .getAssetsStream(widget.basePath, widget.siteId)
+          .first;
+      final asset = assets.firstWhere((a) => a.id == assetId);
+      final oldX = asset.xPercent;
+      final oldY = asset.yPercent;
+      await _updateAssetPosition(asset, xPercent, yPercent);
+      _pushUndo(asset, oldX, oldY);
+      if (mounted) context.showSuccessToast('Pin relocated');
+    } catch (_) {
+      if (mounted) context.showErrorToast('Failed to relocate pin');
+    }
+  }
+
+  void _pushUndo(Asset asset, double? oldX, double? oldY) {
+    setState(() {
+      _lastMovedAsset = asset;
+      _lastMovedOldX = oldX;
+      _lastMovedOldY = oldY;
+    });
+    final name = asset.reference ?? 'Pin';
+    showPremiumToast(
+      context: context,
+      message: '$name moved · Tap to undo',
+      variant: ToastVariant.info,
+      duration: const Duration(seconds: 5),
+      onTap: _performUndo,
+    );
+  }
+
+  Future<void> _performUndo() async {
+    final asset = _lastMovedAsset;
+    final oldX = _lastMovedOldX;
+    final oldY = _lastMovedOldY;
+    if (asset == null || oldX == null || oldY == null) return;
+
+    setState(() {
+      _lastMovedAsset = null;
+      _lastMovedOldX = null;
+      _lastMovedOldY = null;
+    });
+
+    try {
+      final updated = asset.copyWith(xPercent: oldX, yPercent: oldY);
+      await AssetService.instance
+          .updateAsset(widget.basePath, widget.siteId, updated);
+      if (mounted) context.showSuccessToast('Move undone');
+    } catch (_) {
+      if (mounted) context.showErrorToast('Failed to undo');
+    }
+  }
+
   Color _colorForStatus(String status) {
     switch (status) {
       case Asset.statusPass:
@@ -490,6 +575,16 @@ class _InteractiveFloorPlanScreenState
               _saveShowLabels();
             },
           ),
+          // Pin size toggle
+          IconButton(
+            icon: Icon(
+              AppIcons.slider,
+              color: _showPinSizeControl ? AppTheme.primaryBlue : null,
+            ),
+            tooltip: 'Pin size',
+            onPressed: () =>
+                setState(() => _showPinSizeControl = !_showPinSizeControl),
+          ),
           // Placement mode toggle
           IconButton(
             icon: Icon(
@@ -498,8 +593,16 @@ class _InteractiveFloorPlanScreenState
             ),
             tooltip:
                 _isPlacementMode ? 'Exit placement mode' : 'Place assets',
-            onPressed: () =>
-                setState(() => _isPlacementMode = !_isPlacementMode),
+            onPressed: () {
+              setState(() {
+                _isPlacementMode = !_isPlacementMode;
+                if (_isPlacementMode) {
+                  _showPinSizeControl = false;
+                  _isRelocatingMode = false;
+                  _relocatingAssetId = null;
+                }
+              });
+            },
           ),
         ],
       ),
@@ -628,7 +731,7 @@ class _InteractiveFloorPlanScreenState
                                 },
                                 onPanUpdate: (details) {
                                   if (_draggingAssetId != asset.id) return;
-                                  final scale = _transformController.value.getMaxScaleOnAxis();
+                                  final scale = _transformController.value.entry(0, 0);
                                   setState(() {
                                     _dragPosition = Offset(
                                       (_dragPosition?.dx ?? 0) + details.delta.dx / scale,
@@ -641,7 +744,10 @@ class _InteractiveFloorPlanScreenState
                                     final newX = _dragPosition!.dx / _imageWidth;
                                     final newY = _dragPosition!.dy / _imageHeight;
                                     if (newX >= 0 && newX <= 1 && newY >= 0 && newY <= 1) {
+                                      final oldX = asset.xPercent;
+                                      final oldY = asset.yPercent;
                                       _updateAssetPosition(asset, newX, newY);
+                                      _pushUndo(asset, oldX, oldY);
                                     }
                                   }
                                   setState(() {
@@ -682,7 +788,7 @@ class _InteractiveFloorPlanScreenState
                               },
                               onLongPressMoveUpdate: (details) {
                                 if (_draggingAssetId != asset.id) return;
-                                final scale = _transformController.value.getMaxScaleOnAxis();
+                                final scale = _transformController.value.entry(0, 0);
                                 final startX = asset.xPercent! * _imageWidth;
                                 final startY = asset.yPercent! * _imageHeight;
                                 setState(() {
@@ -697,7 +803,10 @@ class _InteractiveFloorPlanScreenState
                                   final newX = _dragPosition!.dx / _imageWidth;
                                   final newY = _dragPosition!.dy / _imageHeight;
                                   if (newX >= 0 && newX <= 1 && newY >= 0 && newY <= 1) {
+                                    final oldX = asset.xPercent;
+                                    final oldY = asset.yPercent;
                                     _updateAssetPosition(asset, newX, newY);
+                                    _pushUndo(asset, oldX, oldY);
                                   }
                                 }
                                 setState(() {
@@ -726,6 +835,41 @@ class _InteractiveFloorPlanScreenState
               );
             },
           ),
+
+          // Pin size overlay (independent of placement mode)
+          if (_showPinSizeControl && !_isPlacementMode && !_isRelocatingMode)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                color: isDark
+                    ? AppTheme.darkSurfaceElevated.withValues(alpha: 0.95)
+                    : Colors.white.withValues(alpha: 0.95),
+                child: Row(
+                  children: [
+                    Icon(AppIcons.setting, size: 16,
+                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary),
+                    const SizedBox(width: 6),
+                    Text('Pin Size', style: TextStyle(fontSize: 13,
+                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary)),
+                    Expanded(
+                      child: Slider(
+                        value: _pinScale,
+                        min: 0.5,
+                        max: 2.5,
+                        divisions: 20,
+                        label: '${(_pinScale * 100).round()}%',
+                        onChanged: (v) => setState(() => _pinScale = v),
+                        onChangeEnd: (_) => _savePinScale(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // Placement mode overlay
           if (_isPlacementMode)
@@ -781,6 +925,47 @@ class _InteractiveFloorPlanScreenState
                     ),
                   ),
                 ],
+              ),
+            ),
+
+          // Relocate mode overlay
+          if (_isRelocatingMode)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: AppTheme.primaryBlue.withValues(alpha: 0.9),
+                child: Row(
+                  children: [
+                    const Icon(AppIcons.location, color: Colors.white, size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Tap where you want to move this pin',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() {
+                        _isRelocatingMode = false;
+                        _relocatingAssetId = null;
+                      }),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
 
@@ -903,6 +1088,7 @@ class _FloorPlanAssetSheet extends StatefulWidget {
   final VoidCallback onViewDetails;
   final Future<void> Function() onPass;
   final Future<void> Function() onFail;
+  final VoidCallback onRelocate;
 
   const _FloorPlanAssetSheet({
     required this.asset,
@@ -914,6 +1100,7 @@ class _FloorPlanAssetSheet extends StatefulWidget {
     required this.onViewDetails,
     required this.onPass,
     required this.onFail,
+    required this.onRelocate,
   });
 
   @override
@@ -1116,21 +1303,35 @@ class _FloorPlanAssetSheetState extends State<_FloorPlanAssetSheet> {
             ),
         ],
 
-        // View Details link
+        // Relocate + View Details links
         const SizedBox(height: 12),
-        Center(
-          child: TextButton(
-            onPressed: widget.onViewDetails,
-            child: Text(
-              'View Details',
-              style: TextStyle(
-                fontSize: 14,
-                color: widget.isDark
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton.icon(
+              onPressed: widget.onRelocate,
+              icon: const Icon(AppIcons.location, size: 16),
+              label: const Text('Relocate', style: TextStyle(fontSize: 14)),
+              style: TextButton.styleFrom(
+                foregroundColor: widget.isDark
                     ? AppTheme.accentOrange
                     : AppTheme.primaryBlue,
               ),
             ),
-          ),
+            const SizedBox(width: 16),
+            TextButton(
+              onPressed: widget.onViewDetails,
+              child: Text(
+                'View Details',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: widget.isDark
+                      ? AppTheme.accentOrange
+                      : AppTheme.primaryBlue,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

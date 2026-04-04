@@ -7,6 +7,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
+import '../settings/privacy_policy_screen.dart';
 
 class WebSettingsScreen extends StatefulWidget {
   const WebSettingsScreen({super.key});
@@ -170,7 +171,12 @@ class _WebSettingsScreenState extends State<WebSettingsScreen> {
                   subtitle: const Text('View privacy policy'),
                   trailing: Icon(AppIcons.arrowRight, size: 18),
                   onTap: () {
-                    // Open privacy policy URL
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const PrivacyPolicyScreen(),
+                      ),
+                    );
                   },
                 ),
               ], isDark),

@@ -18,7 +18,6 @@ export 'company_site.dart';
 export 'company_customer.dart';
 export 'asset.dart';
 export 'asset_type.dart';
-export 'checklist_item.dart';
 export 'floor_plan.dart';
 export 'service_record.dart';
 export 'defect.dart';

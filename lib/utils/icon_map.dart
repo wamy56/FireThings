@@ -194,4 +194,5 @@ class AppIcons {
   static const IconData shield = IconsaxPlusLinear.shield_tick;
   static const IconData image = IconsaxPlusLinear.image;
   static const IconData award = IconsaxPlusLinear.award;
+  static const IconData undo = IconsaxPlusLinear.refresh_left_square;
 }

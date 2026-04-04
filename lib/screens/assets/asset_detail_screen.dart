@@ -420,7 +420,10 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             ),
         ],
       ),
-      body: ListView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: ListView(
         padding: const EdgeInsets.all(AppTheme.screenPadding),
         children: [
           // Header card
@@ -756,6 +759,8 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
           const SizedBox(height: 40),
         ],
+      ),
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -839,6 +840,21 @@ class ComplianceReportService {
 
   final _storage = FirebaseStorage.instance;
 
+  /// Downloads bytes from a Firebase Storage reference.
+  /// On web, uses getDownloadURL() + HTTP GET to avoid CORS issues with getData().
+  static Future<Uint8List?> _downloadBytes(Reference ref, int maxSize) async {
+    if (kIsWeb) {
+      final url = await ref.getDownloadURL();
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+      return null;
+    } else {
+      return await ref.getData(maxSize);
+    }
+  }
+
   Future<Uint8List> generateReport({
     required String basePath,
     required String siteId,
@@ -905,7 +921,7 @@ class ComplianceReportService {
       try {
         final ref =
             _storage.ref('$basePath/sites/$siteId/floor_plans/${plan.id}.${plan.fileExtension}');
-        final bytes = await ref.getData(5 * 1024 * 1024); // 5MB max
+        final bytes = await _downloadBytes(ref, 5 * 1024 * 1024);
         if (bytes != null) {
           floorPlanImages[plan.id] = bytes;
         }
@@ -936,7 +952,7 @@ class ComplianceReportService {
       for (final url in defect.photoUrls.take(1)) {
         try {
           final ref = _storage.refFromURL(url);
-          final bytes = await ref.getData(2 * 1024 * 1024);
+          final bytes = await _downloadBytes(ref, 2 * 1024 * 1024);
           if (bytes != null) {
             defectPhotos[url.hashCode.toString()] = bytes;
           }
@@ -956,7 +972,7 @@ class ComplianceReportService {
         for (final url in record.defectPhotoUrls.take(1)) {
           try {
             final ref = _storage.refFromURL(url);
-            final bytes = await ref.getData(2 * 1024 * 1024);
+            final bytes = await _downloadBytes(ref, 2 * 1024 * 1024);
             if (bytes != null) {
               defectPhotos[url.hashCode.toString()] = bytes;
             }

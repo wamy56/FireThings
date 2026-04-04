@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/asset_type.dart';
-import '../../models/checklist_item.dart';
 import '../../data/default_asset_types.dart';
 import '../../services/asset_type_service.dart';
 import '../../services/analytics_service.dart';
@@ -223,7 +222,6 @@ class _AssetTypeConfigScreenState extends State<AssetTypeConfigScreen> {
                                 [
                                   if (type.category != null) type.category!,
                                   '${type.variants.length} variants',
-                                  '${type.defaultChecklist.length} checklist items',
                                 ].join(' · '),
                                 style: TextStyle(
                                   fontSize: 13,
@@ -280,7 +278,6 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
   late String _selectedIcon;
   late String _selectedColor;
   late List<String> _variants;
-  late List<ChecklistItem> _checklist;
   bool _saving = false;
 
   static const _iconOptions = [
@@ -315,8 +312,6 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
     '#F97316',
   ];
 
-  static const _resultTypes = ['pass_fail', 'text', 'number', 'yes_no'];
-
   @override
   void initState() {
     super.initState();
@@ -328,7 +323,6 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
     _selectedIcon = widget.type.iconName;
     _selectedColor = widget.type.defaultColor;
     _variants = List.from(widget.type.variants);
-    _checklist = List.from(widget.type.defaultChecklist);
   }
 
   @override
@@ -391,7 +385,6 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
         defaultColor: _selectedColor,
         variants: _variants,
         defaultLifespanYears: lifespan,
-        defaultChecklist: _checklist,
         isBuiltIn: isBuiltIn,
       );
 
@@ -404,11 +397,6 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
           isCustom: !isBuiltIn,
         );
       }
-
-      AnalyticsService.instance.logAssetTypeChecklistModified(
-        typeId: widget.type.id,
-        itemCount: _checklist.length,
-      );
 
       if (mounted) {
         context.showSuccessToast('Asset type saved');
@@ -482,67 +470,6 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
             child: const Text('Add'),
           ),
         ],
-      ),
-    );
-  }
-
-  void _addChecklistItem() {
-    final labelController = TextEditingController();
-    String resultType = 'pass_fail';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Add Checklist Item'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: labelController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                    hintText: 'e.g. Visual inspection'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: resultType,
-                decoration: const InputDecoration(labelText: 'Result Type'),
-                items: _resultTypes
-                    .map((t) => DropdownMenuItem(
-                          value: t,
-                          child: Text(t.replaceAll('_', ' ')),
-                        ))
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) setDialogState(() => resultType = v);
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                final label = labelController.text.trim();
-                if (label.isNotEmpty) {
-                  setState(() {
-                    _checklist.add(ChecklistItem(
-                      id: const Uuid().v4(),
-                      label: label,
-                      resultType: resultType,
-                    ));
-                  });
-                }
-                Navigator.pop(ctx);
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -783,98 +710,6 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
                     const SizedBox(height: 20),
                   ],
 
-                  // Checklist section
-                  Row(
-                    children: [
-                      Text('Inspection Checklist',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color:
-                                isDark ? Colors.white : AppTheme.textPrimary,
-                          )),
-                      const Spacer(),
-                      if (widget.canEdit)
-                        TextButton.icon(
-                          onPressed: _addChecklistItem,
-                          icon: const Icon(AppIcons.add, size: 16),
-                          label: const Text('Add'),
-                        ),
-                    ],
-                  ),
-                  if (_checklist.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Text('No checklist items',
-                          style: TextStyle(
-                              color: isDark
-                                  ? AppTheme.darkTextSecondary
-                                  : AppTheme.textSecondary)),
-                    )
-                  else
-                    ReorderableListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _checklist.length,
-                      onReorder: (oldIndex, newIndex) {
-                        if (!widget.canEdit) return;
-                        setState(() {
-                          if (newIndex > oldIndex) newIndex--;
-                          final item = _checklist.removeAt(oldIndex);
-                          _checklist.insert(newIndex, item);
-                        });
-                      },
-                      itemBuilder: (context, index) {
-                        final item = _checklist[index];
-                        return Container(
-                          key: ValueKey(item.id),
-                          margin: const EdgeInsets.symmetric(vertical: 4),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isDark
-                                ? AppTheme.darkSurfaceElevated
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: AppTheme.cardShadow,
-                          ),
-                          child: Row(
-                            children: [
-                              if (widget.canEdit)
-                                const Icon(Icons.drag_handle, size: 20),
-                              if (widget.canEdit) const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(item.label,
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            color: isDark
-                                                ? Colors.white
-                                                : AppTheme.textPrimary)),
-                                    Text(
-                                      '${item.resultType.replaceAll('_', ' ')}${item.isRequired ? ' · required' : ''}',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          color: isDark
-                                              ? AppTheme.darkTextSecondary
-                                              : AppTheme.textSecondary),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (widget.canEdit)
-                                IconButton(
-                                  icon: const Icon(AppIcons.close, size: 18),
-                                  onPressed: () =>
-                                      setState(() => _checklist.removeAt(index)),
-                                ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
                   const SizedBox(height: 80),
                 ],
               ),

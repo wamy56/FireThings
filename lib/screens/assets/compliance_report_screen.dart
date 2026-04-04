@@ -7,6 +7,7 @@ import '../../services/analytics_service.dart';
 import '../../models/asset.dart';
 import '../../services/asset_service.dart';
 import '../../utils/theme.dart';
+import 'package:printing/printing.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/widgets.dart';
@@ -337,16 +338,22 @@ class _ComplianceReportScreenState extends State<ComplianceReportScreen> {
           width: double.infinity,
           height: 50,
           child: ElevatedButton.icon(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => PdfPreviewScreen(
-                  pdfBytes: _pdfBytes!,
-                  title: 'Compliance Report',
-                  fileName:
-                      '${widget.siteName.replaceAll(' ', '_')}_compliance_report.pdf',
-                ),
-              ),
-            ),
+            onPressed: () {
+              if (kIsWeb) {
+                Printing.layoutPdf(onLayout: (_) => _pdfBytes!);
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PdfPreviewScreen(
+                      pdfBytes: _pdfBytes!,
+                      title: 'Compliance Report',
+                      fileName:
+                          '${widget.siteName.replaceAll(' ', '_')}_compliance_report.pdf',
+                    ),
+                  ),
+                );
+              }
+            },
             icon: const Icon(AppIcons.document),
             label: const Text('View Report'),
           ),

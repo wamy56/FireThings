@@ -1,6 +1,4 @@
-import 'checklist_item.dart';
-
-/// Defines a type of fire safety asset with its default checklist and properties.
+/// Defines a type of fire safety asset with its properties.
 class AssetType {
   final String id;
   final String name;
@@ -9,7 +7,6 @@ class AssetType {
   final String defaultColor; // hex colour for pins
   final List<String> variants;
   final int? defaultLifespanYears;
-  final List<ChecklistItem> defaultChecklist;
   final List<String> commonFaults;
   final bool isBuiltIn;
 
@@ -21,7 +18,6 @@ class AssetType {
     required this.defaultColor,
     this.variants = const [],
     this.defaultLifespanYears,
-    this.defaultChecklist = const [],
     this.commonFaults = const [],
     this.isBuiltIn = false,
   });
@@ -35,7 +31,6 @@ class AssetType {
       'defaultColor': defaultColor,
       'variants': variants,
       'defaultLifespanYears': defaultLifespanYears,
-      'defaultChecklist': defaultChecklist.map((c) => c.toJson()).toList(),
       'commonFaults': commonFaults,
       'isBuiltIn': isBuiltIn,
     };
@@ -53,10 +48,6 @@ class AssetType {
               .toList() ??
           [],
       defaultLifespanYears: json['defaultLifespanYears'] as int?,
-      defaultChecklist: (json['defaultChecklist'] as List<dynamic>?)
-              ?.map((c) => ChecklistItem.fromJson(c as Map<String, dynamic>))
-              .toList() ??
-          [],
       commonFaults: (json['commonFaults'] as List<dynamic>?)
               ?.map((f) => f as String)
               .toList() ??
@@ -73,7 +64,6 @@ class AssetType {
     String? defaultColor,
     List<String>? variants,
     int? defaultLifespanYears,
-    List<ChecklistItem>? defaultChecklist,
     List<String>? commonFaults,
     bool? isBuiltIn,
   }) {
@@ -85,7 +75,6 @@ class AssetType {
       defaultColor: defaultColor ?? this.defaultColor,
       variants: variants ?? this.variants,
       defaultLifespanYears: defaultLifespanYears ?? this.defaultLifespanYears,
-      defaultChecklist: defaultChecklist ?? this.defaultChecklist,
       commonFaults: commonFaults ?? this.commonFaults,
       isBuiltIn: isBuiltIn ?? this.isBuiltIn,
     );

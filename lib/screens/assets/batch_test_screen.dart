@@ -260,7 +260,10 @@ class _BatchTestScreenState extends State<BatchTestScreen> {
               ),
           ],
         ),
-        body: Column(
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 750),
+            child: Column(
           children: [
             // Summary bar
             Container(
@@ -478,6 +481,8 @@ class _BatchTestScreenState extends State<BatchTestScreen> {
               ),
             ),
           ],
+        ),
+          ),
         ),
       ),
     );

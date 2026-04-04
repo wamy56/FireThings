@@ -376,14 +376,4 @@ class AnalyticsService {
         'is_custom': isCustom,
       });
 
-  Future<void> logAssetTypeChecklistModified({
-    required String typeId,
-    required int itemCount,
-  }) =>
-      _analytics.logEvent(
-          name: 'asset_type_checklist_modified',
-          parameters: {
-            'type_id': typeId,
-            'item_count': itemCount,
-          });
 }

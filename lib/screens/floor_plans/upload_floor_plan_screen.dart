@@ -268,7 +268,10 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
           ),
         ],
       ),
-      body: KeyboardDismissWrapper(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: KeyboardDismissWrapper(
         child: ListView(
           padding: const EdgeInsets.all(AppTheme.screenPadding),
           children: [
@@ -426,6 +429,8 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
               ),
             ],
           ],
+        ),
+      ),
         ),
       ),
     );

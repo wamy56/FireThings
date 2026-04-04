@@ -331,7 +331,10 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
           ),
         ],
       ),
-      body: KeyboardDismissWrapper(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: KeyboardDismissWrapper(
         child: Form(
           key: _formKey,
           child: ListView(
@@ -478,6 +481,8 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
               const SizedBox(height: 100), // Bottom padding for FAB
             ],
           ),
+        ),
+      ),
         ),
       ),
     );
