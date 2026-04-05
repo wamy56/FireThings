@@ -68,32 +68,27 @@ class DefectService {
     required String rectifiedByName,
     String? rectifiedNote,
   }) async {
-    try {
-      final snapshot = await _defectsCol(basePath, siteId)
-          .where('assetId', isEqualTo: assetId)
-          .where('status', isEqualTo: Defect.statusOpen)
-          .get();
+    final snapshot = await _defectsCol(basePath, siteId)
+        .where('assetId', isEqualTo: assetId)
+        .where('status', isEqualTo: Defect.statusOpen)
+        .get();
 
-      if (snapshot.docs.isEmpty) return 0;
+    if (snapshot.docs.isEmpty) return 0;
 
-      final batch = _firestore.batch();
-      final now = DateTime.now().toIso8601String();
-      for (final doc in snapshot.docs) {
-        batch.update(doc.reference, {
-          'status': Defect.statusRectified,
-          'rectifiedBy': rectifiedBy,
-          'rectifiedByName': rectifiedByName,
-          'rectifiedAt': now,
-          'rectifiedNote':
-              rectifiedNote ?? 'Auto-rectified: asset passed batch test',
-        });
-      }
-      await batch.commit();
-      return snapshot.docs.length;
-    } catch (e) {
-      debugPrint('Error batch-rectifying defects: $e');
-      return 0;
+    final batch = _firestore.batch();
+    final now = DateTime.now().toIso8601String();
+    for (final doc in snapshot.docs) {
+      batch.update(doc.reference, {
+        'status': Defect.statusRectified,
+        'rectifiedBy': rectifiedBy,
+        'rectifiedByName': rectifiedByName,
+        'rectifiedAt': now,
+        'rectifiedNote':
+            rectifiedNote ?? 'Auto-rectified: asset passed batch test',
+      });
     }
+    await batch.commit();
+    return snapshot.docs.length;
   }
 
   /// Stream all defects for a specific asset, newest first.

@@ -420,20 +420,30 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
   }
 
   Widget _buildSection(String title, List<Widget> children, bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          ),
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.cardPadding),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceElevated : AppTheme.surfaceWhite,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        border: Border.all(
+          color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
         ),
-        const SizedBox(height: 8),
-        ...children,
-      ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...children,
+        ],
+      ),
     );
   }
 
@@ -444,7 +454,7 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 100,
+            width: 130,
             child: Text(
               label,
               style: TextStyle(

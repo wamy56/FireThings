@@ -66,8 +66,10 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
   String? _assignedToName;
   List<CompanyMember> _members = [];
 
-  // Site ID tracking
+  // Site ID and coordinates tracking
   String? _selectedSiteId;
+  double? _siteLatitude;
+  double? _siteLongitude;
 
   // Autocomplete
   List<CompanySite> _companySites = [];
@@ -127,6 +129,8 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
     _assignedToUid = job.assignedTo;
     _assignedToName = job.assignedToName;
     _selectedSiteId = job.companySiteId;
+    _siteLatitude = job.latitude;
+    _siteLongitude = job.longitude;
   }
 
   Future<void> _loadMembers() async {
@@ -184,6 +188,8 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
         siteName: _siteNameController.text.trim(),
         siteAddress: _siteAddressController.text.trim(),
         companySiteId: _selectedSiteId,
+        latitude: _siteLatitude,
+        longitude: _siteLongitude,
         parkingNotes: _nullIfEmpty(_parkingNotesController.text),
         accessNotes: _nullIfEmpty(_accessNotesController.text),
         siteNotes: _nullIfEmpty(_siteNotesController.text),
@@ -666,6 +672,8 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
         _siteNameController.text = site.name;
         _siteAddressController.text = site.address;
         _selectedSiteId = site.id;
+        _siteLatitude = site.latitude;
+        _siteLongitude = site.longitude;
         if (site.notes != null && site.notes!.isNotEmpty) {
           _siteNotesController.text = site.notes!;
         }
@@ -679,7 +687,11 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
           // Clear site ID if user manually edits away from autocomplete match
           if (_selectedSiteId != null) {
             final matchesSite = _companySites.any((s) => s.name == controller.text);
-            if (!matchesSite) _selectedSiteId = null;
+            if (!matchesSite) {
+              _selectedSiteId = null;
+              _siteLatitude = null;
+              _siteLongitude = null;
+            }
           }
         });
         return CustomTextField(

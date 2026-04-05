@@ -139,12 +139,8 @@ class _JobDetailContent extends StatelessWidget {
 
         // Site Assets section (conditional)
         if (job.companySiteId != null &&
-            RemoteConfigService.instance.assetRegisterEnabled) ...[
+            RemoteConfigService.instance.assetRegisterEnabled)
           _buildSiteAssetsSection(context),
-          const SizedBox(height: 8),
-        ],
-
-        const SizedBox(height: 8),
 
         // Contact
         if (job.contactName != null ||
@@ -519,21 +515,31 @@ class _JobDetailContent extends StatelessWidget {
   }
 
   Widget _section(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: isDark ? AppTheme.darkTextSecondary : Colors.grey,
-          ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(AppTheme.cardPadding),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceElevated : AppTheme.surfaceWhite,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        border: Border.all(
+          color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
         ),
-        const SizedBox(height: 8),
-        ...children,
-        const SizedBox(height: 16),
-      ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: isDark ? AppTheme.darkTextSecondary : Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...children,
+        ],
+      ),
     );
   }
 
@@ -546,7 +552,7 @@ class _JobDetailContent extends StatelessWidget {
           Icon(icon, size: 18, color: AppTheme.mediumGrey),
           const SizedBox(width: 12),
           SizedBox(
-            width: 80,
+            width: 120,
             child: Text(
               label,
               style: TextStyle(
@@ -580,7 +586,7 @@ class _JobDetailContent extends StatelessWidget {
             Icon(icon, size: 18, color: AppTheme.mediumGrey),
             const SizedBox(width: 12),
             SizedBox(
-              width: 80,
+              width: 120,
               child: Text(
                 label,
                 style: TextStyle(

@@ -160,17 +160,27 @@ class _DefectBottomSheetState extends State<DefectBottomSheet> {
       await DefectService.instance
           .createDefect(widget.basePath, widget.siteId, defect);
 
-      await AssetService.instance.updateAsset(
-        widget.basePath,
-        widget.siteId,
-        widget.asset.copyWith(
-          complianceStatus: Asset.statusFail,
-          lastServiceDate: now,
-          lastServiceBy: user.uid,
-          lastServiceByName: user.displayName ?? 'Unknown',
-          nextServiceDue: DateTime(now.year + 1, now.month, now.day),
-        ),
-      );
+      // Defect and service record are now saved. Update asset status
+      // in a separate try/catch so a failure here doesn't show a
+      // misleading "Failed to save defect" message.
+      try {
+        await AssetService.instance.updateAsset(
+          widget.basePath,
+          widget.siteId,
+          widget.asset.copyWith(
+            complianceStatus: Asset.statusFail,
+            lastServiceDate: now,
+            lastServiceBy: user.uid,
+            lastServiceByName: user.displayName ?? 'Unknown',
+            nextServiceDue: DateTime(now.year + 1, now.month, now.day),
+          ),
+        );
+      } catch (e) {
+        debugPrint('Failed to update asset status after defect save: $e');
+        if (mounted) {
+          context.showErrorToast('Defect saved but failed to update asset status');
+        }
+      }
 
       AnalyticsService.instance.logAssetTested(
         assetType: widget.asset.assetTypeId,

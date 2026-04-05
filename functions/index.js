@@ -145,3 +145,83 @@ exports.onJobStatusChanged = onDocumentUpdated(
     }
   }
 );
+
+/**
+ * Triggered when a dispatched job is rescheduled (scheduledDate or scheduledTime changed).
+ * Sends a push notification to the assigned engineer.
+ */
+exports.onJobRescheduled = onDocumentUpdated(
+  "companies/{companyId}/dispatched_jobs/{jobId}",
+  async (event) => {
+    const beforeData = event.data.before.data();
+    const afterData = event.data.after.data();
+
+    // Only fire if scheduledDate or scheduledTime changed
+    if (
+      beforeData.scheduledDate === afterData.scheduledDate &&
+      beforeData.scheduledTime === afterData.scheduledTime
+    ) {
+      return;
+    }
+
+    const assignee = afterData.assignedTo;
+    if (!assignee) return; // No one to notify
+
+    const memberDoc = await db
+      .collection("companies")
+      .doc(event.params.companyId)
+      .collection("members")
+      .doc(assignee)
+      .get();
+
+    if (!memberDoc.exists) return;
+    const fcmToken = memberDoc.data().fcmToken;
+    if (!fcmToken) return;
+
+    const jobTitle = afterData.title || "Untitled job";
+    let dateText = "a new date";
+    if (afterData.scheduledDate) {
+      const d = new Date(afterData.scheduledDate);
+      dateText = d.toLocaleDateString("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+      });
+      if (afterData.scheduledTime) {
+        dateText += ` at ${afterData.scheduledTime}`;
+      }
+    }
+
+    const message = {
+      token: fcmToken,
+      notification: {
+        title: "Job Rescheduled",
+        body: `"${jobTitle}" has been rescheduled to ${dateText}`,
+      },
+      data: {
+        type: "job_rescheduled",
+        jobId: event.params.jobId,
+        companyId: event.params.companyId,
+      },
+      apns: {
+        payload: {
+          aps: { badge: 1, sound: "default" },
+        },
+      },
+      android: {
+        priority: "high",
+        notification: {
+          channelId: "firethings_dispatch",
+          sound: "default",
+        },
+      },
+    };
+
+    try {
+      await messaging.send(message);
+      console.log(`Reschedule notification sent to engineer ${assignee} for job ${event.params.jobId}`);
+    } catch (error) {
+      console.error("Error sending reschedule notification:", error);
+    }
+  }
+);

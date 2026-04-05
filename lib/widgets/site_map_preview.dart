@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:latlong2/latlong.dart';
+import '../services/geocoding_service.dart';
 import '../utils/theme.dart';
 import '../utils/icon_map.dart';
 
@@ -63,35 +63,20 @@ class _SiteMapPreviewState extends State<SiteMapPreview> {
       return;
     }
 
-    // Geocode the address
-    if (widget.address.trim().isEmpty) {
+    // Geocode the address via shared service
+    final result = await GeocodingService.instance.geocode(widget.address);
+    if (!mounted) return;
+
+    if (result != null) {
+      setState(() {
+        _location = LatLng(result.lat, result.lng);
+        _loading = false;
+      });
+    } else {
       setState(() {
         _error = true;
         _loading = false;
       });
-      return;
-    }
-
-    try {
-      final locations = await locationFromAddress(widget.address);
-      if (locations.isNotEmpty && mounted) {
-        setState(() {
-          _location = LatLng(locations.first.latitude, locations.first.longitude);
-          _loading = false;
-        });
-      } else if (mounted) {
-        setState(() {
-          _error = true;
-          _loading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _error = true;
-          _loading = false;
-        });
-      }
     }
   }
 

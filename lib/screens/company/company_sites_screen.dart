@@ -319,7 +319,10 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
           notes: notes.isEmpty ? null : notes,
           updatedAt: now,
         );
-        await CompanyService.instance.updateSite(widget.companyId, updated);
+        await CompanyService.instance.updateSite(
+          widget.companyId, updated,
+          previousAddress: site.address,
+        );
         if (mounted) context.showSuccessToast('Site updated');
       } else {
         final newSite = CompanySite(

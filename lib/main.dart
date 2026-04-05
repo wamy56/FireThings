@@ -39,6 +39,7 @@ import 'screens/dispatch/engineer_job_detail_screen.dart';
 import 'screens/dispatch/engineer_jobs_screen.dart';
 
 // Web-only imports
+import 'package:go_router/go_router.dart';
 import 'screens/web/web_router.dart';
 
 /// Global navigator key for notification-driven navigation (mobile only).
@@ -84,7 +85,8 @@ void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
     WidgetsFlutterBinding.ensureInitialized();
     await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform);
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     await NotificationService.instance.initialize();
     await NotificationService.instance.checkAndNotify();
     return true;
@@ -92,67 +94,74 @@ void callbackDispatcher() {
 }
 
 void main() {
-  runZonedGuarded(() async {
-    // Ensure Flutter is initialized (must be in same zone as runApp)
-    WidgetsFlutterBinding.ensureInitialized();
+  runZonedGuarded(
+    () async {
+      // Ensure Flutter is initialized (must be in same zone as runApp)
+      WidgetsFlutterBinding.ensureInitialized();
 
-    // Initialize Firebase
-    await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform);
-
-    // Enable Firestore offline persistence
-    FirebaseFirestore.instance.settings = const Settings(
-      persistenceEnabled: true,
-      cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
-    );
-
-    // Initialize Remote Config
-    await RemoteConfigService.instance.initialize();
-
-    // Load persisted theme preference
-    await _loadThemePreference();
-
-    // Mobile-only initialization
-    if (!kIsWeb) {
-      // Register FCM background handler (must be before any FCM usage)
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-      // Request FCM notification permission (iOS primarily, Android 13+)
-      await FirebaseMessaging.instance.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
+      // Initialize Firebase
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
       );
 
-      // Set up Crashlytics error handlers
-      FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-      PlatformDispatcher.instance.onError = (error, stack) {
+      // Enable Firestore offline persistence
+      FirebaseFirestore.instance.settings = const Settings(
+        persistenceEnabled: true,
+        cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+      );
+
+      // Initialize Remote Config
+      await RemoteConfigService.instance.initialize();
+
+      // Load persisted theme preference
+      await _loadThemePreference();
+
+      // Mobile-only initialization
+      if (!kIsWeb) {
+        // Register FCM background handler (must be before any FCM usage)
+        FirebaseMessaging.onBackgroundMessage(
+          _firebaseMessagingBackgroundHandler,
+        );
+
+        // Request FCM notification permission (iOS primarily, Android 13+)
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+
+        // Set up Crashlytics error handlers
+        FlutterError.onError =
+            FirebaseCrashlytics.instance.recordFlutterFatalError;
+        PlatformDispatcher.instance.onError = (error, stack) {
+          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+          return true;
+        };
+
+        // Load custom templates from database (SQLite)
+        await TemplateService.instance.loadCustomTemplates();
+
+        // Initialize notifications
+        await NotificationService.instance.initialize();
+
+        // Register periodic background check
+        await Workmanager().initialize(callbackDispatcher);
+        await Workmanager().registerPeriodicTask(
+          'draft-reminder-check',
+          'checkDraftsAndOverdue',
+          frequency: const Duration(hours: 12),
+          constraints: Constraints(networkType: NetworkType.notRequired),
+        );
+      }
+
+      runApp(const JobsheetApp());
+    },
+    (error, stack) {
+      if (!kIsWeb) {
         FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-        return true;
-      };
-
-      // Load custom templates from database (SQLite)
-      await TemplateService.instance.loadCustomTemplates();
-
-      // Initialize notifications
-      await NotificationService.instance.initialize();
-
-      // Register periodic background check
-      await Workmanager().initialize(callbackDispatcher);
-      await Workmanager().registerPeriodicTask(
-        'draft-reminder-check',
-        'checkDraftsAndOverdue',
-        frequency: const Duration(hours: 12),
-        constraints: Constraints(networkType: NetworkType.notRequired),
-      );
-    }
-
-    runApp(const JobsheetApp());
-  }, (error, stack) {
-    if (!kIsWeb) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    }
-  });
+      }
+    },
+  );
 }
 
 class JobsheetApp extends StatefulWidget {
@@ -163,15 +172,19 @@ class JobsheetApp extends StatefulWidget {
 }
 
 class _JobsheetAppState extends State<JobsheetApp> {
+  late final GoRouter? _webRouter;
+
   @override
   void initState() {
     super.initState();
     themeNotifier.addListener(_onThemeChanged);
+    _webRouter = kIsWeb ? createWebRouter() : null;
   }
 
   @override
   void dispose() {
     themeNotifier.removeListener(_onThemeChanged);
+    _webRouter?.dispose();
     super.dispose();
   }
 
@@ -181,20 +194,19 @@ class _JobsheetAppState extends State<JobsheetApp> {
   Widget build(BuildContext context) {
     // Web: use GoRouter for proper URL routing
     if (kIsWeb) {
-      final router = createWebRouter();
       return MaterialApp.router(
         title: 'FireThings - Dispatcher Portal',
         debugShowCheckedModeBanner: false,
-        routerConfig: router,
+        routerConfig: _webRouter!,
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: themeNotifier.value,
         builder: (context, child) {
           final scale = AppTheme.responsiveTextScale(context.screenSize);
           return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.linear(scale),
-            ),
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
             child: child!,
           );
         },
@@ -213,9 +225,9 @@ class _JobsheetAppState extends State<JobsheetApp> {
       builder: (context, child) {
         final scale = AppTheme.responsiveTextScale(context.screenSize);
         return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaler: TextScaler.linear(scale),
-          ),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(scale)),
           child: child!,
         );
       },
@@ -273,17 +285,23 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     // Listen for token refresh
     _tokenRefreshSub?.cancel();
-    _tokenRefreshSub = FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+    _tokenRefreshSub = FirebaseMessaging.instance.onTokenRefresh.listen((
+      newToken,
+    ) {
       UserProfileService.instance.updateFcmToken(newToken);
     });
 
     // Foreground messages — re-fire as local notification
     _foregroundMessageSub?.cancel();
-    _foregroundMessageSub = FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+    _foregroundMessageSub = FirebaseMessaging.onMessage.listen(
+      _handleForegroundMessage,
+    );
 
     // Background/terminated tap — user tapped notification while app was in background
     _messageOpenedSub?.cancel();
-    _messageOpenedSub = FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
+    _messageOpenedSub = FirebaseMessaging.onMessageOpenedApp.listen(
+      _handleMessageOpenedApp,
+    );
 
     // Check if app was opened from terminated state via notification tap
     final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
@@ -301,7 +319,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (notification == null) return;
 
     final data = message.data;
-    final payload = '${data['type'] ?? ''}|${data['jobId'] ?? ''}|${data['companyId'] ?? ''}';
+    final payload =
+        '${data['type'] ?? ''}|${data['jobId'] ?? ''}|${data['companyId'] ?? ''}';
 
     NotificationService.instance.showDispatchNotification(
       title: notification.title ?? 'FireThings',
@@ -326,13 +345,19 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     final profile = UserProfileService.instance;
     if (profile.isDispatcherOrAdmin) {
-      nav.push(MaterialPageRoute(
-        builder: (_) => DispatchedJobDetailScreen(companyId: companyId, jobId: jobId),
-      ));
+      nav.push(
+        MaterialPageRoute(
+          builder: (_) =>
+              DispatchedJobDetailScreen(companyId: companyId, jobId: jobId),
+        ),
+      );
     } else {
-      nav.push(MaterialPageRoute(
-        builder: (_) => EngineerJobDetailScreen(companyId: companyId, jobId: jobId),
-      ));
+      nav.push(
+        MaterialPageRoute(
+          builder: (_) =>
+              EngineerJobDetailScreen(companyId: companyId, jobId: jobId),
+        ),
+      );
     }
   }
 
@@ -368,11 +393,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         // Show loading while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
-            body: Center(
-              child: AdaptiveLoadingIndicator(
-                size: 32,
-              ),
-            ),
+            body: Center(child: AdaptiveLoadingIndicator(size: 32)),
           );
         }
 
@@ -415,12 +436,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   List<String> get _titles => [
-        'Home',
-        'Jobs',
-        'Invoices',
-        if (_showDispatchTab) 'Dispatch',
-        'Settings',
-      ];
+    'Home',
+    'Jobs',
+    'Invoices',
+    if (_showDispatchTab) 'Dispatch',
+    'Settings',
+  ];
 
   void _switchTab(int newIndex) {
     if (newIndex == _currentIndex) return;
@@ -471,15 +492,17 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               context,
               MaterialPageRoute(
                 builder: (_) => DispatchedJobDetailScreen(
-                    companyId: companyId, jobId: jobId),
+                  companyId: companyId,
+                  jobId: jobId,
+                ),
               ),
             );
           } else {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => EngineerJobDetailScreen(
-                    companyId: companyId, jobId: jobId),
+                builder: (_) =>
+                    EngineerJobDetailScreen(companyId: companyId, jobId: jobId),
               ),
             );
           }
@@ -513,28 +536,28 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   List<Widget> get _screens => [
-        HomeScreen(onTabChanged: _switchTab),
-        const JobsHubScreen(),
-        const InvoicingHubScreen(),
-        if (_showDispatchTab) _dispatchScreen,
-        const SettingsScreen(),
-      ];
+    HomeScreen(onTabChanged: _switchTab),
+    const JobsHubScreen(),
+    const InvoicingHubScreen(),
+    if (_showDispatchTab) _dispatchScreen,
+    const SettingsScreen(),
+  ];
 
   List<IconData> get _navIcons => [
-        AppIcons.homeOutline,
-        AppIcons.briefcaseOutline,
-        AppIcons.receiptOutline,
-        if (_showDispatchTab) AppIcons.taskOutline,
-        AppIcons.settingOutline,
-      ];
+    AppIcons.homeOutline,
+    AppIcons.briefcaseOutline,
+    AppIcons.receiptOutline,
+    if (_showDispatchTab) AppIcons.taskOutline,
+    AppIcons.settingOutline,
+  ];
 
   List<IconData> get _navSelectedIcons => [
-        AppIcons.homeBold,
-        AppIcons.briefcaseBold,
-        AppIcons.receiptBold,
-        if (_showDispatchTab) AppIcons.taskBold,
-        AppIcons.settingBold,
-      ];
+    AppIcons.homeBold,
+    AppIcons.briefcaseBold,
+    AppIcons.receiptBold,
+    if (_showDispatchTab) AppIcons.taskBold,
+    AppIcons.settingBold,
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -555,9 +578,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     }
 
     final body = Scaffold(
-      appBar: AdaptiveNavigationBar(
-        title: titles[safeIndex],
-      ),
+      appBar: AdaptiveNavigationBar(title: titles[safeIndex]),
       body: GestureDetector(
         onHorizontalDragEnd: (details) {
           final velocity = details.primaryVelocity ?? 0;
@@ -597,16 +618,33 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       bottomNavigationBar: useRail
           ? null
           : PlatformUtils.isApple
-              ? _buildCupertinoNavBar(isDark, navIcons, navSelectedIcons, titles, screens.length)
-              : _buildMaterialNavBar(isDark, navIcons, navSelectedIcons, titles, screens.length),
+          ? _buildCupertinoNavBar(
+              isDark,
+              navIcons,
+              navSelectedIcons,
+              titles,
+              screens.length,
+            )
+          : _buildMaterialNavBar(
+              isDark,
+              navIcons,
+              navSelectedIcons,
+              titles,
+              screens.length,
+            ),
     );
 
     if (!useRail) return body;
 
-    final primaryColor = isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue;
-    final unselectedColor = isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey;
+    final primaryColor = isDark
+        ? AppTheme.darkPrimaryBlue
+        : AppTheme.primaryBlue;
+    final unselectedColor = isDark
+        ? AppTheme.darkTextSecondary
+        : AppTheme.mediumGrey;
     final railBg = isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite;
-    final extended = screenSize == ScreenSize.expanded || screenSize == ScreenSize.large;
+    final extended =
+        screenSize == ScreenSize.expanded || screenSize == ScreenSize.large;
 
     return Scaffold(
       body: Row(
@@ -643,7 +681,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     );
   }
 
-  Widget _buildCupertinoNavBar(bool isDark, List<IconData> icons, List<IconData> selectedIcons, List<String> titles, int count) {
+  Widget _buildCupertinoNavBar(
+    bool isDark,
+    List<IconData> icons,
+    List<IconData> selectedIcons,
+    List<String> titles,
+    int count,
+  ) {
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -665,13 +709,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               currentIndex: _currentIndex,
               onTap: _switchTab,
               backgroundColor: Colors.transparent,
-              activeColor: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
-              inactiveColor: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-              items: List.generate(count, (i) => BottomNavigationBarItem(
-                icon: Icon(icons[i]),
-                activeIcon: Icon(selectedIcons[i]),
-                label: titles[i],
-              )),
+              activeColor: isDark
+                  ? AppTheme.darkPrimaryBlue
+                  : AppTheme.primaryBlue,
+              inactiveColor: isDark
+                  ? AppTheme.darkTextSecondary
+                  : AppTheme.mediumGrey,
+              items: List.generate(
+                count,
+                (i) => BottomNavigationBarItem(
+                  icon: Icon(icons[i]),
+                  activeIcon: Icon(selectedIcons[i]),
+                  label: titles[i],
+                ),
+              ),
             ),
           ),
         ),
@@ -679,7 +730,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     );
   }
 
-  Widget _buildMaterialNavBar(bool isDark, List<IconData> icons, List<IconData> selectedIcons, List<String> titles, int count) {
+  Widget _buildMaterialNavBar(
+    bool isDark,
+    List<IconData> icons,
+    List<IconData> selectedIcons,
+    List<String> titles,
+    int count,
+  ) {
     return NavigationBar(
       selectedIndex: _currentIndex,
       onDestinationSelected: _switchTab,
@@ -690,17 +747,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       elevation: 0,
       animationDuration: AppTheme.normalAnimation,
       labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-      destinations: List.generate(count, (i) => NavigationDestination(
-        icon: Icon(
-          icons[i],
-          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
+      destinations: List.generate(
+        count,
+        (i) => NavigationDestination(
+          icon: Icon(
+            icons[i],
+            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
+          ),
+          selectedIcon: Icon(
+            selectedIcons[i],
+            color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
+          ),
+          label: titles[i],
         ),
-        selectedIcon: Icon(
-          selectedIcons[i],
-          color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
-        ),
-        label: titles[i],
-      )),
+      ),
     );
   }
 }

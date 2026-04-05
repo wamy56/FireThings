@@ -17,6 +17,7 @@ import 'dashboard/job_helpers.dart';
 import 'dashboard/date_range_filter.dart';
 import 'dashboard/bulk_actions_toolbar.dart';
 import 'dashboard/csv_export.dart';
+import 'dart:async';
 import 'dart:convert';
 import '../../utils/download_stub.dart' if (dart.library.html) '../../utils/download_web.dart';
 
@@ -48,6 +49,8 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
   final _searchFocusNode = FocusNode();
   final Set<String> _selectedJobIds = {};
   bool _notificationBannerDismissed = false;
+  Stream<List<DispatchedJob>>? _jobsStream;
+  Timer? _searchDebounce;
 
   late final AnimationController _overlayController;
   late final Animation<double> _overlayOpacity;
@@ -71,7 +74,15 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
       _overlayController.value = 1.0;
     }
     _loadMembers();
+    _initJobsStream();
     AnalyticsService.instance.logWebDashboardViewed();
+  }
+
+  void _initJobsStream() {
+    final companyId = _companyId;
+    if (companyId != null) {
+      _jobsStream = DispatchService.instance.getJobsStream(companyId);
+    }
   }
 
   void _selectJob(String jobId) {
@@ -100,6 +111,7 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
     _overlayController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -228,9 +240,9 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
       child: Focus(
         autofocus: true,
         child: StreamBuilder<List<DispatchedJob>>(
-      stream: DispatchService.instance.getJobsStream(companyId),
+      stream: _jobsStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (!snapshot.hasData) {
           return const Center(child: AdaptiveLoadingIndicator());
         }
 
@@ -589,7 +601,10 @@ class _WebDashboardScreenState extends State<WebDashboardScreen>
                   if (_searchQuery.isEmpty && v.isNotEmpty) {
                     AnalyticsService.instance.logWebSearchUsed();
                   }
-                  setState(() { _searchQuery = v; _currentPage = 0; });
+                  _searchDebounce?.cancel();
+                  _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+                    if (mounted) setState(() { _searchQuery = v; _currentPage = 0; });
+                  });
                 },
               ),
             ),

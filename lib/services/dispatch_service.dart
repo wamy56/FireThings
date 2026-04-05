@@ -64,6 +64,25 @@ class DispatchService {
     });
   }
 
+  /// Reschedule a job to a new date and optionally a new time.
+  /// Pass empty string for [newTime] to clear the time.
+  Future<void> rescheduleJob({
+    required String companyId,
+    required String jobId,
+    required DateTime? newDate,
+    String? newTime,
+  }) async {
+    final now = DateTime.now();
+    final updates = <String, dynamic>{
+      'scheduledDate': newDate?.toIso8601String(),
+      'updatedAt': now.toIso8601String(),
+    };
+    if (newTime != null) {
+      updates['scheduledTime'] = newTime.isEmpty ? null : newTime;
+    }
+    await _jobsCol(companyId).doc(jobId).update(updates);
+  }
+
   /// Stream of all jobs for a company, with optional filters.
   Stream<List<DispatchedJob>> getJobsStream(
     String companyId, {

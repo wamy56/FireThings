@@ -919,9 +919,19 @@ class ComplianceReportService {
     final floorPlanImages = <String, Uint8List>{};
     for (final plan in floorPlans) {
       try {
-        final ref =
-            _storage.ref('$basePath/sites/$siteId/floor_plans/${plan.id}.${plan.fileExtension}');
-        final bytes = await _downloadBytes(ref, 5 * 1024 * 1024);
+        Uint8List? bytes;
+        if (kIsWeb && plan.imageUrl.isNotEmpty) {
+          // On web, use the pre-signed download URL stored at upload time
+          // to avoid CORS/auth issues with Storage ref getData().
+          final response = await http.get(Uri.parse(plan.imageUrl));
+          if (response.statusCode == 200) {
+            bytes = response.bodyBytes;
+          }
+        } else {
+          final ref =
+              _storage.ref('$basePath/sites/$siteId/floor_plans/${plan.id}.${plan.fileExtension}');
+          bytes = await _downloadBytes(ref, 5 * 1024 * 1024);
+        }
         if (bytes != null) {
           floorPlanImages[plan.id] = bytes;
         }

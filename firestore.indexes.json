@@ -34,6 +34,14 @@
         { "fieldPath": "assetId", "order": "ASCENDING" },
         { "fieldPath": "serviceDate", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "defects",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "assetId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

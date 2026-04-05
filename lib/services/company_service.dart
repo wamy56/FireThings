@@ -7,6 +7,7 @@ import '../models/company_member.dart';
 import '../models/company_site.dart';
 import '../models/company_customer.dart';
 import '../models/user_profile.dart';
+import 'geocoding_service.dart';
 import 'user_profile_service.dart';
 import 'analytics_service.dart';
 
@@ -365,22 +366,44 @@ class CompanyService {
 
   // ─── Shared Sites ──────────────────────────────────────────────────
 
-  /// Create a shared company site.
+  /// Create a shared company site. Auto-geocodes the address if no coords.
   Future<void> createSite(String companyId, CompanySite site) async {
+    final geocoded = await _geocodeSiteIfNeeded(site);
     await _companiesCol
         .doc(companyId)
         .collection('sites')
-        .doc(site.id)
-        .set(site.toJson());
+        .doc(geocoded.id)
+        .set(geocoded.toJson());
   }
 
-  /// Update a shared company site.
-  Future<void> updateSite(String companyId, CompanySite site) async {
+  /// Update a shared company site. Re-geocodes if address changed.
+  Future<void> updateSite(String companyId, CompanySite site,
+      {String? previousAddress}) async {
+    var updated = site;
+    // Re-geocode if address changed or coords are missing
+    if (previousAddress != null && previousAddress != site.address ||
+        site.latitude == null || site.longitude == null) {
+      updated = await _geocodeSiteIfNeeded(site);
+    }
     await _companiesCol
         .doc(companyId)
         .collection('sites')
-        .doc(site.id)
-        .update(site.toJson());
+        .doc(updated.id)
+        .update(updated.toJson());
+  }
+
+  /// Attempt to geocode a site's address if lat/lng are missing.
+  Future<CompanySite> _geocodeSiteIfNeeded(CompanySite site) async {
+    if (site.latitude != null && site.longitude != null) return site;
+    try {
+      final result = await GeocodingService.instance.geocode(site.address);
+      if (result != null) {
+        return site.copyWith(latitude: result.lat, longitude: result.lng);
+      }
+    } catch (_) {
+      // Geocoding failure is non-blocking
+    }
+    return site;
   }
 
   /// Delete a shared company site.
