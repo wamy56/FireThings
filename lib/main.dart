@@ -253,6 +253,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   late final AuthService _authService;
   late final Stream<User?> _authStream;
   String? _lastSetupUid;
+  bool _postLoginReady = false;
 
   @override
   void initState() {
@@ -379,10 +380,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
     await UserProfileService.instance.loadProfile(user.uid);
     await RemoteConfigService.instance.refreshForUser(user.email);
+    if (mounted) {
+      _postLoginReady = true;
+      setState(() {});
+    }
+    // FCM setup is non-blocking — run after UI is ready
     if (!kIsWeb) {
       _setupFcm(user.uid);
     }
-    if (mounted) setState(() {});
   }
 
   @override
@@ -402,11 +407,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
           final user = snapshot.data!;
           if (_lastSetupUid != user.uid) {
             _lastSetupUid = user.uid;
+            _postLoginReady = false;
             _runPostLoginSetup(user);
+          }
+          if (!_postLoginReady) {
+            return Scaffold(
+              body: Center(child: AdaptiveLoadingIndicator(size: 32)),
+            );
           }
           return const MainNavigationScreen();
         } else {
           _lastSetupUid = null;
+          _postLoginReady = false;
           _teardownFcm();
           UserProfileService.instance.clearProfile();
           return const LoginScreen();
