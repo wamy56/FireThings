@@ -430,9 +430,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   int _previousIndex = 0;
 
   bool get _showDispatchTab {
-    final rc = RemoteConfigService.instance;
-    final profile = UserProfileService.instance;
-    return rc.dispatchEnabled && profile.hasCompany;
+    return RemoteConfigService.instance.dispatchEnabled;
   }
 
   List<String> get _titles => [
