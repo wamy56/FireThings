@@ -377,7 +377,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (!kIsWeb) {
       FirestoreSyncService.instance.performFullSync(user.uid);
     }
-    UserProfileService.instance.loadProfile(user.uid);
+    await UserProfileService.instance.loadProfile(user.uid);
     await RemoteConfigService.instance.refreshForUser(user.email);
     if (!kIsWeb) {
       _setupFcm(user.uid);

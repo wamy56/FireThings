@@ -29,6 +29,38 @@ class EngineerJobsScreen extends StatelessWidget {
             return const Center(child: AdaptiveLoadingIndicator());
           }
 
+          if (snapshot.hasError) {
+            debugPrint('Engineer jobs stream error: ${snapshot.error}');
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    AppIcons.warning,
+                    size: 48,
+                    color: isDark
+                        ? AppTheme.darkTextSecondary
+                        : AppTheme.mediumGrey,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Unable to load jobs',
+                    style: TextStyle(
+                      color: isDark
+                          ? AppTheme.darkTextSecondary
+                          : AppTheme.mediumGrey,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => (context as Element).markNeedsBuild(),
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            );
+          }
+
           final allJobs = snapshot.data ?? [];
           if (allJobs.isEmpty) {
             return Center(

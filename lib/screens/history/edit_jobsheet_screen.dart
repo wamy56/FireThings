@@ -333,6 +333,12 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
     );
   }
 
+  /// Check if a string value looks like an ISO 8601 date (from date picker fields).
+  bool _isDateValue(dynamic value) {
+    if (value is! String) return false;
+    return RegExp(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}').hasMatch(value);
+  }
+
   Widget _buildFieldWidget(String key, dynamic value) {
     final label = _formatFieldLabel(key);
 
@@ -340,6 +346,8 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
       return _buildCheckboxField(key, label, value);
     } else if (value is List) {
       return _buildRepeatGroupEditor(key, label, value);
+    } else if (_isDateValue(value)) {
+      return _buildDateField(key, label, value as String);
     } else {
       return CustomTextField(
         controller: _textControllers[key],
@@ -352,6 +360,42 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
         },
       );
     }
+  }
+
+  Widget _buildDateField(String key, String label, String isoValue) {
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    String displayValue = isoValue;
+    DateTime currentDate = DateTime.now();
+    try {
+      currentDate = DateTime.parse(isoValue);
+      displayValue = dateFormat.format(currentDate);
+    } catch (_) {}
+
+    return GestureDetector(
+      onTap: () async {
+        final picked = await showAdaptiveDatePicker(
+          context: context,
+          initialDate: currentDate,
+          firstDate: DateTime(2020),
+          lastDate: DateTime(2030),
+        );
+        if (picked != null) {
+          setState(() {
+            _formData[key] = picked.toIso8601String();
+            _textControllers[key]?.text = dateFormat.format(picked);
+            _hasChanges = true;
+          });
+        }
+      },
+      child: AbsorbPointer(
+        child: CustomTextField(
+          label: label,
+          initialValue: displayValue,
+          readOnly: true,
+          prefixIcon: Icon(AppIcons.calendar),
+        ),
+      ),
+    );
   }
 
   Widget _buildRepeatGroupEditor(String groupKey, String label, List entries) {
@@ -442,6 +486,46 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
                         },
                         controlAffinity: ListTileControlAffinity.leading,
                         contentPadding: EdgeInsets.zero,
+                      ),
+                    );
+                  }
+
+                  if (_isDateValue(childEntry.value)) {
+                    final dateFormat = DateFormat('dd/MM/yyyy');
+                    String displayValue = childEntry.value as String;
+                    DateTime currentDate = DateTime.now();
+                    try {
+                      currentDate = DateTime.parse(childEntry.value as String);
+                      displayValue = dateFormat.format(currentDate);
+                    } catch (_) {}
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: GestureDetector(
+                        onTap: () async {
+                          final picked = await showAdaptiveDatePicker(
+                            context: context,
+                            initialDate: currentDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              entry[childEntry.key] = picked.toIso8601String();
+                              _textControllers[controllerKey]?.text =
+                                  dateFormat.format(picked);
+                              _hasChanges = true;
+                            });
+                          }
+                        },
+                        child: AbsorbPointer(
+                          child: CustomTextField(
+                            label: childLabel,
+                            initialValue: displayValue,
+                            readOnly: true,
+                            prefixIcon: Icon(AppIcons.calendar),
+                          ),
+                        ),
                       ),
                     );
                   }
