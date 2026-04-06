@@ -67,7 +67,21 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
 
     // Initialize text controllers for dynamic fields
     for (var entry in _formData.entries) {
-      if (entry.value is String || entry.value is num) {
+      if (entry.value is List) {
+        // Repeat group data — initialize controllers per entry per child
+        final entries = entry.value as List;
+        for (final rawEntry in entries) {
+          final entryMap = rawEntry as Map<String, dynamic>;
+          final entryId = entryMap['_entryId'] as String? ?? entry.key;
+          for (final childEntry in entryMap.entries) {
+            if (childEntry.key == '_entryId') continue;
+            if (childEntry.value is String || childEntry.value is num) {
+              _textControllers['${entry.key}.$entryId.${childEntry.key}'] =
+                  TextEditingController(text: childEntry.value.toString());
+            }
+          }
+        }
+      } else if (entry.value is String || entry.value is num) {
         _textControllers[entry.key] = TextEditingController(
           text: entry.value.toString(),
         );
@@ -324,6 +338,8 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
 
     if (value is bool) {
       return _buildCheckboxField(key, label, value);
+    } else if (value is List) {
+      return _buildRepeatGroupEditor(key, label, value);
     } else {
       return CustomTextField(
         controller: _textControllers[key],
@@ -336,6 +352,120 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
         },
       );
     }
+  }
+
+  Widget _buildRepeatGroupEditor(String groupKey, String label, List entries) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Get human-readable labels from the jobsheet's fieldLabels
+    final fieldLabels = widget.jobsheet.fieldLabels;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Icon(AppIcons.element, color: AppTheme.primaryBlue, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              fieldLabels[groupKey] ?? label,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${entries.length}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryBlue,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...entries.asMap().entries.map((mapEntry) {
+          final index = mapEntry.key;
+          final entry = mapEntry.value as Map<String, dynamic>;
+          final entryId = entry['_entryId'] as String? ?? groupKey;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkSurface : Colors.white,
+              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+              boxShadow: AppTheme.cardShadow,
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.grey.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              child: ExpansionTile(
+                initiallyExpanded: index == 0,
+                tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                title: Text(
+                  '#${index + 1}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primaryBlue,
+                  ),
+                ),
+                children: entry.entries
+                    .where((e) => e.key != '_entryId')
+                    .map((childEntry) {
+                  final childLabel = fieldLabels['$groupKey.${childEntry.key}'] ??
+                      _formatFieldLabel(childEntry.key);
+                  final controllerKey = '$groupKey.$entryId.${childEntry.key}';
+
+                  if (childEntry.value is bool) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: CheckboxListTile(
+                        title: Text(childLabel),
+                        value: childEntry.value as bool,
+                        onChanged: (newValue) {
+                          setState(() {
+                            entry[childEntry.key] = newValue ?? false;
+                            _hasChanges = true;
+                          });
+                        },
+                        controlAffinity: ListTileControlAffinity.leading,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    );
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: CustomTextField(
+                      controller: _textControllers[controllerKey],
+                      label: childLabel,
+                      onChanged: (newValue) {
+                        setState(() {
+                          entry[childEntry.key] = newValue;
+                          _hasChanges = true;
+                        });
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          );
+        }),
+      ],
+    );
   }
 
   Widget _buildCheckboxField(String key, String label, bool value) {
@@ -393,6 +523,22 @@ class _EditJobsheetScreenState extends State<EditJobsheetScreen> {
       for (var entry in _textControllers.entries) {
         if (_formData.containsKey(entry.key)) {
           _formData[entry.key] = entry.value.text;
+        }
+        // Sync repeat group child controllers back into the list entries
+        final parts = entry.key.split('.');
+        if (parts.length == 3) {
+          final groupKey = parts[0];
+          final entryId = parts[1];
+          final childKey = parts[2];
+          final groupData = _formData[groupKey];
+          if (groupData is List) {
+            for (final rawEntry in groupData) {
+              final entryMap = rawEntry as Map<String, dynamic>;
+              if (entryMap['_entryId'] == entryId) {
+                entryMap[childKey] = entry.value.text;
+              }
+            }
+          }
         }
       }
 

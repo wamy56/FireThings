@@ -16,6 +16,7 @@ import '../../data/default_asset_types.dart';
 import '../saved_sites/site_picker_screen.dart';
 import '../assets/batch_test_screen.dart';
 import '../../services/analytics_service.dart';
+import '../../utils/rotation_tracker.dart';
 import '../signature/signature_screen.dart';
 
 class JobFormScreen extends StatefulWidget {
@@ -78,6 +79,19 @@ class _JobFormScreenState extends State<JobFormScreen> {
     );
     // Initialize controllers and keys for text fields
     for (var field in widget.template.fields) {
+      if (field.type == FieldType.repeatGroup) {
+        // Initialize repeat group with one empty entry
+        final entryId = const Uuid().v4();
+        _formData[field.id] = <Map<String, dynamic>>[
+          {'_entryId': entryId},
+        ];
+        _initRepeatEntryControllers(field, entryId);
+        if (field.required) {
+          _dynamicFieldKeys[field.id] = GlobalKey();
+          _dynamicFieldFocusNodes[field.id] = FocusNode();
+        }
+        continue;
+      }
       if (field.type == FieldType.text ||
           field.type == FieldType.number ||
           field.type == FieldType.multiline) {
@@ -138,6 +152,33 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
     // Populate text controllers from form data
     for (var field in widget.template.fields) {
+      if (field.type == FieldType.repeatGroup && draft.formData.containsKey(field.id)) {
+        final entries = draft.formData[field.id];
+        if (entries is List && entries.isNotEmpty) {
+          // Dispose any controllers created during initState for the default empty entry
+          _disposeRepeatGroupControllers(field.id);
+
+          final loadedEntries = <Map<String, dynamic>>[];
+          for (final rawEntry in entries) {
+            final entry = Map<String, dynamic>.from(rawEntry as Map);
+            // Ensure each entry has a stable ID
+            if (!entry.containsKey('_entryId')) {
+              entry['_entryId'] = const Uuid().v4();
+            }
+            loadedEntries.add(entry);
+            _initRepeatEntryControllers(field, entry['_entryId'] as String);
+            // Populate controllers with saved values
+            for (final child in field.children ?? <TemplateField>[]) {
+              final controllerKey = '${field.id}.${entry['_entryId']}.${child.id}';
+              if (_textControllers.containsKey(controllerKey) && entry.containsKey(child.id)) {
+                _textControllers[controllerKey]!.text = entry[child.id]?.toString() ?? '';
+              }
+            }
+          }
+          _formData[field.id] = loadedEntries;
+        }
+        continue;
+      }
       if (_textControllers.containsKey(field.id) && draft.formData.containsKey(field.id)) {
         _textControllers[field.id]!.text = draft.formData[field.id]?.toString() ?? '';
       }
@@ -368,6 +409,18 @@ class _JobFormScreenState extends State<JobFormScreen> {
     // Use the draft ID if editing, otherwise create one
     final jobsheetId = _isEditingDraft ? _draftId! : const Uuid().v4();
 
+    // For quarterly tests, calculate suggested 25% rotation
+    List<String>? suggestedAssetIds;
+    if (widget.template.id == 'quarterly_test') {
+      suggestedAssetIds = await RotationTracker.getSuggestedAssets(
+        basePath: basePath,
+        siteId: siteId,
+        assets: activeAssets,
+      );
+    }
+
+    if (!mounted) return;
+
     final result = await Navigator.of(context).push<bool>(
       adaptivePageRoute(
         builder: (_) => BatchTestScreen(
@@ -376,6 +429,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
           assets: activeAssets,
           assetTypes: assetTypes,
           jobsheetId: jobsheetId,
+          suggestedAssetIds: suggestedAssetIds,
         ),
       ),
     );
@@ -542,6 +596,9 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
       case FieldType.multiline:
         return _buildMultilineField(field);
+
+      case FieldType.repeatGroup:
+        return _buildRepeatGroupField(field);
     }
   }
 
@@ -692,6 +749,362 @@ class _JobFormScreenState extends State<JobFormScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Repeat Group Helpers
+  // ---------------------------------------------------------------------------
+
+  void _initRepeatEntryControllers(TemplateField groupField, String entryId) {
+    for (final child in groupField.children ?? <TemplateField>[]) {
+      if (child.type == FieldType.text ||
+          child.type == FieldType.number ||
+          child.type == FieldType.multiline) {
+        _textControllers['${groupField.id}.$entryId.${child.id}'] =
+            TextEditingController();
+      }
+    }
+  }
+
+  void _disposeRepeatGroupControllers(String groupId) {
+    final keysToRemove = _textControllers.keys
+        .where((k) => k.startsWith('$groupId.'))
+        .toList();
+    for (final key in keysToRemove) {
+      _textControllers[key]!.dispose();
+      _textControllers.remove(key);
+    }
+  }
+
+  void _addRepeatEntry(TemplateField groupField) {
+    final entries = _formData[groupField.id] as List<Map<String, dynamic>>;
+    if (groupField.maxEntries != null &&
+        entries.length >= groupField.maxEntries!) {
+      return;
+    }
+    final entryId = const Uuid().v4();
+    _initRepeatEntryControllers(groupField, entryId);
+    setState(() {
+      entries.add({'_entryId': entryId});
+    });
+  }
+
+  void _removeRepeatEntry(TemplateField groupField, int index) {
+    final entries = _formData[groupField.id] as List<Map<String, dynamic>>;
+    final minEntries = groupField.minEntries ?? 1;
+    if (entries.length <= minEntries) return;
+
+    final entryId = entries[index]['_entryId'] as String;
+    // Dispose controllers for this entry
+    for (final child in groupField.children ?? <TemplateField>[]) {
+      final key = '${groupField.id}.$entryId.${child.id}';
+      _textControllers[key]?.dispose();
+      _textControllers.remove(key);
+    }
+    setState(() {
+      entries.removeAt(index);
+    });
+  }
+
+  void _syncRepeatEntryData(TemplateField groupField) {
+    final entries = _formData[groupField.id] as List<Map<String, dynamic>>;
+    for (final entry in entries) {
+      final entryId = entry['_entryId'] as String;
+      for (final child in groupField.children ?? <TemplateField>[]) {
+        final key = '${groupField.id}.$entryId.${child.id}';
+        if (_textControllers.containsKey(key)) {
+          entry[child.id] = _textControllers[key]!.text;
+        }
+      }
+    }
+  }
+
+  Widget _buildRepeatGroupField(TemplateField field) {
+    final entries = _formData[field.id] as List<Map<String, dynamic>>? ?? [];
+    final children = field.children ?? [];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final minEntries = field.minEntries ?? 1;
+    final canAdd =
+        field.maxEntries == null || entries.length < field.maxEntries!;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Section header
+        Row(
+          children: [
+            Icon(AppIcons.element, color: AppTheme.primaryBlue, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              field.label,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${entries.length}',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.primaryBlue,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Entry cards
+        ...entries.asMap().entries.map((mapEntry) {
+          final index = mapEntry.key;
+          final entry = mapEntry.value;
+          final entryId = entry['_entryId'] as String;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.darkSurface : Colors.white,
+              borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+              boxShadow: AppTheme.cardShadow,
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.grey.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                dividerColor: Colors.transparent,
+              ),
+              child: ExpansionTile(
+                initiallyExpanded: true,
+                tilePadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                childrenPadding:
+                    const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                title: Row(
+                  children: [
+                    Text(
+                      '#${index + 1}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primaryBlue,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _repeatEntrySummary(entry, children),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: isDark
+                                  ? AppTheme.darkTextSecondary
+                                  : AppTheme.textSecondary,
+                            ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                trailing: entries.length > minEntries
+                    ? IconButton(
+                        icon: Icon(AppIcons.close, size: 18),
+                        color: AppTheme.errorRed,
+                        onPressed: () =>
+                            _removeRepeatEntry(field, index),
+                        tooltip: 'Remove entry',
+                      )
+                    : null,
+                children: children.map((child) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _buildRepeatChildField(
+                        field.id, entryId, entry, child),
+                  );
+                }).toList(),
+              ),
+            ),
+          );
+        }),
+
+        // Add button
+        if (canAdd)
+          OutlinedButton.icon(
+            onPressed: () => _addRepeatEntry(field),
+            icon: Icon(AppIcons.addCircle, size: 18),
+            label: const Text('Add Another'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.primaryBlue,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              side: BorderSide(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _repeatEntrySummary(
+      Map<String, dynamic> entry, List<TemplateField> children) {
+    // Try to build a useful summary from the first text/dropdown values
+    for (final child in children) {
+      final value = entry[child.id];
+      if (value != null && value.toString().isNotEmpty) {
+        return value.toString();
+      }
+    }
+    return 'New entry';
+  }
+
+  Widget _buildRepeatChildField(
+    String groupId,
+    String entryId,
+    Map<String, dynamic> entry,
+    TemplateField child,
+  ) {
+    final controllerKey = '$groupId.$entryId.${child.id}';
+
+    switch (child.type) {
+      case FieldType.text:
+        return CustomTextField(
+          controller: _textControllers[controllerKey],
+          label: child.label + (child.required ? ' *' : ''),
+          onChanged: (value) => entry[child.id] = value,
+          validator: child.required
+              ? (value) {
+                  if (value == null || value.isEmpty) {
+                    return '${child.label} is required';
+                  }
+                  return null;
+                }
+              : null,
+        );
+
+      case FieldType.number:
+        return CustomTextField(
+          controller: _textControllers[controllerKey],
+          label: child.label + (child.required ? ' *' : ''),
+          keyboardType: TextInputType.number,
+          onChanged: (value) => entry[child.id] = value,
+          validator: child.required
+              ? (value) {
+                  if (value == null || value.isEmpty) {
+                    return '${child.label} is required';
+                  }
+                  return null;
+                }
+              : null,
+        );
+
+      case FieldType.multiline:
+        return CustomTextField(
+          controller: _textControllers[controllerKey],
+          label: child.label + (child.required ? ' *' : ''),
+          maxLines: 3,
+          onChanged: (value) => entry[child.id] = value,
+          validator: child.required
+              ? (value) {
+                  if (value == null || value.isEmpty) {
+                    return '${child.label} is required';
+                  }
+                  return null;
+                }
+              : null,
+        );
+
+      case FieldType.dropdown:
+        return DropdownButtonFormField<String>(
+          initialValue: entry[child.id] as String?,
+          decoration: InputDecoration(
+            labelText: child.label + (child.required ? ' *' : ''),
+            prefixIcon: Icon(AppIcons.arrowDown),
+          ),
+          items: child.options!.map((option) {
+            return DropdownMenuItem(value: option, child: Text(option));
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              entry[child.id] = value;
+            });
+          },
+          validator: child.required
+              ? (value) {
+                  if (value == null || value.isEmpty) {
+                    return '${child.label} is required';
+                  }
+                  return null;
+                }
+              : null,
+        );
+
+      case FieldType.checkbox:
+        return CheckboxListTile(
+          title: Text(child.label),
+          value: entry[child.id] as bool? ?? false,
+          onChanged: (value) {
+            setState(() {
+              entry[child.id] = value ?? false;
+            });
+          },
+          controlAffinity: ListTileControlAffinity.leading,
+          contentPadding: EdgeInsets.zero,
+        );
+
+      case FieldType.date:
+        final dateFormat = DateFormat('dd/MM/yyyy');
+        String displayValue = '';
+        if (entry[child.id] != null) {
+          try {
+            final date = DateTime.parse(entry[child.id] as String);
+            displayValue = dateFormat.format(date);
+          } catch (_) {
+            displayValue = entry[child.id].toString();
+          }
+        }
+        return InkWell(
+          onTap: () async {
+            final picked = await showAdaptiveDatePicker(
+              context: context,
+              initialDate: DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime(2030),
+            );
+            if (picked != null) {
+              setState(() {
+                entry[child.id] = picked.toIso8601String();
+              });
+            }
+          },
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: child.label + (child.required ? ' *' : ''),
+              prefixIcon: Icon(AppIcons.calendar),
+            ),
+            child: Text(
+              displayValue.isNotEmpty ? displayValue : 'Select date',
+              style: TextStyle(
+                color: displayValue.isNotEmpty
+                    ? Theme.of(context).textTheme.bodyLarge?.color
+                    : Theme.of(context).hintColor,
+              ),
+            ),
+          ),
+        );
+
+      case FieldType.repeatGroup:
+        // Nested repeat groups not supported
+        return const SizedBox.shrink();
+    }
+  }
+
   Future<void> _selectFromSavedSites() async {
     final SavedSite? selected = await Navigator.push(
       context,
@@ -704,6 +1117,55 @@ class _JobFormScreenState extends State<JobFormScreen> {
         _siteAddressController.text = selected.address;
         _selectedSiteId = selected.id;
       });
+      // Auto-populate from asset register for annual inspection
+      if (RemoteConfigService.instance.assetRegisterEnabled) {
+        _autoPopulateFromAssetRegister(selected.id);
+      }
+    }
+  }
+
+  Future<void> _autoPopulateFromAssetRegister(String siteId) async {
+    final templateId = widget.template.id;
+    if (templateId != 'annual_inspection' && templateId != 'quarterly_test') {
+      return;
+    }
+
+    final user = _authService.currentUser;
+    if (user == null) return;
+
+    final basePath = 'users/${user.uid}';
+
+    try {
+      final assets = await AssetService.instance
+          .getAssetsStream(basePath, siteId)
+          .first;
+
+      final activeAssets = assets
+          .where((a) => a.complianceStatus != 'decommissioned')
+          .toList();
+
+      if (activeAssets.isEmpty || !mounted) return;
+
+      if (templateId == 'annual_inspection') {
+        final totalDevices = activeAssets.length;
+        final zones = activeAssets
+            .where((a) => a.zone != null && a.zone!.isNotEmpty)
+            .map((a) => a.zone!)
+            .toSet();
+
+        setState(() {
+          _formData['total_devices'] = totalDevices.toString();
+          _formData['total_zones'] = zones.length.toString();
+          if (_textControllers.containsKey('total_devices')) {
+            _textControllers['total_devices']!.text = totalDevices.toString();
+          }
+          if (_textControllers.containsKey('total_zones')) {
+            _textControllers['total_zones']!.text = zones.length.toString();
+          }
+        });
+      }
+    } catch (e) {
+      // Silently fail — auto-populate is a convenience, not critical
     }
   }
 
@@ -734,16 +1196,17 @@ class _JobFormScreenState extends State<JobFormScreen> {
     try {
       // Collect current form data from text controllers
       for (var field in widget.template.fields) {
+        if (field.type == FieldType.repeatGroup) {
+          _syncRepeatEntryData(field);
+          continue;
+        }
         if (_textControllers.containsKey(field.id)) {
           _formData[field.id] = _textControllers[field.id]!.text;
         }
       }
 
       // Build field labels map for PDF generation
-      final fieldLabels = <String, String>{};
-      for (var field in widget.template.fields) {
-        fieldLabels[field.id] = field.label;
-      }
+      final fieldLabels = _buildFieldLabels();
 
       final jobsheet = Jobsheet(
         id: _isEditingDraft ? _draftId! : const Uuid().v4(),
@@ -821,6 +1284,30 @@ class _JobFormScreenState extends State<JobFormScreen> {
       return;
     }
 
+    // Validate repeat group required children programmatically
+    // (collapsed ExpansionTiles may not have validators in the widget tree)
+    for (final field in widget.template.fields) {
+      if (field.type == FieldType.repeatGroup) {
+        _syncRepeatEntryData(field);
+        final entries = _formData[field.id] as List<Map<String, dynamic>>? ?? [];
+        for (var i = 0; i < entries.length; i++) {
+          for (final child in field.children ?? <TemplateField>[]) {
+            if (child.required) {
+              final value = entries[i][child.id];
+              if (value == null || value.toString().trim().isEmpty) {
+                if (mounted) {
+                  context.showErrorToast(
+                    '${child.label} is required in ${field.label} #${i + 1}',
+                  );
+                }
+                return;
+              }
+            }
+          }
+        }
+      }
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -829,11 +1316,15 @@ class _JobFormScreenState extends State<JobFormScreen> {
         throw Exception('User not logged in');
       }
 
-      // Build field labels map for PDF generation
-      final fieldLabels = <String, String>{};
-      for (var field in widget.template.fields) {
-        fieldLabels[field.id] = field.label;
+      // Sync repeat group text controllers before saving
+      for (final field in widget.template.fields) {
+        if (field.type == FieldType.repeatGroup) {
+          _syncRepeatEntryData(field);
+        }
       }
+
+      // Build field labels map for PDF generation
+      final fieldLabels = _buildFieldLabels();
 
       // Create jobsheet object
       final jobsheet = Jobsheet(
@@ -880,6 +1371,19 @@ class _JobFormScreenState extends State<JobFormScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Map<String, String> _buildFieldLabels() {
+    final fieldLabels = <String, String>{};
+    for (var field in widget.template.fields) {
+      fieldLabels[field.id] = field.label;
+      if (field.type == FieldType.repeatGroup && field.children != null) {
+        for (final child in field.children!) {
+          fieldLabels['${field.id}.${child.id}'] = child.label;
+        }
+      }
+    }
+    return fieldLabels;
   }
 
   IconData _getFieldIcon(TemplateField field) {

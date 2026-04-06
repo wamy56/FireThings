@@ -8,6 +8,9 @@ class TemplateField {
   final bool required;
   final List<String>? options; // For dropdown fields
   final String? defaultValue;
+  final List<TemplateField>? children; // For repeatGroup fields
+  final int? minEntries; // For repeatGroup fields (default 1)
+  final int? maxEntries; // For repeatGroup fields (null = unlimited)
 
   TemplateField({
     required this.id,
@@ -16,6 +19,9 @@ class TemplateField {
     this.required = false,
     this.options,
     this.defaultValue,
+    this.children,
+    this.minEntries,
+    this.maxEntries,
   });
 
   /// Convert TemplateField to JSON map
@@ -27,6 +33,10 @@ class TemplateField {
       'required': required,
       'options': options,
       'defaultValue': defaultValue,
+      if (children != null)
+        'children': children!.map((c) => c.toJson()).toList(),
+      if (minEntries != null) 'minEntries': minEntries,
+      if (maxEntries != null) 'maxEntries': maxEntries,
     };
   }
 
@@ -41,6 +51,14 @@ class TemplateField {
           ? List<String>.from(json['options'] as List)
           : null,
       defaultValue: json['defaultValue'] as String?,
+      children: json['children'] != null
+          ? (json['children'] as List)
+              .map((c) =>
+                  TemplateField.fromJson(c as Map<String, dynamic>))
+              .toList()
+          : null,
+      minEntries: json['minEntries'] as int?,
+      maxEntries: json['maxEntries'] as int?,
     );
   }
 
@@ -52,6 +70,9 @@ class TemplateField {
     bool? required,
     List<String>? options,
     String? defaultValue,
+    List<TemplateField>? children,
+    int? minEntries,
+    int? maxEntries,
   }) {
     return TemplateField(
       id: id ?? this.id,
@@ -60,6 +81,9 @@ class TemplateField {
       required: required ?? this.required,
       options: options ?? this.options,
       defaultValue: defaultValue ?? this.defaultValue,
+      children: children ?? this.children,
+      minEntries: minEntries ?? this.minEntries,
+      maxEntries: maxEntries ?? this.maxEntries,
     );
   }
 

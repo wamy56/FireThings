@@ -25,6 +25,8 @@ service cloud.firestore {
       match /members/{memberId} {
         // Members can read all members (to see team list)
         allow read: if isCompanyMember(companyId);
+        // Allow users to check their own membership status (needed for join flow)
+        allow get: if request.auth != null && request.auth.uid == memberId;
         // Admins can add/remove members
         allow delete: if isCompanyAdmin(companyId);
         // Admins can create members, OR users can create their own member doc
@@ -83,6 +85,19 @@ service cloud.firestore {
         match /asset_service_history/{recordId} {
           allow read: if isCompanyMember(companyId);
           allow create: if isCompanyMember(companyId);
+        }
+
+        // Asset defects
+        match /defects/{defectId} {
+          allow read: if isCompanyMember(companyId);
+          allow create, update: if isCompanyMember(companyId);
+          allow delete: if isCompanyDispatcherOrAdmin(companyId);
+        }
+
+        // Compliance metadata
+        match /compliance_meta/{docId} {
+          allow read: if isCompanyMember(companyId);
+          allow write: if isCompanyMember(companyId);
         }
       }
 

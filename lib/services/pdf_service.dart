@@ -470,6 +470,7 @@ pw.Widget _buildCompactField(String label, String value, PdfColor primaryLight, 
 
 bool _isShortField(dynamic value) {
   if (value is bool) return true;
+  if (value is List) return false;
   final str = value?.toString() ?? '';
   return str.length <= 30 && !str.contains('\n');
 }
@@ -502,14 +503,119 @@ pw.Widget _buildWorkDetailField(MapEntry<String, dynamic> entry, Map<String, Str
   );
 }
 
+pw.Widget _buildRepeatGroupSection(
+  String groupKey,
+  List entries,
+  Map<String, String> fieldLabels,
+  PdfColor primaryColor,
+  PdfColor primaryLight,
+) {
+  if (entries.isEmpty) return pw.SizedBox.shrink();
+
+  final groupLabel = fieldLabels[groupKey] ?? _formatFieldLabel(groupKey);
+
+  // Collect all child keys (excluding _entryId) from the first entry to build headers
+  final firstEntry = entries.first as Map<String, dynamic>;
+  final childKeys = firstEntry.keys.where((k) => k != '_entryId').toList();
+
+  if (childKeys.isEmpty) return pw.SizedBox.shrink();
+
+  return pw.Padding(
+    padding: const pw.EdgeInsets.fromLTRB(8, 4, 8, 8),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 6),
+          child: pw.Text(
+            groupLabel,
+            style: pw.TextStyle(
+              fontSize: 10,
+              fontWeight: pw.FontWeight.bold,
+              color: primaryColor,
+            ),
+          ),
+        ),
+        // Table
+        pw.Table(
+          border: pw.TableBorder.all(color: _lightGray, width: 0.5),
+          columnWidths: {
+            for (var j = 0; j < childKeys.length; j++)
+              j: const pw.FlexColumnWidth(),
+          },
+          children: [
+            // Header row
+            pw.TableRow(
+              decoration: pw.BoxDecoration(color: primaryLight),
+              children: childKeys.map((key) {
+                final label = fieldLabels['$groupKey.$key'] ??
+                    _formatFieldLabel(key);
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.all(4),
+                  child: pw.Text(
+                    label,
+                    style: pw.TextStyle(
+                      fontSize: 7,
+                      fontWeight: pw.FontWeight.bold,
+                      color: _darkGray,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            // Data rows
+            ...entries.asMap().entries.map((mapEntry) {
+              final rowIndex = mapEntry.key;
+              final entry = mapEntry.value as Map<String, dynamic>;
+              final isAlternate = rowIndex.isOdd;
+
+              return pw.TableRow(
+                decoration: isAlternate
+                    ? pw.BoxDecoration(color: primaryLight)
+                    : null,
+                children: childKeys.map((key) {
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text(
+                      _formatFieldValue(entry[key]),
+                      style: const pw.TextStyle(fontSize: 8),
+                    ),
+                  );
+                }).toList(),
+              );
+            }),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
 pw.Widget _buildWorkDetailsSection(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight) {
   final entries = jobsheet.formData.entries.toList();
   final List<pw.Widget> rows = [];
+  final List<pw.Widget> repeatGroupSections = [];
 
   int rowIndex = 0;
   int i = 0;
   while (i < entries.length) {
     final entry = entries[i];
+
+    // Handle repeat group entries separately
+    if (entry.value is List) {
+      repeatGroupSections.add(
+        _buildRepeatGroupSection(
+          entry.key,
+          entry.value as List,
+          jobsheet.fieldLabels,
+          primaryColor,
+          primaryLight,
+        ),
+      );
+      i += 1;
+      continue;
+    }
+
     final isShort = _isShortField(entry.value);
     final isAlternate = rowIndex.isOdd;
 
@@ -564,6 +670,7 @@ pw.Widget _buildWorkDetailsSection(Jobsheet jobsheet, PdfColor primaryColor, Pdf
           padding: const pw.EdgeInsets.all(8),
           child: pw.Column(children: rows),
         ),
+        ...repeatGroupSections,
       ],
     ),
   );

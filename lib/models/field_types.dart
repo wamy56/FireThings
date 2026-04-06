@@ -1,5 +1,5 @@
 /// Enum defining all possible field types in a template
-enum FieldType { text, number, dropdown, checkbox, date, multiline }
+enum FieldType { text, number, dropdown, checkbox, date, multiline, repeatGroup }
 
 /// Extension to convert FieldType to/from string for JSON serialization
 extension FieldTypeExtension on FieldType {

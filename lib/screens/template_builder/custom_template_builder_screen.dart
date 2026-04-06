@@ -740,6 +740,8 @@ class _CustomTemplateBuilderScreenState
         return AppIcons.calendar;
       case FieldType.multiline:
         return AppIcons.note;
+      case FieldType.repeatGroup:
+        return AppIcons.element;
     }
   }
 
@@ -757,6 +759,8 @@ class _CustomTemplateBuilderScreenState
         return 'Date';
       case FieldType.multiline:
         return 'Multi-line';
+      case FieldType.repeatGroup:
+        return 'Repeating Section';
     }
   }
 }
@@ -938,6 +942,8 @@ class _AddFieldDialogState extends State<_AddFieldDialog> {
         return 'Date Picker';
       case FieldType.multiline:
         return 'Multi-line Text';
+      case FieldType.repeatGroup:
+        return 'Repeating Section';
     }
   }
 }

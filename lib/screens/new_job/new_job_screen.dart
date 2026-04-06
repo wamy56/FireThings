@@ -783,6 +783,8 @@ class _NewJobScreenState extends State<NewJobScreen> {
         return AppIcons.calendar;
       case FieldType.multiline:
         return AppIcons.note;
+      case FieldType.repeatGroup:
+        return AppIcons.element;
     }
   }
 
@@ -800,6 +802,8 @@ class _NewJobScreenState extends State<NewJobScreen> {
         return 'Date picker';
       case FieldType.multiline:
         return 'Multi-line text';
+      case FieldType.repeatGroup:
+        return 'Repeating section';
     }
   }
 }

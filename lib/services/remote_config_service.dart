@@ -1,4 +1,3 @@
-import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/foundation.dart';
 
@@ -46,17 +45,10 @@ class RemoteConfigService {
     }
   }
 
-  /// Tag dispatch testers and re-fetch Remote Config after login.
-  /// Must be called after the user is authenticated so email is available.
+  /// Re-fetch Remote Config after login.
+  /// Must be called after the user is authenticated.
   Future<void> refreshForUser(String? email) async {
     try {
-      const dispatchTesters = ['cscott93@hotmail.co.uk', 'test@test.com'];
-      if (dispatchTesters.contains(email)) {
-        await FirebaseAnalytics.instance.setUserProperty(
-          name: 'dispatch_tester',
-          value: 'true',
-        );
-      }
       await _remoteConfig.fetchAndActivate();
     } catch (e) {
       debugPrint('Remote Config refresh failed: $e');

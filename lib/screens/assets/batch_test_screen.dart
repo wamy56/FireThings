@@ -21,6 +21,7 @@ class BatchTestScreen extends StatefulWidget {
   final List<Asset> assets;
   final List<AssetType> assetTypes;
   final String? jobsheetId;
+  final List<String>? suggestedAssetIds;
 
   const BatchTestScreen({
     super.key,
@@ -29,6 +30,7 @@ class BatchTestScreen extends StatefulWidget {
     required this.assets,
     required this.assetTypes,
     this.jobsheetId,
+    this.suggestedAssetIds,
   });
 
   @override
@@ -51,9 +53,13 @@ class _BatchTestScreenState extends State<BatchTestScreen> {
   // Saving state per asset
   final Set<String> _savingAssetIds = {};
 
+  // Suggested assets for quarterly rotation
+  late final Set<String> _suggestedIds;
+
   @override
   void initState() {
     super.initState();
+    _suggestedIds = widget.suggestedAssetIds?.toSet() ?? {};
     _loadOpenDefectCounts();
   }
 
@@ -376,6 +382,7 @@ class _BatchTestScreenState extends State<BatchTestScreen> {
                         iconForType: _iconForType,
                         openDefectCount: _openDefectCounts[asset.id] ?? 0,
                         isSaving: _savingAssetIds.contains(asset.id),
+                        isSuggested: _suggestedIds.contains(asset.id),
                         isDark: isDark,
                         onPass: () => _passAsset(asset),
                         onFail: () => _failAsset(asset),
@@ -497,6 +504,7 @@ class _AssetTestCard extends StatelessWidget {
   final IconData Function(AssetType?) iconForType;
   final int openDefectCount;
   final bool isSaving;
+  final bool isSuggested;
   final bool isDark;
   final VoidCallback onPass;
   final VoidCallback onFail;
@@ -508,6 +516,7 @@ class _AssetTestCard extends StatelessWidget {
     required this.iconForType,
     required this.openDefectCount,
     required this.isSaving,
+    this.isSuggested = false,
     required this.isDark,
     required this.onPass,
     required this.onFail,
@@ -527,6 +536,9 @@ class _AssetTestCard extends StatelessWidget {
         color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
         boxShadow: AppTheme.cardShadow,
+        border: isSuggested
+            ? Border.all(color: AppTheme.accentOrange.withValues(alpha: 0.6), width: 1.5)
+            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -548,12 +560,37 @@ class _AssetTestCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      asset.reference ?? assetType?.name ?? 'Asset',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            asset.reference ?? assetType?.name ?? 'Asset',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isSuggested) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppTheme.accentOrange.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Suggested',
+                              style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.accentOrange,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     Text(
                       [
