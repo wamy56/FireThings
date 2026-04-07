@@ -501,6 +501,7 @@ class InvoicePDFService {
     );
 
     // ── Build phase (background isolate) ──
+    if (kIsWeb) return _buildInvoicePdf(data);
     return compute(_buildInvoicePdf, data);
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -25,13 +26,716 @@ const _passGreen = PdfColor.fromInt(0xFF4CAF50);
 const _failRed = PdfColor.fromInt(0xFFD32F2F);
 const _untestedAmber = PdfColor.fromInt(0xFFF97316);
 
-/// Top-level function for compute() — builds the compliance report PDF.
-Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
-  final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
+/// Resizes image bytes to a maximum width, re-encoding as JPEG.
+/// Returns original bytes if already smaller or decoding fails.
+Uint8List _resizeImageBytes(Uint8List bytes, {int maxWidth = 1200}) {
+  try {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null || decoded.width <= maxWidth) return bytes;
+    final resized = img.copyResize(decoded, width: maxWidth);
+    return Uint8List.fromList(img.encodeJpg(resized, quality: 80));
+  } catch (_) {
+    return bytes;
+  }
+}
+
+// ── Parsed data holder used by section helpers ──
+class _ReportContext {
+  final ComplianceReportPdfData data;
+  final List<Asset> assets;
+  final List<AssetType> assetTypes;
+  final List<ServiceRecord> records;
+  final List<FloorPlan> floorPlans;
+  final List<Asset> active;
+  final List<Asset> decom;
+  final List<Asset> pass;
+  final List<Asset> fail;
+  final List<Asset> untested;
+  final PdfColor primaryColor;
+  final PdfColor primaryLight;
+
+  _ReportContext({
+    required this.data,
+    required this.assets,
+    required this.assetTypes,
+    required this.records,
+    required this.floorPlans,
+    required this.active,
+    required this.decom,
+    required this.pass,
+    required this.fail,
+    required this.untested,
+    required this.primaryColor,
+    required this.primaryLight,
+  });
+
+  AssetType? getType(String typeId) {
+    try {
+      return assetTypes.firstWhere((t) => t.id == typeId);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+_ReportContext _buildReportContext(ComplianceReportPdfData data) {
   final colourScheme =
       PdfColourScheme(primaryColorValue: data.colourSchemeValue);
-  final primaryColor = colourScheme.primaryColor;
-  final primaryLight = colourScheme.primaryLight;
+  final assets = data.assetsJson.map((j) => Asset.fromJson(j)).toList();
+  final assetTypes =
+      data.assetTypesJson.map((j) => AssetType.fromJson(j)).toList();
+  final records =
+      data.serviceRecordsJson.map((j) => ServiceRecord.fromJson(j)).toList();
+  final floorPlans =
+      data.floorPlansJson.map((j) => FloorPlan.fromJson(j)).toList();
+  final active =
+      assets.where((a) => a.complianceStatus != Asset.statusDecommissioned).toList();
+
+  return _ReportContext(
+    data: data,
+    assets: assets,
+    assetTypes: assetTypes,
+    records: records,
+    floorPlans: floorPlans,
+    active: active,
+    decom: assets.where((a) => a.complianceStatus == Asset.statusDecommissioned).toList(),
+    pass: active.where((a) => a.complianceStatus == Asset.statusPass).toList(),
+    fail: active.where((a) => a.complianceStatus == Asset.statusFail).toList(),
+    untested: active.where((a) => a.complianceStatus == Asset.statusUntested).toList(),
+    primaryColor: colourScheme.primaryColor,
+    primaryLight: colourScheme.primaryLight,
+  );
+}
+
+// ── Section 1: Cover Page ──
+pw.Page _buildCoverPage(ComplianceReportPdfData data, _ReportContext ctx) {
+  return pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.all(40),
+    build: (context) => pw.Column(
+      mainAxisAlignment: pw.MainAxisAlignment.center,
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        if (data.logoBytes != null)
+          pw.Image(pw.MemoryImage(data.logoBytes!),
+              width: 120, height: 60, fit: pw.BoxFit.contain),
+        if (data.logoBytes != null) pw.SizedBox(height: 40),
+        pw.Text(
+          'SITE COMPLIANCE REPORT',
+          style: pw.TextStyle(
+            fontSize: 24,
+            fontWeight: pw.FontWeight.bold,
+            color: ctx.primaryColor,
+            letterSpacing: 2,
+          ),
+        ),
+        pw.SizedBox(height: 24),
+        pw.Container(
+          width: 60,
+          height: 3,
+          color: ctx.primaryColor,
+        ),
+        pw.SizedBox(height: 24),
+        pw.Text(data.siteName,
+            style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 8),
+        pw.Text(data.siteAddress,
+            style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700),
+            textAlign: pw.TextAlign.center),
+        pw.SizedBox(height: 32),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.center,
+          children: [
+            _coverField('Date', data.reportDate),
+            pw.SizedBox(width: 40),
+            _coverField('Engineer', data.engineerName),
+          ],
+        ),
+        if (data.companyName.isNotEmpty) ...[
+          pw.SizedBox(height: 12),
+          _coverField('Company', data.companyName),
+        ],
+        pw.SizedBox(height: 40),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+          children: [
+            _statBox('Total', '${ctx.assets.length}', ctx.primaryColor),
+            _statBox('Pass', '${ctx.pass.length}', _passGreen),
+            _statBox('Fail', '${ctx.fail.length}', _failRed),
+            _statBox('Untested', '${ctx.untested.length}', _untestedAmber),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+// ── Section 2: Compliance Summary ──
+void _addComplianceSummary(List<pw.Widget> widgets, _ReportContext ctx) {
+  widgets.add(_sectionHeader('Compliance Summary', ctx.primaryColor));
+  widgets.add(pw.SizedBox(height: 8));
+  widgets.add(pw.Text(
+    '${ctx.assets.length} total assets (${ctx.active.length} active, ${ctx.decom.length} decommissioned)',
+    style: const pw.TextStyle(fontSize: 10),
+  ));
+  widgets.add(pw.SizedBox(height: 8));
+
+  final total = ctx.active.length.clamp(1, double.maxFinite.toInt());
+  widgets.add(pw.Container(
+    height: 20,
+    decoration: pw.BoxDecoration(
+      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+    ),
+    child: pw.ClipRRect(
+      horizontalRadius: 4,
+      verticalRadius: 4,
+      child: pw.Row(
+        children: [
+          if (ctx.pass.isNotEmpty)
+            pw.Expanded(
+              flex: ctx.pass.length,
+              child: pw.Container(color: _passGreen),
+            ),
+          if (ctx.fail.isNotEmpty)
+            pw.Expanded(
+              flex: ctx.fail.length,
+              child: pw.Container(color: _failRed),
+            ),
+          if (ctx.untested.isNotEmpty)
+            pw.Expanded(
+              flex: ctx.untested.length,
+              child: pw.Container(color: _untestedAmber),
+            ),
+        ],
+      ),
+    ),
+  ));
+  widgets.add(pw.SizedBox(height: 6));
+  widgets.add(pw.Row(
+    children: [
+      _legendDot(_passGreen, 'Pass ${ctx.pass.length} (${(ctx.pass.length / total * 100).toStringAsFixed(0)}%)'),
+      pw.SizedBox(width: 16),
+      _legendDot(_failRed, 'Fail ${ctx.fail.length} (${(ctx.fail.length / total * 100).toStringAsFixed(0)}%)'),
+      pw.SizedBox(width: 16),
+      _legendDot(_untestedAmber, 'Untested ${ctx.untested.length} (${(ctx.untested.length / total * 100).toStringAsFixed(0)}%)'),
+    ],
+  ));
+  widgets.add(pw.SizedBox(height: 16));
+}
+
+// ── Section 3: Floor Plans ──
+// Pin positions use plan.imageWidth/imageHeight from the model (not the
+// downloaded image bytes), so resizing the source image is safe.
+void _addFloorPlans(List<pw.Widget> widgets, _ReportContext ctx) {
+  for (final plan in ctx.floorPlans) {
+    final imageBytes = ctx.data.floorPlanImages[plan.id];
+    if (imageBytes == null) continue;
+
+    widgets.add(_sectionHeader('Floor Plan: ${plan.name}', ctx.primaryColor));
+    widgets.add(pw.SizedBox(height: 6));
+
+    final planAssets =
+        ctx.active.where((a) => a.floorPlanId == plan.id).toList();
+
+    const containerHeight = 300.0;
+    const containerWidth = 547.0; // A4 (595.28) - 2*24 margins
+    final pinSize = 8.0 * plan.pinScale;
+
+    final imageAspect = plan.imageWidth / plan.imageHeight;
+    final containerAspect = containerWidth / containerHeight;
+
+    double renderW, renderH, offsetX, offsetY;
+    if (imageAspect > containerAspect) {
+      renderW = containerWidth;
+      renderH = containerWidth / imageAspect;
+      offsetX = 0;
+      offsetY = (containerHeight - renderH) / 2;
+    } else {
+      renderH = containerHeight;
+      renderW = containerHeight * imageAspect;
+      offsetX = (containerWidth - renderW) / 2;
+      offsetY = 0;
+    }
+
+    widgets.add(pw.Container(
+      width: containerWidth,
+      height: containerHeight,
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: _lightGray),
+      ),
+      child: pw.Stack(
+        children: [
+          // Position image explicitly at calculated render area.
+          // Use explicit width/height on pw.Image rather than relying
+          // on SizedBox + BoxFit, which doesn't constrain correctly in
+          // the pdf package — the image renders at intrinsic pixel size
+          // instead of the SizedBox dimensions, causing pins to cluster
+          // in the top-left corner.
+          pw.Positioned(
+            left: offsetX,
+            top: offsetY,
+            child: pw.Image(pw.MemoryImage(imageBytes),
+                width: renderW, height: renderH),
+          ),
+          ...planAssets.map((a) {
+            if (a.xPercent == null || a.yPercent == null) {
+              return pw.SizedBox();
+            }
+            final statusColor = a.complianceStatus == Asset.statusPass
+                ? _passGreen
+                : a.complianceStatus == Asset.statusFail
+                    ? _failRed
+                    : _untestedAmber;
+
+            final pinDot = pw.Container(
+              width: pinSize,
+              height: pinSize,
+              decoration: pw.BoxDecoration(
+                color: statusColor,
+                shape: pw.BoxShape.circle,
+                border: pw.Border.all(
+                    color: PdfColors.white, width: 1.0),
+              ),
+            );
+
+            final hasLabel = plan.showLabels &&
+                a.reference != null &&
+                a.reference!.isNotEmpty;
+            final labelFontSize = 5.0 * plan.pinScale;
+
+            return pw.Positioned(
+              left: offsetX + a.xPercent! * renderW - pinSize / 2,
+              top: offsetY + a.yPercent! * renderH - pinSize / 2 -
+                  (hasLabel ? labelFontSize + 4 : 0),
+              child: hasLabel
+                  ? pw.Column(
+                      mainAxisSize: pw.MainAxisSize.min,
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.symmetric(
+                              horizontal: 2, vertical: 1),
+                          decoration: pw.BoxDecoration(
+                            color: PdfColors.white,
+                            borderRadius:
+                                pw.BorderRadius.circular(2),
+                            border: pw.Border.all(
+                                color: _lightGray, width: 0.5),
+                          ),
+                          child: pw.Text(
+                            a.reference!,
+                            style: pw.TextStyle(
+                              fontSize: labelFontSize,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        pw.SizedBox(height: 1),
+                        pinDot,
+                      ],
+                    )
+                  : pinDot,
+            );
+          }),
+        ],
+      ),
+    ));
+
+    // Legend for this floor plan
+    final typeIds = planAssets.map((a) => a.assetTypeId).toSet();
+    if (typeIds.isNotEmpty) {
+      widgets.add(pw.SizedBox(height: 4));
+      widgets.add(pw.Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: typeIds.map((tid) {
+          final type = ctx.getType(tid);
+          final color = type != null
+              ? PdfColor.fromHex(type.defaultColor)
+              : ctx.primaryColor;
+          return pw.Row(
+            mainAxisSize: pw.MainAxisSize.min,
+            children: [
+              pw.Container(
+                width: 8,
+                height: 8,
+                decoration: pw.BoxDecoration(
+                  color: color,
+                  shape: pw.BoxShape.circle,
+                ),
+              ),
+              pw.SizedBox(width: 3),
+              pw.Text(type?.name ?? tid,
+                  style: const pw.TextStyle(fontSize: 7)),
+            ],
+          );
+        }).toList(),
+      ));
+    }
+
+    widgets.add(pw.SizedBox(height: 12));
+  }
+}
+
+// ── Section 4: Asset Register Table ──
+void _addAssetRegister(List<pw.Widget> widgets, _ReportContext ctx) {
+  widgets.add(_sectionHeader('Asset Register', ctx.primaryColor));
+  widgets.add(pw.SizedBox(height: 4));
+  widgets.add(_tableHeader(
+      ['Ref', 'Type', 'Location', 'Zone', 'Status', 'Last Service', 'Lifespan'],
+      [2, 3, 3, 2, 2, 2, 2],
+      ctx.primaryLight));
+
+  for (int i = 0; i < ctx.active.length; i++) {
+    final a = ctx.active[i];
+    final type = ctx.getType(a.assetTypeId);
+    final dateFormat = DateFormat('dd/MM/yy');
+    final lastService =
+        a.lastServiceDate != null ? dateFormat.format(a.lastServiceDate!) : '-';
+    final lifespan = a.expectedLifespanYears != null
+        ? '${a.expectedLifespanYears}y'
+        : '-';
+    final statusLabel = a.complianceStatus == Asset.statusPass
+        ? 'PASS'
+        : a.complianceStatus == Asset.statusFail
+            ? 'FAIL'
+            : 'UNTESTED';
+    final statusColor = a.complianceStatus == Asset.statusPass
+        ? _passGreen
+        : a.complianceStatus == Asset.statusFail
+            ? _failRed
+            : _untestedAmber;
+
+    widgets.add(_tableRow(
+      [
+        a.reference ?? '-',
+        type?.name ?? '-',
+        a.locationDescription ?? '-',
+        a.zone ?? '-',
+        statusLabel,
+        lastService,
+        lifespan,
+      ],
+      [2, 3, 3, 2, 2, 2, 2],
+      isAlt: i.isOdd,
+      primaryLight: ctx.primaryLight,
+      statusIndex: 4,
+      statusColor: statusColor,
+    ));
+  }
+  widgets.add(pw.SizedBox(height: 16));
+}
+
+// ── Section 5: Defect Summary ──
+void _addDefectSummary(List<pw.Widget> widgets, _ReportContext ctx) {
+  final defects = ctx.data.defectsJson
+      .map((j) => Defect.fromJson(j))
+      .toList();
+  final openDefects =
+      defects.where((d) => d.status == Defect.statusOpen).toList();
+
+  if (openDefects.isNotEmpty) {
+    widgets.add(_sectionHeader('Defect Summary', ctx.primaryColor));
+    widgets.add(pw.SizedBox(height: 4));
+
+    for (final defect in openDefects) {
+      final asset =
+          ctx.assets.where((a) => a.id == defect.assetId).firstOrNull;
+      final type = asset != null ? ctx.getType(asset.assetTypeId) : null;
+
+      final severityLabel = defect.severity.toUpperCase();
+      final severityColor = defect.severity == 'critical'
+          ? _failRed
+          : defect.severity == 'major'
+              ? _untestedAmber
+              : PdfColors.grey600;
+
+      widgets.add(pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 6),
+        padding: const pw.EdgeInsets.all(8),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: _lightGray),
+          borderRadius:
+              const pw.BorderRadius.all(pw.Radius.circular(4)),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Row(
+              children: [
+                pw.Expanded(
+                  child: pw.Text(
+                    '${asset?.reference ?? '-'} — ${type?.name ?? 'Unknown'}',
+                    style: pw.TextStyle(
+                        fontSize: 9, fontWeight: pw.FontWeight.bold),
+                  ),
+                ),
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: pw.BoxDecoration(
+                    color: severityColor,
+                    borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(4)),
+                  ),
+                  child: pw.Text(severityLabel,
+                      style: pw.TextStyle(
+                          fontSize: 7,
+                          fontWeight: pw.FontWeight.bold,
+                          color: _white)),
+                ),
+              ],
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(defect.description,
+                style: const pw.TextStyle(fontSize: 8)),
+            if (defect.action != null) ...[
+              pw.SizedBox(height: 2),
+              pw.Text(
+                'Action: ${defect.action!.replaceAll('_', ' ')}',
+                style: pw.TextStyle(
+                    fontSize: 8,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.grey700),
+              ),
+            ],
+            if (defect.photoUrls.isNotEmpty) ...[
+              pw.SizedBox(height: 4),
+              pw.Row(
+                children: defect.photoUrls
+                    .take(3)
+                    .map((url) {
+                  final photoBytes =
+                      ctx.data.defectPhotos[url.hashCode.toString()];
+                  if (photoBytes == null) return pw.SizedBox.shrink();
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.only(right: 4),
+                    child: pw.Image(pw.MemoryImage(photoBytes),
+                        width: 60, height: 45, fit: pw.BoxFit.cover),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ));
+    }
+
+    if (ctx.data.rectifiedCount > 0) {
+      final sinceStr = ctx.data.lastReportDateStr != null
+          ? DateFormat('dd/MM/yyyy')
+              .format(DateTime.parse(ctx.data.lastReportDateStr!))
+          : 'previous report';
+      widgets.add(pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 4),
+        child: pw.Text(
+          '${ctx.data.rectifiedCount} defect${ctx.data.rectifiedCount == 1 ? '' : 's'} rectified since $sinceStr.',
+          style: pw.TextStyle(
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.grey700),
+        ),
+      ));
+    }
+
+    widgets.add(pw.SizedBox(height: 16));
+  } else if (defects.isEmpty) {
+    // Legacy fallback: no defect entities exist, use service records
+    final failedRecords = ctx.records
+        .where((r) =>
+            r.overallResult == 'fail' &&
+            r.defectNote != null &&
+            r.defectNote!.isNotEmpty)
+        .toList();
+
+    if (failedRecords.isNotEmpty) {
+      widgets.add(_sectionHeader('Defect Summary', ctx.primaryColor));
+      widgets.add(pw.SizedBox(height: 4));
+
+      for (final record in failedRecords) {
+        final asset =
+            ctx.assets.where((a) => a.id == record.assetId).firstOrNull;
+        final type =
+            asset != null ? ctx.getType(asset.assetTypeId) : null;
+
+        final severityLabel =
+            record.defectSeverity?.toUpperCase() ?? 'N/A';
+        final severityColor = record.defectSeverity == 'critical'
+            ? _failRed
+            : record.defectSeverity == 'major'
+                ? _untestedAmber
+                : PdfColors.grey600;
+
+        widgets.add(pw.Container(
+          margin: const pw.EdgeInsets.only(bottom: 6),
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: _lightGray),
+            borderRadius:
+                const pw.BorderRadius.all(pw.Radius.circular(4)),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                children: [
+                  pw.Expanded(
+                    child: pw.Text(
+                      '${asset?.reference ?? '-'} — ${type?.name ?? 'Unknown'}',
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold),
+                    ),
+                  ),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: pw.BoxDecoration(
+                      color: severityColor,
+                      borderRadius: const pw.BorderRadius.all(
+                          pw.Radius.circular(4)),
+                    ),
+                    child: pw.Text(severityLabel,
+                        style: pw.TextStyle(
+                            fontSize: 7,
+                            fontWeight: pw.FontWeight.bold,
+                            color: _white)),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Text(record.defectNote ?? '',
+                  style: const pw.TextStyle(fontSize: 8)),
+              if (record.defectAction != null) ...[
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  'Action: ${record.defectAction!.replaceAll('_', ' ')}',
+                  style: pw.TextStyle(
+                      fontSize: 8,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.grey700),
+                ),
+              ],
+              if (record.defectPhotoUrls.isNotEmpty) ...[
+                pw.SizedBox(height: 4),
+                pw.Row(
+                  children: record.defectPhotoUrls
+                      .take(3)
+                      .map((url) {
+                    final photoBytes =
+                        ctx.data.defectPhotos[url.hashCode.toString()];
+                    if (photoBytes == null) {
+                      return pw.SizedBox.shrink();
+                    }
+                    return pw.Padding(
+                      padding: const pw.EdgeInsets.only(right: 4),
+                      child: pw.Image(pw.MemoryImage(photoBytes),
+                          width: 60,
+                          height: 45,
+                          fit: pw.BoxFit.cover),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ],
+          ),
+        ));
+      }
+      widgets.add(pw.SizedBox(height: 16));
+    }
+  }
+}
+
+// ── Section 6: Lifecycle Alerts ──
+void _addLifecycleAlerts(List<pw.Widget> widgets, _ReportContext ctx) {
+  final now = DateTime.now();
+  final lifecycleAlerts = ctx.active.where((a) {
+    if (a.installDate == null || a.expectedLifespanYears == null) {
+      return false;
+    }
+    final age = now.difference(a.installDate!).inDays / 365.25;
+    return (a.expectedLifespanYears! - age) < 1;
+  }).toList();
+
+  if (lifecycleAlerts.isNotEmpty) {
+    widgets.add(_sectionHeader('Lifecycle Alerts', ctx.primaryColor));
+    widgets.add(pw.SizedBox(height: 4));
+    widgets.add(_tableHeader(
+        ['Ref', 'Type', 'Install Date', 'Lifespan', 'Remaining', 'Status'],
+        [2, 3, 2, 2, 2, 2],
+        ctx.primaryLight));
+
+    final dateFormat = DateFormat('dd/MM/yy');
+    for (int i = 0; i < lifecycleAlerts.length; i++) {
+      final a = lifecycleAlerts[i];
+      final type = ctx.getType(a.assetTypeId);
+      final age = now.difference(a.installDate!).inDays / 365.25;
+      final remaining = a.expectedLifespanYears! - age;
+      final isPastEol = remaining <= 0;
+
+      widgets.add(_tableRow(
+        [
+          a.reference ?? '-',
+          type?.name ?? '-',
+          dateFormat.format(a.installDate!),
+          '${a.expectedLifespanYears}y',
+          isPastEol
+              ? '${remaining.abs().toStringAsFixed(1)}y overdue'
+              : '${remaining.toStringAsFixed(1)}y left',
+          isPastEol ? 'PAST EOL' : 'APPROACHING',
+        ],
+        [2, 3, 2, 2, 2, 2],
+        isAlt: i.isOdd,
+        primaryLight: ctx.primaryLight,
+        statusIndex: 5,
+        statusColor: isPastEol ? _failRed : _untestedAmber,
+      ));
+    }
+    widgets.add(pw.SizedBox(height: 16));
+  }
+}
+
+// ── Section 7: Service History Summary ──
+void _addServiceHistory(List<pw.Widget> widgets, _ReportContext ctx) {
+  if (ctx.records.isNotEmpty) {
+    widgets.add(_sectionHeader('Service History Summary', ctx.primaryColor));
+    widgets.add(pw.SizedBox(height: 4));
+    widgets.add(_tableHeader(
+        ['Date', 'Asset Ref', 'Engineer', 'Result'],
+        [2, 3, 3, 2],
+        ctx.primaryLight));
+
+    final sortedRecords = List<ServiceRecord>.from(ctx.records)
+      ..sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
+    final recentRecords = sortedRecords.take(20).toList();
+    final dateFormat = DateFormat('dd/MM/yy');
+    for (int i = 0; i < recentRecords.length; i++) {
+      final r = recentRecords[i];
+      final asset =
+          ctx.assets.where((a) => a.id == r.assetId).firstOrNull;
+      final resultColor =
+          r.overallResult == 'pass' ? _passGreen : _failRed;
+
+      widgets.add(_tableRow(
+        [
+          dateFormat.format(r.serviceDate),
+          asset?.reference ?? '-',
+          r.engineerName,
+          r.overallResult.toUpperCase(),
+        ],
+        [2, 3, 3, 2],
+        isAlt: i.isOdd,
+        primaryLight: ctx.primaryLight,
+        statusIndex: 3,
+        statusColor: resultColor,
+      ));
+    }
+  }
+}
+
+/// Top-level function for compute() — builds the compliance report PDF.
+/// Used on native platforms via compute() isolate.
+Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
+  final ctx = _buildReportContext(data);
+  final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
 
   final regularFont = data.regularFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
@@ -44,97 +748,18 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
     theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
   );
 
-  final assets = data.assetsJson.map((j) => Asset.fromJson(j)).toList();
-  final assetTypes =
-      data.assetTypesJson.map((j) => AssetType.fromJson(j)).toList();
-  final records =
-      data.serviceRecordsJson.map((j) => ServiceRecord.fromJson(j)).toList();
-  final floorPlans =
-      data.floorPlansJson.map((j) => FloorPlan.fromJson(j)).toList();
+  // Section 1: Cover Page
+  pdf.addPage(_buildCoverPage(data, ctx));
 
-  final active =
-      assets.where((a) => a.complianceStatus != Asset.statusDecommissioned).toList();
-  final decom =
-      assets.where((a) => a.complianceStatus == Asset.statusDecommissioned).toList();
-  final pass =
-      active.where((a) => a.complianceStatus == Asset.statusPass).toList();
-  final fail =
-      active.where((a) => a.complianceStatus == Asset.statusFail).toList();
-  final untested =
-      active.where((a) => a.complianceStatus == Asset.statusUntested).toList();
+  // Sections 2-7: Multi-page content
+  final widgets = <pw.Widget>[];
+  _addComplianceSummary(widgets, ctx);
+  _addFloorPlans(widgets, ctx);
+  _addAssetRegister(widgets, ctx);
+  _addDefectSummary(widgets, ctx);
+  _addLifecycleAlerts(widgets, ctx);
+  _addServiceHistory(widgets, ctx);
 
-  AssetType? getType(String typeId) {
-    try {
-      return assetTypes.firstWhere((t) => t.id == typeId);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  // ── Section 1: Cover Page ──
-  pdf.addPage(
-    pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(40),
-      build: (context) => pw.Column(
-        mainAxisAlignment: pw.MainAxisAlignment.center,
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
-        children: [
-          if (data.logoBytes != null)
-            pw.Image(pw.MemoryImage(data.logoBytes!),
-                width: 120, height: 60, fit: pw.BoxFit.contain),
-          if (data.logoBytes != null) pw.SizedBox(height: 40),
-          pw.Text(
-            'SITE COMPLIANCE REPORT',
-            style: pw.TextStyle(
-              fontSize: 24,
-              fontWeight: pw.FontWeight.bold,
-              color: primaryColor,
-              letterSpacing: 2,
-            ),
-          ),
-          pw.SizedBox(height: 24),
-          pw.Container(
-            width: 60,
-            height: 3,
-            color: primaryColor,
-          ),
-          pw.SizedBox(height: 24),
-          pw.Text(data.siteName,
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 8),
-          pw.Text(data.siteAddress,
-              style: const pw.TextStyle(fontSize: 14, color: PdfColors.grey700),
-              textAlign: pw.TextAlign.center),
-          pw.SizedBox(height: 32),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.center,
-            children: [
-              _coverField('Date', data.reportDate),
-              pw.SizedBox(width: 40),
-              _coverField('Engineer', data.engineerName),
-            ],
-          ),
-          if (data.companyName.isNotEmpty) ...[
-            pw.SizedBox(height: 12),
-            _coverField('Company', data.companyName),
-          ],
-          pw.SizedBox(height: 40),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-            children: [
-              _statBox('Total', '${assets.length}', primaryColor),
-              _statBox('Pass', '${pass.length}', _passGreen),
-              _statBox('Fail', '${fail.length}', _failRed),
-              _statBox('Untested', '${untested.length}', _untestedAmber),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-
-  // ── Sections 2-7: Multi-page content ──
   pdf.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
@@ -143,573 +768,82 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
         config: footerConfig,
         pageNumber: context.pageNumber,
         pagesCount: context.pagesCount,
-        primaryColor: primaryColor,
+        primaryColor: ctx.primaryColor,
       ),
-      build: (context) {
-        final widgets = <pw.Widget>[];
-
-        // ── Section 2: Compliance Summary ──
-        widgets.add(_sectionHeader('Compliance Summary', primaryColor));
-        widgets.add(pw.SizedBox(height: 8));
-        widgets.add(pw.Text(
-          '${assets.length} total assets (${active.length} active, ${decom.length} decommissioned)',
-          style: const pw.TextStyle(fontSize: 10),
-        ));
-        widgets.add(pw.SizedBox(height: 8));
-
-        // Bar chart
-        final total = active.length.clamp(1, double.maxFinite.toInt());
-        widgets.add(pw.Container(
-          height: 20,
-          decoration: pw.BoxDecoration(
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
-          child: pw.ClipRRect(
-            horizontalRadius: 4,
-            verticalRadius: 4,
-            child: pw.Row(
-              children: [
-                if (pass.isNotEmpty)
-                  pw.Expanded(
-                    flex: pass.length,
-                    child: pw.Container(color: _passGreen),
-                  ),
-                if (fail.isNotEmpty)
-                  pw.Expanded(
-                    flex: fail.length,
-                    child: pw.Container(color: _failRed),
-                  ),
-                if (untested.isNotEmpty)
-                  pw.Expanded(
-                    flex: untested.length,
-                    child: pw.Container(color: _untestedAmber),
-                  ),
-              ],
-            ),
-          ),
-        ));
-        widgets.add(pw.SizedBox(height: 6));
-        widgets.add(pw.Row(
-          children: [
-            _legendDot(_passGreen, 'Pass ${pass.length} (${(pass.length / total * 100).toStringAsFixed(0)}%)'),
-            pw.SizedBox(width: 16),
-            _legendDot(_failRed, 'Fail ${fail.length} (${(fail.length / total * 100).toStringAsFixed(0)}%)'),
-            pw.SizedBox(width: 16),
-            _legendDot(_untestedAmber, 'Untested ${untested.length} (${(untested.length / total * 100).toStringAsFixed(0)}%)'),
-          ],
-        ));
-        widgets.add(pw.SizedBox(height: 16));
-
-        // ── Section 3: Floor Plans ──
-        for (final plan in floorPlans) {
-          final imageBytes = data.floorPlanImages[plan.id];
-          if (imageBytes == null) continue;
-
-          widgets.add(_sectionHeader('Floor Plan: ${plan.name}', primaryColor));
-          widgets.add(pw.SizedBox(height: 6));
-
-          // Build pin overlays
-          final planAssets =
-              active.where((a) => a.floorPlanId == plan.id).toList();
-
-          // Calculate rendered image area within the container
-          // Container: full content width (~547pt) x 300pt, image uses BoxFit.contain
-          const containerHeight = 300.0;
-          const containerWidth = 547.0; // A4 (595.28) - 2*24 margins
-          final pinSize = 8.0 * plan.pinScale;
-
-          final imageAspect = plan.imageWidth / plan.imageHeight;
-          final containerAspect = containerWidth / containerHeight;
-
-          double renderW, renderH, offsetX, offsetY;
-          if (imageAspect > containerAspect) {
-            // Image wider than container — pillarboxed vertically
-            renderW = containerWidth;
-            renderH = containerWidth / imageAspect;
-            offsetX = 0;
-            offsetY = (containerHeight - renderH) / 2;
-          } else {
-            // Image taller — letterboxed horizontally
-            renderH = containerHeight;
-            renderW = containerHeight * imageAspect;
-            offsetX = (containerWidth - renderW) / 2;
-            offsetY = 0;
-          }
-
-          widgets.add(pw.Container(
-            width: containerWidth,
-            height: containerHeight,
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: _lightGray),
-            ),
-            child: pw.Stack(
-              children: [
-                // Position image explicitly at calculated render area.
-                // Use explicit width/height on pw.Image rather than relying
-                // on SizedBox + BoxFit, which doesn't constrain correctly in
-                // the pdf package — the image renders at intrinsic pixel size
-                // instead of the SizedBox dimensions, causing pins to cluster
-                // in the top-left corner.
-                pw.Positioned(
-                  left: offsetX,
-                  top: offsetY,
-                  child: pw.Image(pw.MemoryImage(imageBytes),
-                      width: renderW, height: renderH),
-                ),
-                ...planAssets.map((a) {
-                  if (a.xPercent == null || a.yPercent == null) {
-                    return pw.SizedBox();
-                  }
-                  final statusColor = a.complianceStatus == Asset.statusPass
-                      ? _passGreen
-                      : a.complianceStatus == Asset.statusFail
-                          ? _failRed
-                          : _untestedAmber;
-
-                  final pinDot = pw.Container(
-                    width: pinSize,
-                    height: pinSize,
-                    decoration: pw.BoxDecoration(
-                      color: statusColor,
-                      shape: pw.BoxShape.circle,
-                      border: pw.Border.all(
-                          color: PdfColors.white, width: 1.0),
-                    ),
-                  );
-
-                  final hasLabel = plan.showLabels &&
-                      a.reference != null &&
-                      a.reference!.isNotEmpty;
-                  final labelFontSize = 5.0 * plan.pinScale;
-
-                  return pw.Positioned(
-                    left: offsetX + a.xPercent! * renderW - pinSize / 2,
-                    top: offsetY + a.yPercent! * renderH - pinSize / 2 -
-                        (hasLabel ? labelFontSize + 4 : 0),
-                    child: hasLabel
-                        ? pw.Column(
-                            mainAxisSize: pw.MainAxisSize.min,
-                            children: [
-                              pw.Container(
-                                padding: const pw.EdgeInsets.symmetric(
-                                    horizontal: 2, vertical: 1),
-                                decoration: pw.BoxDecoration(
-                                  color: PdfColors.white,
-                                  borderRadius:
-                                      pw.BorderRadius.circular(2),
-                                  border: pw.Border.all(
-                                      color: _lightGray, width: 0.5),
-                                ),
-                                child: pw.Text(
-                                  a.reference!,
-                                  style: pw.TextStyle(
-                                    fontSize: labelFontSize,
-                                    fontWeight: pw.FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              pw.SizedBox(height: 1),
-                              pinDot,
-                            ],
-                          )
-                        : pinDot,
-                  );
-                }),
-              ],
-            ),
-          ));
-
-          // Legend for this floor plan
-          final typeIds = planAssets.map((a) => a.assetTypeId).toSet();
-          if (typeIds.isNotEmpty) {
-            widgets.add(pw.SizedBox(height: 4));
-            widgets.add(pw.Wrap(
-              spacing: 12,
-              runSpacing: 4,
-              children: typeIds.map((tid) {
-                final type = getType(tid);
-                final color = type != null
-                    ? PdfColor.fromHex(type.defaultColor)
-                    : primaryColor;
-                return pw.Row(
-                  mainAxisSize: pw.MainAxisSize.min,
-                  children: [
-                    pw.Container(
-                      width: 8,
-                      height: 8,
-                      decoration: pw.BoxDecoration(
-                        color: color,
-                        shape: pw.BoxShape.circle,
-                      ),
-                    ),
-                    pw.SizedBox(width: 3),
-                    pw.Text(type?.name ?? tid,
-                        style: const pw.TextStyle(fontSize: 7)),
-                  ],
-                );
-              }).toList(),
-            ));
-          }
-
-          widgets.add(pw.SizedBox(height: 12));
-        }
-
-        // ── Section 4: Asset Register Table ──
-        widgets.add(_sectionHeader('Asset Register', primaryColor));
-        widgets.add(pw.SizedBox(height: 4));
-        widgets.add(_tableHeader(
-            ['Ref', 'Type', 'Location', 'Zone', 'Status', 'Last Service', 'Lifespan'],
-            [2, 3, 3, 2, 2, 2, 2],
-            primaryLight));
-
-        for (int i = 0; i < active.length; i++) {
-          final a = active[i];
-          final type = getType(a.assetTypeId);
-          final dateFormat = DateFormat('dd/MM/yy');
-          final lastService =
-              a.lastServiceDate != null ? dateFormat.format(a.lastServiceDate!) : '-';
-          final lifespan = a.expectedLifespanYears != null
-              ? '${a.expectedLifespanYears}y'
-              : '-';
-          final statusLabel = a.complianceStatus == Asset.statusPass
-              ? 'PASS'
-              : a.complianceStatus == Asset.statusFail
-                  ? 'FAIL'
-                  : 'UNTESTED';
-          final statusColor = a.complianceStatus == Asset.statusPass
-              ? _passGreen
-              : a.complianceStatus == Asset.statusFail
-                  ? _failRed
-                  : _untestedAmber;
-
-          widgets.add(_tableRow(
-            [
-              a.reference ?? '-',
-              type?.name ?? '-',
-              a.locationDescription ?? '-',
-              a.zone ?? '-',
-              statusLabel,
-              lastService,
-              lifespan,
-            ],
-            [2, 3, 3, 2, 2, 2, 2],
-            isAlt: i.isOdd,
-            primaryLight: primaryLight,
-            statusIndex: 4,
-            statusColor: statusColor,
-          ));
-        }
-        widgets.add(pw.SizedBox(height: 16));
-
-        // ── Section 5: Defect Summary ──
-        final defects = data.defectsJson
-            .map((j) => Defect.fromJson(j))
-            .toList();
-        final openDefects =
-            defects.where((d) => d.status == Defect.statusOpen).toList();
-
-        // Use new defect entities if available, otherwise fall back to legacy
-        if (openDefects.isNotEmpty) {
-          widgets.add(_sectionHeader('Defect Summary', primaryColor));
-          widgets.add(pw.SizedBox(height: 4));
-
-          for (final defect in openDefects) {
-            final asset =
-                assets.where((a) => a.id == defect.assetId).firstOrNull;
-            final type = asset != null ? getType(asset.assetTypeId) : null;
-
-            final severityLabel = defect.severity.toUpperCase();
-            final severityColor = defect.severity == 'critical'
-                ? _failRed
-                : defect.severity == 'major'
-                    ? _untestedAmber
-                    : PdfColors.grey600;
-
-            widgets.add(pw.Container(
-              margin: const pw.EdgeInsets.only(bottom: 6),
-              padding: const pw.EdgeInsets.all(8),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: _lightGray),
-                borderRadius:
-                    const pw.BorderRadius.all(pw.Radius.circular(4)),
-              ),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Row(
-                    children: [
-                      pw.Expanded(
-                        child: pw.Text(
-                          '${asset?.reference ?? '-'} — ${type?.name ?? 'Unknown'}',
-                          style: pw.TextStyle(
-                              fontSize: 9, fontWeight: pw.FontWeight.bold),
-                        ),
-                      ),
-                      pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: pw.BoxDecoration(
-                          color: severityColor,
-                          borderRadius: const pw.BorderRadius.all(
-                              pw.Radius.circular(4)),
-                        ),
-                        child: pw.Text(severityLabel,
-                            style: pw.TextStyle(
-                                fontSize: 7,
-                                fontWeight: pw.FontWeight.bold,
-                                color: _white)),
-                      ),
-                    ],
-                  ),
-                  pw.SizedBox(height: 4),
-                  pw.Text(defect.description,
-                      style: const pw.TextStyle(fontSize: 8)),
-                  if (defect.action != null) ...[
-                    pw.SizedBox(height: 2),
-                    pw.Text(
-                      'Action: ${defect.action!.replaceAll('_', ' ')}',
-                      style: pw.TextStyle(
-                          fontSize: 8,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.grey700),
-                    ),
-                  ],
-                  // Defect photos
-                  if (defect.photoUrls.isNotEmpty) ...[
-                    pw.SizedBox(height: 4),
-                    pw.Row(
-                      children: defect.photoUrls
-                          .take(3)
-                          .map((url) {
-                        final photoBytes =
-                            data.defectPhotos[url.hashCode.toString()];
-                        if (photoBytes == null) return pw.SizedBox.shrink();
-                        return pw.Padding(
-                          padding: const pw.EdgeInsets.only(right: 4),
-                          child: pw.Image(pw.MemoryImage(photoBytes),
-                              width: 60, height: 45, fit: pw.BoxFit.cover),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ],
-              ),
-            ));
-          }
-
-          // Rectified count line
-          if (data.rectifiedCount > 0) {
-            final sinceStr = data.lastReportDateStr != null
-                ? DateFormat('dd/MM/yyyy')
-                    .format(DateTime.parse(data.lastReportDateStr!))
-                : 'previous report';
-            widgets.add(pw.Padding(
-              padding: const pw.EdgeInsets.only(top: 4),
-              child: pw.Text(
-                '${data.rectifiedCount} defect${data.rectifiedCount == 1 ? '' : 's'} rectified since $sinceStr.',
-                style: pw.TextStyle(
-                    fontSize: 8,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.grey700),
-              ),
-            ));
-          }
-
-          widgets.add(pw.SizedBox(height: 16));
-        } else if (defects.isEmpty) {
-          // Legacy fallback: no defect entities exist, use service records
-          final failedRecords = records
-              .where((r) =>
-                  r.overallResult == 'fail' &&
-                  r.defectNote != null &&
-                  r.defectNote!.isNotEmpty)
-              .toList();
-
-          if (failedRecords.isNotEmpty) {
-            widgets.add(_sectionHeader('Defect Summary', primaryColor));
-            widgets.add(pw.SizedBox(height: 4));
-
-            for (final record in failedRecords) {
-              final asset =
-                  assets.where((a) => a.id == record.assetId).firstOrNull;
-              final type =
-                  asset != null ? getType(asset.assetTypeId) : null;
-
-              final severityLabel =
-                  record.defectSeverity?.toUpperCase() ?? 'N/A';
-              final severityColor = record.defectSeverity == 'critical'
-                  ? _failRed
-                  : record.defectSeverity == 'major'
-                      ? _untestedAmber
-                      : PdfColors.grey600;
-
-              widgets.add(pw.Container(
-                margin: const pw.EdgeInsets.only(bottom: 6),
-                padding: const pw.EdgeInsets.all(8),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: _lightGray),
-                  borderRadius:
-                      const pw.BorderRadius.all(pw.Radius.circular(4)),
-                ),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Row(
-                      children: [
-                        pw.Expanded(
-                          child: pw.Text(
-                            '${asset?.reference ?? '-'} — ${type?.name ?? 'Unknown'}',
-                            style: pw.TextStyle(
-                                fontSize: 9,
-                                fontWeight: pw.FontWeight.bold),
-                          ),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: pw.BoxDecoration(
-                            color: severityColor,
-                            borderRadius: const pw.BorderRadius.all(
-                                pw.Radius.circular(4)),
-                          ),
-                          child: pw.Text(severityLabel,
-                              style: pw.TextStyle(
-                                  fontSize: 7,
-                                  fontWeight: pw.FontWeight.bold,
-                                  color: _white)),
-                        ),
-                      ],
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Text(record.defectNote ?? '',
-                        style: const pw.TextStyle(fontSize: 8)),
-                    if (record.defectAction != null) ...[
-                      pw.SizedBox(height: 2),
-                      pw.Text(
-                        'Action: ${record.defectAction!.replaceAll('_', ' ')}',
-                        style: pw.TextStyle(
-                            fontSize: 8,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.grey700),
-                      ),
-                    ],
-                    if (record.defectPhotoUrls.isNotEmpty) ...[
-                      pw.SizedBox(height: 4),
-                      pw.Row(
-                        children: record.defectPhotoUrls
-                            .take(3)
-                            .map((url) {
-                          final photoBytes =
-                              data.defectPhotos[url.hashCode.toString()];
-                          if (photoBytes == null) {
-                            return pw.SizedBox.shrink();
-                          }
-                          return pw.Padding(
-                            padding: const pw.EdgeInsets.only(right: 4),
-                            child: pw.Image(pw.MemoryImage(photoBytes),
-                                width: 60,
-                                height: 45,
-                                fit: pw.BoxFit.cover),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ],
-                ),
-              ));
-            }
-            widgets.add(pw.SizedBox(height: 16));
-          }
-        }
-
-        // ── Section 6: Lifecycle Alerts ──
-        final now = DateTime.now();
-        final lifecycleAlerts = active.where((a) {
-          if (a.installDate == null || a.expectedLifespanYears == null) {
-            return false;
-          }
-          final age = now.difference(a.installDate!).inDays / 365.25;
-          return (a.expectedLifespanYears! - age) < 1;
-        }).toList();
-
-        if (lifecycleAlerts.isNotEmpty) {
-          widgets.add(_sectionHeader('Lifecycle Alerts', primaryColor));
-          widgets.add(pw.SizedBox(height: 4));
-          widgets.add(_tableHeader(
-              ['Ref', 'Type', 'Install Date', 'Lifespan', 'Remaining', 'Status'],
-              [2, 3, 2, 2, 2, 2],
-              primaryLight));
-
-          final dateFormat = DateFormat('dd/MM/yy');
-          for (int i = 0; i < lifecycleAlerts.length; i++) {
-            final a = lifecycleAlerts[i];
-            final type = getType(a.assetTypeId);
-            final age = now.difference(a.installDate!).inDays / 365.25;
-            final remaining = a.expectedLifespanYears! - age;
-            final isPastEol = remaining <= 0;
-
-            widgets.add(_tableRow(
-              [
-                a.reference ?? '-',
-                type?.name ?? '-',
-                dateFormat.format(a.installDate!),
-                '${a.expectedLifespanYears}y',
-                isPastEol
-                    ? '${remaining.abs().toStringAsFixed(1)}y overdue'
-                    : '${remaining.toStringAsFixed(1)}y left',
-                isPastEol ? 'PAST EOL' : 'APPROACHING',
-              ],
-              [2, 3, 2, 2, 2, 2],
-              isAlt: i.isOdd,
-              primaryLight: primaryLight,
-              statusIndex: 5,
-              statusColor: isPastEol ? _failRed : _untestedAmber,
-            ));
-          }
-          widgets.add(pw.SizedBox(height: 16));
-        }
-
-        // ── Section 7: Service History Summary ──
-        if (records.isNotEmpty) {
-          widgets.add(_sectionHeader('Service History Summary', primaryColor));
-          widgets.add(pw.SizedBox(height: 4));
-          widgets.add(_tableHeader(
-              ['Date', 'Asset Ref', 'Engineer', 'Result'],
-              [2, 3, 3, 2],
-              primaryLight));
-
-          records.sort(
-              (a, b) => b.serviceDate.compareTo(a.serviceDate));
-          final recentRecords = records.take(20).toList();
-          final dateFormat = DateFormat('dd/MM/yy');
-          for (int i = 0; i < recentRecords.length; i++) {
-            final r = recentRecords[i];
-            final asset =
-                assets.where((a) => a.id == r.assetId).firstOrNull;
-            final resultColor =
-                r.overallResult == 'pass' ? _passGreen : _failRed;
-
-            widgets.add(_tableRow(
-              [
-                dateFormat.format(r.serviceDate),
-                asset?.reference ?? '-',
-                r.engineerName,
-                r.overallResult.toUpperCase(),
-              ],
-              [2, 3, 3, 2],
-              isAlt: i.isOdd,
-              primaryLight: primaryLight,
-              statusIndex: 3,
-              statusColor: resultColor,
-            ));
-          }
-        }
-
-        return widgets;
-      },
+      build: (context) => widgets,
     ),
   );
 
+  return await pdf.save();
+}
+
+/// Web-specific async builder that yields to the event loop between sections.
+Future<Uint8List> _buildComplianceReportWeb(
+  ComplianceReportPdfData data, {
+  void Function(String phase)? onProgress,
+}) async {
+  final ctx = _buildReportContext(data);
+  final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
+
+  final regularFont = data.regularFontBytes != null
+      ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
+      : pw.Font.helvetica();
+  final boldFont = data.boldFontBytes != null
+      ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
+      : pw.Font.helveticaBold();
+
+  final pdf = pw.Document(
+    theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+  );
+
+  // Section 1: Cover Page
+  onProgress?.call('Building cover page...');
+  pdf.addPage(_buildCoverPage(data, ctx));
+  await Future.delayed(Duration.zero);
+
+  // Build sections 2-7 with yields between each
+  final widgets = <pw.Widget>[];
+
+  onProgress?.call('Building compliance summary...');
+  _addComplianceSummary(widgets, ctx);
+  await Future.delayed(Duration.zero);
+
+  onProgress?.call('Building floor plans...');
+  _addFloorPlans(widgets, ctx);
+  await Future.delayed(Duration.zero);
+
+  onProgress?.call('Building asset register...');
+  _addAssetRegister(widgets, ctx);
+  await Future.delayed(Duration.zero);
+
+  onProgress?.call('Building defect summary...');
+  _addDefectSummary(widgets, ctx);
+  await Future.delayed(Duration.zero);
+
+  onProgress?.call('Building lifecycle alerts...');
+  _addLifecycleAlerts(widgets, ctx);
+  await Future.delayed(Duration.zero);
+
+  onProgress?.call('Building service history...');
+  _addServiceHistory(widgets, ctx);
+  await Future.delayed(Duration.zero);
+
+  pdf.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(24),
+      footer: (context) => PdfFooterBuilder.buildFooter(
+        config: footerConfig,
+        pageNumber: context.pageNumber,
+        pagesCount: context.pagesCount,
+        primaryColor: ctx.primaryColor,
+      ),
+      build: (context) => widgets,
+    ),
+  );
+
+  onProgress?.call('Finalizing PDF...');
+  await Future.delayed(Duration.zero);
   return await pdf.save();
 }
 
@@ -860,8 +994,11 @@ class ComplianceReportService {
     required String siteId,
     required String siteName,
     required String siteAddress,
+    void Function(String phase)? onProgress,
   }) async {
     // ── Gather phase (main thread) ──
+
+    onProgress?.call('Loading fonts and branding...');
 
     // Fonts
     Uint8List? regularFontBytes;
@@ -915,30 +1052,30 @@ class ComplianceReportService {
         .getFloorPlansStream(basePath, siteId)
         .first;
 
-    // Download floor plan images
-    final floorPlanImages = <String, Uint8List>{};
-    for (final plan in floorPlans) {
-      try {
-        Uint8List? bytes;
-        if (kIsWeb && plan.imageUrl.isNotEmpty) {
-          // On web, use the pre-signed download URL stored at upload time
-          // to avoid CORS/auth issues with Storage ref getData().
-          final response = await http.get(Uri.parse(plan.imageUrl));
-          if (response.statusCode == 200) {
-            bytes = response.bodyBytes;
+    // Download floor plan images — parallel
+    onProgress?.call('Downloading floor plan images...');
+    final floorPlanEntries = await Future.wait(
+      floorPlans.map((plan) async {
+        try {
+          Uint8List? bytes;
+          if (kIsWeb && plan.imageUrl.isNotEmpty) {
+            final response = await http.get(Uri.parse(plan.imageUrl));
+            if (response.statusCode == 200) bytes = response.bodyBytes;
+          } else {
+            final ref =
+                _storage.ref('$basePath/sites/$siteId/floor_plans/${plan.id}.${plan.fileExtension}');
+            bytes = await _downloadBytes(ref, 5 * 1024 * 1024);
           }
-        } else {
-          final ref =
-              _storage.ref('$basePath/sites/$siteId/floor_plans/${plan.id}.${plan.fileExtension}');
-          bytes = await _downloadBytes(ref, 5 * 1024 * 1024);
+          return bytes != null ? MapEntry(plan.id, bytes) : null;
+        } catch (e) {
+          debugPrint('Failed to download floor plan image ${plan.id}: $e');
+          return null;
         }
-        if (bytes != null) {
-          floorPlanImages[plan.id] = bytes;
-        }
-      } catch (e) {
-        debugPrint('Failed to download floor plan image ${plan.id}: $e');
-      }
-    }
+      }),
+    );
+    final floorPlanImages = Map.fromEntries(
+      floorPlanEntries.whereType<MapEntry<String, Uint8List>>(),
+    );
 
     // Fetch defects from the new Defect collection
     final allDefects =
@@ -952,25 +1089,29 @@ class ComplianceReportService {
             .where((d) => d.status == Defect.statusRectified)
             .length;
 
-    // Download defect photos from Defect entities (open defects only, max 10)
+    // Download defect photos — parallel
+    onProgress?.call('Downloading defect photos...');
     final defectPhotos = <String, Uint8List>{};
     final openDefectsWithPhotos = allDefects
         .where(
             (d) => d.status == Defect.statusOpen && d.photoUrls.isNotEmpty)
         .take(10);
-    for (final defect in openDefectsWithPhotos) {
-      for (final url in defect.photoUrls.take(1)) {
+
+    final defectPhotoEntries = await Future.wait(
+      openDefectsWithPhotos.expand((defect) => defect.photoUrls.take(1).map((url) async {
         try {
           final ref = _storage.refFromURL(url);
           final bytes = await _downloadBytes(ref, 2 * 1024 * 1024);
-          if (bytes != null) {
-            defectPhotos[url.hashCode.toString()] = bytes;
-          }
+          return bytes != null ? MapEntry(url.hashCode.toString(), bytes) : null;
         } catch (e) {
           debugPrint('Failed to download defect photo: $e');
+          return null;
         }
-      }
-    }
+      })),
+    );
+    defectPhotos.addEntries(
+      defectPhotoEntries.whereType<MapEntry<String, Uint8List>>(),
+    );
 
     // If no defects in new collection, fall back to legacy service record photos
     if (allDefects.isEmpty) {
@@ -978,18 +1119,34 @@ class ComplianceReportService {
           .where((r) =>
               r.overallResult == 'fail' && r.defectPhotoUrls.isNotEmpty)
           .take(10);
-      for (final record in failedRecords) {
-        for (final url in record.defectPhotoUrls.take(1)) {
+
+      final legacyEntries = await Future.wait(
+        failedRecords.expand((record) => record.defectPhotoUrls.take(1).map((url) async {
           try {
             final ref = _storage.refFromURL(url);
             final bytes = await _downloadBytes(ref, 2 * 1024 * 1024);
-            if (bytes != null) {
-              defectPhotos[url.hashCode.toString()] = bytes;
-            }
+            return bytes != null ? MapEntry(url.hashCode.toString(), bytes) : null;
           } catch (e) {
             debugPrint('Failed to download defect photo: $e');
+            return null;
           }
-        }
+        })),
+      );
+      defectPhotos.addEntries(
+        legacyEntries.whereType<MapEntry<String, Uint8List>>(),
+      );
+    }
+
+    // Compress images on web to reduce PDF build cost
+    if (kIsWeb) {
+      onProgress?.call('Compressing images...');
+      for (final key in floorPlanImages.keys.toList()) {
+        await Future.delayed(Duration.zero); // yield between each resize
+        floorPlanImages[key] = _resizeImageBytes(floorPlanImages[key]!, maxWidth: 1200);
+      }
+      for (final key in defectPhotos.keys.toList()) {
+        await Future.delayed(Duration.zero);
+        defectPhotos[key] = _resizeImageBytes(defectPhotos[key]!, maxWidth: 800);
       }
     }
 
@@ -1021,8 +1178,9 @@ class ComplianceReportService {
         .setLastReportDate(basePath, siteId, DateTime.now());
 
     // ── Build phase ──
+    onProgress?.call('Building PDF...');
     if (kIsWeb) {
-      return _buildComplianceReport(data);
+      return _buildComplianceReportWeb(data, onProgress: onProgress);
     }
     return compute(_buildComplianceReport, data);
   }

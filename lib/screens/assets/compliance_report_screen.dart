@@ -33,6 +33,7 @@ class ComplianceReportScreen extends StatefulWidget {
 
 class _ComplianceReportScreenState extends State<ComplianceReportScreen> {
   bool _generating = false;
+  String _progressPhase = '';
   Uint8List? _pdfBytes;
 
   Future<void> _generateReport() async {
@@ -44,6 +45,9 @@ class _ComplianceReportScreenState extends State<ComplianceReportScreen> {
         siteId: widget.siteId,
         siteName: widget.siteName,
         siteAddress: widget.siteAddress,
+        onProgress: (phase) {
+          if (mounted) setState(() => _progressPhase = phase);
+        },
       );
 
       // Log analytics
@@ -248,12 +252,12 @@ class _ComplianceReportScreenState extends State<ComplianceReportScreen> {
 
         // Generate button
         if (_generating)
-          const Center(
+          Center(
             child: Column(
               children: [
-                AdaptiveLoadingIndicator(),
-                SizedBox(height: 12),
-                Text('Generating report...'),
+                const AdaptiveLoadingIndicator(),
+                const SizedBox(height: 12),
+                Text(_progressPhase.isNotEmpty ? _progressPhase : 'Generating report...'),
               ],
             ),
           )

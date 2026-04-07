@@ -761,6 +761,7 @@ class TemplatePdfService {
     );
 
     // ── Build phase (background isolate) ──
+    if (kIsWeb) return _buildFilledPdf(data);
     return compute(_buildFilledPdf, data);
   }
 
@@ -807,6 +808,7 @@ class TemplatePdfService {
     );
 
     // ── Build phase (background isolate) ──
+    if (kIsWeb) return _buildOverlayPdf(data);
     return compute(_buildOverlayPdf, data);
   }
 
