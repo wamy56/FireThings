@@ -175,6 +175,24 @@ class DispatchService {
     }
   }
 
+  /// Stream of pending/active job count for an engineer (real-time).
+  Stream<int> streamPendingJobCount(String companyId, String engineerUid) {
+    return _jobsCol(companyId)
+        .where('assignedTo', isEqualTo: engineerUid)
+        .where('status',
+            whereIn: ['assigned', 'accepted', 'en_route', 'on_site'])
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  /// Stream of unassigned job count for a company (dispatchers/admins).
+  Stream<int> streamUnassignedJobCount(String companyId) {
+    return _jobsCol(companyId)
+        .where('status', isEqualTo: 'created')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
   /// Bulk update status for multiple jobs.
   Future<void> bulkUpdateStatus({
     required String companyId,

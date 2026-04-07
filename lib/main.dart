@@ -27,6 +27,7 @@ import 'widgets/adaptive_app_bar.dart';
 import 'package:workmanager/workmanager.dart';
 import 'services/template_service.dart';
 import 'services/notification_service.dart';
+import 'services/dispatch_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/settings/settings_screen.dart';
@@ -440,9 +441,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     with WidgetsBindingObserver {
   int _currentIndex = 0;
   int _previousIndex = 0;
+  StreamSubscription<int>? _dispatchBadgeSub;
+  int _dispatchBadgeCount = 0;
 
   bool get _showDispatchTab {
     return RemoteConfigService.instance.dispatchEnabled;
+  }
+
+  int get _dispatchTabIndex => _showDispatchTab ? 3 : -1;
+
+  Widget _maybeBadgedIcon(int index, IconData icon, {Color? color}) {
+    final child = Icon(icon, color: color);
+    if (index == _dispatchTabIndex && _dispatchBadgeCount > 0) {
+      return Badge(
+        label: Text(
+          _dispatchBadgeCount > 9 ? '9+' : '$_dispatchBadgeCount',
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+        ),
+        child: child,
+      );
+    }
+    return child;
   }
 
   List<String> get _titles => [
@@ -470,10 +489,36 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (!kIsWeb) {
       NotificationService.onNotificationTap = _handleNotificationTap;
     }
+
+    _subscribeToDispatchBadge();
+  }
+
+  void _subscribeToDispatchBadge() {
+    if (!_showDispatchTab) return;
+
+    final companyId = UserProfileService.instance.companyId;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (companyId == null || uid == null) return;
+
+    final Stream<int> countStream;
+    if (UserProfileService.instance.isDispatcherOrAdmin) {
+      countStream =
+          DispatchService.instance.streamUnassignedJobCount(companyId);
+    } else {
+      countStream =
+          DispatchService.instance.streamPendingJobCount(companyId, uid);
+    }
+
+    _dispatchBadgeSub = countStream.listen((jobCount) {
+      if (mounted && jobCount != _dispatchBadgeCount) {
+        setState(() => _dispatchBadgeCount = jobCount);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _dispatchBadgeSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     if (!kIsWeb) {
       NotificationService.onNotificationTap = null;
@@ -674,8 +719,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
             indicatorColor: primaryColor.withValues(alpha: 0.15),
             destinations: List.generate(titles.length, (i) {
               return NavigationRailDestination(
-                icon: Icon(navIcons[i]),
-                selectedIcon: Icon(navSelectedIcons[i]),
+                icon: _maybeBadgedIcon(i, navIcons[i]),
+                selectedIcon: _maybeBadgedIcon(i, navSelectedIcons[i]),
                 label: Text(titles[i]),
               );
             }),
@@ -728,8 +773,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
               items: List.generate(
                 count,
                 (i) => BottomNavigationBarItem(
-                  icon: Icon(icons[i]),
-                  activeIcon: Icon(selectedIcons[i]),
+                  icon: _maybeBadgedIcon(i, icons[i]),
+                  activeIcon: _maybeBadgedIcon(i, selectedIcons[i]),
                   label: titles[i],
                 ),
               ),
@@ -760,14 +805,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       destinations: List.generate(
         count,
         (i) => NavigationDestination(
-          icon: Icon(
-            icons[i],
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          ),
-          selectedIcon: Icon(
-            selectedIcons[i],
-            color: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
-          ),
+          icon: _maybeBadgedIcon(i, icons[i],
+              color:
+                  isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey),
+          selectedIcon: _maybeBadgedIcon(i, selectedIcons[i],
+              color:
+                  isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue),
           label: titles[i],
         ),
       ),
