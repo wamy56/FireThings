@@ -191,12 +191,23 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
       String contentType = 'image/jpeg';
 
       if (_isPdf) {
-        final pages = Printing.raster(_fileBytes!, dpi: 200);
-        final firstPage = await pages.first;
-        final pngImage = await firstPage.toPng();
-        uploadBytes = pngImage;
-        ext = 'png';
-        contentType = 'image/png';
+        try {
+          final pages = Printing.raster(_fileBytes!, dpi: 200);
+          final firstPage = await pages.first;
+          final pngImage = await firstPage.toPng();
+          uploadBytes = pngImage;
+          ext = 'png';
+          contentType = 'image/png';
+        } catch (e) {
+          if (mounted) {
+            context.showErrorToast(
+              kIsWeb
+                  ? 'PDF conversion failed — please convert to JPEG and re-upload'
+                  : 'PDF conversion failed: ${e.toString()}',
+            );
+          }
+          return;
+        }
       }
 
       // Upload image

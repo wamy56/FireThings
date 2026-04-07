@@ -502,6 +502,12 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
       case 'box': return AppIcons.box;
       case 'radar_heat': return AppIcons.radar;
       case 'door': return AppIcons.securitySafe;
+      case 'flash': return AppIcons.flash;
+      case 'batteryCharging': return AppIcons.batteryCharging;
+      case 'slider': return AppIcons.slider;
+      case 'microphone': return AppIcons.microphone;
+      case 'call': return AppIcons.call;
+      case 'notification': return AppIcons.notification;
       default: return AppIcons.setting;
     }
   }

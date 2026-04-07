@@ -14,6 +14,12 @@ enum BS5839Symbol {
   sprinklerHead, // Circle + "SP"
   fireBlanket, // Square + "FB"
   beamDetector, // Circle + "BD"
+  fireAlarmInterface, // Square + "IO"
+  powerSupply, // Square + "PSU"
+  refugePanel, // Rectangle + "EVC"
+  refugeOutstation, // Circle + "RO"
+  fireTelephone, // Circle + "FT"
+  toiletAlarm, // Circle + "TA"
   other, // Circle + "?"
 }
 
@@ -44,6 +50,18 @@ BS5839Symbol symbolFromIconName(String iconName) {
       return BS5839Symbol.fireBlanket;
     case 'radar_beam':
       return BS5839Symbol.beamDetector;
+    case 'flash':
+      return BS5839Symbol.fireAlarmInterface;
+    case 'batteryCharging':
+      return BS5839Symbol.powerSupply;
+    case 'slider':
+      return BS5839Symbol.refugePanel;
+    case 'microphone':
+      return BS5839Symbol.refugeOutstation;
+    case 'call':
+      return BS5839Symbol.fireTelephone;
+    case 'notification':
+      return BS5839Symbol.toiletAlarm;
     default:
       return BS5839Symbol.other;
   }
@@ -80,11 +98,14 @@ class BS5839SymbolPainter extends CustomPainter {
     switch (symbol) {
       case BS5839Symbol.fireAlarmPanel:
       case BS5839Symbol.fireDoor:
+      case BS5839Symbol.refugePanel:
         _drawRectangle(canvas, size, fillPaint, borderPaint, shadowPaint);
       case BS5839Symbol.callPoint:
         _drawTriangle(canvas, size, fillPaint, borderPaint, shadowPaint);
       case BS5839Symbol.fireExtinguisher:
       case BS5839Symbol.fireBlanket:
+      case BS5839Symbol.fireAlarmInterface:
+      case BS5839Symbol.powerSupply:
         _drawSquare(canvas, size, fillPaint, borderPaint, shadowPaint);
       case BS5839Symbol.aovSmokeVent:
         _drawDiamond(canvas, size, fillPaint, borderPaint, shadowPaint);
@@ -214,6 +235,18 @@ class BS5839SymbolPainter extends CustomPainter {
         return 'FB';
       case BS5839Symbol.beamDetector:
         return 'BD';
+      case BS5839Symbol.fireAlarmInterface:
+        return 'IO';
+      case BS5839Symbol.powerSupply:
+        return 'PSU';
+      case BS5839Symbol.refugePanel:
+        return 'EVC';
+      case BS5839Symbol.refugeOutstation:
+        return 'RO';
+      case BS5839Symbol.fireTelephone:
+        return 'FT';
+      case BS5839Symbol.toiletAlarm:
+        return 'TA';
       case BS5839Symbol.other:
         return '?';
     }

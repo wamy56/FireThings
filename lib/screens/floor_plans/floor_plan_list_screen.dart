@@ -31,7 +31,7 @@ class FloorPlanListScreen extends StatelessWidget {
 
   void _navigateToUpload(BuildContext context) {
     if (kIsWeb) {
-      context.go('/sites/$siteId/floor-plans/upload');
+      context.push('/sites/$siteId/floor-plans/upload');
     } else {
       Navigator.of(context).push(
         MaterialPageRoute(

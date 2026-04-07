@@ -7,6 +7,8 @@ class DefaultAssetTypes {
 
   static final List<AssetType> all = [
     fireAlarmPanel,
+    fireAlarmInterface,
+    powerSupplyUnit,
     smokeDetector,
     heatDetector,
     callPoint,
@@ -17,6 +19,10 @@ class DefaultAssetTypes {
     aovSmokeVent,
     sprinklerHead,
     fireBlanket,
+    disabledRefugePanel,
+    disabledRefugeOutstation,
+    fireTelephone,
+    toiletAlarmSystem,
     otherCustom,
   ];
 
@@ -48,6 +54,50 @@ class DefaultAssetTypes {
       'Sounder circuit fault',
       'PSU failure',
       'Display/LED fault',
+    ],
+  );
+
+  // ─── Fire Alarm Interface (I/O Module) ────────────────────────
+
+  static final fireAlarmInterface = AssetType(
+    id: 'fire_alarm_interface',
+    name: 'Fire Alarm Interface',
+    category: 'Control',
+    iconName: 'flash',
+    defaultColor: '#7C3AED',
+    variants: ['Input Module', 'Output Module', 'Combined I/O', 'Relay Board', 'Mini Input Module', 'Zone Monitor'],
+    defaultLifespanYears: 15,
+    isBuiltIn: true,
+    commonFaults: [
+      'No communication',
+      'LED fault',
+      'Relay stuck',
+      'Wiring fault',
+      'Address conflict',
+      'Module not responding',
+      'Contact fault',
+    ],
+  );
+
+  // ─── Power Supply Unit ───────────────────────────────────────
+
+  static final powerSupplyUnit = AssetType(
+    id: 'power_supply_unit',
+    name: 'Power Supply Unit',
+    category: 'Control',
+    iconName: 'batteryCharging',
+    defaultColor: '#CA8A04',
+    variants: ['24V DC', 'Auxiliary PSU', 'EN54-4 Certified', 'Battery Charger', 'UPS'],
+    defaultLifespanYears: 10,
+    isBuiltIn: true,
+    commonFaults: [
+      'Battery low/failed',
+      'Charger failure',
+      'Output voltage incorrect',
+      'Fuse blown',
+      'Earth fault',
+      'Mains failure indicator',
+      'Battery disconnected',
     ],
   );
 
@@ -259,6 +309,95 @@ class DefaultAssetTypes {
       'Missing/obstructed',
       'Wall fixings loose',
       'Missing signage',
+    ],
+  );
+
+  // ─── Disabled Refuge Panel (EVC Master) ──────────────────────
+
+  static final disabledRefugePanel = AssetType(
+    id: 'disabled_refuge_panel',
+    name: 'Disabled Refuge Panel',
+    category: 'Communication',
+    iconName: 'slider',
+    defaultColor: '#0D9488',
+    variants: ['Type A (simplex)', 'Type B (duplex)', 'Combined EVC/Fire Telephone'],
+    defaultLifespanYears: 15,
+    isBuiltIn: true,
+    commonFaults: [
+      'Display fault',
+      'Battery low/failed',
+      'Line fault',
+      'No communication with outstations',
+      'PSU failure',
+      'Charger fault',
+      'Handset fault',
+    ],
+  );
+
+  // ─── Disabled Refuge Outstation ──────────────────────────────
+
+  static final disabledRefugeOutstation = AssetType(
+    id: 'disabled_refuge_outstation',
+    name: 'Disabled Refuge Outstation',
+    category: 'Communication',
+    iconName: 'microphone',
+    defaultColor: '#0891B2',
+    variants: ['Push-to-Talk', 'Hands-free', 'Combined Visual/Audio', 'Weatherproof'],
+    defaultLifespanYears: 15,
+    isBuiltIn: true,
+    commonFaults: [
+      'No communication with panel',
+      'Speaker fault',
+      'Microphone fault',
+      'Push button stuck',
+      'LED indicator fault',
+      'Damaged/vandalised',
+      'Wiring fault',
+    ],
+  );
+
+  // ─── Fire Telephone ──────────────────────────────────────────
+
+  static final fireTelephone = AssetType(
+    id: 'fire_telephone',
+    name: 'Fire Telephone',
+    category: 'Communication',
+    iconName: 'call',
+    defaultColor: '#E11D48',
+    variants: ['Type A Handset', 'Type B Handset', 'Jack Point', 'Combined Handset/Jack', 'Weatherproof'],
+    defaultLifespanYears: 15,
+    isBuiltIn: true,
+    commonFaults: [
+      'Handset fault',
+      'No communication with master',
+      'Jack socket damaged',
+      'Wiring fault',
+      'Cradle switch fault',
+      'Missing handset',
+      'Cord damaged',
+    ],
+  );
+
+  // ─── Toilet Alarm System ─────────────────────────────────────
+
+  static final toiletAlarmSystem = AssetType(
+    id: 'toilet_alarm_system',
+    name: 'Toilet Alarm System',
+    category: 'Communication',
+    iconName: 'notification',
+    defaultColor: '#BE185D',
+    variants: ['Full Kit', 'Pull Cord Only', 'Interface Unit', 'Overdoor Light', 'Reset Button'],
+    defaultLifespanYears: 15,
+    isBuiltIn: true,
+    commonFaults: [
+      'Pull cord broken/missing',
+      'Overdoor light fault',
+      'Interface not communicating with refuge panel',
+      'Reset button stuck',
+      'Wiring fault',
+      'Sounder fault',
+      'LED indicator fault',
+      'Cord too short/too long',
     ],
   );
 
