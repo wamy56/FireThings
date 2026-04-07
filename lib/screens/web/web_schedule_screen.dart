@@ -30,9 +30,12 @@ class WebScheduleScreen extends StatefulWidget {
   State<WebScheduleScreen> createState() => _WebScheduleScreenState();
 }
 
-class _WebScheduleScreenState extends State<WebScheduleScreen> {
+class _WebScheduleScreenState extends State<WebScheduleScreen>
+    with SingleTickerProviderStateMixin {
   late DateTime _weekStart;
   String? _selectedJobId;
+  bool _panelVisible = false;
+  bool _panelAnimateIn = true;
   List<CompanyMember> _members = [];
   bool _colorByEngineer = true;
   ScheduleViewMode _viewMode = ScheduleViewMode.week;
@@ -51,17 +54,64 @@ class _WebScheduleScreenState extends State<WebScheduleScreen> {
   /// Job IDs currently being geocoded (to avoid duplicate requests).
   final Set<String> _geocodingInProgress = {};
 
+  Stream<List<DispatchedJob>>? _jobsStream;
+
+  late final AnimationController _overlayController;
+  late final Animation<double> _overlayOpacity;
+
   String? get _companyId => UserProfileService.instance.companyId;
 
   @override
   void initState() {
     super.initState();
+    _overlayController = AnimationController(
+      vsync: this,
+      duration: AppTheme.normalAnimation,
+    );
+    _overlayOpacity = CurvedAnimation(
+      parent: _overlayController,
+      curve: AppTheme.defaultCurve,
+    );
     final now = DateTime.now();
     _weekStart = _startOfWeek(now);
     _focusedDay = now;
     _selectedDay = now;
     _loadMembers();
+    _initJobsStream();
     AnalyticsService.instance.logWebScheduleViewed();
+  }
+
+  void _initJobsStream() {
+    final companyId = _companyId;
+    if (companyId != null) {
+      _jobsStream = DispatchService.instance.getJobsStream(companyId);
+    }
+  }
+
+  void _selectJob(String jobId) {
+    final wasAlreadyOpen = _panelVisible;
+    setState(() {
+      _selectedJobId = jobId;
+      _panelVisible = true;
+      _panelAnimateIn = !wasAlreadyOpen;
+    });
+    if (!wasAlreadyOpen) _overlayController.forward();
+  }
+
+  void _dismissPanel() async {
+    await _overlayController.reverse();
+    if (mounted) {
+      setState(() {
+        _panelVisible = false;
+        _selectedJobId = null;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _overlayController.dispose();
+    super.dispose();
   }
 
   DateTime _startOfWeek(DateTime date) {
@@ -265,7 +315,7 @@ class _WebScheduleScreenState extends State<WebScheduleScreen> {
     }
 
     return StreamBuilder<List<DispatchedJob>>(
-      stream: DispatchService.instance.getJobsStream(companyId),
+      stream: _jobsStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: AdaptiveLoadingIndicator());
@@ -295,20 +345,32 @@ class _WebScheduleScreenState extends State<WebScheduleScreen> {
                   isDark: isDark,
                   selectedJobId: _selectedJobId,
                   jobColorFn: _jobColorFn,
-                  onJobTap: (id) => setState(() => _selectedJobId = id),
+                  onJobTap: _selectJob,
                 ),
               ],
             ),
-            if (_selectedJobId != null)
+            if (_panelVisible)
+              Positioned.fill(
+                child: FadeTransition(
+                  opacity: _overlayOpacity,
+                  child: GestureDetector(
+                    onTap: _dismissPanel,
+                    child: Container(color: Colors.black.withValues(alpha: 0.05)),
+                  ),
+                ),
+              ),
+            if (_panelVisible && _selectedJobId != null)
               Positioned(
                 top: 0,
                 bottom: 0,
                 right: 0,
                 width: MediaQuery.of(context).size.width * 0.42,
                 child: WebJobDetailPanel(
+                  key: ValueKey(_selectedJobId),
                   companyId: companyId,
                   jobId: _selectedJobId!,
-                  onClose: () => setState(() => _selectedJobId = null),
+                  onClose: _dismissPanel,
+                  animateIn: _panelAnimateIn,
                   onEdit: (job) {
                     context.push('/jobs/create', extra: job);
                   },
@@ -445,7 +507,7 @@ class _WebScheduleScreenState extends State<WebScheduleScreen> {
                 pins: routeData.pins,
                 routePoints: routeData.routePoints,
                 missingLocationCount: routeData.missingCount,
-                onPinTap: (id) => setState(() => _selectedJobId = id),
+                onPinTap: _selectJob,
               ),
               Positioned(
                 top: 8,
@@ -481,7 +543,7 @@ class _WebScheduleScreenState extends State<WebScheduleScreen> {
           pins: routeData.pins,
           routePoints: routeData.routePoints,
           missingLocationCount: routeData.missingCount,
-          onPinTap: (id) => setState(() => _selectedJobId = id),
+          onPinTap: _selectJob,
         ),
         Positioned(
           top: 8,
@@ -510,7 +572,7 @@ class _WebScheduleScreenState extends State<WebScheduleScreen> {
           selectedJobId: _selectedJobId,
           colorByEngineer: _colorByEngineer,
           jobColorFn: _jobColorFn,
-          onJobTap: (id) => setState(() => _selectedJobId = id),
+          onJobTap: _selectJob,
           onDayHeaderTap: (date) {
             setState(() {
               _selectedDay = date;
@@ -536,7 +598,7 @@ class _WebScheduleScreenState extends State<WebScheduleScreen> {
             });
           },
           onPageChanged: (focused) => setState(() => _focusedDay = focused),
-          onJobTap: (id) => setState(() => _selectedJobId = id),
+          onJobTap: _selectJob,
         );
       case ScheduleViewMode.day:
         final dayJobs = allJobs
@@ -550,7 +612,7 @@ class _WebScheduleScreenState extends State<WebScheduleScreen> {
           isDark: isDark,
           selectedJobId: _selectedJobId,
           jobColorFn: _jobColorFn,
-          onJobTap: (id) => setState(() => _selectedJobId = id),
+          onJobTap: _selectJob,
         );
     }
   }
