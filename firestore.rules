@@ -27,8 +27,9 @@ service cloud.firestore {
         allow read: if isCompanyMember(companyId);
         // Allow users to check their own membership status (needed for join flow)
         allow get: if request.auth != null && request.auth.uid == memberId;
-        // Admins can add/remove members
-        allow delete: if isCompanyAdmin(companyId);
+        // Admins can remove members, or members can leave (self-delete)
+        allow delete: if isCompanyAdmin(companyId)
+                      || request.auth.uid == memberId;
         // Admins can create members, OR users can create their own member doc
         allow create: if isCompanyAdmin(companyId)
                       || (request.auth.uid == memberId

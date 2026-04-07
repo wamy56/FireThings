@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 15,
+      version: 16,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -94,6 +94,10 @@ class DatabaseHelper {
     if (oldVersion < 15) {
       await db.execute('ALTER TABLE jobsheets ADD COLUMN siteId TEXT');
     }
+    if (oldVersion < 16) {
+      await db.execute(
+          'ALTER TABLE jobsheets ADD COLUMN useCompanyBranding INTEGER DEFAULT 0');
+    }
   }
 
   /// Create database tables
@@ -125,7 +129,8 @@ class DatabaseHelper {
         sectionLayout $textTypeNullable,
         lastModifiedAt $textTypeNullable,
         dispatchedJobId $textTypeNullable,
-        siteId $textTypeNullable
+        siteId $textTypeNullable,
+        useCompanyBranding INTEGER NOT NULL DEFAULT 0
       )
     ''');
 

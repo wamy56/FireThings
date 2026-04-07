@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/models.dart';
@@ -6,6 +7,7 @@ import '../../services/database_helper.dart';
 import '../../services/analytics_service.dart';
 import '../../services/asset_service.dart';
 import '../../services/remote_config_service.dart';
+import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -295,7 +297,24 @@ class _EngineerJobContent extends StatelessWidget {
             ),
           ];
         }
-        return [];
+        return [
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  adaptivePageRoute(
+                    builder: (_) => NewJobScreen(dispatchedJob: job),
+                  ),
+                );
+              },
+              icon: Icon(AppIcons.clipboardTick),
+              label: const Text('Create Jobsheet'),
+            ),
+          ),
+        ];
       default:
         return [];
     }
@@ -303,12 +322,30 @@ class _EngineerJobContent extends StatelessWidget {
 
   Future<void> _viewLinkedJobsheet(BuildContext context, String jobsheetId) async {
     try {
-      final jobsheet = await DatabaseHelper.instance.getJobsheetById(jobsheetId);
+      // Try local DB first
+      var jobsheet = await DatabaseHelper.instance.getJobsheetById(jobsheetId);
+
+      // Firestore fallback for jobsheets created on another device
+      if (jobsheet == null) {
+        final companyId = UserProfileService.instance.companyId;
+        if (companyId != null) {
+          final doc = await FirebaseFirestore.instance
+              .collection('companies')
+              .doc(companyId)
+              .collection('completed_jobsheets')
+              .doc(jobsheetId)
+              .get();
+          if (doc.exists && doc.data() != null) {
+            jobsheet = Jobsheet.fromJson(doc.data()!);
+          }
+        }
+      }
+
       if (jobsheet != null && context.mounted) {
         Navigator.push(
           context,
           adaptivePageRoute(
-            builder: (_) => JobDetailScreen(jobsheet: jobsheet),
+            builder: (_) => JobDetailScreen(jobsheet: jobsheet!),
           ),
         );
       } else if (context.mounted) {

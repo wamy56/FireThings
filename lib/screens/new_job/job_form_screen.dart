@@ -16,6 +16,7 @@ import '../../data/default_asset_types.dart';
 import '../saved_sites/site_picker_screen.dart';
 import '../assets/batch_test_screen.dart';
 import '../../services/analytics_service.dart';
+import '../../services/user_profile_service.dart';
 import '../../utils/rotation_tracker.dart';
 import '../signature/signature_screen.dart';
 
@@ -65,6 +66,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
   bool _isEditingDraft = false;
+  bool _useCompanyBranding = false;
   String? _draftId;
   String? _selectedSiteId;
   final List<Map<String, dynamic>> _testedAssets = [];
@@ -118,6 +120,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
     // Pre-fill from dispatched job if provided
     if (widget.dispatchedJob != null) {
       _prefillFromDispatchedJob(widget.dispatchedJob!);
+      _useCompanyBranding = true;
     }
   }
 
@@ -146,6 +149,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
     _systemCategoryController.text = draft.systemCategory;
     _notesController.text = draft.notes;
     _selectedSiteId = draft.siteId;
+    _useCompanyBranding = draft.useCompanyBranding;
 
     // Load dynamic form data
     _formData.addAll(draft.formData);
@@ -269,6 +273,21 @@ class _JobFormScreenState extends State<JobFormScreen> {
                 hint: 'Add any additional notes or observations',
                 maxLines: 4,
               ),
+
+              if (UserProfileService.instance.hasCompany) ...[
+                const SizedBox(height: 16),
+                Card(
+                  child: SwitchListTile(
+                    title: const Text('Use Company Branding'),
+                    subtitle: const Text(
+                        'Apply company PDF header, footer & colours'),
+                    value: _useCompanyBranding,
+                    onChanged: (value) {
+                      setState(() => _useCompanyBranding = value);
+                    },
+                  ),
+                ),
+              ],
 
               const SizedBox(height: 32),
 
@@ -1227,6 +1246,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
         sectionLayout: widget.template.sectionLayout,
         dispatchedJobId: widget.dispatchedJob?.id,
         siteId: _selectedSiteId,
+        useCompanyBranding: _useCompanyBranding,
       );
 
       if (_isEditingDraft) {
@@ -1345,6 +1365,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
         sectionLayout: widget.template.sectionLayout,
         dispatchedJobId: widget.dispatchedJob?.id,
         siteId: _selectedSiteId,
+        useCompanyBranding: _useCompanyBranding,
       );
 
       // Save to database (without signatures yet)

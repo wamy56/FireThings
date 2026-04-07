@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -224,6 +225,24 @@ class _JobDetailContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
+        ] else if (job.status == DispatchedJobStatus.completed &&
+            job.linkedJobsheetId == null) ...[
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(AppIcons.infoCircle,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text('No jobsheet linked to this job yet'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
         ],
 
         // Assignee actions (status progression)
@@ -351,6 +370,30 @@ class _JobDetailContent extends StatelessWidget {
           ),
           const SizedBox(height: 24),
         ];
+      case DispatchedJobStatus.completed:
+        if (job.linkedJobsheetId == null) {
+          return [
+            _section('Your Assignment', []),
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    adaptivePageRoute(
+                      builder: (_) => NewJobScreen(dispatchedJob: job),
+                    ),
+                  );
+                },
+                icon: Icon(AppIcons.clipboardTick),
+                label: const Text('Create Jobsheet'),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ];
+        }
+        return [];
       default:
         return [];
     }
@@ -659,12 +702,30 @@ class _JobDetailContent extends StatelessWidget {
 
   Future<void> _viewLinkedJobsheet(BuildContext context, String jobsheetId) async {
     try {
-      final jobsheet = await DatabaseHelper.instance.getJobsheetById(jobsheetId);
+      // Try local DB first
+      var jobsheet = await DatabaseHelper.instance.getJobsheetById(jobsheetId);
+
+      // Firestore fallback for jobsheets created on another device
+      if (jobsheet == null) {
+        final companyId = UserProfileService.instance.companyId;
+        if (companyId != null) {
+          final doc = await FirebaseFirestore.instance
+              .collection('companies')
+              .doc(companyId)
+              .collection('completed_jobsheets')
+              .doc(jobsheetId)
+              .get();
+          if (doc.exists && doc.data() != null) {
+            jobsheet = Jobsheet.fromJson(doc.data()!);
+          }
+        }
+      }
+
       if (jobsheet != null && context.mounted) {
         Navigator.push(
           context,
           adaptivePageRoute(
-            builder: (_) => JobDetailScreen(jobsheet: jobsheet),
+            builder: (_) => JobDetailScreen(jobsheet: jobsheet!),
           ),
         );
       } else if (context.mounted) {

@@ -1148,7 +1148,7 @@ class PDFService {
     }
 
     final settings = await JobsheetSettingsService.getSettings();
-    final useCompanyBranding = jobsheet.dispatchedJobId != null;
+    final useCompanyBranding = jobsheet.useCompanyBranding;
     final logoBytes = await CompanyPdfConfigService.instance.getEffectiveLogoBytes(
       useCompanyBranding: useCompanyBranding,
       type: PdfDocumentType.jobsheet,

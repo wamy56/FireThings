@@ -4,6 +4,29 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-07 (Session 57)
+
+### Bug Fixes & Dispatch Improvements
+
+**Bug Fixes:**
+- **Fixed "Failed to leave company" error** — Firestore rules now allow members to self-delete their own member doc, so engineers/dispatchers can leave a company (previously only admins could delete member docs)
+- **Fixed "View Linked Jobsheet" for dispatchers/admins** — added Firestore fallback to fetch jobsheets from `companies/{companyId}/completed_jobsheets/` when the jobsheet isn't in the local SQLite database (created on a different device)
+
+**New Features:**
+- **Create Jobsheet from completed dispatched jobs** — engineers can now create a jobsheet for jobs marked "Complete Without Jobsheet". Both engineer and dispatcher detail screens show a "Create Jobsheet" button for completed jobs without a linked jobsheet. Dispatchers see an info card ("No jobsheet linked yet") until the engineer creates one.
+- **Company branding toggle for jobsheets** — added `useCompanyBranding` field to Jobsheet model with SwitchListTile toggle on the job form screen (matching the invoice pattern). Defaults to ON for dispatched jobs, OFF otherwise. Replaces the implicit `dispatchedJobId != null` check in PDF generation.
+
+**Files changed:**
+- `firestore.rules` — added self-delete rule for members
+- `lib/models/jobsheet.dart` — added `useCompanyBranding` field
+- `lib/services/database_helper.dart` — DB version 15 → 16, migration + CREATE TABLE
+- `lib/services/pdf_service.dart` — use explicit `useCompanyBranding` field
+- `lib/screens/dispatch/engineer_job_detail_screen.dart` — "Create Jobsheet" button for completed jobs, Firestore fallback for view
+- `lib/screens/dispatch/dispatched_job_detail_screen.dart` — info card + "Create Jobsheet" for completed jobs, Firestore fallback for view
+- `lib/screens/new_job/job_form_screen.dart` — company branding toggle
+
+---
+
 ## 2026-04-04 (Session 56)
 
 ### Web Dispatcher Jobs Tab Upgrade

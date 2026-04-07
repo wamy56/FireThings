@@ -28,6 +28,7 @@ class Jobsheet {
   final DateTime? lastModifiedAt;
   final String? dispatchedJobId;
   final String? siteId;
+  final bool useCompanyBranding;
 
   Jobsheet({
     required this.id,
@@ -52,6 +53,7 @@ class Jobsheet {
     this.lastModifiedAt,
     this.dispatchedJobId,
     this.siteId,
+    this.useCompanyBranding = false,
   });
 
   /// Convert Jobsheet to JSON map (for database storage)
@@ -79,6 +81,7 @@ class Jobsheet {
       'lastModifiedAt': lastModifiedAt?.toIso8601String(),
       'dispatchedJobId': dispatchedJobId,
       'siteId': siteId,
+      'useCompanyBranding': useCompanyBranding ? 1 : 0,
     };
   }
 
@@ -125,6 +128,7 @@ class Jobsheet {
           : null,
       dispatchedJobId: json['dispatchedJobId'] as String?,
       siteId: json['siteId'] as String?,
+      useCompanyBranding: json['useCompanyBranding'] == 1 || json['useCompanyBranding'] == true,
     );
   }
 
@@ -152,6 +156,7 @@ class Jobsheet {
     DateTime? lastModifiedAt,
     String? dispatchedJobId,
     String? siteId,
+    bool? useCompanyBranding,
   }) {
     return Jobsheet(
       id: id ?? this.id,
@@ -177,6 +182,7 @@ class Jobsheet {
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
       dispatchedJobId: dispatchedJobId ?? this.dispatchedJobId,
       siteId: siteId ?? this.siteId,
+      useCompanyBranding: useCompanyBranding ?? this.useCompanyBranding,
     );
   }
 
