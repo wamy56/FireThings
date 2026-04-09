@@ -185,6 +185,13 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
       case 'aov_smoke_vent': return 'AV';
       case 'sprinkler_head': return 'SH';
       case 'fire_blanket': return 'FB';
+      case 'fire_alarm_interface': return 'IO';
+      case 'power_supply_unit' : return 'PSU' ;
+      case 'disabled_refuge_panel' :return 'EVC' ;
+      case 'disabled_refuge_outstation' : return 'RO' ;
+      case 'fire_telephone' : return 'FT' ;
+      case 'toilet_alarm_system' : return 'TA' ;
+
       default: return 'AST';
     }
   }

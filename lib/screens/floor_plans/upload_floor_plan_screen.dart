@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show compute, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:printing/printing.dart';
@@ -10,6 +12,9 @@ import '../../models/floor_plan.dart';
 import '../../services/floor_plan_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/auth_service.dart';
+import '../../utils/image_utils.dart';
+import '../../utils/image_compress_stub.dart'
+    if (dart.library.html) '../../utils/image_compress_web.dart' as web_compress;
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/widgets.dart';
@@ -153,15 +158,29 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
     // Use Flutter's own codec to get dimensions — this respects EXIF rotation
     // and matches exactly what Image.memory() / CachedNetworkImage will render,
     // ensuring stored dimensions always match the displayed image.
-    final codec = await ui.instantiateImageCodec(bytes);
-    final frame = await codec.getNextFrame();
-    final size = Size(
-      frame.image.width.toDouble(),
-      frame.image.height.toDouble(),
-    );
-    frame.image.dispose();
-    codec.dispose();
-    return size;
+    try {
+      final codec = await ui.instantiateImageCodec(bytes)
+          .timeout(const Duration(seconds: 10));
+      final frame = await codec.getNextFrame();
+      final size = Size(
+        frame.image.width.toDouble(),
+        frame.image.height.toDouble(),
+      );
+      frame.image.dispose();
+      codec.dispose();
+      return size;
+    } catch (e) {
+      // Fallback: use the image package (slower but more reliable on web)
+      debugPrint('_getImageSize codec failed ($e), using image package fallback');
+      try {
+        final decoded = img.decodeImage(bytes);
+        if (decoded != null) {
+          return Size(decoded.width.toDouble(), decoded.height.toDouble());
+        }
+      } catch (_) {}
+      // Last resort default — pins still work since they use percentages
+      return const Size(1024, 768);
+    }
   }
 
   Future<void> _save() async {
@@ -210,6 +229,25 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
         }
       }
 
+      // Compress image to max 2048px JPEG @ 80% for consistent storage size.
+      // Web uses browser-native Canvas API (fast); mobile uses image pkg in isolate.
+      print('[FloorPlan] Starting compression (${uploadBytes.length} bytes)...');
+      if (kIsWeb) {
+        uploadBytes = await web_compress.compressImageBytesWeb(
+          uploadBytes,
+          maxWidth: 2048,
+          quality: 0.80,
+        );
+      } else {
+        uploadBytes = await compute(
+          (Uint8List b) => compressImageBytes(b, maxWidth: 2048, quality: 80),
+          uploadBytes,
+        );
+      }
+      ext = 'jpg';
+      contentType = 'image/jpeg';
+      print('[FloorPlan] Compression done (${uploadBytes.length} bytes). Uploading...');
+
       // Upload image
       final imageUrl = await FloorPlanService.instance.uploadFloorPlanImage(
         widget.basePath,
@@ -219,9 +257,11 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
         contentType: contentType,
         extension: ext,
       );
+      print('[FloorPlan] Upload done. Getting dimensions...');
 
       // Get image dimensions from the upload bytes (always an image at this point)
       final size = await _getImageSize(uploadBytes);
+      print('[FloorPlan] Dimensions: ${size.width}x${size.height}. Creating doc...');
 
       // Create Firestore document
       final plan = FloorPlan(

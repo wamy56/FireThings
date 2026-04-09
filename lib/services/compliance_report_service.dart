@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:http/http.dart' as http;
-import 'package:image/image.dart' as img;
+import '../utils/image_utils.dart';
+import '../utils/image_compress_stub.dart'
+    if (dart.library.html) '../utils/image_compress_web.dart' as web_compress;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -29,14 +31,7 @@ const _untestedAmber = PdfColor.fromInt(0xFFF97316);
 /// Resizes image bytes to a maximum width, re-encoding as JPEG.
 /// Returns original bytes if already smaller or decoding fails.
 Uint8List _resizeImageBytes(Uint8List bytes, {int maxWidth = 1200}) {
-  try {
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null || decoded.width <= maxWidth) return bytes;
-    final resized = img.copyResize(decoded, width: maxWidth);
-    return Uint8List.fromList(img.encodeJpg(resized, quality: 80));
-  } catch (_) {
-    return bytes;
-  }
+  return compressImageBytes(bytes, maxWidth: maxWidth, quality: 80);
 }
 
 // ── Parsed data holder used by section helpers ──
@@ -1137,15 +1132,25 @@ class ComplianceReportService {
       );
     }
 
-    // Compress images on web to reduce PDF build cost
+    // Compress images to reduce PDF size (handles pre-existing large uploads).
+    // Web uses browser-native Canvas API (fast); mobile uses image pkg (sync).
+    onProgress?.call('Compressing images for PDF...');
     if (kIsWeb) {
-      onProgress?.call('Compressing images...');
       for (final key in floorPlanImages.keys.toList()) {
-        await Future.delayed(Duration.zero); // yield between each resize
-        floorPlanImages[key] = _resizeImageBytes(floorPlanImages[key]!, maxWidth: 1200);
+        await Future.delayed(Duration.zero);
+        floorPlanImages[key] = await web_compress.compressImageBytesWeb(
+          floorPlanImages[key]!, maxWidth: 1200, quality: 0.80);
       }
       for (final key in defectPhotos.keys.toList()) {
         await Future.delayed(Duration.zero);
+        defectPhotos[key] = await web_compress.compressImageBytesWeb(
+          defectPhotos[key]!, maxWidth: 800, quality: 0.80);
+      }
+    } else {
+      for (final key in floorPlanImages.keys.toList()) {
+        floorPlanImages[key] = _resizeImageBytes(floorPlanImages[key]!, maxWidth: 1200);
+      }
+      for (final key in defectPhotos.keys.toList()) {
         defectPhotos[key] = _resizeImageBytes(defectPhotos[key]!, maxWidth: 800);
       }
     }
