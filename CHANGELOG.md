@@ -4,6 +4,82 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-11 (Session 60)
+
+### Firebase Storage Upload Fixes
+
+**Bug Fixes:**
+- **Fixed floor plan upload hanging on web** — root cause: `firebase_storage_web` platform channel bug where `putData` and `getDownloadURL` throw `PlatformException(channel-error, Unable to establish connection on channel)` and the Future never resolves, causing the spinner to hang forever. Fix: bypass the Firebase Storage Dart SDK on web and upload directly via the Firebase Storage REST API, constructing the download URL from the response metadata.
+- **Fixed defect photo uploads on web** — same REST API bypass applied to `DefectService.uploadDefectPhotos()` and `ServiceHistoryService.uploadDefectPhotos()`
+- **Fixed mobile defect photos "disappearing"** — storage rules only matched single-level paths (`defects/{filename}`) but uploads used nested paths (`defect_photos/{defectId}/{filename}` and `defects/{recordId}/{filename}`). Uploads silently failed (error swallowed by catch block), so defects saved with empty `photoUrls` lists. Fixed by adding correct nested path rules.
+- **Added timeouts to floor plan upload** — `putData` (30s) and `getDownloadURL` (10s) now have timeouts with a dedicated `TimeoutException` handler showing a clear error message instead of hanging forever
+
+**Infrastructure:**
+- Updated `storage.rules` with correct nested paths for solo and company defect photos (both `defect_photos/` and `defects/` directories)
+- Updated `codemagic.yaml` to deploy storage rules alongside hosting (`--only hosting,storage`)
+- Deployed storage rules to Firebase
+
+**Files changed:**
+- `storage.rules` — added nested defect photo path rules for solo + company
+- `lib/services/floor_plan_service.dart` — REST API upload for web, timeouts, progress logging
+- `lib/services/defect_service.dart` — REST API upload for web
+- `lib/services/service_history_service.dart` — REST API upload for web
+- `lib/screens/floor_plans/upload_floor_plan_screen.dart` — timeout handling, PDF rasterization timeout, better error messages
+- `codemagic.yaml` — deploy storage rules with hosting
+- `lib/screens/assets/add_edit_asset_screen.dart` — added reference prefixes for 6 new asset types
+
+---
+
+## 2026-04-09 (Session 59)
+
+### Floor Plan Web Compression & CORS
+
+- **Web image compression** — new `image_compress_web.dart` using browser-native Canvas API for fast image compression on web (much faster than pure-Dart `image` package). Conditional import via `dart.library.html` with `image_compress_stub.dart` fallback.
+- **Mobile image compression** — new `image_utils.dart` with `compressImageBytes()` using the `image` package, designed to run in isolates via `compute()`
+- **Floor plan upload** — platform-specific compression: web uses Canvas API, mobile uses `image` package in isolate. Both compress to max 2048px JPEG @ 80% quality.
+- **CORS configuration** — added `cors.json` for Firebase Storage bucket (`firethings-51e00.firebasestorage.app`) allowing all origins and methods
+- **Compliance report web fix** — `_downloadBytes()` uses `getDownloadURL()` + HTTP GET on web to avoid CORS issues with `getData()`
+
+**Files changed:**
+- `lib/utils/image_compress_web.dart` — new file, browser Canvas API compression
+- `lib/utils/image_compress_stub.dart` — new file, stub for non-web platforms
+- `lib/utils/image_utils.dart` — new file, mobile image compression
+- `lib/screens/floor_plans/upload_floor_plan_screen.dart` — platform-specific compression path
+- `lib/services/compliance_report_service.dart` — web CORS workaround for `getData()`
+- `cors.json` — Firebase Storage CORS configuration
+
+---
+
+## 2026-04-07 (Session 58)
+
+### New Asset Types, Dispatch Badge & Compliance Report Rewrite
+
+**New Features:**
+- **6 new built-in asset types** — Fire Alarm Interface (I/O Module), Power Supply Unit, Disabled Refuge Panel (EVC Master), Disabled Refuge Outstation, Fire Telephone, Toilet Alarm System. Each with variants, common faults, and lifecycle data.
+- **BS5839 floor plan symbols** — added symbols for all 6 new types (IO, PSU, EVC, RO, FT, TA) with correct shapes (square, rectangle, circle) per BS 5839-1 conventions
+- **Dispatch badge count** — bottom navigation Dispatch tab now shows a badge with unassigned job count (for dispatchers/admins) or pending job count (for engineers), using real-time Firestore streams
+- **Web schedule panel animation** — job detail panel on schedule screen now has animated overlay with fade transitions instead of instant show/hide
+
+**Improvements:**
+- **Compliance report service rewrite** — major refactor (~800 lines changed) for improved structure and maintainability
+- **Floor plan upload** — added PDF rasterization support using `Printing.raster()` with first-page extraction and PNG conversion
+
+**Files changed:**
+- `lib/data/default_asset_types.dart` — 6 new asset type definitions
+- `lib/widgets/bs5839_symbols.dart` — 6 new BS5839 symbol mappings and painters
+- `lib/main.dart` — dispatch badge count stream subscription, `_maybeBadgedIcon()` helper
+- `lib/services/dispatch_service.dart` — `streamUnassignedJobCount()`, `streamPendingJobCount()`
+- `lib/services/compliance_report_service.dart` — major rewrite
+- `lib/screens/web/web_schedule_screen.dart` — animated panel overlay
+- `lib/screens/floor_plans/upload_floor_plan_screen.dart` — PDF rasterization
+- `lib/screens/assets/add_edit_asset_screen.dart` — asset type screen updates for new types
+- `lib/screens/assets/site_asset_register_screen.dart` — new type support
+- `lib/screens/assets/asset_detail_screen.dart` — new type support
+- `lib/screens/assets/asset_type_config_screen.dart` — new type support
+- `lib/screens/assets/batch_test_screen.dart` — new type support
+
+---
+
 ## 2026-04-07 (Session 57)
 
 ### Bug Fixes & Dispatch Improvements

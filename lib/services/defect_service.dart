@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../models/defect.dart';
 
 /// Service for managing asset defects with full lifecycle (open → rectified).
@@ -191,6 +195,9 @@ class DefectService {
   }
 
   /// Upload defect photos to Firebase Storage and return download URLs.
+  ///
+  /// On web, bypasses the Firebase Storage Dart SDK (platform channel bug)
+  /// and uploads directly via the Storage REST API.
   Future<List<String>> uploadDefectPhotos({
     required String basePath,
     required String siteId,
@@ -201,16 +208,51 @@ class DefectService {
     final urls = <String>[];
     for (int i = 0; i < photos.length; i++) {
       try {
-        final ref = _storage.ref(
-            '$basePath/sites/$siteId/assets/$assetId/defect_photos/$defectId/$i.jpg');
-        await ref.putData(
-            photos[i], SettableMetadata(contentType: 'image/jpeg'));
-        final url = await ref.getDownloadURL();
+        final path =
+            '$basePath/sites/$siteId/assets/$assetId/defect_photos/$defectId/$i.jpg';
+        final url = kIsWeb
+            ? await _uploadViaRestApi(path, photos[i])
+            : await _uploadViaSdk(path, photos[i]);
         urls.add(url);
       } catch (e) {
         debugPrint('Error uploading defect photo $i: $e');
       }
     }
     return urls;
+  }
+
+  Future<String> _uploadViaSdk(String path, Uint8List bytes) async {
+    final ref = _storage.ref(path);
+    await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+    return await ref.getDownloadURL();
+  }
+
+  Future<String> _uploadViaRestApi(String path, Uint8List bytes) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('Not signed in');
+
+    final idToken = await user.getIdToken();
+    final bucket = _storage.bucket;
+    final encodedPath = Uri.encodeComponent(path);
+
+    final response = await http.post(
+      Uri.parse(
+        'https://firebasestorage.googleapis.com/v0/b/$bucket/o?uploadType=media&name=$encodedPath',
+      ),
+      headers: {
+        'Authorization': 'Bearer $idToken',
+        'Content-Type': 'image/jpeg',
+      },
+      body: bytes,
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode != 200) {
+      throw Exception('Upload failed (${response.statusCode})');
+    }
+
+    final metadata = jsonDecode(response.body) as Map<String, dynamic>;
+    final token = metadata['downloadTokens'] as String?;
+    if (token == null) throw Exception('No download token in response');
+    return 'https://firebasestorage.googleapis.com/v0/b/$bucket/o/$encodedPath?alt=media&token=$token';
   }
 }

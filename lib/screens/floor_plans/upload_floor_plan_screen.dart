@@ -211,13 +211,17 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
 
       if (_isPdf) {
         try {
+          debugPrint('[FloorPlan] Rasterizing PDF...');
           final pages = Printing.raster(_fileBytes!, dpi: 200);
-          final firstPage = await pages.first;
+          final firstPage = await pages.first
+              .timeout(const Duration(seconds: 20));
           final pngImage = await firstPage.toPng();
           uploadBytes = pngImage;
           ext = 'png';
           contentType = 'image/png';
+          debugPrint('[FloorPlan] PDF rasterized (${pngImage.length} bytes)');
         } catch (e) {
+          debugPrint('[FloorPlan] PDF rasterization failed: $e');
           if (mounted) {
             context.showErrorToast(
               kIsWeb
@@ -231,7 +235,7 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
 
       // Compress image to max 2048px JPEG @ 80% for consistent storage size.
       // Web uses browser-native Canvas API (fast); mobile uses image pkg in isolate.
-      print('[FloorPlan] Starting compression (${uploadBytes.length} bytes)...');
+      debugPrint('[FloorPlan] Starting compression (${uploadBytes.length} bytes)...');
       if (kIsWeb) {
         uploadBytes = await web_compress.compressImageBytesWeb(
           uploadBytes,
@@ -246,7 +250,7 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
       }
       ext = 'jpg';
       contentType = 'image/jpeg';
-      print('[FloorPlan] Compression done (${uploadBytes.length} bytes). Uploading...');
+      debugPrint('[FloorPlan] Compression done (${uploadBytes.length} bytes). Uploading...');
 
       // Upload image
       final imageUrl = await FloorPlanService.instance.uploadFloorPlanImage(
@@ -257,11 +261,11 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
         contentType: contentType,
         extension: ext,
       );
-      print('[FloorPlan] Upload done. Getting dimensions...');
+      debugPrint('[FloorPlan] Upload done. Getting dimensions...');
 
       // Get image dimensions from the upload bytes (always an image at this point)
       final size = await _getImageSize(uploadBytes);
-      print('[FloorPlan] Dimensions: ${size.width}x${size.height}. Creating doc...');
+      debugPrint('[FloorPlan] Dimensions: ${size.width}x${size.height}. Creating doc...');
 
       // Create Firestore document
       final plan = FloorPlan(
@@ -290,7 +294,17 @@ class _UploadFloorPlanScreenState extends State<UploadFloorPlanScreen> {
         context.showSuccessToast('Floor plan uploaded');
         Navigator.of(context).pop(true);
       }
+    } on TimeoutException {
+      debugPrint('[FloorPlan] Upload timed out');
+      if (mounted) {
+        context.showErrorToast(
+          kIsWeb
+              ? 'Upload timed out — check that Firebase Storage is configured correctly'
+              : 'Upload timed out — check your connection and try again',
+        );
+      }
     } catch (e) {
+      debugPrint('[FloorPlan] Upload failed (${e.runtimeType}): $e');
       if (mounted) {
         context.showErrorToast('Upload failed: ${e.toString()}');
       }

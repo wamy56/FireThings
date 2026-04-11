@@ -62,7 +62,7 @@ class DefaultFirebaseOptions {
     appId: '1:218966840739:web:19e4d14f2b47d20c7b3616',
     messagingSenderId: '218966840739',
     projectId: 'firethings-51e00',
-    authDomain: 'firethings-51e00.firebaseapp.com',
+    authDomain: 'firethings.co.uk',
     storageBucket: 'firethings-51e00.firebasestorage.app',
     measurementId: 'G-8N2ESV7GG1',
   );

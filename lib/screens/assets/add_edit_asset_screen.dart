@@ -186,12 +186,11 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
       case 'sprinkler_head': return 'SH';
       case 'fire_blanket': return 'FB';
       case 'fire_alarm_interface': return 'IO';
-      case 'power_supply_unit' : return 'PSU' ;
-      case 'disabled_refuge_panel' :return 'EVC' ;
-      case 'disabled_refuge_outstation' : return 'RO' ;
-      case 'fire_telephone' : return 'FT' ;
-      case 'toilet_alarm_system' : return 'TA' ;
-
+      case 'power_supply_unit': return 'PSU';
+      case 'disabled_refuge_panel': return 'DRP';
+      case 'disabled_refuge_outstation': return 'DRO';
+      case 'fire_telephone': return 'FT';
+      case 'toilet_alarm_system': return 'TAS';
       default: return 'AST';
     }
   }
