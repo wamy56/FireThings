@@ -167,8 +167,11 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
     final ref = await AssetService.instance
         .suggestNextReference(widget.basePath, widget.siteId, prefix);
     if (mounted) {
+      // Remove listener so programmatic change doesn't reset _refWasAutoFilled
+      _referenceController.removeListener(_onReferenceChanged);
       _referenceController.text = ref;
       _refWasAutoFilled = true;
+      _referenceController.addListener(_onReferenceChanged);
     }
   }
 
