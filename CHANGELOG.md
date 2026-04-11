@@ -4,6 +4,56 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-11 (Session 62)
+
+### PDF Branding Customiser Upgrade (Phases 1-5 Complete)
+
+Complete rewrite of the PDF branding system from basic text line lists to a template-based, block-composable editor with dynamic variables, dual-colour schemes, font selection, and a unified editor UI.
+
+**New Data Models (Phase 1):**
+- `lib/models/pdf_variable.dart` — `PdfVariable` enum (13 variables with `{token}` syntax) + `PdfVariableResolver` class
+- `lib/models/pdf_content_block.dart` — `ContentBlock` class replacing `HeaderTextLine` with rich styling (text/logo/divider/spacer types, per-block font size, bold/italic/uppercase, alignment, colour override)
+- `lib/models/pdf_colour_scheme_v2.dart` — `PdfColourSchemeV2` with primary + optional secondary colours, 8 presets with secondary pairings
+- `lib/models/pdf_font_config.dart` — `PdfFontConfig` with 4 font families (Roboto, Inter, Lato, Merriweather)
+- `lib/models/pdf_layout_template.dart` — `HeaderLayoutTemplate` (6 variants) + `FooterLayoutTemplate` (4 variants)
+- `lib/models/pdf_branding_config.dart` — Unified config replacing separate header/footer/colour models
+- `lib/data/pdf_branding_presets.dart` — 5 starter templates (Classic, Modern, Professional, Minimal, Bold)
+
+**Migration & Services (Phase 2):**
+- `lib/services/pdf_branding_migration.dart` — V1 → V2 migration (HeaderTextLine → ContentBlock, LogoZone → HeaderLayoutTemplate)
+- `lib/services/pdf_branding_config_service.dart` — Unified config service with auto-migration from v1
+- `lib/services/pdf_branding_editor_adapter.dart` — Adapter pattern (`PersonalBrandingAdapter` + `CompanyBrandingAdapter`) eliminating ~1400 lines of duplication
+- Updated `company_pdf_config_service.dart` with v2 branding config methods
+- Updated `firestore_sync_service.dart` with `syncPdfBrandingConfig()`
+- Updated `pdf_generation_data.dart` DTOs with `brandingConfigJson` + italic/boldItalic font bytes
+
+**PDF Builder (Phase 3):**
+- `lib/services/pdf_branding_builder.dart` — Unified builder replacing `PdfHeaderBuilder` + `PdfFooterBuilder`, renders all 6 header and 4 footer templates, resolves variables, applies per-block styling
+- Updated `pdf_service.dart`, `invoice_pdf_service.dart`, `compliance_report_service.dart` — V2 gather phase + isolate dual-path (v2 when brandingConfig exists, v1 fallback)
+
+**New UI (Phase 4):**
+- `lib/screens/pdf_branding/template_preset_selector.dart` — Horizontal preset carousel with mini-thumbnail previews
+- `lib/screens/pdf_branding/branding_live_preview.dart` — Accurate live preview using actual colours/fonts/blocks
+- `lib/screens/pdf_branding/content_block_editor_card.dart` — Collapsed/expanded card for editing content blocks
+- `lib/screens/pdf_branding/variable_insertion_sheet.dart` — Bottom sheet with variable chips filtered by doc type
+- `lib/screens/pdf_branding/pdf_branding_editor_screen.dart` — Unified editor (header, footer, colours, fonts, logo in one screen)
+- `lib/screens/pdf_branding/pdf_branding_hub_screen.dart` — Hub with Jobsheet/Invoice sections
+
+**Navigation Updates:**
+- `settings_screen.dart` — Points to `PdfBrandingHubScreen`
+- `jobs_hub_screen.dart` — Points to `PdfBrandingHubScreen(docType: jobsheet)`
+- `invoicing_hub_screen.dart` — Points to `PdfBrandingHubScreen(docType: invoice)`
+- `company_settings_screen.dart` — Uses `CompanyBrandingAdapter` with hub screen
+- `web_router.dart` — Updated `/branding` route to use hub + adapter
+
+**Cleanup (Phase 5):**
+- Deleted 5 old screens (3,771 lines): `pdf_design_screen.dart`, `pdf_header_designer_screen.dart`, `pdf_footer_designer_screen.dart`, `pdf_colour_scheme_screen.dart`, `company_pdf_design_screen.dart`
+- Old v1 services kept for migration reads during transition period
+
+**Net impact:** ~-3,771 lines deleted, ~+2,200 lines added. Zero duplication between personal and company editors.
+
+---
+
 ## 2026-04-11 (Session 61)
 
 ### Granular Permission System & Role Change Bug Fix

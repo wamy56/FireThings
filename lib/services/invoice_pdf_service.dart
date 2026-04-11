@@ -8,17 +8,26 @@ import '../models/pdf_colour_scheme.dart';
 import 'payment_settings_service.dart';
 import 'pdf_header_builder.dart';
 import 'pdf_footer_builder.dart';
+import 'pdf_branding_builder.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
 
 /// Top-level function for compute() — builds the invoice PDF in a background isolate.
 Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
   final invoice = Invoice.fromJson(data.invoiceJson);
+
+  // V2 branding config (preferred when present)
+  final brandingConfig = data.brandingConfigJson != null
+      ? PdfBrandingConfig.fromJson(data.brandingConfigJson!)
+      : null;
+
+  // V1 legacy configs (fallback)
   final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
   final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
   final colourScheme = PdfColourScheme(primaryColorValue: data.colourSchemeValue);
-  final primaryColor = colourScheme.primaryColor;
-  final primaryLightColor = colourScheme.primaryLight;
+
+  final primaryColor = brandingConfig?.colourScheme.primaryColor ?? colourScheme.primaryColor;
+  final primaryLightColor = brandingConfig?.colourScheme.primaryLight ?? colourScheme.primaryLight;
 
   final paymentDetails = PaymentDetails(
     bankName: data.paymentDetailsMap['bankName'] ?? '',
@@ -34,13 +43,62 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
   final boldFont = data.boldFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
       : pw.Font.helveticaBold();
+  final italicFont = data.italicFontBytes != null
+      ? pw.Font.ttf(ByteData.sublistView(data.italicFontBytes!))
+      : null;
+  final boldItalicFont = data.boldItalicFontBytes != null
+      ? pw.Font.ttf(ByteData.sublistView(data.boldItalicFontBytes!))
+      : null;
 
   final pdf = pw.Document(
     theme: pw.ThemeData.withFont(
       base: regularFont,
       bold: boldFont,
+      italic: italicFont,
+      boldItalic: boldItalicFont,
     ),
   );
+
+  // Build variable resolver for v2 branding
+  final variableResolver = PdfVariableResolver({
+    '{company_name}': invoice.engineerName,
+    '{invoice_number}': invoice.invoiceNumber,
+    '{date}': DateFormat('dd/MM/yyyy').format(invoice.date),
+    '{customer_name}': invoice.customerName,
+    '{engineer_name}': invoice.engineerName,
+  });
+
+  // Build header widget (v2 or v1)
+  pw.Widget headerWidget;
+  if (brandingConfig != null) {
+    headerWidget = _buildHeaderV2(
+      invoice, data.logoBytes, brandingConfig, variableResolver, primaryColor,
+      font: regularFont, boldFont: boldFont,
+      italicFont: italicFont, boldItalicFont: boldItalicFont,
+    );
+  } else {
+    headerWidget = _buildHeader(invoice, data.logoBytes, headerConfig, primaryColor);
+  }
+
+  // Build footer widget (v2 or v1)
+  pw.Widget footerWidget;
+  if (brandingConfig != null) {
+    footerWidget = PdfBrandingBuilder.buildFooter(
+      config: brandingConfig,
+      resolver: variableResolver,
+      pageNumber: 1,
+      pagesCount: 1,
+      font: regularFont, boldFont: boldFont,
+      italicFont: italicFont, boldItalicFont: boldItalicFont,
+    );
+  } else {
+    footerWidget = PdfFooterBuilder.buildFooter(
+      config: footerConfig,
+      pageNumber: 1,
+      pagesCount: 1,
+      primaryColor: primaryColor,
+    );
+  }
 
   pdf.addPage(
     pw.Page(
@@ -49,7 +107,7 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
       build: (context) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          _buildHeader(invoice, data.logoBytes, headerConfig, primaryColor),
+          headerWidget,
           pw.SizedBox(height: 24),
           _buildInvoiceInfo(invoice),
           pw.SizedBox(height: 24),
@@ -65,12 +123,7 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
           pw.Spacer(),
           if (!paymentDetails.isEmpty) _buildPaymentTerms(paymentDetails, primaryColor, primaryLightColor),
           pw.SizedBox(height: 16),
-          PdfFooterBuilder.buildFooter(
-            config: footerConfig,
-            pageNumber: 1,
-            pagesCount: 1,
-            primaryColor: primaryColor,
-          ),
+          footerWidget,
           pw.SizedBox(height: 8),
           pw.Center(
             child: pw.Text(
@@ -84,6 +137,63 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
   );
 
   return await pdf.save();
+}
+
+/// V2 header using the new branding builder for invoices.
+pw.Widget _buildHeaderV2(
+  Invoice invoice,
+  Uint8List? logoBytes,
+  PdfBrandingConfig brandingConfig,
+  PdfVariableResolver resolver,
+  PdfColor primaryColor, {
+  pw.Font? font,
+  pw.Font? boldFont,
+  pw.Font? italicFont,
+  pw.Font? boldItalicFont,
+}) {
+  return pw.Container(
+    decoration: pw.BoxDecoration(
+      border: pw.Border(
+        bottom: pw.BorderSide(color: primaryColor, width: 2),
+      ),
+    ),
+    padding: const pw.EdgeInsets.only(bottom: 8),
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Expanded(
+          flex: 5,
+          child: PdfBrandingBuilder.buildHeader(
+            config: brandingConfig,
+            resolver: resolver,
+            logoBytes: logoBytes,
+            font: font,
+            boldFont: boldFont,
+            italicFont: italicFont,
+            boldItalicFont: boldItalicFont,
+          ),
+        ),
+        pw.SizedBox(width: 12),
+        // Invoice badge
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: pw.BoxDecoration(
+            color: primaryColor,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+          ),
+          child: pw.Text(
+            'INVOICE',
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.white,
+              letterSpacing: 2,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // ── Constants ──
@@ -465,11 +575,29 @@ class InvoicePDFService {
       // Google Fonts unavailable — isolate will fall back to Helvetica
     }
 
+    // Load italic font variants for v2 support
+    Uint8List? italicFontBytes;
+    Uint8List? boldItalicFontBytes;
+    try {
+      final italicFont = await PdfGoogleFonts.robotoItalic();
+      final boldItalicFont = await PdfGoogleFonts.robotoBoldItalic();
+      italicFontBytes = _extractFontBytes(italicFont);
+      boldItalicFontBytes = _extractFontBytes(boldItalicFont);
+    } catch (_) {}
+
     final companyPdf = CompanyPdfConfigService.instance;
     final logoBytes = await companyPdf.getEffectiveLogoBytes(
       useCompanyBranding: invoice.useCompanyBranding,
       type: PdfDocumentType.invoice,
     );
+
+    // V2 branding config
+    final brandingConfig = await companyPdf.getEffectiveBrandingConfig(
+      PdfDocumentType.invoice,
+      useCompanyBranding: invoice.useCompanyBranding,
+    );
+
+    // V1 configs (backward compat)
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(
       PdfDocumentType.invoice,
       useCompanyBranding: invoice.useCompanyBranding,
@@ -493,11 +621,14 @@ class InvoicePDFService {
         'paymentTerms': paymentDetails.paymentTerms,
       },
       logoBytes: logoBytes,
+      brandingConfigJson: brandingConfig.toJson(),
       headerConfigJson: headerConfig.toJson(),
       footerConfigJson: footerConfig.toJson(),
       colourSchemeValue: colourScheme.primaryColorValue,
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
+      italicFontBytes: italicFontBytes,
+      boldItalicFontBytes: boldItalicFontBytes,
     );
 
     // ── Build phase (background isolate) ──

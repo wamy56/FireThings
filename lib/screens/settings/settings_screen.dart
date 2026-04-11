@@ -28,7 +28,7 @@ import '../company/team_management_screen.dart';
 import 'profile_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'manage_permissions_screen.dart';
-import '../invoicing/pdf_design_screen.dart';
+import '../pdf_branding/pdf_branding_hub_screen.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/tools_disclaimer_gate.dart';
 
@@ -221,7 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.push(
                     context,
                     adaptivePageRoute(
-                      builder: (_) => const PdfDesignScreen(),
+                      builder: (_) => const PdfBrandingHubScreen(),
                     ),
                   );
                 },

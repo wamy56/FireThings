@@ -13,7 +13,7 @@ import '../../utils/adaptive_widgets.dart';
 import '../new_job/new_job_screen.dart';
 import '../new_job/jobsheet_drafts_screen.dart';
 import '../history/history_screen.dart';
-import '../invoicing/pdf_design_screen.dart';
+import '../pdf_branding/pdf_branding_hub_screen.dart';
 import 'custom_templates_screen.dart';
 
 class JobsHubScreen extends StatefulWidget {
@@ -279,7 +279,7 @@ class _JobsHubScreenState extends State<JobsHubScreen> {
                           onTap: () => Navigator.push(
                             context,
                             adaptivePageRoute(
-                              builder: (_) => const PdfDesignScreen(docType: PdfDocumentType.jobsheet),
+                              builder: (_) => const PdfBrandingHubScreen(docType: PdfDocumentType.jobsheet),
                             ),
                           ),
                         ),

@@ -31,7 +31,8 @@ import 'web_settings_screen.dart';
 import '../company/team_management_screen.dart';
 import '../company/company_sites_screen.dart';
 import '../company/company_customers_screen.dart';
-import '../company/company_pdf_design_screen.dart';
+import '../../services/pdf_branding_editor_adapter.dart';
+import '../pdf_branding/pdf_branding_hub_screen.dart';
 
 /// Converts a [Stream] into a [Listenable] for GoRouter's refreshListenable.
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -306,7 +307,12 @@ GoRouter createWebRouter() {
           ),
           GoRoute(
             path: '/branding',
-            builder: (context, state) => CompanyPdfDesignScreen(companyId: UserProfileService.instance.companyId ?? ''),
+            builder: (context, state) {
+              final companyId = UserProfileService.instance.companyId ?? '';
+              return PdfBrandingHubScreen(
+                adapterFactory: () => CompanyBrandingAdapter(companyId),
+              );
+            },
           ),
           GoRoute(
             path: '/settings',

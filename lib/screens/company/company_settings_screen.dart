@@ -12,7 +12,8 @@ import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 import 'team_management_screen.dart';
-import 'company_pdf_design_screen.dart';
+import '../../services/pdf_branding_editor_adapter.dart';
+import '../pdf_branding/pdf_branding_hub_screen.dart';
 import 'company_sites_screen.dart';
 import 'company_customers_screen.dart';
 
@@ -295,7 +296,9 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
             Navigator.push(
               context,
               adaptivePageRoute(
-                builder: (_) => CompanyPdfDesignScreen(companyId: _company!.id),
+                builder: (_) => PdfBrandingHubScreen(
+                  adapterFactory: () => CompanyBrandingAdapter(_company!.id),
+                ),
               ),
             );
           },
