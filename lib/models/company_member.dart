@@ -1,3 +1,5 @@
+import 'permission.dart';
+
 /// Role of a company member
 enum CompanyRole { admin, dispatcher, engineer }
 
@@ -10,7 +12,7 @@ class CompanyMember {
   final String? fcmToken;
   final DateTime joinedAt;
   final bool isActive;
-  final bool canManageAssetTypes;
+  final Map<String, bool> permissions;
 
   CompanyMember({
     required this.uid,
@@ -20,8 +22,8 @@ class CompanyMember {
     this.fcmToken,
     required this.joinedAt,
     this.isActive = true,
-    this.canManageAssetTypes = false,
-  });
+    Map<String, bool>? permissions,
+  }) : permissions = permissions ?? AppPermission.defaultsForRole(role);
 
   Map<String, dynamic> toJson() {
     return {
@@ -32,24 +34,34 @@ class CompanyMember {
       'fcmToken': fcmToken,
       'joinedAt': joinedAt.toIso8601String(),
       'isActive': isActive,
-      'canManageAssetTypes': canManageAssetTypes,
+      'permissions': permissions,
     };
   }
 
   factory CompanyMember.fromJson(Map<String, dynamic> json) {
+    final role = CompanyRole.values.firstWhere(
+      (r) => r.name == json['role'],
+      orElse: () => CompanyRole.engineer,
+    );
     return CompanyMember(
       uid: json['uid'] as String,
       displayName: json['displayName'] as String,
       email: json['email'] as String,
-      role: CompanyRole.values.firstWhere(
-        (r) => r.name == json['role'],
-        orElse: () => CompanyRole.engineer,
-      ),
+      role: role,
       fcmToken: json['fcmToken'] as String?,
       joinedAt: DateTime.parse(json['joinedAt'] as String),
       isActive: json['isActive'] as bool? ?? true,
-      canManageAssetTypes: json['canManageAssetTypes'] as bool? ?? false,
+      permissions: json['permissions'] != null
+          ? Map<String, bool>.from(json['permissions'] as Map)
+          : null,
     );
+  }
+
+  /// Check if this member has a specific permission.
+  /// Admin role always returns true as a safety net.
+  bool hasPermission(AppPermission perm) {
+    if (role == CompanyRole.admin) return true;
+    return permissions[perm.key] ?? false;
   }
 
   CompanyMember copyWith({
@@ -60,7 +72,7 @@ class CompanyMember {
     String? fcmToken,
     DateTime? joinedAt,
     bool? isActive,
-    bool? canManageAssetTypes,
+    Map<String, bool>? permissions,
   }) {
     return CompanyMember(
       uid: uid ?? this.uid,
@@ -70,7 +82,7 @@ class CompanyMember {
       fcmToken: fcmToken ?? this.fcmToken,
       joinedAt: joinedAt ?? this.joinedAt,
       isActive: isActive ?? this.isActive,
-      canManageAssetTypes: canManageAssetTypes ?? this.canManageAssetTypes,
+      permissions: permissions ?? this.permissions,
     );
   }
 

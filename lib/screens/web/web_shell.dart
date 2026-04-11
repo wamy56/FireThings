@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/user_profile_service.dart';
+import '../../models/permission.dart';
 import '../../services/company_service.dart';
 import '../../services/web_notification_service.dart';
 import '../../utils/theme.dart';
@@ -114,14 +115,14 @@ class _WebShellState extends State<WebShell> {
     );
   }
 
-  int _selectedIndexFromPath(String path, bool isAdmin) {
+  int _selectedIndexFromPath(String path, bool canBrand) {
     if (path.startsWith('/jobs') || path == '/') return 0;
     if (path.startsWith('/schedule')) return 1;
     if (path.startsWith('/team')) return 2;
     if (path.startsWith('/sites')) return 3;
     if (path.startsWith('/customers')) return 4;
-    if (isAdmin && path.startsWith('/branding')) return 5;
-    if (path.startsWith('/settings')) return isAdmin ? 6 : 5;
+    if (canBrand && path.startsWith('/branding')) return 5;
+    if (path.startsWith('/settings')) return canBrand ? 6 : 5;
     return 0;
   }
 
@@ -129,7 +130,7 @@ class _WebShellState extends State<WebShell> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final width = MediaQuery.of(context).size.width;
-    final isAdmin = UserProfileService.instance.isAdmin;
+    final canBrand = UserProfileService.instance.hasPermission(AppPermission.pdfBranding);
     final user = FirebaseAuth.instance.currentUser;
 
     // Very narrow window — suggest mobile app
@@ -173,7 +174,7 @@ class _WebShellState extends State<WebShell> {
     final extended = width >= 1200;
     final showDrawer = width < 900;
     final currentPath = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _selectedIndexFromPath(currentPath, isAdmin);
+    final selectedIndex = _selectedIndexFromPath(currentPath, canBrand);
 
     final primaryColor = isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue;
     final unselectedColor = isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey;
@@ -205,7 +206,7 @@ class _WebShellState extends State<WebShell> {
         selectedIcon: Icon(AppIcons.userBold),
         label: const Text('Customers'),
       ),
-      if (isAdmin)
+      if (canBrand)
         NavigationRailDestination(
           icon: Icon(AppIcons.brush),
           selectedIcon: Icon(AppIcons.brush),
@@ -224,7 +225,7 @@ class _WebShellState extends State<WebShell> {
       '/team',
       '/sites',
       '/customers',
-      if (isAdmin) '/branding',
+      if (canBrand) '/branding',
       '/settings',
     ];
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/company_member.dart';
+import '../../models/permission.dart';
 import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
@@ -7,6 +8,7 @@ import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
+import 'member_permissions_screen.dart';
 
 class TeamManagementScreen extends StatefulWidget {
   const TeamManagementScreen({super.key});
@@ -19,7 +21,7 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
-  bool get _isAdmin => UserProfileService.instance.isAdmin;
+  bool get _canManageTeam => UserProfileService.instance.hasPermission(AppPermission.teamManage);
   String? get _companyId => UserProfileService.instance.companyId;
   String? get _currentUid => UserProfileService.instance.profile?.uid;
 
@@ -204,7 +206,7 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
               ),
             ),
           ),
-          if (_isAdmin && !isCurrentUser)
+          if (_canManageTeam && !isCurrentUser)
             PopupMenuButton<String>(
               icon: Icon(AppIcons.more),
               onSelected: (action) =>
@@ -213,6 +215,10 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
                 const PopupMenuItem(
                   value: 'change_role',
                   child: Text('Change Role'),
+                ),
+                const PopupMenuItem(
+                  value: 'edit_permissions',
+                  child: Text('Edit Permissions'),
                 ),
                 const PopupMenuItem(
                   value: 'remove',
@@ -287,6 +293,17 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
       } catch (e) {
         if (mounted) context.showErrorToast('Failed to change role');
       }
+    } else if (action == 'edit_permissions') {
+      final result = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MemberPermissionsScreen(
+            companyId: companyId,
+            member: member,
+          ),
+        ),
+      );
+      if (result == true && mounted) setState(() {});
     } else if (action == 'remove') {
       final confirm = await showAdaptiveAlertDialog<bool>(
         context: context,

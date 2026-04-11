@@ -63,8 +63,8 @@ class _JobDetailContent extends StatelessWidget {
 
   const _JobDetailContent({required this.job, required this.isDark});
 
-  bool get _isDispatcherOrAdmin =>
-      UserProfileService.instance.isDispatcherOrAdmin;
+  bool get _canEditJobs =>
+      UserProfileService.instance.hasPermission(AppPermission.dispatchEdit);
 
   bool get _isAssignee =>
       FirebaseAuth.instance.currentUser?.uid == job.assignedTo;
@@ -249,7 +249,7 @@ class _JobDetailContent extends StatelessWidget {
         if (_isAssignee) ..._buildAssigneeActions(context),
 
         // Dispatcher actions
-        if (_isDispatcherOrAdmin) ...[
+        if (_canEditJobs) ...[
           if (job.status != DispatchedJobStatus.completed)
             Row(
               children: [

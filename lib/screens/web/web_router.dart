@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/user_profile_service.dart';
+import '../../models/permission.dart';
 import '../../services/remote_config_service.dart';
 import '../../services/web_notification_service.dart';
 import '../../services/analytics_service.dart';
@@ -86,7 +87,7 @@ GoRouter createWebRouter() {
           );
         }
         if (!profile.hasCompany) return '/access-denied?reason=noCompany';
-        if (!profile.isDispatcherOrAdmin) return '/access-denied?reason=engineerOnly';
+        if (!profile.hasPermission(AppPermission.webPortalAccess)) return '/access-denied?reason=engineerOnly';
       }
 
       return null;

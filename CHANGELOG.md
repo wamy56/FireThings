@@ -4,6 +4,47 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-11 (Session 61)
+
+### Granular Permission System & Role Change Bug Fix
+
+**Bug Fix:**
+- Fixed "Failed to save" error when admin changes a member's role — root cause was `CompanyService.updateMemberRole()` writing to another user's profile doc (`users/{memberUid}/profile/main`), blocked by Firestore security rules. Removed cross-user profile writes from `updateMemberRole()`, `removeMember()`, and `deleteCompany()`.
+
+**New Feature: Granular Per-User Permissions**
+- Created `AppPermission` enum (`lib/models/permission.dart`) with 22 granular permissions across 9 categories (Web Portal, Dispatch, Sites, Customers, Assets, Floor Plans, Asset Types, Branding, Company)
+- Admin/Dispatcher/Engineer roles kept as default permission templates; admins always have all permissions as safety net
+- Added `permissions` field (`Map<String, bool>`) to `CompanyMember` model, replacing `canManageAssetTypes`
+- Updated `UserProfileService` to load member doc and expose `hasPermission(AppPermission)` method with SharedPreferences caching
+- Added `updateMemberPermissions()` to `CompanyService`; `updateMemberRole()` now also writes default permissions for new role
+- Replaced all hardcoded `isAdmin`/`isDispatcherOrAdmin` checks across 11 files with granular `hasPermission()` calls
+- Built `MemberPermissionsScreen` — admin UI with grouped toggles by category, role dropdown with "apply defaults" option, self-edit safeguards
+- Added "Edit Permissions" option to team management popup menu
+- Updated Firestore security rules: new `hasPermission()` helper function, split coarse `write` rules into granular `create`/`update`/`delete`
+- Zero-migration: `CompanyMember.fromJson()` generates defaults from role when `permissions` field missing
+
+**Files changed:**
+- `lib/models/permission.dart` — new file, `AppPermission` enum
+- `lib/models/company_member.dart` — added `permissions` map, removed `canManageAssetTypes`
+- `lib/models/models.dart` — added permission.dart to barrel
+- `lib/services/user_profile_service.dart` — member doc loading, `hasPermission()`, permissions caching
+- `lib/services/company_service.dart` — bug fixes, `updateMemberPermissions()`, permissions param on role change
+- `lib/screens/company/member_permissions_screen.dart` — new admin permission editor screen
+- `lib/screens/company/team_management_screen.dart` — "Edit Permissions" popup option
+- `lib/screens/company/company_settings_screen.dart` — granular permission checks
+- `lib/screens/company/company_sites_screen.dart` — separate create/edit/delete permissions
+- `lib/screens/company/company_customers_screen.dart` �� separate create/edit/delete permissions
+- `lib/screens/dispatch/dispatched_job_detail_screen.dart` — `dispatchEdit` permission
+- `lib/screens/floor_plans/floor_plan_list_screen.dart` — `floorPlansDelete` permission
+- `lib/screens/assets/asset_detail_screen.dart` — `assetsDelete` permission
+- `lib/screens/settings/settings_screen.dart` — `teamManage` permission
+- `lib/screens/web/web_router.dart` — `webPortalAccess` permission
+- `lib/screens/web/web_shell.dart` — `pdfBranding` permission
+- `lib/main.dart` — `dispatchViewAll` permission
+- `firestore.rules` — `hasPermission()` helper, granular per-resource rules
+
+---
+
 ## 2026-04-11 (Session 60)
 
 ### Firebase Storage Upload Fixes

@@ -6,6 +6,7 @@ import '../models/company.dart';
 import '../models/company_member.dart';
 import '../models/company_site.dart';
 import '../models/company_customer.dart';
+import '../models/permission.dart';
 import '../models/user_profile.dart';
 import 'geocoding_service.dart';
 import 'user_profile_service.dart';
@@ -231,25 +232,22 @@ class CompanyService {
             .toList());
   }
 
-  /// Update a member's role. Admin only.
+  /// Update a member's role and apply default permissions for the new role.
   Future<void> updateMemberRole(
     String companyId,
     String memberUid,
-    CompanyRole newRole,
-  ) async {
+    CompanyRole newRole, {
+    Map<String, bool>? permissions,
+  }) async {
+    final perms = permissions ?? AppPermission.defaultsForRole(newRole);
     await _companiesCol
         .doc(companyId)
         .collection('members')
         .doc(memberUid)
-        .update({'role': newRole.name});
-
-    // Also update the member's user profile
-    await _firestore
-        .collection('users')
-        .doc(memberUid)
-        .collection('profile')
-        .doc('main')
-        .set({'companyRole': newRole.name}, SetOptions(merge: true));
+        .update({
+      'role': newRole.name,
+      'permissions': perms,
+    });
 
     // If updating self, refresh local cache
     if (memberUid == _uid) {
@@ -262,23 +260,26 @@ class CompanyService {
     }
   }
 
+  /// Update a member's granular permissions without changing their role.
+  Future<void> updateMemberPermissions(
+    String companyId,
+    String memberUid,
+    Map<String, bool> permissions,
+  ) async {
+    await _companiesCol
+        .doc(companyId)
+        .collection('members')
+        .doc(memberUid)
+        .update({'permissions': permissions});
+  }
+
   /// Remove a member from the company. Admin only.
   Future<void> removeMember(String companyId, String memberUid) async {
-    final batch = _firestore.batch();
-    batch.update(
-      _companiesCol.doc(companyId).collection('members').doc(memberUid),
-      {'isActive': false},
-    );
-    batch.set(
-      _firestore.collection('users').doc(memberUid).collection('profile').doc('main'),
-      {
-        'uid': memberUid,
-        'companyId': null,
-        'companyRole': null,
-      },
-      SetOptions(merge: true),
-    );
-    await batch.commit();
+    await _companiesCol
+        .doc(companyId)
+        .collection('members')
+        .doc(memberUid)
+        .update({'isActive': false});
   }
 
   /// Regenerate the invite code. Admin only.
@@ -303,21 +304,8 @@ class CompanyService {
 
     final batch = _firestore.batch();
 
-    // Clear each member's company profile
+    // Delete all member docs
     for (final memberDoc in membersSnapshot.docs) {
-      batch.set(
-        _firestore
-            .collection('users')
-            .doc(memberDoc.id)
-            .collection('profile')
-            .doc('main'),
-        {
-          'uid': memberDoc.id,
-          'companyId': null,
-          'companyRole': null,
-        },
-        SetOptions(merge: true),
-      );
       batch.delete(memberDoc.reference);
     }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/company.dart';
 import '../../services/company_service.dart';
+import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -49,7 +50,10 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
     }
   }
 
-  bool get _isAdmin => UserProfileService.instance.isAdmin;
+  final _ups = UserProfileService.instance;
+  bool get _canBrand => _ups.hasPermission(AppPermission.pdfBranding);
+  bool get _canEditCompany => _ups.hasPermission(AppPermission.companyEdit);
+  bool get _canDeleteCompany => _ups.hasPermission(AppPermission.companyDelete);
 
   @override
   Widget build(BuildContext context) {
@@ -71,18 +75,21 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                     const SizedBox(height: 24),
                     _buildTeamSection(isDark),
                     const SizedBox(height: 24),
-                    if (_isAdmin || UserProfileService.instance.isDispatcherOrAdmin) ...[
+                    if (_ups.hasPermission(AppPermission.sitesEdit) ||
+                        _ups.hasPermission(AppPermission.customersEdit)) ...[
                       _buildSharedDataSection(isDark),
                       const SizedBox(height: 24),
                     ],
-                    if (_isAdmin) ...[
+                    if (_canBrand) ...[
                       _buildPdfBrandingSection(isDark),
                       const SizedBox(height: 24),
                     ],
-                    if (!_isAdmin) _buildLeaveButton(),
-                    if (_isAdmin) ...[
+                    if (!_canEditCompany && !_canDeleteCompany) _buildLeaveButton(),
+                    if (_canEditCompany) ...[
                       _buildEditButton(),
                       const SizedBox(height: 12),
+                    ],
+                    if (_canDeleteCompany) ...[
                       _buildDeleteButton(),
                     ],
                   ],
@@ -164,7 +171,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                   }
                 },
               ),
-              if (_isAdmin)
+              if (_ups.hasPermission(AppPermission.inviteCodeRegenerate))
                 IconButton(
                   icon: Icon(AppIcons.refresh),
                   onPressed: _regenerateInviteCode,

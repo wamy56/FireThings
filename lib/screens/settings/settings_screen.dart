@@ -18,6 +18,7 @@ import '../saved_sites/saved_sites_screen.dart';
 import '../saved_customers/saved_customers_screen.dart';
 import '../../services/email_service.dart';
 import '../../services/remote_config_service.dart';
+import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
 import '../debug/debug_screen.dart';
 import '../company/create_company_screen.dart';
@@ -520,7 +521,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     ];
 
-    if (profile.isDispatcherOrAdmin) {
+    if (profile.hasPermission(AppPermission.teamManage)) {
       tiles.add(_SettingsTileData(
         title: 'Team',
         subtitle: 'Manage team members',

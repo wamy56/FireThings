@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/company_customer.dart';
 import '../../services/company_service.dart';
+import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -28,7 +29,9 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
-  bool get _canEdit => UserProfileService.instance.isDispatcherOrAdmin;
+  bool get _canCreate => UserProfileService.instance.hasPermission(AppPermission.customersCreate);
+  bool get _canEdit => UserProfileService.instance.hasPermission(AppPermission.customersEdit);
+  bool get _canDelete => UserProfileService.instance.hasPermission(AppPermission.customersDelete);
 
   @override
   void dispose() {
@@ -40,7 +43,7 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Shared Customers')),
-      floatingActionButton: _canEdit && MediaQuery.of(context).viewInsets.bottom == 0
+      floatingActionButton: _canCreate && MediaQuery.of(context).viewInsets.bottom == 0
           ? FloatingActionButton.extended(
               onPressed: () => _showCustomerDialog(),
               icon: Icon(AppIcons.add),
@@ -116,7 +119,7 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
                                   : 'No Shared Customers',
                               message: _searchQuery.isNotEmpty
                                   ? 'Try a different search term'
-                                  : _canEdit
+                                  : _canCreate
                                       ? 'Tap + to add a customer'
                                       : 'No customers have been added yet',
                             )
@@ -200,23 +203,26 @@ class _CompanyCustomersScreenState extends State<CompanyCustomersScreen> {
                 ],
               ),
             ),
-            if (_canEdit) ...[
+            if (_canEdit || _canDelete) ...[
               const SizedBox(width: 8),
               IntrinsicWidth(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    CardActionButton(
-                      label: 'Edit',
-                      onPressed: () => _showCustomerDialog(customer: customer),
-                    ),
-                    const SizedBox(height: 6),
-                    CardActionButton(
-                      label: 'Delete',
-                      onPressed: () => _confirmDelete(customer),
-                      isDestructive: true,
-                    ),
+                    if (_canEdit)
+                      CardActionButton(
+                        label: 'Edit',
+                        onPressed: () => _showCustomerDialog(customer: customer),
+                      ),
+                    if (_canEdit && _canDelete)
+                      const SizedBox(height: 6),
+                    if (_canDelete)
+                      CardActionButton(
+                        label: 'Delete',
+                        onPressed: () => _confirmDelete(customer),
+                        isDestructive: true,
+                      ),
                   ],
                 ),
               ),

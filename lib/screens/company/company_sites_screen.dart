@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/company_site.dart';
 import '../../services/company_service.dart';
+import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -32,7 +33,9 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
-  bool get _canEdit => UserProfileService.instance.isDispatcherOrAdmin;
+  bool get _canCreate => UserProfileService.instance.hasPermission(AppPermission.sitesCreate);
+  bool get _canEdit => UserProfileService.instance.hasPermission(AppPermission.sitesEdit);
+  bool get _canDelete => UserProfileService.instance.hasPermission(AppPermission.sitesDelete);
 
   @override
   void dispose() {
@@ -44,7 +47,7 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Shared Sites')),
-      floatingActionButton: _canEdit && MediaQuery.of(context).viewInsets.bottom == 0
+      floatingActionButton: _canCreate && MediaQuery.of(context).viewInsets.bottom == 0
           ? FloatingActionButton.extended(
               onPressed: () => _showSiteDialog(),
               icon: Icon(AppIcons.add),
@@ -124,7 +127,7 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
                                     : 'No Shared Sites',
                                 message: _searchQuery.isNotEmpty
                                     ? 'Try a different search term'
-                                    : _canEdit
+                                    : _canCreate
                                         ? 'Tap + to add a site'
                                         : 'No sites have been added yet',
                               )
@@ -206,18 +209,19 @@ class _CompanySitesScreenState extends State<CompanySitesScreen> {
                     ),
                     const SizedBox(height: 6),
                   ],
-                  if (_canEdit) ...[
+                  if (_canEdit)
                     CardActionButton(
                       label: 'Edit',
                       onPressed: () => _showSiteDialog(site: site),
                     ),
+                  if (_canEdit && _canDelete)
                     const SizedBox(height: 6),
+                  if (_canDelete)
                     CardActionButton(
                       label: 'Delete',
                       onPressed: () => _confirmDelete(site),
                       isDestructive: true,
                     ),
-                  ],
                 ],
               ),
             ),

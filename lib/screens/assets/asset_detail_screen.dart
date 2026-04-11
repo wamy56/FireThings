@@ -14,6 +14,7 @@ import '../../services/asset_type_service.dart';
 import '../../services/defect_service.dart';
 import '../../services/service_history_service.dart';
 import '../../services/analytics_service.dart';
+import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -362,7 +363,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   bool get _canDelete {
     final profile = UserProfileService.instance;
     // Solo users can always delete their own. Company: dispatchers/admins only.
-    return !profile.hasCompany || profile.isDispatcherOrAdmin;
+    return !profile.hasCompany || profile.hasPermission(AppPermission.assetsDelete);
   }
 
   @override

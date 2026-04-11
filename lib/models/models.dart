@@ -12,6 +12,7 @@ export 'pdf_footer_config.dart';
 export 'pdf_section_layout_config.dart';
 export 'company.dart';
 export 'company_member.dart';
+export 'permission.dart';
 export 'dispatched_job.dart';
 export 'user_profile.dart';
 export 'company_site.dart';

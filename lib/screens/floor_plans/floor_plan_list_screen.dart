@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../models/floor_plan.dart';
 import '../../services/floor_plan_service.dart';
+import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -26,7 +27,7 @@ class FloorPlanListScreen extends StatelessWidget {
 
   bool get _canDelete {
     final profile = UserProfileService.instance;
-    return !profile.hasCompany || profile.isDispatcherOrAdmin;
+    return !profile.hasCompany || profile.hasPermission(AppPermission.floorPlansDelete);
   }
 
   void _navigateToUpload(BuildContext context) {

@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/company_member.dart';
+import '../models/permission.dart';
 import '../models/user_profile.dart';
 
 /// Manages the current user's profile (company association, FCM token).
@@ -14,14 +17,19 @@ class UserProfileService {
   static const _companyIdKey = 'user_company_id';
   static const _companyRoleKey = 'user_company_role';
   static const _fcmTokenKey = 'user_fcm_token';
+  static const _permissionsKey = 'user_permissions';
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   UserProfile? _cachedProfile;
+  CompanyMember? _cachedMember;
 
   /// The current cached profile.
   UserProfile? get profile => _cachedProfile;
+
+  /// The current cached company member (includes permissions).
+  CompanyMember? get member => _cachedMember;
 
   /// Quick check — does the current user belong to a company?
   bool get hasCompany => _cachedProfile?.hasCompany ?? false;
@@ -30,13 +38,22 @@ class UserProfileService {
   String? get companyId => _cachedProfile?.companyId;
 
   /// Current company role from cache.
-  CompanyRole? get companyRole => _cachedProfile?.companyRole;
-
-  /// Whether the user is a dispatcher or admin.
-  bool get isDispatcherOrAdmin => _cachedProfile?.isDispatcherOrAdmin ?? false;
+  CompanyRole? get companyRole => _cachedMember?.role ?? _cachedProfile?.companyRole;
 
   /// Whether the user is an admin.
-  bool get isAdmin => _cachedProfile?.isAdmin ?? false;
+  bool get isAdmin => _cachedMember?.role == CompanyRole.admin;
+
+  /// Whether the user is a dispatcher or admin (backward compat).
+  bool get isDispatcherOrAdmin =>
+      _cachedMember?.role == CompanyRole.admin ||
+      _cachedMember?.role == CompanyRole.dispatcher;
+
+  /// Check a granular permission for the current user.
+  /// Admin role always returns true as a safety net.
+  bool hasPermission(AppPermission perm) {
+    if (_cachedMember == null) return false;
+    return _cachedMember!.hasPermission(perm);
+  }
 
   String? get _uid => _auth.currentUser?.uid;
 
@@ -66,12 +83,42 @@ class UserProfileService {
         _cachedProfile = UserProfile(uid: uid);
       }
 
+      // Load member doc if user belongs to a company
+      await _loadMemberDoc(uid, _cachedProfile!.companyId);
+
       // Cache to SharedPreferences
       await _cacheToPrefs(_cachedProfile!);
     } catch (e) {
       debugPrint('UserProfileService: loadProfile failed: $e');
       // Fall back to SharedPreferences
       await _loadFromPrefs(uid);
+    }
+  }
+
+  /// Load the company member doc to get role and permissions.
+  Future<void> _loadMemberDoc(String uid, String? companyId) async {
+    if (companyId == null) {
+      _cachedMember = null;
+      return;
+    }
+    try {
+      final memberDoc = await _firestore
+          .collection('companies')
+          .doc(companyId)
+          .collection('members')
+          .doc(uid)
+          .get();
+
+      if (memberDoc.exists && memberDoc.data() != null) {
+        _cachedMember = CompanyMember.fromJson(memberDoc.data()!);
+        // Sync role back to profile cache
+        _cachedProfile = _cachedProfile?.copyWith(companyRole: _cachedMember!.role);
+      } else {
+        _cachedMember = null;
+      }
+    } catch (e) {
+      debugPrint('UserProfileService: _loadMemberDoc failed: $e');
+      // _cachedMember stays as whatever it was (possibly loaded from prefs)
     }
   }
 
@@ -122,10 +169,12 @@ class UserProfileService {
   /// Clear cached profile (on sign out).
   Future<void> clearProfile() async {
     _cachedProfile = null;
+    _cachedMember = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_companyIdKey);
     await prefs.remove(_companyRoleKey);
     await prefs.remove(_fcmTokenKey);
+    await prefs.remove(_permissionsKey);
   }
 
   Future<void> _cacheToPrefs(UserProfile profile) async {
@@ -143,6 +192,15 @@ class UserProfileService {
     if (profile.fcmToken != null) {
       await prefs.setString(_fcmTokenKey, profile.fcmToken!);
     }
+    // Cache permissions
+    if (_cachedMember != null) {
+      await prefs.setString(
+        _permissionsKey,
+        jsonEncode(_cachedMember!.toJson()),
+      );
+    } else {
+      await prefs.remove(_permissionsKey);
+    }
   }
 
   Future<void> _loadFromPrefs(String uid) async {
@@ -150,6 +208,7 @@ class UserProfileService {
     final cId = prefs.getString(_companyIdKey);
     final roleStr = prefs.getString(_companyRoleKey);
     final token = prefs.getString(_fcmTokenKey);
+    final memberJson = prefs.getString(_permissionsKey);
 
     CompanyRole? role;
     if (roleStr != null) {
@@ -165,5 +224,17 @@ class UserProfileService {
       companyRole: role,
       fcmToken: token,
     );
+
+    // Restore cached member from SharedPreferences
+    if (memberJson != null) {
+      try {
+        _cachedMember = CompanyMember.fromJson(
+          jsonDecode(memberJson) as Map<String, dynamic>,
+        );
+      } catch (e) {
+        debugPrint('UserProfileService: failed to restore cached member: $e');
+        _cachedMember = null;
+      }
+    }
   }
 }

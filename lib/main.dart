@@ -15,6 +15,7 @@ import 'services/auth_service.dart';
 import 'services/remote_config_service.dart';
 import 'services/firestore_sync_service.dart';
 import 'services/user_profile_service.dart';
+import 'models/permission.dart';
 import 'utils/theme.dart';
 import 'utils/responsive.dart';
 import 'utils/adaptive_widgets.dart';
@@ -346,7 +347,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (nav == null) return;
 
     final profile = UserProfileService.instance;
-    if (profile.isDispatcherOrAdmin) {
+    if (profile.hasPermission(AppPermission.dispatchViewAll)) {
       nav.push(
         MaterialPageRoute(
           builder: (_) =>
@@ -501,7 +502,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (companyId == null || uid == null) return;
 
     final Stream<int> countStream;
-    if (UserProfileService.instance.isDispatcherOrAdmin) {
+    if (UserProfileService.instance.hasPermission(AppPermission.dispatchViewAll)) {
       countStream =
           DispatchService.instance.streamUnassignedJobCount(companyId);
     } else {
@@ -542,7 +543,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         final companyId = parts[2];
         if (jobId.isNotEmpty && companyId.isNotEmpty) {
           final profile = UserProfileService.instance;
-          if (profile.isDispatcherOrAdmin) {
+          if (profile.hasPermission(AppPermission.dispatchViewAll)) {
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -584,7 +585,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   Widget get _dispatchScreen {
     final profile = UserProfileService.instance;
-    if (profile.isDispatcherOrAdmin) {
+    if (profile.hasPermission(AppPermission.dispatchViewAll)) {
       return const DispatchDashboardScreen();
     }
     return const EngineerJobsScreen();
