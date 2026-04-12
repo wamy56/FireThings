@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/user_profile_service.dart';
-import '../../models/permission.dart';
 import '../../services/remote_config_service.dart';
 import '../../services/web_notification_service.dart';
 import '../../services/analytics_service.dart';
@@ -31,8 +30,7 @@ import 'web_settings_screen.dart';
 import '../company/team_management_screen.dart';
 import '../company/company_sites_screen.dart';
 import '../company/company_customers_screen.dart';
-import '../../services/pdf_branding_editor_adapter.dart';
-import '../pdf_branding/pdf_branding_hub_screen.dart';
+import '../company/company_pdf_design_screen.dart';
 
 /// Converts a [Stream] into a [Listenable] for GoRouter's refreshListenable.
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -88,7 +86,7 @@ GoRouter createWebRouter() {
           );
         }
         if (!profile.hasCompany) return '/access-denied?reason=noCompany';
-        if (!profile.hasPermission(AppPermission.webPortalAccess)) return '/access-denied?reason=engineerOnly';
+        if (!profile.isDispatcherOrAdmin) return '/access-denied?reason=engineerOnly';
       }
 
       return null;
@@ -307,12 +305,7 @@ GoRouter createWebRouter() {
           ),
           GoRoute(
             path: '/branding',
-            builder: (context, state) {
-              final companyId = UserProfileService.instance.companyId ?? '';
-              return PdfBrandingHubScreen(
-                adapterFactory: () => CompanyBrandingAdapter(companyId),
-              );
-            },
+            builder: (context, state) => CompanyPdfDesignScreen(companyId: UserProfileService.instance.companyId ?? ''),
           ),
           GoRoute(
             path: '/settings',

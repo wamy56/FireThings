@@ -679,6 +679,17 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             ),
           ],
 
+          // Photos
+          const SizedBox(height: AppTheme.sectionGap),
+          _SectionHeader('Photos'),
+          const SizedBox(height: 8),
+          AssetPhotoGallery(
+            basePath: widget.basePath,
+            siteId: widget.siteId,
+            asset: asset,
+            onPhotosChanged: _loadAsset,
+          ),
+
           // Active Defects
           StreamBuilder<List<Defect>>(
             stream: DefectService.instance.getDefectsForAsset(

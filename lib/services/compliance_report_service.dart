@@ -20,7 +20,6 @@ import 'jobsheet_settings_service.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
 import 'pdf_footer_builder.dart';
-import 'pdf_branding_builder.dart';
 
 // ── Colour constants for the isolate ──
 const _white = PdfColors.white;
@@ -75,19 +74,8 @@ class _ReportContext {
 }
 
 _ReportContext _buildReportContext(ComplianceReportPdfData data) {
-  // Prefer v2 branding config colour scheme when available
-  final PdfColor primaryColor;
-  final PdfColor primaryLight;
-  if (data.brandingConfigJson != null) {
-    final branding = PdfBrandingConfig.fromJson(data.brandingConfigJson!);
-    primaryColor = branding.colourScheme.primaryColor;
-    primaryLight = branding.colourScheme.primaryLight;
-  } else {
-    final colourScheme = PdfColourScheme(primaryColorValue: data.colourSchemeValue);
-    primaryColor = colourScheme.primaryColor;
-    primaryLight = colourScheme.primaryLight;
-  }
-
+  final colourScheme =
+      PdfColourScheme(primaryColorValue: data.colourSchemeValue);
   final assets = data.assetsJson.map((j) => Asset.fromJson(j)).toList();
   final assetTypes =
       data.assetTypesJson.map((j) => AssetType.fromJson(j)).toList();
@@ -109,8 +97,8 @@ _ReportContext _buildReportContext(ComplianceReportPdfData data) {
     pass: active.where((a) => a.complianceStatus == Asset.statusPass).toList(),
     fail: active.where((a) => a.complianceStatus == Asset.statusFail).toList(),
     untested: active.where((a) => a.complianceStatus == Asset.statusUntested).toList(),
-    primaryColor: primaryColor,
-    primaryLight: primaryLight,
+    primaryColor: colourScheme.primaryColor,
+    primaryLight: colourScheme.primaryLight,
   );
 }
 
@@ -347,37 +335,18 @@ void _addFloorPlans(List<pw.Widget> widgets, _ReportContext ctx) {
       ),
     ));
 
-    // Legend for this floor plan
-    final typeIds = planAssets.map((a) => a.assetTypeId).toSet();
-    if (typeIds.isNotEmpty) {
-      widgets.add(pw.SizedBox(height: 4));
-      widgets.add(pw.Wrap(
-        spacing: 12,
-        runSpacing: 4,
-        children: typeIds.map((tid) {
-          final type = ctx.getType(tid);
-          final color = type != null
-              ? PdfColor.fromHex(type.defaultColor)
-              : ctx.primaryColor;
-          return pw.Row(
-            mainAxisSize: pw.MainAxisSize.min,
-            children: [
-              pw.Container(
-                width: 8,
-                height: 8,
-                decoration: pw.BoxDecoration(
-                  color: color,
-                  shape: pw.BoxShape.circle,
-                ),
-              ),
-              pw.SizedBox(width: 3),
-              pw.Text(type?.name ?? tid,
-                  style: const pw.TextStyle(fontSize: 7)),
-            ],
-          );
-        }).toList(),
-      ));
-    }
+    // Status legend for this floor plan
+    widgets.add(pw.SizedBox(height: 4));
+    widgets.add(pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.start,
+      children: [
+        _legendDot(_passGreen, 'Pass'),
+        pw.SizedBox(width: 12),
+        _legendDot(_failRed, 'Fail'),
+        pw.SizedBox(width: 12),
+        _legendDot(_untestedAmber, 'Untested'),
+      ],
+    ));
 
     widgets.add(pw.SizedBox(height: 12));
   }
@@ -743,9 +712,6 @@ void _addServiceHistory(List<pw.Widget> widgets, _ReportContext ctx) {
 Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
   final ctx = _buildReportContext(data);
   final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
-  final brandingConfig = data.brandingConfigJson != null
-      ? PdfBrandingConfig.fromJson(data.brandingConfigJson!)
-      : null;
 
   final regularFont = data.regularFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
@@ -753,28 +719,10 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
   final boldFont = data.boldFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
       : pw.Font.helveticaBold();
-  final italicFont = data.italicFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.italicFontBytes!))
-      : null;
-  final boldItalicFont = data.boldItalicFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.boldItalicFontBytes!))
-      : null;
 
   final pdf = pw.Document(
-    theme: pw.ThemeData.withFont(
-      base: regularFont, bold: boldFont,
-      italic: italicFont, boldItalic: boldItalicFont,
-    ),
+    theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
   );
-
-  // Build variable resolver for v2 footer
-  final variableResolver = PdfVariableResolver({
-    '{company_name}': data.companyName,
-    '{engineer_name}': data.engineerName,
-    '{site_name}': data.siteName,
-    '{site_address}': data.siteAddress,
-    '{date}': data.reportDate,
-  });
 
   // Section 1: Cover Page
   pdf.addPage(_buildCoverPage(data, ctx));
@@ -792,24 +740,12 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
-      footer: (context) {
-        if (brandingConfig != null) {
-          return PdfBrandingBuilder.buildFooter(
-            config: brandingConfig,
-            resolver: variableResolver,
-            pageNumber: context.pageNumber,
-            pagesCount: context.pagesCount,
-            font: regularFont, boldFont: boldFont,
-            italicFont: italicFont, boldItalicFont: boldItalicFont,
-          );
-        }
-        return PdfFooterBuilder.buildFooter(
-          config: footerConfig,
-          pageNumber: context.pageNumber,
-          pagesCount: context.pagesCount,
-          primaryColor: ctx.primaryColor,
-        );
-      },
+      footer: (context) => PdfFooterBuilder.buildFooter(
+        config: footerConfig,
+        pageNumber: context.pageNumber,
+        pagesCount: context.pagesCount,
+        primaryColor: ctx.primaryColor,
+      ),
       build: (context) => widgets,
     ),
   );
@@ -824,9 +760,6 @@ Future<Uint8List> _buildComplianceReportWeb(
 }) async {
   final ctx = _buildReportContext(data);
   final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
-  final brandingConfig = data.brandingConfigJson != null
-      ? PdfBrandingConfig.fromJson(data.brandingConfigJson!)
-      : null;
 
   final regularFont = data.regularFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
@@ -834,27 +767,10 @@ Future<Uint8List> _buildComplianceReportWeb(
   final boldFont = data.boldFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
       : pw.Font.helveticaBold();
-  final italicFont = data.italicFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.italicFontBytes!))
-      : null;
-  final boldItalicFont = data.boldItalicFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.boldItalicFontBytes!))
-      : null;
 
   final pdf = pw.Document(
-    theme: pw.ThemeData.withFont(
-      base: regularFont, bold: boldFont,
-      italic: italicFont, boldItalic: boldItalicFont,
-    ),
+    theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
   );
-
-  final variableResolver = PdfVariableResolver({
-    '{company_name}': data.companyName,
-    '{engineer_name}': data.engineerName,
-    '{site_name}': data.siteName,
-    '{site_address}': data.siteAddress,
-    '{date}': data.reportDate,
-  });
 
   // Section 1: Cover Page
   onProgress?.call('Building cover page...');
@@ -892,24 +808,12 @@ Future<Uint8List> _buildComplianceReportWeb(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
-      footer: (context) {
-        if (brandingConfig != null) {
-          return PdfBrandingBuilder.buildFooter(
-            config: brandingConfig,
-            resolver: variableResolver,
-            pageNumber: context.pageNumber,
-            pagesCount: context.pagesCount,
-            font: regularFont, boldFont: boldFont,
-            italicFont: italicFont, boldItalicFont: boldItalicFont,
-          );
-        }
-        return PdfFooterBuilder.buildFooter(
-          config: footerConfig,
-          pageNumber: context.pageNumber,
-          pagesCount: context.pagesCount,
-          primaryColor: ctx.primaryColor,
-        );
-      },
+      footer: (context) => PdfFooterBuilder.buildFooter(
+        config: footerConfig,
+        pageNumber: context.pageNumber,
+        pagesCount: context.pagesCount,
+        primaryColor: ctx.primaryColor,
+      ),
       build: (context) => widgets,
     ),
   );
@@ -1085,19 +989,12 @@ class ComplianceReportService {
     // Branding
     final settings = await JobsheetSettingsService.getSettings();
     final useCompanyBranding = basePath.startsWith('companies/');
-    final companyPdf = CompanyPdfConfigService.instance;
-    final logoBytes = await companyPdf.getEffectiveLogoBytes(
+    final logoBytes =
+        await CompanyPdfConfigService.instance.getEffectiveLogoBytes(
       useCompanyBranding: useCompanyBranding,
       type: PdfDocumentType.jobsheet,
     );
-
-    // V2 branding config (inherits from jobsheet)
-    final brandingConfig = await companyPdf.getEffectiveBrandingConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-
-    // V1 configs (backward compat)
+    final companyPdf = CompanyPdfConfigService.instance;
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(
       PdfDocumentType.jobsheet,
       useCompanyBranding: useCompanyBranding,
@@ -1110,16 +1007,6 @@ class ComplianceReportService {
       PdfDocumentType.jobsheet,
       useCompanyBranding: useCompanyBranding,
     );
-
-    // Load italic font variants for v2 support
-    Uint8List? italicFontBytes;
-    Uint8List? boldItalicFontBytes;
-    try {
-      final italicFont = await PdfGoogleFonts.robotoItalic();
-      final boldItalicFont = await PdfGoogleFonts.robotoBoldItalic();
-      italicFontBytes = _extractFontBytes(italicFont);
-      boldItalicFontBytes = _extractFontBytes(boldItalicFont);
-    } catch (_) {}
 
     // User info
     final user = AuthService().currentUser;
@@ -1256,14 +1143,11 @@ class ComplianceReportService {
       companyName: companyName,
       reportDate: DateFormat('dd/MM/yyyy').format(DateTime.now()),
       logoBytes: logoBytes,
-      brandingConfigJson: brandingConfig.toJson(),
       headerConfigJson: headerConfig.toJson(),
       footerConfigJson: footerConfig.toJson(),
       colourSchemeValue: colourScheme.primaryColorValue,
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
-      italicFontBytes: italicFontBytes,
-      boldItalicFontBytes: boldItalicFontBytes,
       assetsJson: assets.map((a) => a.toJson()).toList(),
       assetTypesJson: assetTypes.map((t) => t.toJson()).toList(),
       serviceRecordsJson: records.map((r) => r.toJson()).toList(),

@@ -4,6 +4,106 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-12 (Session 66)
+
+### Web Portal Max-Width Container Fixes
+
+Fixed two web portal screens that were missing the standard `Center` + `ConstrainedBox(maxWidth: 750)` wrapper, causing content to spread across the full viewport on wide screens.
+
+**Files Modified:**
+- `lib/screens/assets/asset_type_config_screen.dart` — Wrapped `_AssetTypeEditScreen` body with max-width 750 container
+- `lib/screens/company/member_permissions_screen.dart` — Wrapped `ListView` with max-width 750 container
+
+**Result:**
+- Asset type edit/create form now centered on web
+- Member permissions screen now centered on web
+- Consistent with all other company/asset management screens
+
+---
+
+## 2026-04-12 (Session 65)
+
+### Multi-Site Hosting Architecture Plan
+
+Created comprehensive planning document for expanding Firebase Hosting to support multiple sites.
+
+**New Documentation:**
+- `MULTI_SITE_HOSTING_PLAN.md` — Complete implementation guide for multi-site Firebase Hosting architecture
+
+**Planned Architecture:**
+- `www.firethings.com` → Marketing/landing site (static HTML or Next.js)
+- `app.firethings.com` → Dispatch portal (existing Flutter web app)
+- `customers.firethings.com` → Future customer portal
+
+**Document Covers:**
+- Firebase multi-site setup (`.firebaserc` and `firebase.json` configuration)
+- Marketing site directory structure and example HTML
+- DNS/subdomain configuration
+- Deployment workflow and CI/CD integration
+- Future customer portal considerations
+- Implementation checklist
+
+No code changes — planning documentation only.
+
+---
+
+## 2026-04-12 (Session 64)
+
+### Asset Photos Feature
+
+Added support for multiple photos per asset to help engineers locate equipment in the field (hidden in cupboards, ceiling voids, behind locked doors, etc.).
+
+**Model Changes:**
+- `lib/models/asset.dart` — Changed `photoUrl: String?` to `photoUrls: List<String>` with migration support for legacy single-photo field
+- `lib/models/permission.dart` — Added `assetsAddPhotos` and `assetsDeletePhotos` permissions (engineers can add but not delete by default)
+
+**Service Changes:**
+- `lib/services/asset_service.dart` — Added `uploadAssetPhoto()`, `deleteAssetPhoto()`, `deleteAllAssetPhotos()` methods with Firebase Storage integration, image compression (1280px max, 80% quality), and dual SDK/REST API upload paths for web compatibility
+
+**New Widgets:**
+- `lib/widgets/full_screen_image_viewer.dart` — Swipeable full-screen image viewer with pinch-to-zoom (InteractiveViewer), page indicator dots, and immersive mode
+- `lib/widgets/asset_photo_gallery.dart` — Horizontal scrolling thumbnail gallery with add/delete buttons, permission checks, camera/gallery source picker, and 5-photo limit
+
+**Screen Integration:**
+- `lib/screens/assets/asset_detail_screen.dart` — Added Photos section below Notes with `AssetPhotoGallery` widget
+- `lib/screens/assets/add_edit_asset_screen.dart` — Updated to preserve existing `photoUrls` when editing assets
+
+**Configuration:**
+- Max 5 photos per asset (`AssetService.maxPhotos`)
+- Storage path: `{basePath}/sites/{siteId}/assets/{assetId}/photos/{timestamp}.jpg`
+
+---
+
+## 2026-04-12 (Session 63)
+
+### PDF Branding v2 Revert
+
+Reverted all PDF branding v2 changes from Session 62, restoring the original v1 PDF branding system.
+
+**Deleted (v2 files):**
+- `lib/screens/pdf_branding/` — entire directory (6 screens: hub, editor, live preview, content block card, variable sheet, preset selector)
+- `lib/data/pdf_branding_presets.dart`
+- `lib/models/pdf_variable.dart`, `pdf_content_block.dart`, `pdf_colour_scheme_v2.dart`, `pdf_font_config.dart`, `pdf_layout_template.dart`, `pdf_branding_config.dart`
+- `lib/services/pdf_branding_migration.dart`, `pdf_branding_config_service.dart`, `pdf_branding_editor_adapter.dart`, `pdf_branding_builder.dart`
+
+**Restored (v1 screens from commit 5d5254f):**
+- `lib/screens/settings/pdf_header_designer_screen.dart` (731 lines)
+- `lib/screens/settings/pdf_footer_designer_screen.dart` (494 lines)
+- `lib/screens/settings/pdf_colour_scheme_screen.dart` (599 lines)
+- `lib/screens/invoicing/pdf_design_screen.dart` (181 lines)
+- `lib/screens/company/company_pdf_design_screen.dart` (1766 lines)
+
+**Reverted (modified files to pre-session-62 state):**
+- `lib/services/pdf_service.dart`, `invoice_pdf_service.dart`, `compliance_report_service.dart`
+- `lib/services/company_pdf_config_service.dart`, `firestore_sync_service.dart`, `pdf_generation_data.dart`
+- `lib/screens/settings/settings_screen.dart`, `jobs/jobs_hub_screen.dart`, `invoicing/invoicing_hub_screen.dart`
+- `lib/screens/company/company_settings_screen.dart`, `web/web_router.dart`
+- `lib/models/models.dart` — barrel exports (re-added `permission.dart` export)
+
+**Net change:** ~4,400 lines removed (v2), ~3,770 lines restored (v1)
+
+---
+
 ## 2026-04-11 (Session 62)
 
 ### PDF Branding Customiser Upgrade (Phases 1-5 Complete)

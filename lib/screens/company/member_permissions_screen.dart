@@ -61,18 +61,23 @@ class _MemberPermissionsScreenState extends State<MemberPermissionsScreen> {
             ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppTheme.screenPadding),
-        children: [
-          _buildMemberHeader(isDark),
-          const SizedBox(height: 24),
-          _buildRoleSection(isDark),
-          const SizedBox(height: 24),
-          ...AppPermission.categories.map(
-            (category) => _buildCategorySection(category, isDark),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 750),
+          child: ListView(
+            padding: const EdgeInsets.all(AppTheme.screenPadding),
+            children: [
+              _buildMemberHeader(isDark),
+              const SizedBox(height: 24),
+              _buildRoleSection(isDark),
+              const SizedBox(height: 24),
+              ...AppPermission.categories.map(
+                (category) => _buildCategorySection(category, isDark),
+              ),
+              const SizedBox(height: 32),
+            ],
           ),
-          const SizedBox(height: 32),
-        ],
+        ),
       ),
     );
   }

@@ -527,10 +527,13 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
       ),
       body: _saving
           ? const Center(child: AdaptiveLoadingIndicator())
-          : KeyboardDismissWrapper(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 750),
+                child: KeyboardDismissWrapper(
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
                   // Name & Category
                   if (!isBuiltIn || widget.isNew) ...[
                     CustomTextField(
@@ -744,6 +747,8 @@ class _AssetTypeEditScreenState extends State<_AssetTypeEditScreen> {
                 ],
               ),
             ),
+          ),
+        ),
     );
   }
 }

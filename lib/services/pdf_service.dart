@@ -8,7 +8,6 @@ import '../models/models.dart';
 import 'jobsheet_settings_service.dart';
 import 'pdf_header_builder.dart';
 import 'pdf_footer_builder.dart';
-import 'pdf_branding_builder.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
 import 'auth_service.dart';
@@ -21,20 +20,12 @@ import '../models/pdf_colour_scheme.dart';
 /// Top-level function for compute() — builds the jobsheet PDF in a background isolate.
 Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
   final jobsheet = Jobsheet.fromJson(data.jobsheetJson);
-
-  // V2 branding config (preferred when present)
-  final brandingConfig = data.brandingConfigJson != null
-      ? PdfBrandingConfig.fromJson(data.brandingConfigJson!)
-      : null;
-
-  // V1 legacy configs (fallback)
   final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
   final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
   final colourScheme = PdfColourScheme(primaryColorValue: data.colourSchemeValue);
-
-  final primaryColor = brandingConfig?.colourScheme.primaryColor ?? colourScheme.primaryColor;
-  final primaryLight = brandingConfig?.colourScheme.primaryLight ?? colourScheme.primaryLight;
-  final primaryMedium = brandingConfig?.colourScheme.primaryMedium ?? colourScheme.primaryMedium;
+  final primaryColor = colourScheme.primaryColor;
+  final primaryLight = colourScheme.primaryLight;
+  final primaryMedium = colourScheme.primaryMedium;
 
   final regularFont = data.regularFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
@@ -42,19 +33,11 @@ Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
   final boldFont = data.boldFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
       : pw.Font.helveticaBold();
-  final italicFont = data.italicFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.italicFontBytes!))
-      : null;
-  final boldItalicFont = data.boldItalicFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.boldItalicFontBytes!))
-      : null;
 
   final pdf = pw.Document(
     theme: pw.ThemeData.withFont(
       base: regularFont,
       bold: boldFont,
-      italic: italicFont,
-      boldItalic: boldItalicFont,
     ),
   );
 
@@ -65,133 +48,22 @@ Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
     phone: data.settingsPhone,
   );
 
-  // Build variable resolver for v2 branding
-  final variableResolver = PdfVariableResolver({
-    '{company_name}': settings.companyName.isNotEmpty ? settings.companyName : jobsheet.engineerName,
-    '{tagline}': settings.tagline,
-    '{address}': settings.address,
-    '{phone}': settings.phone,
-    '{engineer_name}': jobsheet.engineerName,
-    '{job_reference}': jobsheet.jobNumber,
-    '{date}': DateFormat('dd/MM/yyyy').format(jobsheet.date),
-    '{site_name}': jobsheet.siteAddress,
-    '{customer_name}': jobsheet.customerName,
-  });
-
   pdf.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
-      header: (context) {
-        if (brandingConfig != null) {
-          return _buildHeaderV2(
-            jobsheet, context, brandingConfig, variableResolver,
-            data.logoBytes, primaryColor,
-            font: regularFont, boldFont: boldFont,
-            italicFont: italicFont, boldItalicFont: boldItalicFont,
-          );
-        }
-        return _buildHeader(jobsheet, context, settings, data.logoBytes, headerConfig, primaryColor);
-      },
-      footer: (context) {
-        if (brandingConfig != null) {
-          return PdfBrandingBuilder.buildFooter(
-            config: brandingConfig,
-            resolver: variableResolver,
-            pageNumber: context.pageNumber,
-            pagesCount: context.pagesCount,
-            font: regularFont, boldFont: boldFont,
-            italicFont: italicFont, boldItalicFont: boldItalicFont,
-          );
-        }
-        return PdfFooterBuilder.buildFooter(
-          config: footerConfig,
-          pageNumber: context.pageNumber,
-          pagesCount: context.pagesCount,
-          primaryColor: primaryColor,
-        );
-      },
+      header: (context) => _buildHeader(jobsheet, context, settings, data.logoBytes, headerConfig, primaryColor),
+      footer: (context) => PdfFooterBuilder.buildFooter(
+        config: footerConfig,
+        pageNumber: context.pageNumber,
+        pagesCount: context.pagesCount,
+        primaryColor: primaryColor,
+      ),
       build: (context) => _buildDynamicSections(jobsheet, primaryColor, primaryLight, primaryMedium, data),
     ),
   );
 
   return await pdf.save();
-}
-
-/// V2 header using the new branding builder.
-pw.Widget _buildHeaderV2(
-  Jobsheet jobsheet,
-  pw.Context context,
-  PdfBrandingConfig brandingConfig,
-  PdfVariableResolver resolver,
-  Uint8List? logoBytes,
-  PdfColor primaryColor, {
-  pw.Font? font,
-  pw.Font? boldFont,
-  pw.Font? italicFont,
-  pw.Font? boldItalicFont,
-}) {
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border(
-        bottom: pw.BorderSide(color: primaryColor, width: 2),
-      ),
-    ),
-    padding: const pw.EdgeInsets.only(bottom: 8),
-    margin: const pw.EdgeInsets.only(bottom: 4),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Expanded(
-          flex: 5,
-          child: PdfBrandingBuilder.buildHeader(
-            config: brandingConfig,
-            resolver: resolver,
-            logoBytes: logoBytes,
-            font: font,
-            boldFont: boldFont,
-            italicFont: italicFont,
-            boldItalicFont: boldItalicFont,
-          ),
-        ),
-        pw.SizedBox(width: 12),
-        // Solid-fill badge (document type + reference)
-        pw.Expanded(
-          flex: 2,
-          child: pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            decoration: pw.BoxDecoration(
-              color: primaryColor,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Text(
-                  jobsheet.templateType.toUpperCase(),
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    color: _white,
-                    letterSpacing: 1,
-                  ),
-                  textAlign: pw.TextAlign.center,
-                ),
-                pw.SizedBox(height: 6),
-                pw.Text(
-                  'REF: ${jobsheet.jobNumber}',
-                  style: pw.TextStyle(
-                    fontSize: 9,
-                    color: PdfColor.fromInt(0xCCFFFFFF),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
 }
 
 /// Minimal settings holder used inside the isolate (replaces JobsheetHeaderFooter).
@@ -1277,20 +1149,11 @@ class PDFService {
 
     final settings = await JobsheetSettingsService.getSettings();
     final useCompanyBranding = jobsheet.useCompanyBranding;
-    final companyPdf = CompanyPdfConfigService.instance;
-
-    final logoBytes = await companyPdf.getEffectiveLogoBytes(
+    final logoBytes = await CompanyPdfConfigService.instance.getEffectiveLogoBytes(
       useCompanyBranding: useCompanyBranding,
       type: PdfDocumentType.jobsheet,
     );
-
-    // V2 branding config (unified)
-    final brandingConfig = await companyPdf.getEffectiveBrandingConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-
-    // V1 configs (still needed for backward compat in the isolate)
+    final companyPdf = CompanyPdfConfigService.instance;
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(
       PdfDocumentType.jobsheet,
       useCompanyBranding: useCompanyBranding,
@@ -1303,18 +1166,6 @@ class PDFService {
       PdfDocumentType.jobsheet,
       useCompanyBranding: useCompanyBranding,
     );
-
-    // Load italic font variants for v2 support
-    Uint8List? italicFontBytes;
-    Uint8List? boldItalicFontBytes;
-    try {
-      final italicFont = await PdfGoogleFonts.robotoItalic();
-      final boldItalicFont = await PdfGoogleFonts.robotoBoldItalic();
-      italicFontBytes = _extractFontBytes(italicFont);
-      boldItalicFontBytes = _extractFontBytes(boldItalicFont);
-    } catch (_) {
-      // Google Fonts unavailable
-    }
 
     // ── Fetch asset inspection records if jobsheet has a linked site ──
     List<Map<String, dynamic>>? assetServiceRecords;
@@ -1360,7 +1211,6 @@ class PDFService {
     final data = JobsheetPdfData(
       jobsheetJson: jobsheet.toJson(),
       logoBytes: logoBytes,
-      brandingConfigJson: brandingConfig.toJson(),
       headerConfigJson: headerConfig.toJson(),
       footerConfigJson: footerConfig.toJson(),
       colourSchemeValue: colourScheme.primaryColorValue,
@@ -1370,8 +1220,6 @@ class PDFService {
       settingsPhone: settings.phone,
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
-      italicFontBytes: italicFontBytes,
-      boldItalicFontBytes: boldItalicFontBytes,
       assetServiceRecords: assetServiceRecords,
     );
 

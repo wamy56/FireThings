@@ -152,24 +152,6 @@ class FirestoreSyncService {
     }
   }
 
-  Future<void> syncPdfBrandingConfig(String jsonString, PdfDocumentType type) async {
-    try {
-      final uid = _uid;
-      if (uid == null) return;
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('pdf_config')
-          .doc('branding_v2_${type.name}')
-          .set({
-        'data': jsonString,
-        'lastModifiedAt': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('FirestoreSync: sync pdf branding (${type.name}) failed: $e');
-    }
-  }
-
   // ==================== FULL SYNC (pull on launch) ====================
 
   /// Perform a full bidirectional sync for the current user.

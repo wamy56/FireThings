@@ -18,7 +18,6 @@ import '../saved_sites/saved_sites_screen.dart';
 import '../saved_customers/saved_customers_screen.dart';
 import '../../services/email_service.dart';
 import '../../services/remote_config_service.dart';
-import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
 import '../debug/debug_screen.dart';
 import '../company/create_company_screen.dart';
@@ -28,7 +27,7 @@ import '../company/team_management_screen.dart';
 import 'profile_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'manage_permissions_screen.dart';
-import '../pdf_branding/pdf_branding_hub_screen.dart';
+import '../invoicing/pdf_design_screen.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/tools_disclaimer_gate.dart';
 
@@ -221,7 +220,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Navigator.push(
                     context,
                     adaptivePageRoute(
-                      builder: (_) => const PdfBrandingHubScreen(),
+                      builder: (_) => const PdfDesignScreen(),
                     ),
                   );
                 },
@@ -521,7 +520,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     ];
 
-    if (profile.hasPermission(AppPermission.teamManage)) {
+    if (profile.isDispatcherOrAdmin) {
       tiles.add(_SettingsTileData(
         title: 'Team',
         subtitle: 'Manage team members',

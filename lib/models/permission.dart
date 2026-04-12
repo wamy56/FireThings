@@ -27,6 +27,8 @@ enum AppPermission {
   assetsCreate('assets_create', 'Add Assets', 'Assets'),
   assetsEdit('assets_edit', 'Edit Assets', 'Assets'),
   assetsDelete('assets_delete', 'Delete Assets', 'Assets'),
+  assetsAddPhotos('assets_add_photos', 'Add Asset Photos', 'Assets'),
+  assetsDeletePhotos('assets_delete_photos', 'Delete Asset Photos', 'Assets'),
 
   // Floor Plans
   floorPlansUpload('floor_plans_upload', 'Upload Floor Plans', 'Floor Plans'),
@@ -73,6 +75,8 @@ enum AppPermission {
           assetsCreate.key: true,
           assetsEdit.key: true,
           assetsDelete.key: true,
+          assetsAddPhotos.key: true,
+          assetsDeletePhotos.key: true,
           floorPlansUpload.key: true,
           floorPlansEdit.key: true,
           floorPlansDelete.key: true,
@@ -99,6 +103,8 @@ enum AppPermission {
           assetsCreate.key: true,
           assetsEdit.key: true,
           assetsDelete.key: false,
+          assetsAddPhotos.key: true,
+          assetsDeletePhotos.key: false,
           floorPlansUpload.key: true,
           floorPlansEdit.key: true,
           floorPlansDelete.key: false,

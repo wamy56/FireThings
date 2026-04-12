@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/company.dart';
 import '../../services/company_service.dart';
-import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -12,8 +11,7 @@ import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 import 'team_management_screen.dart';
-import '../../services/pdf_branding_editor_adapter.dart';
-import '../pdf_branding/pdf_branding_hub_screen.dart';
+import 'company_pdf_design_screen.dart';
 import 'company_sites_screen.dart';
 import 'company_customers_screen.dart';
 
@@ -51,10 +49,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
     }
   }
 
-  final _ups = UserProfileService.instance;
-  bool get _canBrand => _ups.hasPermission(AppPermission.pdfBranding);
-  bool get _canEditCompany => _ups.hasPermission(AppPermission.companyEdit);
-  bool get _canDeleteCompany => _ups.hasPermission(AppPermission.companyDelete);
+  bool get _isAdmin => UserProfileService.instance.isAdmin;
 
   @override
   Widget build(BuildContext context) {
@@ -76,21 +71,18 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                     const SizedBox(height: 24),
                     _buildTeamSection(isDark),
                     const SizedBox(height: 24),
-                    if (_ups.hasPermission(AppPermission.sitesEdit) ||
-                        _ups.hasPermission(AppPermission.customersEdit)) ...[
+                    if (_isAdmin || UserProfileService.instance.isDispatcherOrAdmin) ...[
                       _buildSharedDataSection(isDark),
                       const SizedBox(height: 24),
                     ],
-                    if (_canBrand) ...[
+                    if (_isAdmin) ...[
                       _buildPdfBrandingSection(isDark),
                       const SizedBox(height: 24),
                     ],
-                    if (!_canEditCompany && !_canDeleteCompany) _buildLeaveButton(),
-                    if (_canEditCompany) ...[
+                    if (!_isAdmin) _buildLeaveButton(),
+                    if (_isAdmin) ...[
                       _buildEditButton(),
                       const SizedBox(height: 12),
-                    ],
-                    if (_canDeleteCompany) ...[
                       _buildDeleteButton(),
                     ],
                   ],
@@ -172,7 +164,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                   }
                 },
               ),
-              if (_ups.hasPermission(AppPermission.inviteCodeRegenerate))
+              if (_isAdmin)
                 IconButton(
                   icon: Icon(AppIcons.refresh),
                   onPressed: _regenerateInviteCode,
@@ -296,9 +288,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
             Navigator.push(
               context,
               adaptivePageRoute(
-                builder: (_) => PdfBrandingHubScreen(
-                  adapterFactory: () => CompanyBrandingAdapter(_company!.id),
-                ),
+                builder: (_) => CompanyPdfDesignScreen(companyId: _company!.id),
               ),
             );
           },

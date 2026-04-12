@@ -1,6 +1,12 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../models/asset.dart';
+import '../utils/image_utils.dart';
 
 /// CRUD service for assets in the asset register.
 /// Uses basePath pattern: 'users/{uid}' for solo engineers,
@@ -10,6 +16,9 @@ class AssetService {
   static final AssetService instance = AssetService._();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  static const int maxPhotos = 5;
 
   CollectionReference<Map<String, dynamic>> _assetsCol(
       String basePath, String siteId) {
@@ -131,5 +140,144 @@ class AssetService {
       debugPrint('Error suggesting reference: $e');
       return '$prefix-001';
     }
+  }
+
+  /// Upload a photo to an asset. Compresses the image, uploads to Storage,
+  /// and appends the URL to the asset's photoUrls array.
+  /// Returns the download URL, or null if upload fails or max photos reached.
+  Future<String?> uploadAssetPhoto({
+    required String basePath,
+    required String siteId,
+    required String assetId,
+    required Uint8List bytes,
+  }) async {
+    try {
+      // Check current photo count
+      final asset = await getAsset(basePath, siteId, assetId);
+      if (asset == null) {
+        debugPrint('Asset not found');
+        return null;
+      }
+      if (asset.photoUrls.length >= maxPhotos) {
+        debugPrint('Max photos ($maxPhotos) reached');
+        return null;
+      }
+
+      // Compress image
+      final compressed = compressImageBytes(bytes, maxWidth: 1280, quality: 80);
+
+      // Upload to Storage
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final path = '$basePath/sites/$siteId/assets/$assetId/photos/$timestamp.jpg';
+      final url = kIsWeb
+          ? await _uploadViaRestApi(path, compressed)
+          : await _uploadViaSdk(path, compressed);
+
+      // Update asset's photoUrls
+      final updatedUrls = [...asset.photoUrls, url];
+      await _assetsCol(basePath, siteId).doc(assetId).update({
+        'photoUrls': updatedUrls,
+        'updatedAt': DateTime.now().toIso8601String(),
+        'lastModifiedAt': DateTime.now().toIso8601String(),
+      });
+
+      return url;
+    } catch (e) {
+      debugPrint('Error uploading asset photo: $e');
+      return null;
+    }
+  }
+
+  /// Delete a photo from an asset. Removes from Storage and updates photoUrls.
+  Future<bool> deleteAssetPhoto({
+    required String basePath,
+    required String siteId,
+    required String assetId,
+    required String photoUrl,
+  }) async {
+    try {
+      // Get current asset
+      final asset = await getAsset(basePath, siteId, assetId);
+      if (asset == null) return false;
+
+      // Remove URL from array
+      final updatedUrls = asset.photoUrls.where((u) => u != photoUrl).toList();
+      await _assetsCol(basePath, siteId).doc(assetId).update({
+        'photoUrls': updatedUrls,
+        'updatedAt': DateTime.now().toIso8601String(),
+        'lastModifiedAt': DateTime.now().toIso8601String(),
+      });
+
+      // Delete from Storage (best effort - don't fail if storage delete fails)
+      try {
+        final ref = _storage.refFromURL(photoUrl);
+        await ref.delete();
+      } catch (e) {
+        debugPrint('Warning: Failed to delete photo from storage: $e');
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('Error deleting asset photo: $e');
+      return false;
+    }
+  }
+
+  /// Delete all photos for an asset (used when deleting the asset itself).
+  Future<void> deleteAllAssetPhotos({
+    required String basePath,
+    required String siteId,
+    required String assetId,
+  }) async {
+    try {
+      final asset = await getAsset(basePath, siteId, assetId);
+      if (asset == null || asset.photoUrls.isEmpty) return;
+
+      for (final url in asset.photoUrls) {
+        try {
+          final ref = _storage.refFromURL(url);
+          await ref.delete();
+        } catch (e) {
+          debugPrint('Warning: Failed to delete photo: $e');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error deleting all asset photos: $e');
+    }
+  }
+
+  Future<String> _uploadViaSdk(String path, Uint8List bytes) async {
+    final ref = _storage.ref(path);
+    await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+    return await ref.getDownloadURL();
+  }
+
+  Future<String> _uploadViaRestApi(String path, Uint8List bytes) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw Exception('Not signed in');
+
+    final idToken = await user.getIdToken();
+    final bucket = _storage.bucket;
+    final encodedPath = Uri.encodeComponent(path);
+
+    final response = await http.post(
+      Uri.parse(
+        'https://firebasestorage.googleapis.com/v0/b/$bucket/o?uploadType=media&name=$encodedPath',
+      ),
+      headers: {
+        'Authorization': 'Bearer $idToken',
+        'Content-Type': 'image/jpeg',
+      },
+      body: bytes,
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode != 200) {
+      throw Exception('Upload failed (${response.statusCode})');
+    }
+
+    final metadata = jsonDecode(response.body) as Map<String, dynamic>;
+    final token = metadata['downloadTokens'] as String?;
+    if (token == null) throw Exception('No download token in response');
+    return 'https://firebasestorage.googleapis.com/v0/b/$bucket/o/$encodedPath?alt=media&token=$token';
   }
 }

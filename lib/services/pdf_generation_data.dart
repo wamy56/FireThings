@@ -5,9 +5,6 @@ import 'dart:typed_data';
 class JobsheetPdfData {
   final Map<String, dynamic> jobsheetJson;
   final Uint8List? logoBytes;
-  // V2 unified branding config (preferred when present)
-  final Map<String, dynamic>? brandingConfigJson;
-  // V1 legacy fields (kept for backward compat during transition)
   final Map<String, dynamic> headerConfigJson;
   final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
@@ -17,14 +14,11 @@ class JobsheetPdfData {
   final String settingsPhone;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
-  final Uint8List? italicFontBytes;
-  final Uint8List? boldItalicFontBytes;
   final List<Map<String, dynamic>>? assetServiceRecords;
 
   JobsheetPdfData({
     required this.jobsheetJson,
     required this.logoBytes,
-    this.brandingConfigJson,
     required this.headerConfigJson,
     required this.footerConfigJson,
     required this.colourSchemeValue,
@@ -34,8 +28,6 @@ class JobsheetPdfData {
     required this.settingsPhone,
     this.regularFontBytes,
     this.boldFontBytes,
-    this.italicFontBytes,
-    this.boldItalicFontBytes,
     this.assetServiceRecords,
   });
 }
@@ -45,29 +37,21 @@ class InvoicePdfData {
   final Map<String, dynamic> invoiceJson;
   final Map<String, String> paymentDetailsMap;
   final Uint8List? logoBytes;
-  // V2 unified branding config (preferred when present)
-  final Map<String, dynamic>? brandingConfigJson;
-  // V1 legacy fields (kept for backward compat during transition)
   final Map<String, dynamic> headerConfigJson;
   final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
-  final Uint8List? italicFontBytes;
-  final Uint8List? boldItalicFontBytes;
 
   InvoicePdfData({
     required this.invoiceJson,
     required this.paymentDetailsMap,
     required this.logoBytes,
-    this.brandingConfigJson,
     required this.headerConfigJson,
     required this.footerConfigJson,
     required this.colourSchemeValue,
     this.regularFontBytes,
     this.boldFontBytes,
-    this.italicFontBytes,
-    this.boldItalicFontBytes,
   });
 }
 
@@ -122,16 +106,11 @@ class ComplianceReportPdfData {
   final String companyName;
   final String reportDate;
   final Uint8List? logoBytes;
-  // V2 unified branding config (preferred when present)
-  final Map<String, dynamic>? brandingConfigJson;
-  // V1 legacy fields (kept for backward compat during transition)
   final Map<String, dynamic> headerConfigJson;
   final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
-  final Uint8List? italicFontBytes;
-  final Uint8List? boldItalicFontBytes;
   final List<Map<String, dynamic>> assetsJson;
   final List<Map<String, dynamic>> assetTypesJson;
   final List<Map<String, dynamic>> serviceRecordsJson;
@@ -149,14 +128,11 @@ class ComplianceReportPdfData {
     required this.companyName,
     required this.reportDate,
     this.logoBytes,
-    this.brandingConfigJson,
     required this.headerConfigJson,
     required this.footerConfigJson,
     required this.colourSchemeValue,
     this.regularFontBytes,
     this.boldFontBytes,
-    this.italicFontBytes,
-    this.boldItalicFontBytes,
     required this.assetsJson,
     required this.assetTypesJson,
     required this.serviceRecordsJson,

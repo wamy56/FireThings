@@ -287,7 +287,7 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
         lastServiceByName:
             _isEditing ? widget.asset!.lastServiceByName : null,
         nextServiceDue: _isEditing ? widget.asset!.nextServiceDue : null,
-        photoUrl: _isEditing ? widget.asset!.photoUrl : null,
+        photoUrls: _isEditing ? widget.asset!.photoUrls : const [],
       );
 
       if (_isEditing) {

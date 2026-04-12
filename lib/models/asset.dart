@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// Represents a fire safety asset (detector, call point, extinguisher, etc.)
 /// belonging to a site's asset register.
 class Asset {
@@ -30,7 +32,7 @@ class Asset {
   final String? lastServiceBy;
   final String? lastServiceByName;
   final DateTime? nextServiceDue;
-  final String? photoUrl;
+  final List<String> photoUrls;
   final String createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -62,7 +64,7 @@ class Asset {
     this.lastServiceBy,
     this.lastServiceByName,
     this.nextServiceDue,
-    this.photoUrl,
+    this.photoUrls = const [],
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
@@ -96,7 +98,7 @@ class Asset {
       'lastServiceBy': lastServiceBy,
       'lastServiceByName': lastServiceByName,
       'nextServiceDue': nextServiceDue?.toIso8601String(),
-      'photoUrl': photoUrl,
+      'photoUrls': photoUrls,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -142,7 +144,7 @@ class Asset {
       nextServiceDue: json['nextServiceDue'] != null
           ? DateTime.tryParse(json['nextServiceDue'] as String)
           : null,
-      photoUrl: json['photoUrl'] as String?,
+      photoUrls: _parsePhotoUrls(json),
       createdBy: json['createdBy'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
@@ -151,6 +153,32 @@ class Asset {
           ? DateTime.tryParse(json['lastModifiedAt'] as String)
           : null,
     );
+  }
+
+  /// Parse photoUrls from JSON, handling both:
+  /// - String (from SQLite, JSON-encoded)
+  /// - List (from Firestore, direct)
+  /// - Old single photoUrl field (migration)
+  static List<String> _parsePhotoUrls(Map<String, dynamic> json) {
+    final photoUrls = json['photoUrls'];
+    if (photoUrls == null) {
+      // Migration: convert old single photoUrl to list
+      final legacyUrl = json['photoUrl'] as String?;
+      return legacyUrl != null ? [legacyUrl] : const [];
+    }
+    if (photoUrls is String) {
+      // From SQLite: JSON-encoded string
+      try {
+        return List<String>.from(jsonDecode(photoUrls) as List);
+      } catch (_) {
+        return const [];
+      }
+    }
+    if (photoUrls is List) {
+      // From Firestore: direct list
+      return photoUrls.map((e) => e as String).toList();
+    }
+    return const [];
   }
 
   Asset copyWith({
@@ -178,7 +206,7 @@ class Asset {
     String? lastServiceBy,
     String? lastServiceByName,
     DateTime? nextServiceDue,
-    String? photoUrl,
+    List<String>? photoUrls,
     String? createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -211,7 +239,7 @@ class Asset {
       lastServiceBy: lastServiceBy ?? this.lastServiceBy,
       lastServiceByName: lastServiceByName ?? this.lastServiceByName,
       nextServiceDue: nextServiceDue ?? this.nextServiceDue,
-      photoUrl: photoUrl ?? this.photoUrl,
+      photoUrls: photoUrls ?? this.photoUrls,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

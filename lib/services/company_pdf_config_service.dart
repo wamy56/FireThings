@@ -1,11 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import '../models/pdf_branding_config.dart';
 import '../models/pdf_header_config.dart';
 import '../models/pdf_footer_config.dart';
 import '../models/pdf_colour_scheme.dart';
 import 'branding_service.dart';
-import 'pdf_branding_config_service.dart';
 import 'pdf_header_config_service.dart';
 import 'pdf_footer_config_service.dart';
 import 'pdf_colour_scheme_service.dart';
@@ -24,7 +22,6 @@ class CompanyPdfConfigService {
   final Map<String, PdfFooterConfig> _footerCache = {};
   final Map<String, PdfColourScheme> _colourCache = {};
   final Map<String, Uint8List> _logoCache = {};
-  final Map<String, PdfBrandingConfig> _brandingCache = {};
 
   String _cacheKey(String companyId, PdfDocumentType type) =>
       '${companyId}_${type.name}';
@@ -201,59 +198,12 @@ class CompanyPdfConfigService {
     return BrandingService.getLogoBytes(type);
   }
 
-  // --- Branding Config V2 ---
-
-  String _brandingDocId(PdfDocumentType type) => 'branding_v2_${type.name}';
-
-  Future<PdfBrandingConfig?> getBrandingConfig(String companyId, PdfDocumentType type) async {
-    final key = _cacheKey(companyId, type);
-    if (_brandingCache.containsKey(key)) return _brandingCache[key];
-
-    try {
-      final doc = await _configDoc(companyId, _brandingDocId(type)).get();
-      if (doc.exists) {
-        final data = doc.data() as Map<String, dynamic>?;
-        if (data != null && data['config'] is String) {
-          final config = PdfBrandingConfig.fromJsonString(data['config'] as String);
-          _brandingCache[key] = config;
-          return config;
-        }
-      }
-    } catch (e) {
-      debugPrint('CompanyPdfConfigService: getBrandingConfig failed: $e');
-    }
-    return null;
-  }
-
-  Future<void> saveBrandingConfig(String companyId, PdfBrandingConfig config, PdfDocumentType type) async {
-    final key = _cacheKey(companyId, type);
-    _brandingCache[key] = config;
-    await _configDoc(companyId, _brandingDocId(type)).set({
-      'config': config.toJsonString(),
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
-  }
-
-  /// Get effective branding config: company config if applicable, else personal.
-  Future<PdfBrandingConfig> getEffectiveBrandingConfig(
-    PdfDocumentType type, {
-    bool useCompanyBranding = false,
-  }) async {
-    final companyId = UserProfileService.instance.companyId;
-    if (companyId != null && useCompanyBranding) {
-      final companyConfig = await getBrandingConfig(companyId, type);
-      if (companyConfig != null) return companyConfig;
-    }
-    return PdfBrandingConfigService.getConfig(type);
-  }
-
   /// Clear cached config (e.g. on company change)
   void clearCache() {
     _headerCache.clear();
     _footerCache.clear();
     _colourCache.clear();
     _logoCache.clear();
-    _brandingCache.clear();
   }
 
   // --- B2: Effective config resolution ---

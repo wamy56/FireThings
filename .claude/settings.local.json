@@ -15,7 +15,9 @@
       "WebFetch(domain:github.com)",
       "Bash(xargs grep:*)",
       "Bash(python3:*)",
-      "Bash(firebase deploy:*)"
+      "Bash(firebase deploy:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
