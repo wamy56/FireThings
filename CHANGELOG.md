@@ -4,6 +4,25 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-12 (Session 69)
+
+### UI: Permission Toggle Colors Changed to Blue
+
+Changed the toggle switch colors on the "Edit Permissions" screen from orange to blue to better match the app's primary color scheme.
+
+**Changes:**
+- Light mode: Uses `AppTheme.primaryBlue` (Deep Navy #1E3A5F)
+- Dark mode: Uses `AppTheme.darkPrimaryBlue` (#3D7AC7)
+
+**Files Modified:**
+- `lib/screens/company/member_permissions_screen.dart` — Changed `activeTrackColor` and `activeThumbColor` from `accentOrange` to theme-aware blue
+
+**Result:**
+- Permission toggles now display in blue on both mobile app and web dispatch portal
+- Consistent with primary brand colors across light and dark themes
+
+---
+
 ## 2026-04-12 (Session 68)
 
 ### UI: Added Icons for Weekly Test & Emergency Lighting Templates

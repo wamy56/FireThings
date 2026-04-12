@@ -234,8 +234,8 @@ class _MemberPermissionsScreenState extends State<MemberPermissionsScreen> {
                               _hasChanges = true;
                             });
                           },
-                    activeTrackColor: AppTheme.accentOrange.withValues(alpha: 0.5),
-                    activeThumbColor: AppTheme.accentOrange,
+                    activeTrackColor: (isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue).withValues(alpha: 0.5),
+                    activeThumbColor: isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue,
                   ),
                   if (!isLast)
                     Divider(height: 1, indent: 16, endIndent: 16),
