@@ -821,6 +821,10 @@ class AppTheme {
         return const Color(0xFF009688); // Teal
       case 'fault_finding':
         return errorRed;
+      case 'weekly_test':
+        return const Color(0xFF2196F3); // Blue
+      case 'emergency_lighting_annual':
+        return const Color(0xFFFFC107); // Amber (for lighting)
       default:
         return mediumGrey;
     }

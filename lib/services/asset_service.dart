@@ -6,7 +6,6 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/asset.dart';
-import '../utils/image_utils.dart';
 
 /// CRUD service for assets in the asset register.
 /// Uses basePath pattern: 'users/{uid}' for solo engineers,
@@ -163,15 +162,12 @@ class AssetService {
         return null;
       }
 
-      // Compress image
-      final compressed = compressImageBytes(bytes, maxWidth: 1280, quality: 80);
-
-      // Upload to Storage
+      // Upload to Storage (compression already done by caller)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final path = '$basePath/sites/$siteId/assets/$assetId/photos/$timestamp.jpg';
       final url = kIsWeb
-          ? await _uploadViaRestApi(path, compressed)
-          : await _uploadViaSdk(path, compressed);
+          ? await _uploadViaRestApi(path, bytes)
+          : await _uploadViaSdk(path, bytes);
 
       // Update asset's photoUrls
       final updatedUrls = [...asset.photoUrls, url];

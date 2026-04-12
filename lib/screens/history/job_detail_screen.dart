@@ -244,10 +244,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               ],
             ),
             const Divider(height: 24),
+            // Regular fields (excluding signatures and repeat groups)
             ..._jobsheet.formData.entries
-                .where((entry) => !(entry.key.contains('signature') &&
-                    entry.value is String &&
-                    (entry.value as String).startsWith('data:image/png;base64,')))
+                .where((entry) =>
+                    entry.value is! List &&
+                    !(entry.key.contains('signature') &&
+                        entry.value is String &&
+                        (entry.value as String).startsWith('data:image/png;base64,')))
                 .map((entry) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
@@ -279,6 +282,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 ),
               );
             }),
+            // Repeat group fields
+            ..._jobsheet.formData.entries
+                .where((entry) => entry.value is List)
+                .map((entry) => _buildRepeatGroupDisplay(
+                      entry.key,
+                      _jobsheet.fieldLabels[entry.key] ?? _formatFieldLabel(entry.key),
+                      entry.value as List,
+                    )),
             ..._jobsheet.formData.entries
                 .where((entry) =>
                     entry.key.contains('signature') &&
@@ -594,6 +605,122 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       if (!context.mounted) return;
       context.showErrorToast('Error sharing PDF: $e');
     }
+  }
+
+  Widget _buildRepeatGroupDisplay(String groupKey, String label, List entries) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(AppIcons.element, color: AppTheme.primaryBlue, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${entries.length}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.primaryBlue,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...entries.asMap().entries.map((mapEntry) {
+            final index = mapEntry.key;
+            final entry = mapEntry.value as Map<String, dynamic>;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: isDark ? AppTheme.darkSurface : Colors.white,
+                borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                boxShadow: AppTheme.cardShadow,
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.grey.withValues(alpha: 0.15),
+                ),
+              ),
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  initiallyExpanded: index == 0,
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  title: Text(
+                    '#${index + 1}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primaryBlue,
+                    ),
+                  ),
+                  children: entry.entries
+                      .where((e) => e.key != '_entryId')
+                      .map((childEntry) {
+                    final childLabel =
+                        _jobsheet.fieldLabels['$groupKey.${childEntry.key}'] ??
+                            _formatFieldLabel(childEntry.key);
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              childLabel,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              _formatFieldValue(childEntry.value),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
   }
 
   String _formatFieldLabel(String key) {

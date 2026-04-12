@@ -1,7 +1,13 @@
+import 'dart:typed_data';
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show compute, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/asset.dart';
+import '../utils/image_utils.dart';
+import '../utils/image_compress_stub.dart'
+    if (dart.library.html) '../utils/image_compress_web.dart' as web_compress;
 import '../models/permission.dart';
 import '../services/asset_service.dart';
 import '../services/user_profile_service.dart';
@@ -81,16 +87,31 @@ class _AssetPhotoGalleryState extends State<AssetPhotoGallery> {
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
-        maxWidth: 1280,
-        maxHeight: 1280,
-        imageQuality: 80,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 90,
       );
 
       if (image == null) return;
 
       setState(() => _isUploading = true);
 
-      final bytes = await image.readAsBytes();
+      Uint8List bytes = await image.readAsBytes();
+
+      // Platform-aware compression (web uses Canvas API, mobile uses isolate)
+      if (kIsWeb) {
+        bytes = await web_compress.compressImageBytesWeb(
+          bytes,
+          maxWidth: 1280,
+          quality: 0.80,
+        );
+      } else {
+        bytes = await compute(
+          (Uint8List b) => compressImageBytes(b, maxWidth: 1280, quality: 80),
+          bytes,
+        );
+      }
+
       final url = await AssetService.instance.uploadAssetPhoto(
         basePath: widget.basePath,
         siteId: widget.siteId,

@@ -1076,8 +1076,14 @@ class ComplianceReportService {
     final defectPhotoEntries = await Future.wait(
       openDefectsWithPhotos.expand((defect) => defect.photoUrls.take(1).map((url) async {
         try {
-          final ref = _storage.refFromURL(url);
-          final bytes = await _downloadBytes(ref, 2 * 1024 * 1024);
+          Uint8List? bytes;
+          if (kIsWeb && url.isNotEmpty) {
+            final response = await http.get(Uri.parse(url));
+            if (response.statusCode == 200) bytes = response.bodyBytes;
+          } else {
+            final ref = _storage.refFromURL(url);
+            bytes = await _downloadBytes(ref, 2 * 1024 * 1024);
+          }
           return bytes != null ? MapEntry(url.hashCode.toString(), bytes) : null;
         } catch (e) {
           debugPrint('Failed to download defect photo: $e');
@@ -1099,8 +1105,14 @@ class ComplianceReportService {
       final legacyEntries = await Future.wait(
         failedRecords.expand((record) => record.defectPhotoUrls.take(1).map((url) async {
           try {
-            final ref = _storage.refFromURL(url);
-            final bytes = await _downloadBytes(ref, 2 * 1024 * 1024);
+            Uint8List? bytes;
+            if (kIsWeb && url.isNotEmpty) {
+              final response = await http.get(Uri.parse(url));
+              if (response.statusCode == 200) bytes = response.bodyBytes;
+            } else {
+              final ref = _storage.refFromURL(url);
+              bytes = await _downloadBytes(ref, 2 * 1024 * 1024);
+            }
             return bytes != null ? MapEntry(url.hashCode.toString(), bytes) : null;
           } catch (e) {
             debugPrint('Failed to download defect photo: $e');

@@ -760,6 +760,10 @@ class _NewJobScreenState extends State<NewJobScreen> {
         return AppIcons.settingOutline;
       case 'fault_finding':
         return AppIcons.designtools;
+      case 'weekly_test':
+        return AppIcons.clipboard;
+      case 'emergency_lighting_annual':
+        return AppIcons.lamp;
       default:
         return AppIcons.briefcaseOutline;
     }

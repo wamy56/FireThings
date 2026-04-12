@@ -134,7 +134,24 @@ class _JobFormScreenState extends State<JobFormScreen> {
       _systemCategoryController.text = job.systemCategory!;
     }
     if (job.scheduledDate != null) {
-      _selectedDate = job.scheduledDate!;
+      DateTime date = job.scheduledDate!;
+      if (job.scheduledTime != null) {
+        final timeParts = job.scheduledTime!.split(':');
+        if (timeParts.length >= 2) {
+          date = DateTime(
+            date.year,
+            date.month,
+            date.day,
+            int.tryParse(timeParts[0]) ?? 0,
+            int.tryParse(timeParts[1]) ?? 0,
+          );
+        }
+      } else {
+        // No scheduled time - default to current time
+        final now = DateTime.now();
+        date = DateTime(date.year, date.month, date.day, now.hour, now.minute);
+      }
+      _selectedDate = date;
     }
   }
 

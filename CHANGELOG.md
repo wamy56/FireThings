@@ -4,6 +4,45 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-12 (Session 68)
+
+### UI: Added Icons for Weekly Test & Emergency Lighting Templates
+
+Added distinct icons and colors for two jobsheet templates that were using default styling.
+
+**Changes:**
+- Weekly Test: clipboard icon with blue background (#2196F3)
+- Emergency Lighting Annual Test: lamp icon with amber background (#FFC107)
+
+**Files Modified:**
+- `lib/screens/new_job/new_job_screen.dart` — Added icon cases in `_getTemplateIcon()`
+- `lib/utils/theme.dart` — Added color cases in `getTemplateColor()`
+
+---
+
+## 2026-04-12 (Session 67)
+
+### Bug Fix: Compliance Report Defect Photos Not Showing on Web
+
+Fixed an issue where defect photos appeared correctly in compliance reports generated on mobile but were missing when generated on the web portal.
+
+**Root Cause:**
+- Floor plan downloads had special `kIsWeb` handling using direct HTTP GET
+- Defect photo downloads used `_downloadBytes` which fails silently on web due to redundant URL resolution and no timeout
+
+**Fix:**
+- Added `kIsWeb` guard to defect photo download, using the URL directly with `http.get()` on web (matching floor plan pattern)
+- Applied same fix to legacy defect photos section
+
+**Files Modified:**
+- `lib/services/compliance_report_service.dart` — Added web-specific HTTP GET path for both defect photo download sections (lines ~1076 and ~1105)
+
+**Result:**
+- Defect photos now appear correctly in compliance reports generated on web portal
+- Mobile behavior unchanged
+
+---
+
 ## 2026-04-12 (Session 66)
 
 ### Web Portal Max-Width Container Fixes
