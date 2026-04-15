@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import '../../models/pdf_header_config.dart';
 import '../../models/pdf_footer_config.dart';
 import '../../models/pdf_colour_scheme.dart';
+import '../../models/pdf_section_style_config.dart';
+import '../../models/pdf_typography_config.dart';
 import '../../services/company_pdf_config_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
@@ -36,6 +38,10 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
   PdfFooterConfig? _invoiceFooter;
   PdfColourScheme? _jobsheetColour;
   PdfColourScheme? _invoiceColour;
+  PdfSectionStyleConfig? _jobsheetSectionStyle;
+  PdfSectionStyleConfig? _invoiceSectionStyle;
+  PdfTypographyConfig? _jobsheetTypography;
+  PdfTypographyConfig? _invoiceTypography;
 
   @override
   void initState() {
@@ -51,6 +57,10 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
       _service.getFooterConfig(widget.companyId, PdfDocumentType.invoice),
       _service.getColourScheme(widget.companyId, PdfDocumentType.jobsheet),
       _service.getColourScheme(widget.companyId, PdfDocumentType.invoice),
+      _service.getSectionStyleConfig(widget.companyId, PdfDocumentType.jobsheet),
+      _service.getSectionStyleConfig(widget.companyId, PdfDocumentType.invoice),
+      _service.getTypographyConfig(widget.companyId, PdfDocumentType.jobsheet),
+      _service.getTypographyConfig(widget.companyId, PdfDocumentType.invoice),
     ]);
 
     if (mounted) {
@@ -61,6 +71,10 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
         _invoiceFooter = results[3] as PdfFooterConfig?;
         _jobsheetColour = results[4] as PdfColourScheme?;
         _invoiceColour = results[5] as PdfColourScheme?;
+        _jobsheetSectionStyle = results[6] as PdfSectionStyleConfig?;
+        _invoiceSectionStyle = results[7] as PdfSectionStyleConfig?;
+        _jobsheetTypography = results[8] as PdfTypographyConfig?;
+        _invoiceTypography = results[9] as PdfTypographyConfig?;
         _isLoading = false;
       });
     }
@@ -116,6 +130,22 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
                   _jobsheetColour != null ? 'Configured' : 'Not set (uses personal)',
                   () => _editColourScheme(PdfDocumentType.jobsheet),
                 ),
+                const SizedBox(height: 8),
+                _buildConfigCard(
+                  isDark,
+                  'Section Style',
+                  AppIcons.layout,
+                  _jobsheetSectionStyle != null ? 'Configured' : 'Not set (uses personal)',
+                  () => _editSectionStyle(PdfDocumentType.jobsheet),
+                ),
+                const SizedBox(height: 8),
+                _buildConfigCard(
+                  isDark,
+                  'Typography',
+                  AppIcons.text,
+                  _jobsheetTypography != null ? 'Configured' : 'Not set (uses personal)',
+                  () => _editTypography(PdfDocumentType.jobsheet),
+                ),
 
                 const SizedBox(height: 32),
 
@@ -144,6 +174,22 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
                   AppIcons.colorSwatch,
                   _invoiceColour != null ? 'Configured' : 'Not set (uses personal)',
                   () => _editColourScheme(PdfDocumentType.invoice),
+                ),
+                const SizedBox(height: 8),
+                _buildConfigCard(
+                  isDark,
+                  'Section Style',
+                  AppIcons.layout,
+                  _invoiceSectionStyle != null ? 'Configured' : 'Not set (uses personal)',
+                  () => _editSectionStyle(PdfDocumentType.invoice),
+                ),
+                const SizedBox(height: 8),
+                _buildConfigCard(
+                  isDark,
+                  'Typography',
+                  AppIcons.text,
+                  _invoiceTypography != null ? 'Configured' : 'Not set (uses personal)',
+                  () => _editTypography(PdfDocumentType.invoice),
                 ),
 
                 const SizedBox(height: 40),
@@ -240,6 +286,44 @@ class _CompanyPdfDesignScreenState extends State<CompanyPdfDesignScreen> {
           docType: type,
           initialScheme: config,
           title: 'Company $typeName Colours',
+        ),
+      ),
+    );
+    _loadConfigs();
+  }
+
+  Future<void> _editSectionStyle(PdfDocumentType type) async {
+    final typeName = type == PdfDocumentType.jobsheet ? 'Jobsheet' : 'Invoice';
+    final current = type == PdfDocumentType.jobsheet ? _jobsheetSectionStyle : _invoiceSectionStyle;
+    final config = current ?? PdfSectionStyleConfig.defaults();
+
+    await Navigator.push(
+      context,
+      adaptivePageRoute(
+        builder: (_) => _CompanySectionStyleEditorScreen(
+          companyId: widget.companyId,
+          docType: type,
+          initialConfig: config,
+          title: 'Company $typeName Section Style',
+        ),
+      ),
+    );
+    _loadConfigs();
+  }
+
+  Future<void> _editTypography(PdfDocumentType type) async {
+    final typeName = type == PdfDocumentType.jobsheet ? 'Jobsheet' : 'Invoice';
+    final current = type == PdfDocumentType.jobsheet ? _jobsheetTypography : _invoiceTypography;
+    final config = current ?? PdfTypographyConfig.defaults();
+
+    await Navigator.push(
+      context,
+      adaptivePageRoute(
+        builder: (_) => _CompanyTypographyEditorScreen(
+          companyId: widget.companyId,
+          docType: type,
+          initialConfig: config,
+          title: 'Company $typeName Typography',
         ),
       ),
     );
@@ -1755,6 +1839,491 @@ class _CompanyColourEditorState extends State<_CompanyColourEditorScreen> {
       selectedPrimaryColorValue: _scheme.primaryColorValue,
       isDark: isDark,
       onPresetSelected: _selectPreset,
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECTION STYLE EDITOR
+// ═══════════════════════════════════════════════════════════════════
+
+class _CompanySectionStyleEditorScreen extends StatefulWidget {
+  final String companyId;
+  final PdfDocumentType docType;
+  final PdfSectionStyleConfig initialConfig;
+  final String title;
+
+  const _CompanySectionStyleEditorScreen({
+    required this.companyId,
+    required this.docType,
+    required this.initialConfig,
+    required this.title,
+  });
+
+  @override
+  State<_CompanySectionStyleEditorScreen> createState() =>
+      _CompanySectionStyleEditorState();
+}
+
+class _CompanySectionStyleEditorState
+    extends State<_CompanySectionStyleEditorScreen> {
+  late PdfSectionStyleConfig _config;
+
+  @override
+  void initState() {
+    super.initState();
+    _config = widget.initialConfig;
+  }
+
+  Future<void> _save() async {
+    await CompanyPdfConfigService.instance.saveSectionStyleConfig(
+      widget.companyId,
+      _config,
+      widget.docType,
+    );
+    if (!mounted) return;
+    context.showSuccessToast('Section style saved');
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      appBar: AdaptiveNavigationBar(
+        title: widget.title,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: AnimatedSaveButton(
+              label: 'Save',
+              onPressed: _save,
+              outlined: true,
+            ),
+          ),
+        ],
+      ),
+      body: KeyboardDismissWrapper(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 750),
+            child: ListView(
+              padding: const EdgeInsets.all(AppTheme.screenPadding),
+              children: [
+                // Card Style
+                _buildSectionTitle('CARD STYLE', isDark),
+                const SizedBox(height: 8),
+                _buildCardStyleSelector(isDark),
+
+                const SizedBox(height: 24),
+
+                // Corner Radius
+                _buildSectionTitle('CORNER RADIUS', isDark),
+                const SizedBox(height: 8),
+                _buildCornerRadiusSelector(isDark),
+
+                const SizedBox(height: 24),
+
+                // Header Style
+                _buildSectionTitle('HEADER STYLE', isDark),
+                const SizedBox(height: 8),
+                _buildHeaderStyleSelector(isDark),
+
+                const SizedBox(height: 24),
+
+                // Spacing
+                _buildSectionTitle('SECTION SPACING', isDark),
+                const SizedBox(height: 8),
+                _buildSlider(
+                  value: _config.sectionSpacing,
+                  min: 6,
+                  max: 24,
+                  divisions: 6,
+                  onChanged: (value) {
+                    setState(() {
+                      _config = _config.copyWith(sectionSpacing: value);
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 24),
+
+                // Inner Padding
+                _buildSectionTitle('INNER PADDING', isDark),
+                const SizedBox(height: 8),
+                _buildSlider(
+                  value: _config.innerPadding,
+                  min: 8,
+                  max: 20,
+                  divisions: 6,
+                  onChanged: (value) {
+                    setState(() {
+                      _config = _config.copyWith(innerPadding: value);
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title, bool isDark) {
+    return Text(
+      title,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+        letterSpacing: 1,
+      ),
+    );
+  }
+
+  Widget _buildCardStyleSelector(bool isDark) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: SectionCardStyle.values.map((style) {
+        final isSelected = _config.cardStyle == style;
+        return ChoiceChip(
+          label: Text(_cardStyleLabel(style)),
+          selected: isSelected,
+          onSelected: (_) {
+            setState(() {
+              _config = _config.copyWith(cardStyle: style);
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  String _cardStyleLabel(SectionCardStyle style) {
+    switch (style) {
+      case SectionCardStyle.bordered:
+        return 'Bordered';
+      case SectionCardStyle.shadowed:
+        return 'Shadowed';
+      case SectionCardStyle.elevated:
+        return 'Elevated';
+      case SectionCardStyle.flat:
+        return 'Flat';
+    }
+  }
+
+  Widget _buildCornerRadiusSelector(bool isDark) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: SectionCornerRadius.values.map((radius) {
+        final isSelected = _config.cornerRadius == radius;
+        return ChoiceChip(
+          label: Text(_cornerRadiusLabel(radius)),
+          selected: isSelected,
+          onSelected: (_) {
+            setState(() {
+              _config = _config.copyWith(cornerRadius: radius);
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  String _cornerRadiusLabel(SectionCornerRadius radius) {
+    switch (radius) {
+      case SectionCornerRadius.small:
+        return 'Small (${radius.pixels.toInt()}px)';
+      case SectionCornerRadius.medium:
+        return 'Medium (${radius.pixels.toInt()}px)';
+      case SectionCornerRadius.large:
+        return 'Large (${radius.pixels.toInt()}px)';
+    }
+  }
+
+  Widget _buildHeaderStyleSelector(bool isDark) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: SectionHeaderStyle.values.map((style) {
+        final isSelected = _config.headerStyle == style;
+        return ChoiceChip(
+          label: Text(_headerStyleLabel(style)),
+          selected: isSelected,
+          onSelected: (_) {
+            setState(() {
+              _config = _config.copyWith(headerStyle: style);
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  String _headerStyleLabel(SectionHeaderStyle style) {
+    switch (style) {
+      case SectionHeaderStyle.fullWidth:
+        return 'Full Width';
+      case SectionHeaderStyle.leftAccent:
+        return 'Left Accent';
+      case SectionHeaderStyle.underlined:
+        return 'Underlined';
+    }
+  }
+
+  Widget _buildSlider({
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ),
+        SizedBox(
+          width: 50,
+          child: Text(
+            '${value.toInt()}px',
+            style: const TextStyle(fontSize: 14),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TYPOGRAPHY EDITOR
+// ═══════════════════════════════════════════════════════════════════
+
+class _CompanyTypographyEditorScreen extends StatefulWidget {
+  final String companyId;
+  final PdfDocumentType docType;
+  final PdfTypographyConfig initialConfig;
+  final String title;
+
+  const _CompanyTypographyEditorScreen({
+    required this.companyId,
+    required this.docType,
+    required this.initialConfig,
+    required this.title,
+  });
+
+  @override
+  State<_CompanyTypographyEditorScreen> createState() =>
+      _CompanyTypographyEditorState();
+}
+
+class _CompanyTypographyEditorState
+    extends State<_CompanyTypographyEditorScreen> {
+  late PdfTypographyConfig _config;
+
+  @override
+  void initState() {
+    super.initState();
+    _config = widget.initialConfig;
+  }
+
+  Future<void> _save() async {
+    await CompanyPdfConfigService.instance.saveTypographyConfig(
+      widget.companyId,
+      _config,
+      widget.docType,
+    );
+    if (!mounted) return;
+    context.showSuccessToast('Typography settings saved');
+    Navigator.pop(context);
+  }
+
+  void _resetToDefaults() {
+    setState(() {
+      _config = PdfTypographyConfig.defaults();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Scaffold(
+      appBar: AdaptiveNavigationBar(
+        title: widget.title,
+        actions: [
+          IconButton(
+            icon: Icon(AppIcons.refresh),
+            onPressed: _resetToDefaults,
+            tooltip: 'Reset to defaults',
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: AnimatedSaveButton(
+              label: 'Save',
+              onPressed: _save,
+              outlined: true,
+            ),
+          ),
+        ],
+      ),
+      body: KeyboardDismissWrapper(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 750),
+            child: ListView(
+              padding: const EdgeInsets.all(AppTheme.screenPadding),
+              children: [
+                Text(
+                  'Adjust font sizes throughout your PDF documents.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark
+                        ? AppTheme.darkTextSecondary
+                        : AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                _buildFontSizeSlider(
+                  title: 'Section Headers',
+                  value: _config.sectionHeaderSize,
+                  min: 8,
+                  max: 16,
+                  onChanged: (value) {
+                    setState(() {
+                      _config = _config.copyWith(sectionHeaderSize: value);
+                    });
+                  },
+                ),
+
+                _buildFontSizeSlider(
+                  title: 'Field Labels',
+                  value: _config.fieldLabelSize,
+                  min: 6,
+                  max: 12,
+                  onChanged: (value) {
+                    setState(() {
+                      _config = _config.copyWith(fieldLabelSize: value);
+                    });
+                  },
+                ),
+
+                _buildFontSizeSlider(
+                  title: 'Field Values',
+                  value: _config.fieldValueSize,
+                  min: 8,
+                  max: 14,
+                  onChanged: (value) {
+                    setState(() {
+                      _config = _config.copyWith(fieldValueSize: value);
+                    });
+                  },
+                ),
+
+                _buildFontSizeSlider(
+                  title: 'Table Headers',
+                  value: _config.tableHeaderSize,
+                  min: 7,
+                  max: 12,
+                  onChanged: (value) {
+                    setState(() {
+                      _config = _config.copyWith(tableHeaderSize: value);
+                    });
+                  },
+                ),
+
+                _buildFontSizeSlider(
+                  title: 'Table Body',
+                  value: _config.tableBodySize,
+                  min: 7,
+                  max: 12,
+                  onChanged: (value) {
+                    setState(() {
+                      _config = _config.copyWith(tableBodySize: value);
+                    });
+                  },
+                ),
+
+                _buildFontSizeSlider(
+                  title: 'Footer Text',
+                  value: _config.footerSize,
+                  min: 6,
+                  max: 10,
+                  onChanged: (value) {
+                    setState(() {
+                      _config = _config.copyWith(footerSize: value);
+                    });
+                  },
+                ),
+
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFontSizeSlider({
+    required String title,
+    required double value,
+    required double min,
+    required double max,
+    required ValueChanged<double> onChanged,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color:
+                      isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                ),
+              ),
+              Text(
+                '${value.toInt()}pt',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primaryBlue,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Slider(
+            value: value,
+            min: min,
+            max: max,
+            divisions: (max - min).toInt(),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 }

@@ -6,6 +6,8 @@ import '../../utils/icon_map.dart';
 import '../settings/pdf_header_designer_screen.dart';
 import '../settings/pdf_footer_designer_screen.dart';
 import '../settings/pdf_colour_scheme_screen.dart';
+import '../settings/pdf_section_style_screen.dart';
+import '../settings/pdf_typography_screen.dart';
 import '../../widgets/adaptive_app_bar.dart';
 
 class PdfDesignScreen extends StatelessWidget {
@@ -87,6 +89,34 @@ class PdfDesignScreen extends StatelessWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 8),
+            _buildConfigCard(
+              context,
+              isDark,
+              'Section Style',
+              AppIcons.layout,
+              'Customise section cards and spacing',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfSectionStyleScreen(docType: PdfDocumentType.jobsheet),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildConfigCard(
+              context,
+              isDark,
+              'Typography',
+              AppIcons.text,
+              'Adjust font sizes throughout the document',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfTypographyScreen(docType: PdfDocumentType.jobsheet),
+                ),
+              ),
+            ),
           ],
 
           if (docType == null) const SizedBox(height: 32),
@@ -133,6 +163,34 @@ class PdfDesignScreen extends StatelessWidget {
                 context,
                 adaptivePageRoute(
                   builder: (_) => PdfColourSchemeScreen(docType: PdfDocumentType.invoice),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildConfigCard(
+              context,
+              isDark,
+              'Section Style',
+              AppIcons.layout,
+              'Customise section cards and spacing',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfSectionStyleScreen(docType: PdfDocumentType.invoice),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildConfigCard(
+              context,
+              isDark,
+              'Typography',
+              AppIcons.text,
+              'Adjust font sizes throughout the document',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => PdfTypographyScreen(docType: PdfDocumentType.invoice),
                 ),
               ),
             ),

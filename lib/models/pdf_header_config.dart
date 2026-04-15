@@ -13,6 +13,24 @@ enum LogoSize {
   const LogoSize(this.pixels);
 }
 
+/// Header visual style
+enum HeaderStyle {
+  classic, // Bottom border only, white background (current look)
+  modern, // Solid primary background with rounded bottom corners
+  minimal, // No border, clean separation with extra padding
+}
+
+/// Corner radius options for modern header
+enum HeaderCornerRadius {
+  none(0),
+  small(8),
+  medium(12),
+  large(16);
+
+  final double pixels;
+  const HeaderCornerRadius(this.pixels);
+}
+
 class HeaderTextLine {
   final String key;
   final String value;
@@ -59,15 +77,23 @@ class PdfHeaderConfig {
   final LogoSize logoSize;
   final List<HeaderTextLine> leftLines;
   final List<HeaderTextLine> centreLines;
+  final HeaderStyle headerStyle;
+  final HeaderCornerRadius cornerRadius;
+  final double verticalPadding;
+  final double horizontalPadding;
 
   const PdfHeaderConfig({
     required this.logoZone,
     required this.logoSize,
     required this.leftLines,
     required this.centreLines,
+    this.headerStyle = HeaderStyle.modern,
+    this.cornerRadius = HeaderCornerRadius.medium,
+    this.verticalPadding = 16,
+    this.horizontalPadding = 24,
   });
 
-  /// Default config matching the current hardcoded layout
+  /// Default config with modern styling
   factory PdfHeaderConfig.defaults() => const PdfHeaderConfig(
         logoZone: LogoZone.left,
         logoSize: LogoSize.medium,
@@ -78,6 +104,10 @@ class PdfHeaderConfig {
           HeaderTextLine(key: 'phone', fontSize: 9),
         ],
         centreLines: [],
+        headerStyle: HeaderStyle.modern,
+        cornerRadius: HeaderCornerRadius.medium,
+        verticalPadding: 16,
+        horizontalPadding: 24,
       );
 
   Map<String, dynamic> toJson() => {
@@ -85,6 +115,10 @@ class PdfHeaderConfig {
         'logoSize': logoSize.name,
         'leftLines': leftLines.map((l) => l.toJson()).toList(),
         'centreLines': centreLines.map((l) => l.toJson()).toList(),
+        'headerStyle': headerStyle.name,
+        'cornerRadius': cornerRadius.name,
+        'verticalPadding': verticalPadding,
+        'horizontalPadding': horizontalPadding,
       };
 
   factory PdfHeaderConfig.fromJson(Map<String, dynamic> json) =>
@@ -98,15 +132,23 @@ class PdfHeaderConfig {
           orElse: () => LogoSize.medium,
         ),
         leftLines: (json['leftLines'] as List<dynamic>?)
-                ?.map((e) =>
-                    HeaderTextLine.fromJson(e as Map<String, dynamic>))
+                ?.map((e) => HeaderTextLine.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [],
         centreLines: (json['centreLines'] as List<dynamic>?)
-                ?.map((e) =>
-                    HeaderTextLine.fromJson(e as Map<String, dynamic>))
+                ?.map((e) => HeaderTextLine.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [],
+        headerStyle: HeaderStyle.values.firstWhere(
+          (e) => e.name == json['headerStyle'],
+          orElse: () => HeaderStyle.modern,
+        ),
+        cornerRadius: HeaderCornerRadius.values.firstWhere(
+          (e) => e.name == json['cornerRadius'],
+          orElse: () => HeaderCornerRadius.medium,
+        ),
+        verticalPadding: (json['verticalPadding'] as num?)?.toDouble() ?? 16,
+        horizontalPadding: (json['horizontalPadding'] as num?)?.toDouble() ?? 24,
       );
 
   String toJsonString() => jsonEncode(toJson());
@@ -119,11 +161,19 @@ class PdfHeaderConfig {
     LogoSize? logoSize,
     List<HeaderTextLine>? leftLines,
     List<HeaderTextLine>? centreLines,
+    HeaderStyle? headerStyle,
+    HeaderCornerRadius? cornerRadius,
+    double? verticalPadding,
+    double? horizontalPadding,
   }) =>
       PdfHeaderConfig(
         logoZone: logoZone ?? this.logoZone,
         logoSize: logoSize ?? this.logoSize,
         leftLines: leftLines ?? this.leftLines,
         centreLines: centreLines ?? this.centreLines,
+        headerStyle: headerStyle ?? this.headerStyle,
+        cornerRadius: cornerRadius ?? this.cornerRadius,
+        verticalPadding: verticalPadding ?? this.verticalPadding,
+        horizontalPadding: horizontalPadding ?? this.horizontalPadding,
       );
 }

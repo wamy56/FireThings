@@ -152,6 +152,42 @@ class FirestoreSyncService {
     }
   }
 
+  Future<void> syncPdfSectionStyle(String jsonString, PdfDocumentType type) async {
+    try {
+      final uid = _uid;
+      if (uid == null) return;
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('pdf_config')
+          .doc('section_style_${type.name}')
+          .set({
+        'data': jsonString,
+        'lastModifiedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('FirestoreSync: sync pdf section style (${type.name}) failed: $e');
+    }
+  }
+
+  Future<void> syncPdfTypography(String jsonString, PdfDocumentType type) async {
+    try {
+      final uid = _uid;
+      if (uid == null) return;
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('pdf_config')
+          .doc('typography_${type.name}')
+          .set({
+        'data': jsonString,
+        'lastModifiedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint('FirestoreSync: sync pdf typography (${type.name}) failed: $e');
+    }
+  }
+
   // ==================== FULL SYNC (pull on launch) ====================
 
   /// Perform a full bidirectional sync for the current user.

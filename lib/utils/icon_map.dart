@@ -133,6 +133,8 @@ class AppIcons {
   static const IconData designtools = IconsaxPlusLinear.designtools;
   static const IconData brush = IconsaxPlusLinear.brush;
   static const IconData magicPen = IconsaxPlusLinear.magicpen;
+  static const IconData layout = IconsaxPlusLinear.element_3;
+  static const IconData text = IconsaxPlusLinear.text;
 
   // ============================================
   // Communication

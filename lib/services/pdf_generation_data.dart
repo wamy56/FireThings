@@ -8,6 +8,9 @@ class JobsheetPdfData {
   final Map<String, dynamic> headerConfigJson;
   final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
+  final int? secondaryColourValue;
+  final Map<String, dynamic>? sectionStyleJson;
+  final Map<String, dynamic>? typographyJson;
   final String settingsCompanyName;
   final String settingsTagline;
   final String settingsAddress;
@@ -22,6 +25,9 @@ class JobsheetPdfData {
     required this.headerConfigJson,
     required this.footerConfigJson,
     required this.colourSchemeValue,
+    this.secondaryColourValue,
+    this.sectionStyleJson,
+    this.typographyJson,
     required this.settingsCompanyName,
     required this.settingsTagline,
     required this.settingsAddress,
@@ -40,6 +46,9 @@ class InvoicePdfData {
   final Map<String, dynamic> headerConfigJson;
   final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
+  final int? secondaryColourValue;
+  final Map<String, dynamic>? sectionStyleJson;
+  final Map<String, dynamic>? typographyJson;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
 
@@ -50,6 +59,9 @@ class InvoicePdfData {
     required this.headerConfigJson,
     required this.footerConfigJson,
     required this.colourSchemeValue,
+    this.secondaryColourValue,
+    this.sectionStyleJson,
+    this.typographyJson,
     this.regularFontBytes,
     this.boldFontBytes,
   });
@@ -109,6 +121,9 @@ class ComplianceReportPdfData {
   final Map<String, dynamic> headerConfigJson;
   final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
+  final int? secondaryColourValue;
+  final Map<String, dynamic>? sectionStyleJson;
+  final Map<String, dynamic>? typographyJson;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
   final List<Map<String, dynamic>> assetsJson;
@@ -131,6 +146,9 @@ class ComplianceReportPdfData {
     required this.headerConfigJson,
     required this.footerConfigJson,
     required this.colourSchemeValue,
+    this.secondaryColourValue,
+    this.sectionStyleJson,
+    this.typographyJson,
     this.regularFontBytes,
     this.boldFontBytes,
     required this.assetsJson,

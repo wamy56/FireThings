@@ -3,10 +3,14 @@ import 'package:flutter/foundation.dart';
 import '../models/pdf_header_config.dart';
 import '../models/pdf_footer_config.dart';
 import '../models/pdf_colour_scheme.dart';
+import '../models/pdf_section_style_config.dart';
+import '../models/pdf_typography_config.dart';
 import 'branding_service.dart';
 import 'pdf_header_config_service.dart';
 import 'pdf_footer_config_service.dart';
 import 'pdf_colour_scheme_service.dart';
+import 'pdf_section_style_service.dart';
+import 'pdf_typography_service.dart';
 import 'user_profile_service.dart';
 
 /// Service for reading/writing company-level PDF config from Firestore.
@@ -21,6 +25,8 @@ class CompanyPdfConfigService {
   final Map<String, PdfHeaderConfig> _headerCache = {};
   final Map<String, PdfFooterConfig> _footerCache = {};
   final Map<String, PdfColourScheme> _colourCache = {};
+  final Map<String, PdfSectionStyleConfig> _sectionStyleCache = {};
+  final Map<String, PdfTypographyConfig> _typographyCache = {};
   final Map<String, Uint8List> _logoCache = {};
 
   String _cacheKey(String companyId, PdfDocumentType type) =>
@@ -32,6 +38,8 @@ class CompanyPdfConfigService {
   String _headerDocId(PdfDocumentType type) => 'header_${type.name}';
   String _footerDocId(PdfDocumentType type) => 'footer_${type.name}';
   String _colourDocId(PdfDocumentType type) => 'colour_scheme_${type.name}';
+  String _sectionStyleDocId(PdfDocumentType type) => 'section_style_${type.name}';
+  String _typographyDocId(PdfDocumentType type) => 'typography_${type.name}';
 
   // --- Header ---
 
@@ -126,6 +134,68 @@ class CompanyPdfConfigService {
     });
   }
 
+  // --- Section Style ---
+
+  Future<PdfSectionStyleConfig?> getSectionStyleConfig(String companyId, PdfDocumentType type) async {
+    final key = _cacheKey(companyId, type);
+    if (_sectionStyleCache.containsKey(key)) return _sectionStyleCache[key];
+
+    try {
+      final doc = await _configDoc(companyId, _sectionStyleDocId(type)).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data != null && data['config'] is String) {
+          final config = PdfSectionStyleConfig.fromJsonString(data['config'] as String);
+          _sectionStyleCache[key] = config;
+          return config;
+        }
+      }
+    } catch (e) {
+      debugPrint('CompanyPdfConfigService: getSectionStyleConfig failed: $e');
+    }
+    return null;
+  }
+
+  Future<void> saveSectionStyleConfig(String companyId, PdfSectionStyleConfig config, PdfDocumentType type) async {
+    final key = _cacheKey(companyId, type);
+    _sectionStyleCache[key] = config;
+    await _configDoc(companyId, _sectionStyleDocId(type)).set({
+      'config': config.toJsonString(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
+  // --- Typography ---
+
+  Future<PdfTypographyConfig?> getTypographyConfig(String companyId, PdfDocumentType type) async {
+    final key = _cacheKey(companyId, type);
+    if (_typographyCache.containsKey(key)) return _typographyCache[key];
+
+    try {
+      final doc = await _configDoc(companyId, _typographyDocId(type)).get();
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>?;
+        if (data != null && data['config'] is String) {
+          final config = PdfTypographyConfig.fromJsonString(data['config'] as String);
+          _typographyCache[key] = config;
+          return config;
+        }
+      }
+    } catch (e) {
+      debugPrint('CompanyPdfConfigService: getTypographyConfig failed: $e');
+    }
+    return null;
+  }
+
+  Future<void> saveTypographyConfig(String companyId, PdfTypographyConfig config, PdfDocumentType type) async {
+    final key = _cacheKey(companyId, type);
+    _typographyCache[key] = config;
+    await _configDoc(companyId, _typographyDocId(type)).set({
+      'config': config.toJsonString(),
+      'updatedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
   // --- Company Logo ---
 
   String _logoDocId(PdfDocumentType type) => 'logo_${type.name}';
@@ -203,6 +273,8 @@ class CompanyPdfConfigService {
     _headerCache.clear();
     _footerCache.clear();
     _colourCache.clear();
+    _sectionStyleCache.clear();
+    _typographyCache.clear();
     _logoCache.clear();
   }
 
@@ -247,5 +319,31 @@ class CompanyPdfConfigService {
       if (companyConfig != null) return companyConfig;
     }
     return PdfColourSchemeService.getScheme(type);
+  }
+
+  /// Get effective section style config.
+  Future<PdfSectionStyleConfig> getEffectiveSectionStyleConfig(
+    PdfDocumentType type, {
+    bool useCompanyBranding = false,
+  }) async {
+    final companyId = UserProfileService.instance.companyId;
+    if (companyId != null && useCompanyBranding) {
+      final companyConfig = await getSectionStyleConfig(companyId, type);
+      if (companyConfig != null) return companyConfig;
+    }
+    return PdfSectionStyleService.getConfig(type);
+  }
+
+  /// Get effective typography config.
+  Future<PdfTypographyConfig> getEffectiveTypographyConfig(
+    PdfDocumentType type, {
+    bool useCompanyBranding = false,
+  }) async {
+    final companyId = UserProfileService.instance.companyId;
+    if (companyId != null && useCompanyBranding) {
+      final companyConfig = await getTypographyConfig(companyId, type);
+      if (companyConfig != null) return companyConfig;
+    }
+    return PdfTypographyService.getConfig(type);
   }
 }

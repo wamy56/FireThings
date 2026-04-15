@@ -4,6 +4,83 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-15 (Session 70)
+
+### PDF Redesign Implementation - Full 6-Phase Rollout
+
+Implemented comprehensive PDF redesign following the specification in `PDF_REDESIGN_IMPLEMENTATION.md`. This transforms the PDF generation system into a modern, professional design with full user customization for both personal and company PDFs.
+
+#### Phase 1: Updated Model Layer
+- **PdfColourScheme** — Added secondary color support, text/background color getters, improved `copyWith` method
+- **PdfHeaderConfig** — Added `HeaderStyle` and `HeaderCornerRadius` enums with `style`, `cornerRadius`, `showDivider` fields
+- **PdfSectionStyleConfig** (NEW) — Card style (bordered/shadowed/elevated/flat), corner radius (small/medium/large), header style (fullWidth/leftAccent/underlined), spacing and padding controls
+- **PdfTypographyConfig** (NEW) — Font size configuration for section headers, field labels, field values, table headers, table body, and footer text
+- **PdfStylePreset** (NEW) — Preset combinations (modern, classic, minimal, bold) for quick styling
+- Updated `models/models.dart` barrel exports
+
+#### Phase 2: Created PDF Widget Library
+New reusable PDF widgets at `lib/services/pdf_widgets/`:
+- `pdf_style_helpers.dart` — `buildCardDecoration()`, `labelStyle()`, `valueStyle()`, color constants
+- `pdf_modern_header.dart` — `buildModernHeader()` with 3 style variants (modern/classic/minimal)
+- `pdf_section_card.dart` — `buildSectionCard()` with styled headers (fullWidth/leftAccent/underlined)
+- `pdf_field_row.dart` — `buildFieldGrid()`, `buildCompactFieldRow()` for consistent field layouts
+- `pdf_modern_table.dart` — `buildModernTable()`, `buildSimpleTable()` with styled headers
+- `pdf_signature_box.dart` — `buildSignatureSection()` with consistent styling
+
+#### Phase 3: Updated Services
+- **PdfSectionStyleService** (NEW) — SharedPreferences persistence + Firestore sync for section styles
+- **PdfTypographyService** (NEW) — SharedPreferences persistence + Firestore sync for typography
+- **FirestoreSyncService** — Added `syncPdfSectionStyle()` and `syncPdfTypography()` methods
+- **CompanyPdfConfigService** — Added section style and typography caches, CRUD methods, effective config resolution
+- **PdfGenerationData DTOs** — Added `secondaryColourValue`, `sectionStyleJson`, `typographyJson` fields
+
+#### Phase 4: Refactored pdf_service.dart
+- Updated imports to use new widget library
+- Refactored `_buildHeader()` to use `buildModernHeader()` with style variants
+- Refactored `_buildSection()` to use `buildSectionCard()` with configurable styles
+- Updated all section builders to use new widgets and respect typography settings
+- Removed legacy inline styling code
+
+#### Phase 5: Created Customization Screens
+- **PdfSectionStyleScreen** (NEW) — Card style selector, corner radius selector, header style selector, spacing/padding sliders
+- **PdfTypographyScreen** (NEW) — Font size sliders for all PDF text elements with reset-to-defaults
+- **PdfDesignScreen** — Added navigation cards for Section Style and Typography for both Jobsheet and Invoice
+
+#### Phase 6: Company PDF Support
+- Updated `CompanyPdfDesignScreen` with Section Style and Typography config cards
+- Added `_CompanySectionStyleEditorScreen` private widget with full styling controls
+- Added `_CompanyTypographyEditorScreen` private widget with font size sliders
+- Integrated with `CompanyPdfConfigService` for Firestore persistence
+
+**Files Created:**
+- `lib/models/pdf_section_style_config.dart`
+- `lib/models/pdf_typography_config.dart`
+- `lib/models/pdf_style_preset.dart`
+- `lib/services/pdf_section_style_service.dart`
+- `lib/services/pdf_typography_service.dart`
+- `lib/services/pdf_widgets/pdf_style_helpers.dart`
+- `lib/services/pdf_widgets/pdf_modern_header.dart`
+- `lib/services/pdf_widgets/pdf_section_card.dart`
+- `lib/services/pdf_widgets/pdf_field_row.dart`
+- `lib/services/pdf_widgets/pdf_modern_table.dart`
+- `lib/services/pdf_widgets/pdf_signature_box.dart`
+- `lib/screens/settings/pdf_section_style_screen.dart`
+- `lib/screens/settings/pdf_typography_screen.dart`
+
+**Files Modified:**
+- `lib/models/pdf_colour_scheme.dart`
+- `lib/models/pdf_header_config.dart`
+- `lib/models/models.dart`
+- `lib/services/pdf_service.dart`
+- `lib/services/pdf_generation_data.dart`
+- `lib/services/firestore_sync_service.dart`
+- `lib/services/company_pdf_config_service.dart`
+- `lib/screens/invoicing/pdf_design_screen.dart`
+- `lib/screens/company/company_pdf_design_screen.dart`
+- `lib/utils/icon_map.dart` (added `layout` and `text` icons)
+
+---
+
 ## 2026-04-12 (Session 69)
 
 ### UI: Permission Toggle Colors Changed to Blue

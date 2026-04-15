@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -6,7 +5,6 @@ import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
 import 'jobsheet_settings_service.dart';
-import 'pdf_header_builder.dart';
 import 'pdf_footer_builder.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
@@ -15,17 +13,32 @@ import 'service_history_service.dart';
 import 'asset_service.dart';
 import 'asset_type_service.dart';
 import '../data/default_asset_types.dart';
-import '../models/pdf_colour_scheme.dart';
+import 'pdf_widgets/pdf_modern_header.dart';
+import 'pdf_widgets/pdf_section_card.dart';
+import 'pdf_widgets/pdf_field_row.dart';
+import 'pdf_widgets/pdf_modern_table.dart';
+import 'pdf_widgets/pdf_signature_box.dart';
+import 'pdf_widgets/pdf_style_helpers.dart';
 
 /// Top-level function for compute() — builds the jobsheet PDF in a background isolate.
 Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
   final jobsheet = Jobsheet.fromJson(data.jobsheetJson);
   final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
   final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
-  final colourScheme = PdfColourScheme(primaryColorValue: data.colourSchemeValue);
-  final primaryColor = colourScheme.primaryColor;
-  final primaryLight = colourScheme.primaryLight;
-  final primaryMedium = colourScheme.primaryMedium;
+
+  // Reconstruct colour scheme with optional secondary
+  final colourScheme = PdfColourScheme(
+    primaryColorValue: data.colourSchemeValue,
+    secondaryColorValue: data.secondaryColourValue,
+  );
+
+  // Reconstruct section style and typography configs
+  final sectionStyle = data.sectionStyleJson != null
+      ? PdfSectionStyleConfig.fromJson(data.sectionStyleJson!)
+      : PdfSectionStyleConfig.defaults();
+  final typography = data.typographyJson != null
+      ? PdfTypographyConfig.fromJson(data.typographyJson!)
+      : PdfTypographyConfig.defaults();
 
   final regularFont = data.regularFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
@@ -52,14 +65,16 @@ Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
-      header: (context) => _buildHeader(jobsheet, context, settings, data.logoBytes, headerConfig, primaryColor),
+      header: (context) => _buildHeader(
+        jobsheet, context, settings, data.logoBytes, headerConfig, colourScheme),
       footer: (context) => PdfFooterBuilder.buildFooter(
         config: footerConfig,
         pageNumber: context.pageNumber,
         pagesCount: context.pagesCount,
-        primaryColor: primaryColor,
+        primaryColor: colourScheme.primaryColor,
       ),
-      build: (context) => _buildDynamicSections(jobsheet, primaryColor, primaryLight, primaryMedium, data),
+      build: (context) => _buildDynamicSections(
+        jobsheet, colourScheme, sectionStyle, typography, data),
     ),
   );
 
@@ -84,78 +99,32 @@ class _JobsheetSettings {
 // ── Constants shared by builder helpers ──
 
 const PdfColor _darkGray = PdfColor.fromInt(0xFF424242);
-const PdfColor _lightGray = PdfColor.fromInt(0xFFE0E0E0);
-const PdfColor _white = PdfColors.white;
 
 // ── Builder helpers (top-level so they work inside the isolate) ──
 
-pw.Widget _buildHeader(Jobsheet jobsheet, pw.Context context, _JobsheetSettings settings, Uint8List? logoBytes, PdfHeaderConfig headerConfig, PdfColor primaryColor) {
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border(
-        bottom: pw.BorderSide(color: primaryColor, width: 2),
-      ),
-    ),
-    padding: const pw.EdgeInsets.only(bottom: 8),
-    margin: const pw.EdgeInsets.only(bottom: 4),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Expanded(
-          flex: 5,
-          child: PdfHeaderBuilder.buildLeftAndCentre(
-            config: headerConfig,
-            logoBytes: logoBytes,
-            primaryColor: primaryColor,
-            fallbackValues: {
-              'companyName': settings.companyName.isNotEmpty ? settings.companyName : jobsheet.engineerName,
-              'tagline': settings.tagline,
-              'address': settings.address,
-              'phone': settings.phone,
-            },
-          ),
-        ),
-        pw.SizedBox(width: 12),
-        // ── Solid-fill badge (matches invoice style) ──
-        pw.Expanded(
-          flex: 2,
-          child: pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            decoration: pw.BoxDecoration(
-              color: primaryColor,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Text(
-                  jobsheet.templateType.toUpperCase(),
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    color: _white,
-                    letterSpacing: 1,
-                  ),
-                  textAlign: pw.TextAlign.center,
-                ),
-                pw.SizedBox(height: 6),
-                pw.Text(
-                  'REF: ${jobsheet.jobNumber}',
-                  style: pw.TextStyle(
-                    fontSize: 9,
-                    color: PdfColor.fromInt(0xCCFFFFFF),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
+pw.Widget _buildHeader(Jobsheet jobsheet, pw.Context context, _JobsheetSettings settings, Uint8List? logoBytes, PdfHeaderConfig headerConfig, PdfColourScheme colors) {
+  return buildModernHeader(
+    config: headerConfig,
+    colors: colors,
+    logoBytes: logoBytes,
+    documentType: jobsheet.templateType,
+    documentRef: jobsheet.jobNumber,
+    fallbackValues: {
+      'companyName': settings.companyName.isNotEmpty ? settings.companyName : jobsheet.engineerName,
+      'tagline': settings.tagline,
+      'address': settings.address,
+      'phone': settings.phone,
+    },
   );
 }
 
-List<pw.Widget> _buildDynamicSections(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight, PdfColor primaryMedium, JobsheetPdfData data) {
+List<pw.Widget> _buildDynamicSections(
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+  JobsheetPdfData data,
+) {
   final layout = jobsheet.sectionLayout ?? PdfSectionLayoutConfig.defaults();
   final visibleSections = layout.sections.where((s) => s.visible).toList();
   final widgets = <pw.Widget>[pw.SizedBox(height: 4)];
@@ -167,8 +136,8 @@ List<pw.Widget> _buildDynamicSections(Jobsheet jobsheet, PdfColor primaryColor, 
         layout.jobSiteLayout == SectionLayoutMode.sideBySide &&
         i + 1 < visibleSections.length &&
         visibleSections[i + 1].id == PdfSectionId.siteDetails) {
-      widgets.add(_buildJobAndSiteRow(jobsheet, primaryColor, primaryLight));
-      widgets.add(pw.SizedBox(height: 6));
+      widgets.add(_buildJobAndSiteRow(jobsheet, colors, sectionStyle, typography));
+      widgets.add(pw.SizedBox(height: sectionStyle.sectionSpacing));
       i++;
       continue;
     }
@@ -176,295 +145,216 @@ List<pw.Widget> _buildDynamicSections(Jobsheet jobsheet, PdfColor primaryColor, 
         layout.jobSiteLayout == SectionLayoutMode.sideBySide &&
         i + 1 < visibleSections.length &&
         visibleSections[i + 1].id == PdfSectionId.jobInfo) {
-      widgets.add(_buildSiteAndJobRow(jobsheet, primaryColor, primaryLight));
-      widgets.add(pw.SizedBox(height: 6));
+      widgets.add(_buildSiteAndJobRow(jobsheet, colors, sectionStyle, typography));
+      widgets.add(pw.SizedBox(height: sectionStyle.sectionSpacing));
       i++;
       continue;
     }
 
-    final section = _buildSection(entry.id, jobsheet, primaryColor, primaryLight, primaryMedium, data);
+    final section = _buildSection(entry.id, jobsheet, colors, sectionStyle, typography, data);
     if (section != null) {
       widgets.add(section);
-      widgets.add(pw.SizedBox(height: 6));
+      widgets.add(pw.SizedBox(height: sectionStyle.sectionSpacing));
     }
   }
 
   return widgets;
 }
 
-pw.Widget? _buildSection(PdfSectionId id, Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight, PdfColor primaryMedium, JobsheetPdfData data) {
+pw.Widget? _buildSection(
+  PdfSectionId id,
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+  JobsheetPdfData data,
+) {
   switch (id) {
     case PdfSectionId.jobInfo:
-      return _buildJobInfoOnly(jobsheet, primaryColor, primaryLight);
+      return _buildJobInfoOnly(jobsheet, colors, sectionStyle, typography);
     case PdfSectionId.siteDetails:
-      return _buildSiteDetailsOnly(jobsheet, primaryColor, primaryLight);
+      return _buildSiteDetailsOnly(jobsheet, colors, sectionStyle, typography);
     case PdfSectionId.workDetails:
-      return _buildWorkDetailsSection(jobsheet, primaryColor, primaryLight);
+      return _buildWorkDetailsSection(jobsheet, colors, sectionStyle, typography);
     case PdfSectionId.notes:
-      return jobsheet.notes.isNotEmpty ? _buildNotesSection(jobsheet, primaryColor, primaryLight) : null;
+      return jobsheet.notes.isNotEmpty
+          ? _buildNotesSection(jobsheet, colors, sectionStyle, typography)
+          : null;
     case PdfSectionId.defects:
-      return jobsheet.defects.isNotEmpty ? _buildDefectsSection(jobsheet) : null;
+      return jobsheet.defects.isNotEmpty
+          ? _buildDefectsSection(jobsheet, colors, sectionStyle, typography)
+          : null;
     case PdfSectionId.compliance:
-      return _buildComplianceStatement(primaryColor);
+      return _buildComplianceStatement(colors, sectionStyle, typography);
     case PdfSectionId.signatures:
-      return _buildSignaturesSection(jobsheet, primaryColor, primaryLight);
+      return _buildSignaturesSection(jobsheet, colors, sectionStyle, typography);
     case PdfSectionId.assetSummary:
-      return _buildAssetSummarySection(data, primaryColor, primaryLight);
+      return _buildAssetSummarySection(data, colors, sectionStyle, typography);
   }
 }
 
-pw.Widget _buildSectionHeader(String title, PdfColor primaryColor) {
-  return pw.Container(
-    width: double.infinity,
-    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: pw.BoxDecoration(
-      color: primaryColor,
-      borderRadius: const pw.BorderRadius.only(
-        topLeft: pw.Radius.circular(4),
-        topRight: pw.Radius.circular(4),
-      ),
-    ),
-    child: pw.Text(
-      title.toUpperCase(),
-      style: pw.TextStyle(
-        fontSize: 9,
-        fontWeight: pw.FontWeight.bold,
-        color: _white,
-        letterSpacing: 0.5,
-      ),
-    ),
-  );
-}
-
-pw.Widget _buildJobInfoOnly(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight) {
+pw.Widget _buildJobInfoOnly(
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
   final dateFormat = DateFormat('dd/MM/yyyy');
   final timeFormat = DateFormat('HH:mm');
 
-  final fields = [
-    ('Date:', dateFormat.format(jobsheet.date)),
-    ('Time:', timeFormat.format(jobsheet.date)),
-    ('Job No:', jobsheet.jobNumber),
-    ('Category:', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
-    ('Engineer:', jobsheet.engineerName),
-  ];
-
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: _lightGray),
-      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-    ),
-    child: pw.Column(
-      children: [
-        _buildSectionHeader('Job Information', primaryColor),
-        pw.Padding(
-          padding: const pw.EdgeInsets.all(8),
-          child: pw.Column(
-            children: [
-              for (int i = 0; i < fields.length; i++)
-                _buildCompactField(fields[i].$1, fields[i].$2, primaryLight, isAlternate: i.isOdd),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-pw.Widget _buildSiteDetailsOnly(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight) {
-  final fields = [
-    ('Customer:', jobsheet.customerName),
-    ('Address:', jobsheet.siteAddress),
-  ];
-
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: _lightGray),
-      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-    ),
-    child: pw.Column(
-      children: [
-        _buildSectionHeader('Site Details', primaryColor),
-        pw.Padding(
-          padding: const pw.EdgeInsets.all(8),
-          child: pw.Column(
-            children: [
-              for (int i = 0; i < fields.length; i++)
-                _buildCompactField(fields[i].$1, fields[i].$2, primaryLight, isAlternate: i.isOdd),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-pw.Widget _buildSiteAndJobRow(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight) {
-  final dateFormat = DateFormat('dd/MM/yyyy');
-  final timeFormat = DateFormat('HH:mm');
-
-  final siteFields = [
-    ('Customer:', jobsheet.customerName),
-    ('Address:', jobsheet.siteAddress),
-  ];
-
-  final jobFields = [
-    ('Date:', dateFormat.format(jobsheet.date)),
-    ('Time:', timeFormat.format(jobsheet.date)),
-    ('Job No:', jobsheet.jobNumber),
-    ('Category:', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
-    ('Engineer:', jobsheet.engineerName),
-  ];
-
-  return pw.Row(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
+  return buildSectionCard(
+    title: 'Job Information',
+    colors: colors,
+    style: sectionStyle,
     children: [
-      pw.Expanded(
-        child: pw.Container(
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: _lightGray),
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
-          child: pw.Column(
-            children: [
-              _buildSectionHeader('Site Details', primaryColor),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(8),
-                child: pw.Column(
-                  children: [
-                    for (int i = 0; i < siteFields.length; i++)
-                      _buildCompactField(siteFields[i].$1, siteFields[i].$2, primaryLight, isAlternate: i.isOdd),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      pw.SizedBox(width: 12),
-      pw.Expanded(
-        child: pw.Container(
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: _lightGray),
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
-          child: pw.Column(
-            children: [
-              _buildSectionHeader('Job Information', primaryColor),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(8),
-                child: pw.Column(
-                  children: [
-                    for (int i = 0; i < jobFields.length; i++)
-                      _buildCompactField(jobFields[i].$1, jobFields[i].$2, primaryLight, isAlternate: i.isOdd),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      buildFieldGrid(
+        fields: [
+          ('Date', dateFormat.format(jobsheet.date)),
+          ('Time', timeFormat.format(jobsheet.date)),
+          ('Job No', jobsheet.jobNumber),
+          ('Category', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
+          ('Engineer', jobsheet.engineerName),
+        ],
+        colors: colors,
+        typography: typography,
       ),
     ],
   );
 }
 
-pw.Widget _buildJobAndSiteRow(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight) {
-  final dateFormat = DateFormat('dd/MM/yyyy');
-  final timeFormat = DateFormat('HH:mm');
-
-  final jobFields = [
-    ('Date:', dateFormat.format(jobsheet.date)),
-    ('Time:', timeFormat.format(jobsheet.date)),
-    ('Job No:', jobsheet.jobNumber),
-    ('Category:', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
-    ('Engineer:', jobsheet.engineerName),
-  ];
-
-  final siteFields = [
-    ('Customer:', jobsheet.customerName),
-    ('Address:', jobsheet.siteAddress),
-  ];
-
-  return pw.Row(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
+pw.Widget _buildSiteDetailsOnly(
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
+  return buildSectionCard(
+    title: 'Site Details',
+    colors: colors,
+    style: sectionStyle,
     children: [
-      pw.Expanded(
-        child: pw.Container(
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: _lightGray),
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
-          child: pw.Column(
-            children: [
-              _buildSectionHeader('Job Information', primaryColor),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(8),
-                child: pw.Column(
-                  children: [
-                    for (int i = 0; i < jobFields.length; i++)
-                      _buildCompactField(jobFields[i].$1, jobFields[i].$2, primaryLight, isAlternate: i.isOdd),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      pw.SizedBox(width: 12),
-      pw.Expanded(
-        child: pw.Container(
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: _lightGray),
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
-          child: pw.Column(
-            children: [
-              _buildSectionHeader('Site Details', primaryColor),
-              pw.Padding(
-                padding: const pw.EdgeInsets.all(8),
-                child: pw.Column(
-                  children: [
-                    for (int i = 0; i < siteFields.length; i++)
-                      _buildCompactField(siteFields[i].$1, siteFields[i].$2, primaryLight, isAlternate: i.isOdd),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      buildFieldGrid(
+        fields: [
+          ('Customer', jobsheet.customerName),
+          ('Address', jobsheet.siteAddress),
+        ],
+        colors: colors,
+        typography: typography,
+        twoColumn: false,
       ),
     ],
   );
 }
 
-pw.Widget _buildCompactField(String label, String value, PdfColor primaryLight, {bool isAlternate = false}) {
-  return pw.Container(
-    padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-    decoration: pw.BoxDecoration(
-      color: isAlternate ? primaryLight : null,
-      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
-    ),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.SizedBox(
-          width: 75,
-          child: pw.Text(
-            label,
-            style: pw.TextStyle(
-              fontSize: 9,
-              fontWeight: pw.FontWeight.bold,
-              color: _darkGray,
+pw.Widget _buildSiteAndJobRow(
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
+  final dateFormat = DateFormat('dd/MM/yyyy');
+  final timeFormat = DateFormat('HH:mm');
+
+  return pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Expanded(
+        child: buildSectionCard(
+          title: 'Site Details',
+          colors: colors,
+          style: sectionStyle,
+          children: [
+            buildFieldGrid(
+              fields: [
+                ('Customer', jobsheet.customerName),
+                ('Address', jobsheet.siteAddress),
+              ],
+              colors: colors,
+              typography: typography,
+              twoColumn: false,
             ),
-          ),
+          ],
         ),
-        pw.Expanded(
-          child: pw.Text(
-            value,
-            style: const pw.TextStyle(fontSize: 10),
-          ),
+      ),
+      pw.SizedBox(width: 12),
+      pw.Expanded(
+        child: buildSectionCard(
+          title: 'Job Information',
+          colors: colors,
+          style: sectionStyle,
+          children: [
+            buildFieldGrid(
+              fields: [
+                ('Date', dateFormat.format(jobsheet.date)),
+                ('Time', timeFormat.format(jobsheet.date)),
+                ('Job No', jobsheet.jobNumber),
+                ('Category', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
+                ('Engineer', jobsheet.engineerName),
+              ],
+              colors: colors,
+              typography: typography,
+              twoColumn: false,
+            ),
+          ],
         ),
-      ],
-    ),
+      ),
+    ],
+  );
+}
+
+pw.Widget _buildJobAndSiteRow(
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
+  final dateFormat = DateFormat('dd/MM/yyyy');
+  final timeFormat = DateFormat('HH:mm');
+
+  return pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Expanded(
+        child: buildSectionCard(
+          title: 'Job Information',
+          colors: colors,
+          style: sectionStyle,
+          children: [
+            buildFieldGrid(
+              fields: [
+                ('Date', dateFormat.format(jobsheet.date)),
+                ('Time', timeFormat.format(jobsheet.date)),
+                ('Job No', jobsheet.jobNumber),
+                ('Category', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
+                ('Engineer', jobsheet.engineerName),
+              ],
+              colors: colors,
+              typography: typography,
+              twoColumn: false,
+            ),
+          ],
+        ),
+      ),
+      pw.SizedBox(width: 12),
+      pw.Expanded(
+        child: buildSectionCard(
+          title: 'Site Details',
+          colors: colors,
+          style: sectionStyle,
+          children: [
+            buildFieldGrid(
+              fields: [
+                ('Customer', jobsheet.customerName),
+                ('Address', jobsheet.siteAddress),
+              ],
+              colors: colors,
+              typography: typography,
+              twoColumn: false,
+            ),
+          ],
+        ),
+      ),
+    ],
   );
 }
 
@@ -475,7 +365,12 @@ bool _isShortField(dynamic value) {
   return str.length <= 30 && !str.contains('\n');
 }
 
-pw.Widget _buildWorkDetailField(MapEntry<String, dynamic> entry, Map<String, String> fieldLabels, PdfColor primaryColor) {
+pw.Widget _buildWorkDetailField(
+  MapEntry<String, dynamic> entry,
+  Map<String, String> fieldLabels,
+  PdfColourScheme colors,
+  PdfTypographyConfig typography,
+) {
   final isBoolean = entry.value is bool;
   return pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -485,18 +380,21 @@ pw.Widget _buildWorkDetailField(MapEntry<String, dynamic> entry, Map<String, Str
         child: pw.Text(
           '${fieldLabels[entry.key] ?? _formatFieldLabel(entry.key)}:',
           style: pw.TextStyle(
-            fontSize: 9,
+            fontSize: typography.fieldLabelSize + 1,
             fontWeight: pw.FontWeight.bold,
-            color: _darkGray,
+            color: colors.textSecondary,
           ),
         ),
       ),
       pw.Expanded(
         child: isBoolean
-            ? _buildCheckboxField(entry.value as bool, primaryColor)
+            ? _buildCheckboxField(entry.value as bool, colors.primaryColor)
             : pw.Text(
                 _formatFieldValue(entry.value),
-                style: const pw.TextStyle(fontSize: 10),
+                style: pw.TextStyle(
+                  fontSize: typography.fieldValueSize,
+                  color: colors.textPrimary,
+                ),
               ),
       ),
     ],
@@ -507,8 +405,9 @@ pw.Widget _buildRepeatGroupSection(
   String groupKey,
   List entries,
   Map<String, String> fieldLabels,
-  PdfColor primaryColor,
-  PdfColor primaryLight,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
 ) {
   if (entries.isEmpty) return pw.SizedBox.shrink();
 
@@ -530,15 +429,15 @@ pw.Widget _buildRepeatGroupSection(
           child: pw.Text(
             groupLabel,
             style: pw.TextStyle(
-              fontSize: 10,
+              fontSize: typography.fieldValueSize,
               fontWeight: pw.FontWeight.bold,
-              color: primaryColor,
+              color: colors.primaryColor,
             ),
           ),
         ),
         // Table
         pw.Table(
-          border: pw.TableBorder.all(color: _lightGray, width: 0.5),
+          border: pw.TableBorder.all(color: colors.primaryMedium, width: 0.5),
           columnWidths: {
             for (var j = 0; j < childKeys.length; j++)
               j: const pw.FlexColumnWidth(),
@@ -546,18 +445,18 @@ pw.Widget _buildRepeatGroupSection(
           children: [
             // Header row
             pw.TableRow(
-              decoration: pw.BoxDecoration(color: primaryLight),
+              decoration: pw.BoxDecoration(color: colors.primaryColor),
               children: childKeys.map((key) {
                 final label = fieldLabels['$groupKey.$key'] ??
                     _formatFieldLabel(key);
                 return pw.Padding(
-                  padding: const pw.EdgeInsets.all(4),
+                  padding: const pw.EdgeInsets.all(6),
                   child: pw.Text(
-                    label,
+                    label.toUpperCase(),
                     style: pw.TextStyle(
-                      fontSize: 7,
+                      fontSize: typography.tableHeaderSize - 2,
                       fontWeight: pw.FontWeight.bold,
-                      color: _darkGray,
+                      color: pdfWhite,
                     ),
                   ),
                 );
@@ -571,14 +470,17 @@ pw.Widget _buildRepeatGroupSection(
 
               return pw.TableRow(
                 decoration: isAlternate
-                    ? pw.BoxDecoration(color: primaryLight)
+                    ? pw.BoxDecoration(color: colors.primarySoft)
                     : null,
                 children: childKeys.map((key) {
                   return pw.Padding(
-                    padding: const pw.EdgeInsets.all(4),
+                    padding: const pw.EdgeInsets.all(6),
                     child: pw.Text(
                       _formatFieldValue(entry[key]),
-                      style: const pw.TextStyle(fontSize: 8),
+                      style: pw.TextStyle(
+                        fontSize: typography.tableBodySize - 1,
+                        color: colors.textPrimary,
+                      ),
                     ),
                   );
                 }).toList(),
@@ -591,7 +493,12 @@ pw.Widget _buildRepeatGroupSection(
   );
 }
 
-pw.Widget _buildWorkDetailsSection(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight) {
+pw.Widget _buildWorkDetailsSection(
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
   final entries = jobsheet.formData.entries.toList();
   final List<pw.Widget> rows = [];
   final List<pw.Widget> repeatGroupSections = [];
@@ -608,8 +515,9 @@ pw.Widget _buildWorkDetailsSection(Jobsheet jobsheet, PdfColor primaryColor, Pdf
           entry.key,
           entry.value as List,
           jobsheet.fieldLabels,
-          primaryColor,
-          primaryLight,
+          colors,
+          sectionStyle,
+          typography,
         ),
       );
       i += 1;
@@ -624,18 +532,18 @@ pw.Widget _buildWorkDetailsSection(Jobsheet jobsheet, PdfColor primaryColor, Pdf
         pw.Container(
           padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: pw.BoxDecoration(
-            color: isAlternate ? primaryLight : null,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
+            color: isAlternate ? colors.primarySoft : null,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
           ),
           child: pw.Row(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Expanded(
-                child: _buildWorkDetailField(entry, jobsheet.fieldLabels, primaryColor),
+                child: _buildWorkDetailField(entry, jobsheet.fieldLabels, colors, typography),
               ),
               pw.SizedBox(width: 12),
               pw.Expanded(
-                child: _buildWorkDetailField(entries[i + 1], jobsheet.fieldLabels, primaryColor),
+                child: _buildWorkDetailField(entries[i + 1], jobsheet.fieldLabels, colors, typography),
               ),
             ],
           ),
@@ -647,10 +555,10 @@ pw.Widget _buildWorkDetailsSection(Jobsheet jobsheet, PdfColor primaryColor, Pdf
         pw.Container(
           padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
           decoration: pw.BoxDecoration(
-            color: isAlternate ? primaryLight : null,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
+            color: isAlternate ? colors.primarySoft : null,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
           ),
-          child: _buildWorkDetailField(entry, jobsheet.fieldLabels, primaryColor),
+          child: _buildWorkDetailField(entry, jobsheet.fieldLabels, colors, typography),
         ),
       );
       i += 1;
@@ -658,21 +566,14 @@ pw.Widget _buildWorkDetailsSection(Jobsheet jobsheet, PdfColor primaryColor, Pdf
     rowIndex++;
   }
 
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: _lightGray),
-      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-    ),
-    child: pw.Column(
-      children: [
-        _buildSectionHeader('Work Carried Out', primaryColor),
-        pw.Padding(
-          padding: const pw.EdgeInsets.all(8),
-          child: pw.Column(children: rows),
-        ),
-        ...repeatGroupSections,
-      ],
-    ),
+  return buildSectionCard(
+    title: 'Work Carried Out',
+    colors: colors,
+    style: sectionStyle,
+    children: [
+      ...rows,
+      ...repeatGroupSections,
+    ],
   );
 }
 
@@ -720,93 +621,108 @@ pw.Widget _buildCheckbox(bool checked, String label, PdfColor primaryColor) {
   );
 }
 
-pw.Widget _buildNotesSection(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight) {
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: _lightGray),
-      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-    ),
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        _buildSectionHeader('Additional Notes / Observations', primaryColor),
-        pw.Container(
-          width: double.infinity,
-          padding: const pw.EdgeInsets.all(8),
-          constraints: const pw.BoxConstraints(minHeight: 30),
-          decoration: pw.BoxDecoration(
-            color: primaryLight,
-            borderRadius: const pw.BorderRadius.only(
-              bottomLeft: pw.Radius.circular(4),
-              bottomRight: pw.Radius.circular(4),
-            ),
-          ),
-          child: pw.Text(
-            jobsheet.notes,
-            style: const pw.TextStyle(fontSize: 10),
+pw.Widget _buildNotesSection(
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
+  return buildSectionCard(
+    title: 'Additional Notes / Observations',
+    colors: colors,
+    style: sectionStyle,
+    children: [
+      pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.all(8),
+        constraints: const pw.BoxConstraints(minHeight: 30),
+        decoration: pw.BoxDecoration(
+          color: colors.primarySoft,
+          borderRadius: pw.BorderRadius.circular(sectionStyle.cornerRadius.pixels),
+        ),
+        child: pw.Text(
+          jobsheet.notes,
+          style: pw.TextStyle(
+            fontSize: typography.fieldValueSize,
+            color: colors.textPrimary,
           ),
         ),
-      ],
-    ),
+      ),
+    ],
   );
 }
 
-pw.Widget _buildDefectsSection(Jobsheet jobsheet) {
+pw.Widget _buildDefectsSection(
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
+  // Defects section uses red styling to stand out
   return pw.Container(
+    margin: pw.EdgeInsets.only(bottom: sectionStyle.sectionSpacing),
     decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: PdfColors.red200),
-      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+      border: pw.Border.all(color: PdfColors.red200, width: 0.5),
+      borderRadius: pw.BorderRadius.circular(sectionStyle.cornerRadius.pixels),
+      boxShadow: sectionStyle.cardStyle == SectionCardStyle.shadowed ||
+              sectionStyle.cardStyle == SectionCardStyle.elevated
+          ? [
+              pw.BoxShadow(
+                color: const PdfColor.fromInt(0x1A000000),
+                blurRadius: 4,
+                offset: const PdfPoint(0, 2),
+              ),
+            ]
+          : null,
     ),
     child: pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Container(
           width: double.infinity,
-          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          decoration: const pw.BoxDecoration(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: pw.BoxDecoration(
             color: PdfColors.red,
             borderRadius: pw.BorderRadius.only(
-              topLeft: pw.Radius.circular(4),
-              topRight: pw.Radius.circular(4),
+              topLeft: pw.Radius.circular(sectionStyle.cornerRadius.pixels),
+              topRight: pw.Radius.circular(sectionStyle.cornerRadius.pixels),
             ),
           ),
           child: pw.Text(
             'DEFECTS / ISSUES IDENTIFIED',
             style: pw.TextStyle(
-              fontSize: 9,
+              fontSize: sectionStyle.headerFontSize,
               fontWeight: pw.FontWeight.bold,
-              color: _white,
+              color: pdfWhite,
               letterSpacing: 0.5,
             ),
           ),
         ),
         pw.Padding(
-          padding: const pw.EdgeInsets.all(8),
+          padding: pw.EdgeInsets.all(sectionStyle.innerPadding),
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: jobsheet.defects.asMap().entries.map((entry) {
               return pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 5),
+                padding: const pw.EdgeInsets.only(bottom: 6),
                 child: pw.Row(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Container(
-                      width: 18,
-                      height: 18,
-                      margin: const pw.EdgeInsets.only(right: 8),
-                      decoration: pw.BoxDecoration(
+                      width: 20,
+                      height: 20,
+                      margin: const pw.EdgeInsets.only(right: 10),
+                      decoration: const pw.BoxDecoration(
                         color: PdfColors.red,
-                        borderRadius: const pw.BorderRadius.all(
-                          pw.Radius.circular(9),
-                        ),
+                        borderRadius: pw.BorderRadius.all(pw.Radius.circular(10)),
                       ),
                       child: pw.Center(
                         child: pw.Text(
                           '${entry.key + 1}',
                           style: pw.TextStyle(
-                            fontSize: 9,
+                            fontSize: typography.fieldValueSize - 1,
                             fontWeight: pw.FontWeight.bold,
-                            color: _white,
+                            color: pdfWhite,
                           ),
                         ),
                       ),
@@ -816,7 +732,10 @@ pw.Widget _buildDefectsSection(Jobsheet jobsheet) {
                         padding: const pw.EdgeInsets.only(top: 2),
                         child: pw.Text(
                           entry.value,
-                          style: const pw.TextStyle(fontSize: 10),
+                          style: pw.TextStyle(
+                            fontSize: typography.fieldValueSize,
+                            color: colors.textPrimary,
+                          ),
                         ),
                       ),
                     ),
@@ -831,16 +750,25 @@ pw.Widget _buildDefectsSection(Jobsheet jobsheet) {
   );
 }
 
-pw.Widget _buildComplianceStatement(PdfColor primaryColor) {
+pw.Widget _buildComplianceStatement(
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
   return pw.Container(
-    padding: const pw.EdgeInsets.all(8),
+    margin: pw.EdgeInsets.only(bottom: sectionStyle.sectionSpacing),
+    padding: pw.EdgeInsets.all(sectionStyle.innerPadding),
     decoration: pw.BoxDecoration(
-      color: PdfColor.fromInt(0xFFF5F5F5),
+      color: colors.primarySoft,
       border: pw.Border(
-        left: pw.BorderSide(color: primaryColor, width: 4),
-        top: pw.BorderSide(color: _lightGray, width: 0.5),
-        right: pw.BorderSide(color: _lightGray, width: 0.5),
-        bottom: pw.BorderSide(color: _lightGray, width: 0.5),
+        left: pw.BorderSide(color: colors.primaryColor, width: 4),
+        top: pw.BorderSide(color: colors.primaryMedium, width: 0.5),
+        right: pw.BorderSide(color: colors.primaryMedium, width: 0.5),
+        bottom: pw.BorderSide(color: colors.primaryMedium, width: 0.5),
+      ),
+      borderRadius: pw.BorderRadius.only(
+        topRight: pw.Radius.circular(sectionStyle.cornerRadius.pixels),
+        bottomRight: pw.Radius.circular(sectionStyle.cornerRadius.pixels),
       ),
     ),
     child: pw.Column(
@@ -849,17 +777,21 @@ pw.Widget _buildComplianceStatement(PdfColor primaryColor) {
         pw.Text(
           'CERTIFICATION STATEMENT',
           style: pw.TextStyle(
-            fontSize: 9,
+            fontSize: typography.sectionHeaderSize - 2,
             fontWeight: pw.FontWeight.bold,
-            color: _darkGray,
+            color: colors.primaryColor,
+            letterSpacing: 0.5,
           ),
         ),
-        pw.SizedBox(height: 4),
+        pw.SizedBox(height: 6),
         pw.Text(
           'I hereby certify that the work described above has been carried out in accordance with '
           'BS 5839-1 and the manufacturer\'s instructions. The system has been left in full '
           'working order unless otherwise stated in the defects section above.',
-          style: const pw.TextStyle(fontSize: 8, color: _darkGray),
+          style: pw.TextStyle(
+            fontSize: typography.fieldLabelSize,
+            color: colors.textSecondary,
+          ),
           textAlign: pw.TextAlign.justify,
         ),
       ],
@@ -867,156 +799,27 @@ pw.Widget _buildComplianceStatement(PdfColor primaryColor) {
   );
 }
 
-pw.Widget _buildSignaturesSection(Jobsheet jobsheet, PdfColor primaryColor, PdfColor primaryLight) {
+pw.Widget _buildSignaturesSection(
+  Jobsheet jobsheet,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
   final dateFormat = DateFormat('dd/MM/yyyy');
 
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: _lightGray),
-      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-    ),
-    child: pw.Column(
-      children: [
-        _buildSectionHeader('Authorisation & Sign-Off', primaryColor),
-        pw.Padding(
-          padding: const pw.EdgeInsets.all(8),
-          child: pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'Engineer',
-                      style: pw.TextStyle(
-                        fontSize: 9,
-                        fontWeight: pw.FontWeight.bold,
-                        color: _darkGray,
-                      ),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Container(
-                      height: 40,
-                      decoration: pw.BoxDecoration(
-                        color: primaryLight,
-                        border: pw.Border.all(color: _lightGray),
-                        borderRadius: const pw.BorderRadius.all(
-                          pw.Radius.circular(2),
-                        ),
-                      ),
-                      child: _buildSignatureContent(
-                        jobsheet.engineerSignature,
-                      ),
-                    ),
-                    pw.SizedBox(height: 4),
-                    _buildSignatureField(
-                      'Name:',
-                      jobsheet.engineerName,
-                    ),
-                    pw.SizedBox(height: 2),
-                    _buildSignatureField(
-                      'Date:',
-                      dateFormat.format(jobsheet.date),
-                    ),
-                  ],
-                ),
-              ),
-              pw.SizedBox(width: 12),
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(
-                      'Customer / Site Representative',
-                      style: pw.TextStyle(
-                        fontSize: 9,
-                        fontWeight: pw.FontWeight.bold,
-                        color: _darkGray,
-                      ),
-                    ),
-                    pw.SizedBox(height: 4),
-                    pw.Container(
-                      height: 40,
-                      decoration: pw.BoxDecoration(
-                        color: primaryLight,
-                        border: pw.Border.all(color: _lightGray),
-                        borderRadius: const pw.BorderRadius.all(
-                          pw.Radius.circular(2),
-                        ),
-                      ),
-                      child: _buildSignatureContent(
-                        jobsheet.customerSignature,
-                      ),
-                    ),
-                    pw.SizedBox(height: 4),
-                    _buildSignatureField(
-                      'Name:',
-                      jobsheet.customerSignatureName ?? '',
-                    ),
-                    pw.SizedBox(height: 2),
-                    _buildSignatureField(
-                      'Date:',
-                      dateFormat.format(jobsheet.date),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-pw.Widget _buildSignatureContent(String? signatureBase64) {
-  if (signatureBase64 == null || signatureBase64.isEmpty) {
-    return pw.Center(
-      child: pw.Text(
-        'Signature',
-        style: const pw.TextStyle(fontSize: 8, color: _lightGray),
-      ),
-    );
-  }
-
-  try {
-    final bytes = base64Decode(signatureBase64);
-    return pw.Padding(
-      padding: const pw.EdgeInsets.all(4),
-      child: pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.contain),
-    );
-  } catch (e) {
-    return pw.Center(
-      child: pw.Text(
-        'Signature unavailable',
-        style: const pw.TextStyle(fontSize: 8, color: _lightGray),
-      ),
-    );
-  }
-}
-
-pw.Widget _buildSignatureField(String label, String value) {
-  return pw.Row(
+  return buildSectionCard(
+    title: 'Authorisation & Sign-Off',
+    colors: colors,
+    style: sectionStyle,
     children: [
-      pw.SizedBox(
-        width: 40,
-        child: pw.Text(
-          label,
-          style: const pw.TextStyle(fontSize: 8, color: _darkGray),
-        ),
-      ),
-      pw.Expanded(
-        child: pw.Container(
-          padding: const pw.EdgeInsets.only(bottom: 2),
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(bottom: pw.BorderSide(color: _lightGray)),
-          ),
-          child: pw.Text(
-            value,
-            style: const pw.TextStyle(fontSize: 9),
-          ),
-        ),
+      buildSignatureSection(
+        engineerSignatureBase64: jobsheet.engineerSignature,
+        customerSignatureBase64: jobsheet.customerSignature,
+        engineerName: jobsheet.engineerName,
+        customerName: jobsheet.customerSignatureName,
+        date: dateFormat.format(jobsheet.date),
+        colors: colors,
+        typography: typography,
       ),
     ],
   );
@@ -1058,78 +861,59 @@ Uint8List _extractFontBytes(pw.Font font) {
 
 /// Builds the "Asset Inspection Summary" table from pre-fetched service records.
 pw.Widget? _buildAssetSummarySection(
-    JobsheetPdfData data, PdfColor primaryColor, PdfColor primaryLight) {
+  JobsheetPdfData data,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
   final records = data.assetServiceRecords;
   if (records == null || records.isEmpty) return null;
 
   final passCount = records.where((r) => r['result'] == 'pass').length;
   final failCount = records.where((r) => r['result'] == 'fail').length;
-  final defectCount =
-      records.where((r) => r['defectNote'] != null && (r['defectNote'] as String).isNotEmpty).length;
+  final defectCount = records
+      .where((r) => r['defectNote'] != null && (r['defectNote'] as String).isNotEmpty)
+      .length;
 
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: _lightGray),
-      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-    ),
-    child: pw.Column(
-      children: [
-        _buildSectionHeader('Asset Inspection Summary', primaryColor),
-        // Table header
-        pw.Container(
-          color: primaryLight,
-          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: pw.Row(
-            children: [
-              pw.Expanded(flex: 2, child: pw.Text('Ref', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 3, child: pw.Text('Type', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 3, child: pw.Text('Location', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 2, child: pw.Text('Zone', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 2, child: pw.Text('Result', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-              pw.Expanded(flex: 2, child: pw.Text('Defects', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold))),
-            ],
-          ),
-        ),
-        // Table rows
-        ...records.asMap().entries.map((entry) {
-          final r = entry.value;
-          final isAlt = entry.key.isOdd;
+  return buildSectionCard(
+    title: 'Asset Inspection Summary',
+    colors: colors,
+    style: sectionStyle,
+    children: [
+      buildModernTable(
+        headers: ['Ref', 'Type', 'Location', 'Zone', 'Result', 'Defects'],
+        rows: records.map((r) {
           final hasDefect = r['defectNote'] != null && (r['defectNote'] as String).isNotEmpty;
-          return pw.Container(
-            color: isAlt ? primaryLight : null,
-            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            child: pw.Row(
-              children: [
-                pw.Expanded(flex: 2, child: pw.Text(r['reference'] ?? '-', style: const pw.TextStyle(fontSize: 8))),
-                pw.Expanded(flex: 3, child: pw.Text(r['typeName'] ?? '-', style: const pw.TextStyle(fontSize: 8))),
-                pw.Expanded(flex: 3, child: pw.Text(r['location'] ?? '-', style: const pw.TextStyle(fontSize: 8))),
-                pw.Expanded(flex: 2, child: pw.Text(r['zone'] ?? '-', style: const pw.TextStyle(fontSize: 8))),
-                pw.Expanded(
-                  flex: 2,
-                  child: pw.Text(
-                    (r['result'] as String? ?? '-').toUpperCase(),
-                    style: pw.TextStyle(
-                      fontSize: 8,
-                      fontWeight: pw.FontWeight.bold,
-                      color: r['result'] == 'pass' ? PdfColors.green800 : PdfColors.red,
-                    ),
-                  ),
-                ),
-                pw.Expanded(flex: 2, child: pw.Text(hasDefect ? 'Yes' : '-', style: const pw.TextStyle(fontSize: 8))),
-              ],
-            ),
-          );
-        }),
-        // Summary line
-        pw.Container(
-          padding: const pw.EdgeInsets.all(8),
-          child: pw.Text(
-            '${records.length} assets tested: $passCount pass, $failCount fail. $defectCount defect${defectCount == 1 ? '' : 's'} logged.',
-            style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+          return <String>[
+            (r['reference'] as String?) ?? '-',
+            (r['typeName'] as String?) ?? '-',
+            (r['location'] as String?) ?? '-',
+            (r['zone'] as String?) ?? '-',
+            (r['result'] as String? ?? '-').toUpperCase(),
+            hasDefect ? 'Yes' : '-',
+          ];
+        }).toList(),
+        colors: colors,
+        typography: typography,
+        columnFlex: [2, 3, 3, 2, 2, 2],
+      ),
+      pw.SizedBox(height: 8),
+      pw.Container(
+        padding: const pw.EdgeInsets.all(8),
+        decoration: pw.BoxDecoration(
+          color: colors.primarySoft,
+          borderRadius: pw.BorderRadius.circular(sectionStyle.cornerRadius.pixels),
+        ),
+        child: pw.Text(
+          '${records.length} assets tested: $passCount pass, $failCount fail. $defectCount defect${defectCount == 1 ? '' : 's'} logged.',
+          style: pw.TextStyle(
+            fontSize: typography.fieldLabelSize + 1,
+            fontWeight: pw.FontWeight.bold,
+            color: colors.textPrimary,
           ),
         ),
-      ],
-    ),
+      ),
+    ],
   );
 }
 
@@ -1163,6 +947,14 @@ class PDFService {
       useCompanyBranding: useCompanyBranding,
     );
     final colourScheme = await companyPdf.getEffectiveColourScheme(
+      PdfDocumentType.jobsheet,
+      useCompanyBranding: useCompanyBranding,
+    );
+    final sectionStyle = await companyPdf.getEffectiveSectionStyleConfig(
+      PdfDocumentType.jobsheet,
+      useCompanyBranding: useCompanyBranding,
+    );
+    final typography = await companyPdf.getEffectiveTypographyConfig(
       PdfDocumentType.jobsheet,
       useCompanyBranding: useCompanyBranding,
     );
@@ -1214,6 +1006,9 @@ class PDFService {
       headerConfigJson: headerConfig.toJson(),
       footerConfigJson: footerConfig.toJson(),
       colourSchemeValue: colourScheme.primaryColorValue,
+      secondaryColourValue: colourScheme.secondaryColorValue,
+      sectionStyleJson: sectionStyle.toJson(),
+      typographyJson: typography.toJson(),
       settingsCompanyName: settings.companyName,
       settingsTagline: settings.tagline,
       settingsAddress: settings.address,
