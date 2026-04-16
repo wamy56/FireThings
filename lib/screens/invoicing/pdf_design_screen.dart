@@ -3,11 +3,7 @@ import '../../models/pdf_header_config.dart' show PdfDocumentType;
 import '../../utils/adaptive_widgets.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
-import '../settings/pdf_header_designer_screen.dart';
-import '../settings/pdf_footer_designer_screen.dart';
-import '../settings/pdf_colour_scheme_screen.dart';
-import '../settings/pdf_section_style_screen.dart';
-import '../settings/pdf_typography_screen.dart';
+import '../settings/unified_pdf_editor_screen.dart';
 import '../../widgets/adaptive_app_bar.dart';
 
 class PdfDesignScreen extends StatelessWidget {
@@ -51,69 +47,15 @@ class PdfDesignScreen extends StatelessWidget {
             _buildConfigCard(
               context,
               isDark,
-              'Header',
+              'Design',
               AppIcons.edit,
-              'Customise your jobsheet PDF header and logo',
+              'Customise header, footer, colours, sections, and typography',
               () => Navigator.push(
                 context,
                 adaptivePageRoute(
-                  builder: (_) => PdfHeaderDesignerScreen(docType: PdfDocumentType.jobsheet),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildConfigCard(
-              context,
-              isDark,
-              'Footer',
-              AppIcons.edit,
-              'Customise your jobsheet PDF footer content',
-              () => Navigator.push(
-                context,
-                adaptivePageRoute(
-                  builder: (_) => PdfFooterDesignerScreen(docType: PdfDocumentType.jobsheet),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildConfigCard(
-              context,
-              isDark,
-              'Colour Scheme',
-              AppIcons.colorSwatch,
-              'Choose your jobsheet PDF colour theme',
-              () => Navigator.push(
-                context,
-                adaptivePageRoute(
-                  builder: (_) => PdfColourSchemeScreen(docType: PdfDocumentType.jobsheet),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildConfigCard(
-              context,
-              isDark,
-              'Section Style',
-              AppIcons.layout,
-              'Customise section cards and spacing',
-              () => Navigator.push(
-                context,
-                adaptivePageRoute(
-                  builder: (_) => PdfSectionStyleScreen(docType: PdfDocumentType.jobsheet),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildConfigCard(
-              context,
-              isDark,
-              'Typography',
-              AppIcons.text,
-              'Adjust font sizes throughout the document',
-              () => Navigator.push(
-                context,
-                adaptivePageRoute(
-                  builder: (_) => PdfTypographyScreen(docType: PdfDocumentType.jobsheet),
+                  builder: (_) => const UnifiedPdfEditorScreen(
+                    docType: PdfDocumentType.jobsheet,
+                  ),
                 ),
               ),
             ),
@@ -128,69 +70,15 @@ class PdfDesignScreen extends StatelessWidget {
             _buildConfigCard(
               context,
               isDark,
-              'Header',
+              'Design',
               AppIcons.edit,
-              'Customise your invoice PDF header and logo',
+              'Customise header, footer, colours, sections, and typography',
               () => Navigator.push(
                 context,
                 adaptivePageRoute(
-                  builder: (_) => PdfHeaderDesignerScreen(docType: PdfDocumentType.invoice),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildConfigCard(
-              context,
-              isDark,
-              'Footer',
-              AppIcons.edit,
-              'Customise your invoice PDF footer content',
-              () => Navigator.push(
-                context,
-                adaptivePageRoute(
-                  builder: (_) => PdfFooterDesignerScreen(docType: PdfDocumentType.invoice),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildConfigCard(
-              context,
-              isDark,
-              'Colour Scheme',
-              AppIcons.colorSwatch,
-              'Choose your invoice PDF colour theme',
-              () => Navigator.push(
-                context,
-                adaptivePageRoute(
-                  builder: (_) => PdfColourSchemeScreen(docType: PdfDocumentType.invoice),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildConfigCard(
-              context,
-              isDark,
-              'Section Style',
-              AppIcons.layout,
-              'Customise section cards and spacing',
-              () => Navigator.push(
-                context,
-                adaptivePageRoute(
-                  builder: (_) => PdfSectionStyleScreen(docType: PdfDocumentType.invoice),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            _buildConfigCard(
-              context,
-              isDark,
-              'Typography',
-              AppIcons.text,
-              'Adjust font sizes throughout the document',
-              () => Navigator.push(
-                context,
-                adaptivePageRoute(
-                  builder: (_) => PdfTypographyScreen(docType: PdfDocumentType.invoice),
+                  builder: (_) => const UnifiedPdfEditorScreen(
+                    docType: PdfDocumentType.invoice,
+                  ),
                 ),
               ),
             ),

@@ -4,6 +4,28 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-16 (Session 71)
+
+### Unified PDF Editor - UX Improvement
+
+Consolidated the 5 separate PDF customization screens (Header, Footer, Colour Scheme, Section Style, Typography) into a single tabbed editor with a unified live preview. This solves two UX problems: (1) Section Style and Typography screens had no visual feedback, and (2) users had to navigate in/out of 5 different screens to fully configure PDF styling.
+
+#### New Files Created
+- **`lib/widgets/unified_pdf_preview.dart`** — Reusable preview widget showing combined effect of all 5 config types (header, footer, colours, section style, typography). Renders scaled mockup with proper header styles (modern/classic/minimal), section card styles (bordered/shadowed/elevated/flat), section header styles (fullWidth/leftAccent/underlined), and footer zones.
+- **`lib/screens/settings/unified_pdf_editor_screen.dart`** — Main unified editor with 5-tab interface (Header, Footer, Colours, Style, Typography). Live preview updates as settings change. Supports both personal (`isCompany: false`) and company (`isCompany: true, companyId: ...`) modes. Single save button persists all configs simultaneously.
+
+#### Files Modified
+- **`lib/screens/invoicing/pdf_design_screen.dart`** — Replaced 5 navigation cards per doc type with single "Design" card navigating to `UnifiedPdfEditorScreen`
+- **`lib/screens/company/company_pdf_design_screen.dart`** — Simplified from 2335 lines to ~110 lines. Removed all private inline editor screens (`_CompanyHeaderEditorScreen`, `_CompanyFooterEditorScreen`, `_CompanyColourSchemeEditorScreen`, `_CompanySectionStyleEditorScreen`, `_CompanyTypographyEditorScreen`). Now uses `UnifiedPdfEditorScreen` in company mode.
+- **`lib/utils/icon_map.dart`** — Added `layout` and `text` icons to Design/Branding section
+
+#### Bug Fixes
+- Fixed `AnimatedSaveButton(onSave: ...)` → `AnimatedSaveButton(onPressed: ...)` in `pdf_typography_screen.dart` and `pdf_section_style_screen.dart`
+- Fixed `AppTheme.primary` → `AppTheme.primaryBlue` in `pdf_typography_screen.dart` and `company_pdf_design_screen.dart`
+- Removed unused imports
+
+---
+
 ## 2026-04-15 (Session 70)
 
 ### PDF Redesign Implementation - Full 6-Phase Rollout
