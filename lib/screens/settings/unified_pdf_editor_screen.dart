@@ -8,6 +8,7 @@ import '../../models/pdf_footer_config.dart';
 import '../../models/pdf_colour_scheme.dart';
 import '../../models/pdf_section_style_config.dart';
 import '../../models/pdf_typography_config.dart';
+import '../../models/pdf_style_preset.dart';
 import '../../services/pdf_header_config_service.dart';
 import '../../services/pdf_footer_config_service.dart';
 import '../../services/pdf_colour_scheme_service.dart';
@@ -26,9 +27,7 @@ import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/preset_colour_grid.dart';
 
-/// Unified PDF editor screen that consolidates all 5 PDF customization aspects
-/// (Header, Footer, Colours, Section Style, Typography) into a single tabbed interface
-/// with a live unified preview.
+/// Unified PDF editor screen with Template, Header, and Footer tabs.
 class UnifiedPdfEditorScreen extends StatefulWidget {
   final PdfDocumentType docType;
   final bool isCompany;
@@ -61,6 +60,9 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
   String? _logoPath;
   Uint8List? _logoBytes;
 
+  // Selected template preset
+  PdfStylePreset? _selectedPreset;
+
   bool _isLoading = true;
 
   String get _title {
@@ -72,7 +74,7 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadAllConfigs();
   }
 
@@ -89,6 +91,13 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
       } else {
         await _loadPersonalConfigs();
       }
+
+      // Detect which preset matches the current configs
+      _selectedPreset = PdfStylePresetExtension.matchFromConfigs(
+        header: _headerConfig,
+        sectionStyle: _sectionStyle,
+        typography: _typography,
+      );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -135,11 +144,16 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
       service.getCompanyLogoBytes(companyId, widget.docType),
     ]);
 
-    _headerConfig = (results[0] as PdfHeaderConfig?) ?? PdfHeaderConfig.defaults();
-    _footerConfig = (results[1] as PdfFooterConfig?) ?? PdfFooterConfig.defaults();
-    _colourScheme = (results[2] as PdfColourScheme?) ?? PdfColourScheme.defaults();
-    _sectionStyle = (results[3] as PdfSectionStyleConfig?) ?? PdfSectionStyleConfig.defaults();
-    _typography = (results[4] as PdfTypographyConfig?) ?? PdfTypographyConfig.defaults();
+    _headerConfig =
+        (results[0] as PdfHeaderConfig?) ?? PdfHeaderConfig.defaults();
+    _footerConfig =
+        (results[1] as PdfFooterConfig?) ?? PdfFooterConfig.defaults();
+    _colourScheme =
+        (results[2] as PdfColourScheme?) ?? PdfColourScheme.defaults();
+    _sectionStyle = (results[3] as PdfSectionStyleConfig?) ??
+        PdfSectionStyleConfig.defaults();
+    _typography =
+        (results[4] as PdfTypographyConfig?) ?? PdfTypographyConfig.defaults();
     _logoBytes = results[5] as Uint8List?;
   }
 
@@ -177,9 +191,19 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
       service.saveHeaderConfig(companyId, _headerConfig, widget.docType),
       service.saveFooterConfig(companyId, _footerConfig, widget.docType),
       service.saveColourScheme(companyId, _colourScheme, widget.docType),
-      service.saveSectionStyleConfig(companyId, _sectionStyle, widget.docType),
+      service.saveSectionStyleConfig(
+          companyId, _sectionStyle, widget.docType),
       service.saveTypographyConfig(companyId, _typography, widget.docType),
     ]);
+  }
+
+  void _applyPreset(PdfStylePreset preset) {
+    setState(() {
+      _selectedPreset = preset;
+      _headerConfig = preset.applyToHeaderConfig(_headerConfig);
+      _sectionStyle = preset.sectionStyleConfig;
+      _typography = preset.typographyConfig;
+    });
   }
 
   @override
@@ -229,20 +253,18 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
                           ? AppTheme.darkSurfaceElevated
                           : Colors.grey.shade100,
                       border: Border(
-                        top: BorderSide(color: Colors.grey.shade300, width: 0.5),
-                        bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
+                        top: BorderSide(
+                            color: Colors.grey.shade300, width: 0.5),
+                        bottom: BorderSide(
+                            color: Colors.grey.shade300, width: 0.5),
                       ),
                     ),
                     child: TabBar(
                       controller: _tabController,
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
                       tabs: const [
+                        Tab(text: 'Template'),
                         Tab(text: 'Header'),
                         Tab(text: 'Footer'),
-                        Tab(text: 'Colours'),
-                        Tab(text: 'Style'),
-                        Tab(text: 'Typography'),
                       ],
                     ),
                   ),
@@ -253,16 +275,277 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
                     child: TabBarView(
                       controller: _tabController,
                       children: [
+                        _buildTemplateTab(isDark),
                         _buildHeaderTab(isDark),
                         _buildFooterTab(isDark),
-                        _buildColourTab(isDark),
-                        _buildStyleTab(isDark),
-                        _buildTypographyTab(isDark),
                       ],
                     ),
                   ),
                 ],
               ),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // TEMPLATE TAB
+  // ═══════════════════════════════════════════════════════════════════
+
+  Widget _buildTemplateTab(bool isDark) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildSectionLabel('TEMPLATE STYLE', isDark),
+        const SizedBox(height: 8),
+        _buildPresetGrid(isDark),
+
+        const SizedBox(height: 24),
+
+        _buildSectionLabel('COLOUR SCHEME', isDark),
+        const SizedBox(height: 8),
+        PresetColourGrid(
+          selectedPrimaryColorValue: _colourScheme.primaryColorValue,
+          isDark: isDark,
+          onPresetSelected: (scheme) {
+            setState(() => _colourScheme = scheme);
+          },
+        ),
+
+        const SizedBox(height: 16),
+
+        OutlinedButton.icon(
+          onPressed: _openColourPicker,
+          icon: Icon(AppIcons.colorSwatch),
+          label: const Text('Pick Custom Colour'),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Current colour preview
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkSurface : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Color(_colourScheme.primaryColorValue),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade400),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Primary: #${_colourScheme.primaryColorValue.toRadixString(16).substring(2).toUpperCase()}',
+                style: TextStyle(
+                  fontFamily: 'monospace',
+                  color:
+                      isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPresetGrid(bool isDark) {
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childAspectRatio: 1.6,
+      children: PdfStylePreset.values.map((preset) {
+        final isSelected = _selectedPreset == preset;
+        return _buildPresetCard(preset, isSelected, isDark);
+      }).toList(),
+    );
+  }
+
+  Widget _buildPresetCard(
+      PdfStylePreset preset, bool isSelected, bool isDark) {
+    final primaryColor = Color(_colourScheme.primaryColorValue);
+
+    return GestureDetector(
+      onTap: () => _applyPreset(preset),
+      child: AnimatedContainer(
+        duration: AppTheme.fastAnimation,
+        curve: AppTheme.defaultCurve,
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkSurface : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? primaryColor : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      preset.label,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected
+                            ? primaryColor
+                            : isDark
+                                ? AppTheme.darkTextPrimary
+                                : AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (isSelected)
+                    Icon(AppIcons.tickCircle, color: primaryColor, size: 20),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                preset.description,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark
+                      ? AppTheme.darkTextSecondary
+                      : AppTheme.textSecondary,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const Spacer(),
+              _buildPresetMiniPreview(preset, isDark),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// A small visual indicator showing the preset's card/header style
+  Widget _buildPresetMiniPreview(PdfStylePreset preset, bool isDark) {
+    final primaryColor = Color(_colourScheme.primaryColorValue);
+    final config = preset.sectionStyleConfig;
+
+    return SizedBox(
+      height: 20,
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius:
+                    BorderRadius.circular(config.cornerRadius.pixels * 0.5),
+                border: config.cardStyle == SectionCardStyle.bordered
+                    ? Border.all(color: Colors.grey.shade300, width: 1)
+                    : null,
+                boxShadow: config.cardStyle == SectionCardStyle.shadowed ||
+                        config.cardStyle == SectionCardStyle.elevated
+                    ? [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 2,
+                        ),
+                      ]
+                    : null,
+                color: config.cardStyle == SectionCardStyle.flat
+                    ? primaryColor.withValues(alpha: 0.1)
+                    : isDark
+                        ? AppTheme.darkSurfaceElevated
+                        : Colors.white,
+              ),
+              child: Row(
+                children: [
+                  if (config.headerStyle == SectionHeaderStyle.fullWidth)
+                    Container(
+                      width: 40,
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        borderRadius: BorderRadius.only(
+                          topLeft: Radius.circular(
+                              config.cornerRadius.pixels * 0.5),
+                          bottomLeft: Radius.circular(
+                              config.cornerRadius.pixels * 0.5),
+                        ),
+                      ),
+                    ),
+                  if (config.headerStyle == SectionHeaderStyle.leftAccent)
+                    Container(
+                      width: 3,
+                      color: primaryColor,
+                    ),
+                  if (config.headerStyle == SectionHeaderStyle.underlined)
+                    Container(
+                      width: 40,
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: primaryColor, width: 1),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openColourPicker() {
+    Color pickerColor = Color(_colourScheme.primaryColorValue);
+
+    showPremiumDialog(
+      context: context,
+      child: Builder(
+        builder: (context) => AlertDialog(
+          title: const Text('Pick a colour'),
+          content: SingleChildScrollView(
+            child: ColorPicker(
+              pickerColor: pickerColor,
+              onColorChanged: (color) => pickerColor = color,
+              enableAlpha: false,
+              labelTypes: const [],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _colourScheme = PdfColourScheme(
+                    primaryColorValue: pickerColor.toARGB32(),
+                  );
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Select'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -293,7 +576,8 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
           selected: {_headerConfig.logoZone},
           onSelectionChanged: (selection) {
             setState(() {
-              _headerConfig = _headerConfig.copyWith(logoZone: selection.first);
+              _headerConfig =
+                  _headerConfig.copyWith(logoZone: selection.first);
             });
           },
         ),
@@ -311,46 +595,208 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
           selected: {_headerConfig.logoSize},
           onSelectionChanged: (selection) {
             setState(() {
-              _headerConfig = _headerConfig.copyWith(logoSize: selection.first);
+              _headerConfig =
+                  _headerConfig.copyWith(logoSize: selection.first);
             });
           },
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 24),
 
-        // Header style
-        _buildSectionLabel('HEADER STYLE', isDark),
+        // Header text - Left Zone
+        _buildSectionLabel('HEADER TEXT \u2014 LEFT ZONE', isDark),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: HeaderStyle.values.map((style) {
-            final isSelected = _headerConfig.headerStyle == style;
-            return ChoiceChip(
-              label: Text(_headerStyleLabel(style)),
-              selected: isSelected,
-              onSelected: (_) {
-                setState(() {
-                  _headerConfig = _headerConfig.copyWith(headerStyle: style);
-                });
-              },
-            );
-          }).toList(),
-        ),
+        _buildHeaderLinesList(isLeft: true, isDark: isDark),
+        const SizedBox(height: 8),
+        _buildAddHeaderLineButton(isLeft: true),
+
+        const SizedBox(height: 24),
+
+        // Header text - Centre Zone
+        _buildSectionLabel('HEADER TEXT \u2014 CENTRE ZONE (OPTIONAL)', isDark),
+        const SizedBox(height: 8),
+        _buildHeaderLinesList(isLeft: false, isDark: isDark),
+        const SizedBox(height: 8),
+        _buildAddHeaderLineButton(isLeft: false),
 
         const SizedBox(height: 24),
       ],
     );
   }
 
-  String _headerStyleLabel(HeaderStyle style) {
-    switch (style) {
-      case HeaderStyle.modern:
-        return 'Modern';
-      case HeaderStyle.classic:
-        return 'Classic';
-      case HeaderStyle.minimal:
-        return 'Minimal';
+  Widget _buildHeaderLinesList({required bool isLeft, required bool isDark}) {
+    final lines =
+        isLeft ? _headerConfig.leftLines : _headerConfig.centreLines;
+
+    if (lines.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkSurface : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Text(
+            'No lines added',
+            style: TextStyle(color: Colors.grey.shade500),
+          ),
+        ),
+      );
     }
+
+    return ReorderableListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: lines.length,
+      onReorder: (oldIndex, newIndex) {
+        if (newIndex > oldIndex) newIndex--;
+        final updated = List<HeaderTextLine>.from(lines);
+        final item = updated.removeAt(oldIndex);
+        updated.insert(newIndex, item);
+        setState(() {
+          _headerConfig = isLeft
+              ? _headerConfig.copyWith(leftLines: updated)
+              : _headerConfig.copyWith(centreLines: updated);
+        });
+      },
+      itemBuilder: (context, index) {
+        final line = lines[index];
+        return _buildHeaderLineCard(
+          key: ValueKey('${isLeft ? 'left' : 'centre'}_$index'),
+          line: line,
+          index: index,
+          isLeft: isLeft,
+          isDark: isDark,
+        );
+      },
+    );
+  }
+
+  Widget _buildHeaderLineCard({
+    required Key key,
+    required HeaderTextLine line,
+    required int index,
+    required bool isLeft,
+    required bool isDark,
+  }) {
+    return Card(
+      key: key,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(AppIcons.menu, size: 18, color: Colors.grey.shade400),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _labelForLineKey(line.key),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppTheme.darkTextSecondary
+                          : AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  TextFormField(
+                    initialValue: line.value,
+                    decoration: InputDecoration(
+                      hintText: _hintForLineKey(line.key),
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                    ),
+                    style: const TextStyle(fontSize: 14),
+                    onChanged: (val) =>
+                        _updateHeaderLine(index, isLeft, val),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: Icon(AppIcons.trash, size: 18),
+              color: Colors.red,
+              onPressed: () => _removeHeaderLine(index, isLeft),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _updateHeaderLine(int index, bool isLeft, String value) {
+    final lines =
+        isLeft ? _headerConfig.leftLines : _headerConfig.centreLines;
+    final updated = List<HeaderTextLine>.from(lines);
+    updated[index] = updated[index].copyWith(value: value);
+    setState(() {
+      _headerConfig = isLeft
+          ? _headerConfig.copyWith(leftLines: updated)
+          : _headerConfig.copyWith(centreLines: updated);
+    });
+  }
+
+  void _removeHeaderLine(int index, bool isLeft) {
+    final lines =
+        isLeft ? _headerConfig.leftLines : _headerConfig.centreLines;
+    final updated = List<HeaderTextLine>.from(lines);
+    updated.removeAt(index);
+    setState(() {
+      _headerConfig = isLeft
+          ? _headerConfig.copyWith(leftLines: updated)
+          : _headerConfig.copyWith(centreLines: updated);
+    });
+  }
+
+  Widget _buildAddHeaderLineButton({required bool isLeft}) {
+    return OutlinedButton.icon(
+      onPressed: () => _addHeaderLine(isLeft),
+      icon: Icon(AppIcons.add),
+      label: const Text('Add Text Line'),
+    );
+  }
+
+  void _addHeaderLine(bool isLeft) {
+    final options = [
+      ('companyName', 'Company Name', 18.0, true),
+      ('tagline', 'Tagline', 10.0, true),
+      ('address', 'Address', 9.0, false),
+      ('phone', 'Phone', 9.0, false),
+      ('engineerName', 'Engineer Name', 10.0, false),
+      ('custom', 'Custom Text', 9.0, false),
+    ];
+
+    showAdaptiveActionSheet(
+      context: context,
+      title: 'Add Header Line',
+      options: options.map((opt) {
+        return ActionSheetOption(
+          label: opt.$2,
+          onTap: () {
+            final newLine = HeaderTextLine(
+              key: opt.$1,
+              fontSize: opt.$3,
+              bold: opt.$4,
+            );
+            final lines = isLeft
+                ? _headerConfig.leftLines
+                : _headerConfig.centreLines;
+            final updated = List<HeaderTextLine>.from(lines)..add(newLine);
+            setState(() {
+              _headerConfig = isLeft
+                  ? _headerConfig.copyWith(leftLines: updated)
+                  : _headerConfig.copyWith(centreLines: updated);
+            });
+          },
+        );
+      }).toList(),
+    );
   }
 
   Widget _buildLogoUploader(bool isDark) {
@@ -373,7 +819,8 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
                   child: _logoBytes != null
                       ? Image.memory(_logoBytes!, fit: BoxFit.contain)
                       : (_logoPath != null && !kIsWeb)
-                          ? Image.file(File(_logoPath!), fit: BoxFit.contain)
+                          ? Image.file(File(_logoPath!),
+                              fit: BoxFit.contain)
                           : const SizedBox.shrink(),
                 ),
                 Positioned(
@@ -495,7 +942,8 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
           'Footer text appears at the bottom of every page.',
           style: TextStyle(
             fontSize: 14,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+            color:
+                isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
           ),
         ),
         const SizedBox(height: 16),
@@ -504,7 +952,7 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
         const SizedBox(height: 8),
         _buildFooterLinesList(isLeft: true, isDark: isDark),
         const SizedBox(height: 8),
-        _buildAddLineButton(isLeft: true),
+        _buildAddFooterLineButton(isLeft: true),
 
         const SizedBox(height: 24),
 
@@ -512,7 +960,7 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
         const SizedBox(height: 8),
         _buildFooterLinesList(isLeft: false, isDark: isDark),
         const SizedBox(height: 8),
-        _buildAddLineButton(isLeft: false),
+        _buildAddFooterLineButton(isLeft: false),
 
         const SizedBox(height: 24),
       ],
@@ -520,7 +968,8 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
   }
 
   Widget _buildFooterLinesList({required bool isLeft, required bool isDark}) {
-    final lines = isLeft ? _footerConfig.leftLines : _footerConfig.centreLines;
+    final lines =
+        isLeft ? _footerConfig.leftLines : _footerConfig.centreLines;
 
     if (lines.isEmpty) {
       return Container(
@@ -597,7 +1046,8 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
   }
 
   void _updateFooterLine(int index, bool isLeft, String value) {
-    final lines = isLeft ? _footerConfig.leftLines : _footerConfig.centreLines;
+    final lines =
+        isLeft ? _footerConfig.leftLines : _footerConfig.centreLines;
     final updated = List<HeaderTextLine>.from(lines);
     updated[index] = updated[index].copyWith(value: value);
     setState(() {
@@ -608,7 +1058,8 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
   }
 
   void _removeFooterLine(int index, bool isLeft) {
-    final lines = isLeft ? _footerConfig.leftLines : _footerConfig.centreLines;
+    final lines =
+        isLeft ? _footerConfig.leftLines : _footerConfig.centreLines;
     final updated = List<HeaderTextLine>.from(lines);
     updated.removeAt(index);
     setState(() {
@@ -618,7 +1069,7 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
     });
   }
 
-  Widget _buildAddLineButton({required bool isLeft}) {
+  Widget _buildAddFooterLineButton({required bool isLeft}) {
     return OutlinedButton.icon(
       onPressed: () => _addFooterLine(isLeft),
       icon: Icon(AppIcons.add),
@@ -654,6 +1105,10 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
     );
   }
 
+  // ═══════════════════════════════════════════════════════════════════
+  // HELPER WIDGETS
+  // ═══════════════════════════════════════════════════════════════════
+
   String _labelForLineKey(String key) {
     switch (key) {
       case 'companyName':
@@ -675,407 +1130,24 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
     }
   }
 
-  // ═══════════════════════════════════════════════════════════════════
-  // COLOUR TAB
-  // ═══════════════════════════════════════════════════════════════════
-
-  Widget _buildColourTab(bool isDark) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _buildSectionLabel('PRESET COLOURS', isDark),
-        const SizedBox(height: 8),
-        PresetColourGrid(
-          selectedPrimaryColorValue: _colourScheme.primaryColorValue,
-          isDark: isDark,
-          onPresetSelected: (scheme) {
-            setState(() => _colourScheme = scheme);
-          },
-        ),
-
-        const SizedBox(height: 24),
-
-        _buildSectionLabel('CUSTOM COLOUR', isDark),
-        const SizedBox(height: 8),
-        OutlinedButton.icon(
-          onPressed: _openColourPicker,
-          icon: Icon(AppIcons.colorSwatch),
-          label: const Text('Pick Custom Colour'),
-        ),
-
-        const SizedBox(height: 16),
-
-        // Current colour preview
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkSurface : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Color(_colourScheme.primaryColorValue),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade400),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Primary: #${_colourScheme.primaryColorValue.toRadixString(16).substring(2).toUpperCase()}',
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _openColourPicker() {
-    Color pickerColor = Color(_colourScheme.primaryColorValue);
-
-    showPremiumDialog(
-      context: context,
-      child: Builder(
-        builder: (context) => AlertDialog(
-          title: const Text('Pick a colour'),
-          content: SingleChildScrollView(
-            child: ColorPicker(
-              pickerColor: pickerColor,
-              onColorChanged: (color) => pickerColor = color,
-              enableAlpha: false,
-              labelTypes: const [],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                setState(() {
-                  _colourScheme = PdfColourScheme(
-                    primaryColorValue: pickerColor.toARGB32(),
-                  );
-                });
-                Navigator.pop(context);
-              },
-              child: const Text('Select'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // STYLE TAB
-  // ═══════════════════════════════════════════════════════════════════
-
-  Widget _buildStyleTab(bool isDark) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // Card Style
-        _buildSectionLabel('CARD STYLE', isDark),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: SectionCardStyle.values.map((style) {
-            final isSelected = _sectionStyle.cardStyle == style;
-            return ChoiceChip(
-              label: Text(_cardStyleLabel(style)),
-              selected: isSelected,
-              onSelected: (_) {
-                setState(() {
-                  _sectionStyle = _sectionStyle.copyWith(cardStyle: style);
-                });
-              },
-            );
-          }).toList(),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Corner Radius
-        _buildSectionLabel('CORNER RADIUS', isDark),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: SectionCornerRadius.values.map((radius) {
-            final isSelected = _sectionStyle.cornerRadius == radius;
-            return ChoiceChip(
-              label: Text(_cornerRadiusLabel(radius)),
-              selected: isSelected,
-              onSelected: (_) {
-                setState(() {
-                  _sectionStyle = _sectionStyle.copyWith(cornerRadius: radius);
-                });
-              },
-            );
-          }).toList(),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Header Style
-        _buildSectionLabel('SECTION HEADER STYLE', isDark),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: SectionHeaderStyle.values.map((style) {
-            final isSelected = _sectionStyle.headerStyle == style;
-            return ChoiceChip(
-              label: Text(_sectionHeaderStyleLabel(style)),
-              selected: isSelected,
-              onSelected: (_) {
-                setState(() {
-                  _sectionStyle = _sectionStyle.copyWith(headerStyle: style);
-                });
-              },
-            );
-          }).toList(),
-        ),
-
-        const SizedBox(height: 24),
-
-        // Spacing
-        _buildSectionLabel('SECTION SPACING', isDark),
-        const SizedBox(height: 8),
-        _buildSliderRow(
-          value: _sectionStyle.sectionSpacing,
-          min: 6,
-          max: 24,
-          divisions: 6,
-          onChanged: (value) {
-            setState(() {
-              _sectionStyle = _sectionStyle.copyWith(sectionSpacing: value);
-            });
-          },
-        ),
-
-        const SizedBox(height: 16),
-
-        // Inner Padding
-        _buildSectionLabel('INNER PADDING', isDark),
-        const SizedBox(height: 8),
-        _buildSliderRow(
-          value: _sectionStyle.innerPadding,
-          min: 8,
-          max: 20,
-          divisions: 6,
-          onChanged: (value) {
-            setState(() {
-              _sectionStyle = _sectionStyle.copyWith(innerPadding: value);
-            });
-          },
-        ),
-      ],
-    );
-  }
-
-  String _cardStyleLabel(SectionCardStyle style) {
-    switch (style) {
-      case SectionCardStyle.bordered:
-        return 'Bordered';
-      case SectionCardStyle.shadowed:
-        return 'Shadowed';
-      case SectionCardStyle.elevated:
-        return 'Elevated';
-      case SectionCardStyle.flat:
-        return 'Flat';
+  String _hintForLineKey(String key) {
+    switch (key) {
+      case 'companyName':
+        return 'Your Company Name';
+      case 'tagline':
+        return 'Your tagline or slogan';
+      case 'address':
+        return '123 Example Street, City';
+      case 'phone':
+        return '01234 567 890';
+      case 'engineerName':
+        return 'Auto-filled from profile';
+      case 'custom':
+        return 'Enter custom text';
+      default:
+        return '';
     }
   }
-
-  String _cornerRadiusLabel(SectionCornerRadius radius) {
-    switch (radius) {
-      case SectionCornerRadius.small:
-        return 'Small (${radius.pixels.toInt()}px)';
-      case SectionCornerRadius.medium:
-        return 'Medium (${radius.pixels.toInt()}px)';
-      case SectionCornerRadius.large:
-        return 'Large (${radius.pixels.toInt()}px)';
-    }
-  }
-
-  String _sectionHeaderStyleLabel(SectionHeaderStyle style) {
-    switch (style) {
-      case SectionHeaderStyle.fullWidth:
-        return 'Full Width';
-      case SectionHeaderStyle.leftAccent:
-        return 'Left Accent';
-      case SectionHeaderStyle.underlined:
-        return 'Underlined';
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // TYPOGRAPHY TAB
-  // ═══════════════════════════════════════════════════════════════════
-
-  Widget _buildTypographyTab(bool isDark) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Adjust font sizes throughout your PDF.',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () {
-                setState(() {
-                  _typography = PdfTypographyConfig.defaults();
-                });
-              },
-              icon: Icon(AppIcons.refresh, size: 18),
-              label: const Text('Reset'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        _buildFontSizeSlider(
-          label: 'Section Headers',
-          value: _typography.sectionHeaderSize,
-          min: 8,
-          max: 16,
-          onChanged: (value) {
-            setState(() {
-              _typography = _typography.copyWith(sectionHeaderSize: value);
-            });
-          },
-        ),
-
-        _buildFontSizeSlider(
-          label: 'Field Labels',
-          value: _typography.fieldLabelSize,
-          min: 6,
-          max: 12,
-          onChanged: (value) {
-            setState(() {
-              _typography = _typography.copyWith(fieldLabelSize: value);
-            });
-          },
-        ),
-
-        _buildFontSizeSlider(
-          label: 'Field Values',
-          value: _typography.fieldValueSize,
-          min: 8,
-          max: 14,
-          onChanged: (value) {
-            setState(() {
-              _typography = _typography.copyWith(fieldValueSize: value);
-            });
-          },
-        ),
-
-        _buildFontSizeSlider(
-          label: 'Table Headers',
-          value: _typography.tableHeaderSize,
-          min: 7,
-          max: 12,
-          onChanged: (value) {
-            setState(() {
-              _typography = _typography.copyWith(tableHeaderSize: value);
-            });
-          },
-        ),
-
-        _buildFontSizeSlider(
-          label: 'Table Body',
-          value: _typography.tableBodySize,
-          min: 7,
-          max: 12,
-          onChanged: (value) {
-            setState(() {
-              _typography = _typography.copyWith(tableBodySize: value);
-            });
-          },
-        ),
-
-        _buildFontSizeSlider(
-          label: 'Footer Text',
-          value: _typography.footerSize,
-          min: 6,
-          max: 10,
-          onChanged: (value) {
-            setState(() {
-              _typography = _typography.copyWith(footerSize: value);
-            });
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFontSizeSlider({
-    required String label,
-    required double value,
-    required double min,
-    required double max,
-    required ValueChanged<double> onChanged,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
-                ),
-              ),
-              Text(
-                '${value.toInt()}pt',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryBlue,
-                ),
-              ),
-            ],
-          ),
-          Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: (max - min).toInt(),
-            onChanged: onChanged,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════
-  // HELPER WIDGETS
-  // ═══════════════════════════════════════════════════════════════════
 
   Widget _buildSectionLabel(String title, bool isDark) {
     return Text(
@@ -1086,35 +1158,6 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
         color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
         letterSpacing: 1,
       ),
-    );
-  }
-
-  Widget _buildSliderRow({
-    required double value,
-    required double min,
-    required double max,
-    required int divisions,
-    required ValueChanged<double> onChanged,
-  }) {
-    return Row(
-      children: [
-        Expanded(
-          child: Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: divisions,
-            onChanged: onChanged,
-          ),
-        ),
-        SizedBox(
-          width: 50,
-          child: Text(
-            '${value.toInt()}px',
-            style: const TextStyle(fontSize: 14),
-          ),
-        ),
-      ],
     );
   }
 }

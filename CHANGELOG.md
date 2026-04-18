@@ -4,6 +4,27 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-18 (Session 72)
+
+### PDF Customizer Overhaul — Template Presets + Bug Fixes
+
+Simplified the PDF customizer from 5 tabs to 3 (Template | Header | Footer). Replaced granular Style and Typography controls with 4 pre-made professional template presets (Modern, Classic, Minimal, Bold) that control the entire PDF look. Added header text editing back (was lost in Session 71 overhaul). Fixed logo centre placement bug.
+
+#### Changes
+- **Template tab**: 2x2 grid of 4 preset cards with mini style indicators + colour scheme picker (moved from old Colours tab). Each preset sets header style, section card/header styles, corner radius, spacing, padding, and typography as a cohesive unit.
+- **Header tab**: Restored header text line editing with simplified cards (text field + delete + drag-to-reorder). Removed Header Style picker (now controlled by template). Left zone and centre zone support with add line options (Company Name, Tagline, Address, Phone, Engineer Name, Custom Text).
+- **Logo centre fix**: Centred logos now appear correctly above the header content row in both the live preview and generated PDFs (jobsheet and invoice). Previously, selecting "Centre" placed the logo at the far right.
+- **Removed**: Typography tab (6 font size sliders), Style tab (card style, corner radius, header style, spacing sliders), Colours tab (merged into Template tab)
+
+#### Files Modified
+- **`lib/models/pdf_style_preset.dart`** — Added `typographyConfig` getter, `applyToHeaderConfig()` method, `matchFromConfigs()` static matcher. Removed `colourScheme` getter. Changed `headerConfig` to individual property getters (headerStyle, cornerRadius, padding).
+- **`lib/screens/settings/unified_pdf_editor_screen.dart`** — Restructured from 5 tabs to 3. Added template preset grid, header text line editing with ReorderableListView, colour picker in template tab.
+- **`lib/widgets/unified_pdf_preview.dart`** — Fixed centre logo layout in all 3 header styles (modern/classic/minimal) using Column with centred logo above content row.
+- **`lib/services/pdf_widgets/pdf_modern_header.dart`** — Fixed centre logo placement in jobsheet PDF generation. Added `_buildCentredLogo()` helper. All 3 header style builders now handle centre logo via Column layout.
+- **`lib/services/pdf_header_builder.dart`** — Fixed centre logo placement in invoice PDF generation. Centre logo now renders above the text row instead of inline.
+
+---
+
 ## 2026-04-16 (Session 71)
 
 ### Unified PDF Editor - UX Improvement

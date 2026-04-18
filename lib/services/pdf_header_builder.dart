@@ -53,12 +53,7 @@ class PdfHeaderBuilder {
       leftChildren.add(pw.Expanded(child: pw.SizedBox()));
     }
 
-    // Centre zone
-    if (config.logoZone == LogoZone.centre && logoWidget != null) {
-      centreChildren.add(logoWidget);
-      centreChildren.add(pw.SizedBox(width: 10));
-    }
-
+    // Centre zone text (logo centre is handled separately above the row)
     final centreTextLines = _buildTextLines(config.centreLines, fallbackValues, effectivePrimary);
     if (centreTextLines.isNotEmpty) {
       centreChildren.add(
@@ -72,10 +67,10 @@ class PdfHeaderBuilder {
     }
 
     // Build the combined row
-    final children = <pw.Widget>[];
+    final rowChildren = <pw.Widget>[];
 
     // Left zone as a row
-    children.add(
+    rowChildren.add(
       pw.Expanded(
         flex: 3,
         child: pw.Row(
@@ -87,8 +82,8 @@ class PdfHeaderBuilder {
 
     // Centre zone (only if it has content)
     if (centreChildren.isNotEmpty) {
-      children.add(pw.SizedBox(width: 12));
-      children.add(
+      rowChildren.add(pw.SizedBox(width: 12));
+      rowChildren.add(
         pw.Expanded(
           flex: 2,
           child: pw.Row(
@@ -99,10 +94,27 @@ class PdfHeaderBuilder {
       );
     }
 
-    return pw.Row(
+    final contentRow = pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: children,
+      children: rowChildren,
     );
+
+    // If logo is centred, place it above the content row
+    if (config.logoZone == LogoZone.centre && logoWidget != null) {
+      return pw.Column(
+        children: [
+          pw.Center(
+            child: pw.Padding(
+              padding: const pw.EdgeInsets.only(bottom: 8),
+              child: logoWidget,
+            ),
+          ),
+          contentRow,
+        ],
+      );
+    }
+
+    return contentRow;
   }
 
   static List<pw.Widget> _buildTextLines(

@@ -87,6 +87,26 @@ class UnifiedPdfPreview extends StatelessWidget {
 
   Widget _buildModernHeader() {
     final cornerRadius = headerConfig.cornerRadius.pixels * _scale;
+    final hasCentreLogo =
+        headerConfig.logoZone == LogoZone.centre && logoBytes != null;
+
+    final contentRow = Row(
+      children: [
+        if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
+          _buildLogo(),
+        if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
+          SizedBox(width: 8 * _scale),
+        Expanded(child: _buildHeaderZone(headerConfig.leftLines, Colors.white)),
+        if (headerConfig.centreLines.isNotEmpty) ...[
+          SizedBox(width: 8 * _scale),
+          Expanded(
+              child:
+                  _buildHeaderZone(headerConfig.centreLines, Colors.white)),
+        ],
+        SizedBox(width: 8 * _scale),
+        _buildDocTypeBadge(isModern: true),
+      ],
+    );
 
     return Container(
       padding: EdgeInsets.symmetric(
@@ -100,29 +120,43 @@ class UnifiedPdfPreview extends StatelessWidget {
           bottomRight: Radius.circular(cornerRadius),
         ),
       ),
-      child: Row(
-        children: [
-          if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
-            _buildLogo(),
-          if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
-            SizedBox(width: 8 * _scale),
-          Expanded(child: _buildHeaderZone(headerConfig.leftLines, Colors.white)),
-          if (headerConfig.centreLines.isNotEmpty) ...[
-            SizedBox(width: 8 * _scale),
-            Expanded(child: _buildHeaderZone(headerConfig.centreLines, Colors.white)),
-          ],
-          if (headerConfig.logoZone == LogoZone.centre && logoBytes != null) ...[
-            SizedBox(width: 8 * _scale),
-            _buildLogo(),
-          ],
-          SizedBox(width: 8 * _scale),
-          _buildDocTypeBadge(isModern: true),
-        ],
-      ),
+      child: hasCentreLogo
+          ? Column(
+              children: [
+                Center(
+                    child: Padding(
+                        padding: EdgeInsets.only(bottom: 6 * _scale),
+                        child: _buildLogo())),
+                contentRow,
+              ],
+            )
+          : contentRow,
     );
   }
 
   Widget _buildClassicHeader() {
+    final hasCentreLogo =
+        headerConfig.logoZone == LogoZone.centre && logoBytes != null;
+
+    final contentRow = Row(
+      children: [
+        if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
+          _buildLogo(),
+        if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
+          SizedBox(width: 8 * _scale),
+        Expanded(
+            child: _buildHeaderZone(headerConfig.leftLines, _primaryColor)),
+        if (headerConfig.centreLines.isNotEmpty) ...[
+          SizedBox(width: 8 * _scale),
+          Expanded(
+              child:
+                  _buildHeaderZone(headerConfig.centreLines, _primaryColor)),
+        ],
+        SizedBox(width: 8 * _scale),
+        _buildDocTypeBadge(isModern: false),
+      ],
+    );
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: headerConfig.horizontalPadding * _scale,
@@ -133,53 +167,59 @@ class UnifiedPdfPreview extends StatelessWidget {
           bottom: BorderSide(color: _primaryColor, width: 2),
         ),
       ),
-      child: Row(
-        children: [
-          if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
-            _buildLogo(),
-          if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
-            SizedBox(width: 8 * _scale),
-          Expanded(child: _buildHeaderZone(headerConfig.leftLines, _primaryColor)),
-          if (headerConfig.centreLines.isNotEmpty) ...[
-            SizedBox(width: 8 * _scale),
-            Expanded(child: _buildHeaderZone(headerConfig.centreLines, _primaryColor)),
-          ],
-          if (headerConfig.logoZone == LogoZone.centre && logoBytes != null) ...[
-            SizedBox(width: 8 * _scale),
-            _buildLogo(),
-          ],
-          SizedBox(width: 8 * _scale),
-          _buildDocTypeBadge(isModern: false),
-        ],
-      ),
+      child: hasCentreLogo
+          ? Column(
+              children: [
+                Center(
+                    child: Padding(
+                        padding: EdgeInsets.only(bottom: 6 * _scale),
+                        child: _buildLogo())),
+                contentRow,
+              ],
+            )
+          : contentRow,
     );
   }
 
   Widget _buildMinimalHeader() {
+    final hasCentreLogo =
+        headerConfig.logoZone == LogoZone.centre && logoBytes != null;
+
+    final contentRow = Row(
+      children: [
+        if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
+          _buildLogo(),
+        if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
+          SizedBox(width: 8 * _scale),
+        Expanded(
+            child: _buildHeaderZone(headerConfig.leftLines, _primaryColor)),
+        if (headerConfig.centreLines.isNotEmpty) ...[
+          SizedBox(width: 8 * _scale),
+          Expanded(
+              child:
+                  _buildHeaderZone(headerConfig.centreLines, _primaryColor)),
+        ],
+        SizedBox(width: 8 * _scale),
+        _buildDocTypeBadge(isModern: false),
+      ],
+    );
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: headerConfig.horizontalPadding * _scale,
         vertical: (headerConfig.verticalPadding + 4) * _scale,
       ),
-      child: Row(
-        children: [
-          if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
-            _buildLogo(),
-          if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
-            SizedBox(width: 8 * _scale),
-          Expanded(child: _buildHeaderZone(headerConfig.leftLines, _primaryColor)),
-          if (headerConfig.centreLines.isNotEmpty) ...[
-            SizedBox(width: 8 * _scale),
-            Expanded(child: _buildHeaderZone(headerConfig.centreLines, _primaryColor)),
-          ],
-          if (headerConfig.logoZone == LogoZone.centre && logoBytes != null) ...[
-            SizedBox(width: 8 * _scale),
-            _buildLogo(),
-          ],
-          SizedBox(width: 8 * _scale),
-          _buildDocTypeBadge(isModern: false),
-        ],
-      ),
+      child: hasCentreLogo
+          ? Column(
+              children: [
+                Center(
+                    child: Padding(
+                        padding: EdgeInsets.only(bottom: 6 * _scale),
+                        child: _buildLogo())),
+                contentRow,
+              ],
+            )
+          : contentRow,
     );
   }
 

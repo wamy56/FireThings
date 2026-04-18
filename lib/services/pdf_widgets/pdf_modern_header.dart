@@ -27,6 +27,20 @@ pw.Widget buildModernHeader({
   }
 }
 
+/// Build a centred logo widget for use above the header content row
+pw.Widget? _buildCentredLogo(PdfHeaderConfig config, Uint8List? logoBytes) {
+  if (config.logoZone != LogoZone.centre || logoBytes == null) return null;
+  return pw.Center(
+    child: pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.Image(
+        pw.MemoryImage(logoBytes),
+        height: config.logoSize.pixels,
+      ),
+    ),
+  );
+}
+
 /// Modern style: Solid primary background with rounded bottom corners
 pw.Widget _buildModernStyleHeader(
   PdfHeaderConfig config,
@@ -36,6 +50,51 @@ pw.Widget _buildModernStyleHeader(
   String documentRef,
   Map<String, String> fallbackValues,
 ) {
+  final centredLogo = _buildCentredLogo(config, logoBytes);
+
+  final contentRow = pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.center,
+    children: [
+      // Logo + Company info
+      pw.Expanded(
+        flex: 3,
+        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues,
+            isModern: true),
+      ),
+      pw.SizedBox(width: 16),
+      // Document badge
+      pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: pw.BoxDecoration(
+          color: const PdfColor.fromInt(0x26FFFFFF), // 15% white overlay
+          borderRadius: pw.BorderRadius.circular(8),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Text(
+              documentType.toUpperCase(),
+              style: pw.TextStyle(
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: pdfWhite,
+                letterSpacing: 1.5,
+              ),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              'REF: $documentRef',
+              style: pw.TextStyle(
+                fontSize: 9,
+                color: const PdfColor.fromInt(0xCCFFFFFF),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+
   return pw.Container(
     padding: pw.EdgeInsets.symmetric(
       horizontal: config.horizontalPadding,
@@ -48,48 +107,9 @@ pw.Widget _buildModernStyleHeader(
         bottomRight: pw.Radius.circular(config.cornerRadius.pixels),
       ),
     ),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
-      children: [
-        // Logo + Company info
-        pw.Expanded(
-          flex: 3,
-          child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues,
-              isModern: true),
-        ),
-        pw.SizedBox(width: 16),
-        // Document badge
-        pw.Container(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: pw.BoxDecoration(
-            color: const PdfColor.fromInt(0x26FFFFFF), // 15% white overlay
-            borderRadius: pw.BorderRadius.circular(8),
-          ),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(
-                documentType.toUpperCase(),
-                style: pw.TextStyle(
-                  fontSize: 16,
-                  fontWeight: pw.FontWeight.bold,
-                  color: pdfWhite,
-                  letterSpacing: 1.5,
-                ),
-              ),
-              pw.SizedBox(height: 4),
-              pw.Text(
-                'REF: $documentRef',
-                style: pw.TextStyle(
-                  fontSize: 9,
-                  color: const PdfColor.fromInt(0xCCFFFFFF),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
+    child: centredLogo != null
+        ? pw.Column(children: [centredLogo, contentRow])
+        : contentRow,
   );
 }
 
@@ -102,6 +122,49 @@ pw.Widget _buildClassicStyleHeader(
   String documentRef,
   Map<String, String> fallbackValues,
 ) {
+  final centredLogo = _buildCentredLogo(config, logoBytes);
+
+  final contentRow = pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Expanded(
+        flex: 5,
+        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues,
+            isModern: false),
+      ),
+      pw.SizedBox(width: 12),
+      pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: pw.BoxDecoration(
+          color: colors.primaryColor,
+          borderRadius: pw.BorderRadius.circular(4),
+        ),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
+          children: [
+            pw.Text(
+              documentType.toUpperCase(),
+              style: pw.TextStyle(
+                fontSize: 14,
+                fontWeight: pw.FontWeight.bold,
+                color: pdfWhite,
+                letterSpacing: 1,
+              ),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'REF: $documentRef',
+              style: pw.TextStyle(
+                fontSize: 9,
+                color: const PdfColor.fromInt(0xCCFFFFFF),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+
   return pw.Container(
     padding: const pw.EdgeInsets.only(bottom: 8),
     margin: const pw.EdgeInsets.only(bottom: 4),
@@ -110,46 +173,9 @@ pw.Widget _buildClassicStyleHeader(
         bottom: pw.BorderSide(color: colors.primaryColor, width: 2),
       ),
     ),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Expanded(
-          flex: 5,
-          child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues,
-              isModern: false),
-        ),
-        pw.SizedBox(width: 12),
-        pw.Container(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: pw.BoxDecoration(
-            color: colors.primaryColor,
-            borderRadius: pw.BorderRadius.circular(4),
-          ),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text(
-                documentType.toUpperCase(),
-                style: pw.TextStyle(
-                  fontSize: 14,
-                  fontWeight: pw.FontWeight.bold,
-                  color: pdfWhite,
-                  letterSpacing: 1,
-                ),
-              ),
-              pw.SizedBox(height: 6),
-              pw.Text(
-                'REF: $documentRef',
-                style: pw.TextStyle(
-                  fontSize: 9,
-                  color: const PdfColor.fromInt(0xCCFFFFFF),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
+    child: centredLogo != null
+        ? pw.Column(children: [centredLogo, contentRow])
+        : contentRow,
   );
 }
 
@@ -162,41 +188,47 @@ pw.Widget _buildMinimalStyleHeader(
   String documentRef,
   Map<String, String> fallbackValues,
 ) {
+  final centredLogo = _buildCentredLogo(config, logoBytes);
+
+  final contentRow = pw.Row(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    children: [
+      pw.Expanded(
+        flex: 3,
+        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues,
+            isModern: false),
+      ),
+      pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.end,
+        children: [
+          pw.Text(
+            documentType.toUpperCase(),
+            style: pw.TextStyle(
+              fontSize: 24,
+              fontWeight: pw.FontWeight.bold,
+              color: colors.primaryColor,
+              letterSpacing: 2,
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'REF: $documentRef',
+            style: pw.TextStyle(
+              fontSize: 10,
+              color: colors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    ],
+  );
+
   return pw.Container(
     padding: const pw.EdgeInsets.only(bottom: 16),
     margin: const pw.EdgeInsets.only(bottom: 8),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Expanded(
-          flex: 3,
-          child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues,
-              isModern: false),
-        ),
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.end,
-          children: [
-            pw.Text(
-              documentType.toUpperCase(),
-              style: pw.TextStyle(
-                fontSize: 24,
-                fontWeight: pw.FontWeight.bold,
-                color: colors.primaryColor,
-                letterSpacing: 2,
-              ),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              'REF: $documentRef',
-              style: pw.TextStyle(
-                fontSize: 10,
-                color: colors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ],
-    ),
+    child: centredLogo != null
+        ? pw.Column(children: [centredLogo, contentRow])
+        : contentRow,
   );
 }
 
