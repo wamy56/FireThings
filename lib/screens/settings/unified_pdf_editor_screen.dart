@@ -225,9 +225,12 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
         ],
       ),
       body: KeyboardDismissWrapper(
-        child: _isLoading
-            ? const Center(child: AdaptiveLoadingIndicator())
-            : Column(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 900),
+            child: _isLoading
+                ? const AdaptiveLoadingIndicator()
+                : Column(
                 children: [
                   // Preview section (40% of available height)
                   Expanded(
@@ -283,6 +286,8 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
                   ),
                 ],
               ),
+          ),
+        ),
       ),
     );
   }
