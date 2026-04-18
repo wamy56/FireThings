@@ -751,7 +751,7 @@ class _QuoteScreenState extends State<QuoteScreen> {
               SizedBox(
                 width: 110,
                 child: DropdownButtonFormField<String>(
-                  value: c.category,
+                  initialValue: c.category,
                   decoration: const InputDecoration(
                     labelText: 'Category',
                     border: OutlineInputBorder(),
