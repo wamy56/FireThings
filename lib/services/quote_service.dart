@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:uuid/uuid.dart';
 import '../models/models.dart';
@@ -121,7 +122,7 @@ class QuoteService {
   /// Total value of approved quotes.
   Future<double> getApprovedValue() async {
     final approved = await getQuotesByStatus(QuoteStatus.approved);
-    return approved.fold<double>(0.0, (sum, q) => sum + q.total);
+    return approved.fold<double>(0.0, (acc, q) => acc + q.total);
   }
 
   /// Convert an approved quote into a dispatched job.
@@ -170,5 +171,69 @@ class QuoteService {
     );
 
     return job;
+  }
+
+  // ── Web / Firestore-direct methods ──
+
+  final _firestore = FirebaseFirestore.instance;
+
+  /// Stream all quotes across the company using collectionGroup query.
+  Stream<List<Quote>> getCompanyQuotesStream(String companyId) {
+    return _firestore
+        .collectionGroup('quotes')
+        .where('companyId', isEqualTo: companyId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => Quote.fromJson(doc.data()))
+            .toList());
+  }
+
+  /// Stream a single quote document for the detail panel.
+  Stream<Quote?> getQuoteStream(String engineerId, String quoteId) {
+    return _firestore
+        .collection('users')
+        .doc(engineerId)
+        .collection('quotes')
+        .doc(quoteId)
+        .snapshots()
+        .map((doc) =>
+            doc.exists ? Quote.fromJson(doc.data()!) : null);
+  }
+
+  /// Save a quote directly to Firestore (web portal, bypasses SQLite).
+  Future<void> saveQuoteToFirestore(Quote quote) async {
+    await _firestore
+        .collection('users')
+        .doc(quote.engineerId)
+        .collection('quotes')
+        .doc(quote.id)
+        .set(quote.toJson(), SetOptions(merge: true));
+  }
+
+  /// Delete a quote directly from Firestore (web portal).
+  Future<void> deleteQuoteFromFirestore(
+      String engineerId, String quoteId) async {
+    await _firestore
+        .collection('users')
+        .doc(engineerId)
+        .collection('quotes')
+        .doc(quoteId)
+        .delete();
+  }
+
+  /// Get the next quote number from Firestore (web portal).
+  Future<String> getNextQuoteNumberFromFirestore(String companyId) async {
+    final snap = await _firestore
+        .collectionGroup('quotes')
+        .where('companyId', isEqualTo: companyId)
+        .orderBy('quoteNumber', descending: true)
+        .limit(1)
+        .get();
+
+    if (snap.docs.isEmpty) return 'Q-0001';
+    final lastNumber = snap.docs.first.data()['quoteNumber'] as String? ?? 'Q-0000';
+    final num = int.tryParse(lastNumber.replaceAll('Q-', '')) ?? 0;
+    return 'Q-${(num + 1).toString().padLeft(4, '0')}';
   }
 }

@@ -38,6 +38,7 @@ class Invoice {
   final String invoiceNumber;
   final String engineerId;
   final String engineerName;
+  final String? companyId;
   final String customerName;
   final String customerAddress;
   final String? customerEmail;
@@ -56,6 +57,7 @@ class Invoice {
     required this.invoiceNumber,
     required this.engineerId,
     required this.engineerName,
+    this.companyId,
     required this.customerName,
     required this.customerAddress,
     this.customerEmail,
@@ -70,7 +72,7 @@ class Invoice {
     this.useCompanyBranding = false,
   });
 
-  double get subtotal => items.fold(0, (sum, item) => sum + item.total);
+  double get subtotal => items.fold(0, (acc, item) => acc + item.total);
   double get tax => includeVat ? subtotal * 0.20 : 0.0;
   double get total => subtotal + tax;
 
@@ -80,6 +82,7 @@ class Invoice {
       'invoiceNumber': invoiceNumber,
       'engineerId': engineerId,
       'engineerName': engineerName,
+      'companyId': companyId,
       'customerName': customerName,
       'customerAddress': customerAddress,
       'customerEmail': customerEmail,
@@ -101,6 +104,7 @@ class Invoice {
       invoiceNumber: json['invoiceNumber'] as String,
       engineerId: json['engineerId'] as String,
       engineerName: json['engineerName'] as String? ?? '',
+      companyId: json['companyId'] as String?,
       customerName: json['customerName'] as String,
       customerAddress: json['customerAddress'] as String,
       customerEmail: json['customerEmail'] as String?,
@@ -128,6 +132,7 @@ class Invoice {
     String? invoiceNumber,
     String? engineerId,
     String? engineerName,
+    String? companyId,
     String? customerName,
     String? customerAddress,
     String? customerEmail,
@@ -146,6 +151,7 @@ class Invoice {
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       engineerId: engineerId ?? this.engineerId,
       engineerName: engineerName ?? this.engineerName,
+      companyId: companyId ?? this.companyId,
       customerName: customerName ?? this.customerName,
       customerAddress: customerAddress ?? this.customerAddress,
       customerEmail: customerEmail ?? this.customerEmail,

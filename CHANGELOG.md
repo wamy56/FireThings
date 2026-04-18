@@ -4,6 +4,32 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-18 (Session 74)
+
+### Web Portal: Quotes & Invoices Dashboard
+
+Added full Quotes and Invoices sections to the web dispatch portal, giving office staff complete control over quoting and invoicing. Both follow the same patterns as the existing Jobs dashboard — DataTable with filters, slide-in detail panel, create/edit forms.
+
+#### New Files (8)
+- **`lib/screens/web/dashboard/invoice_helpers.dart`** — Status color/label/badge helpers + CSV export for invoices
+- **`lib/screens/web/web_quotes_screen.dart`** — Quotes dashboard: StreamBuilder on company-wide collectionGroup query, summary cards (Drafts/Sent/Approved/Declined/Value), DataTable with sorting/filtering/pagination, CSV export, column visibility toggle, slide-in detail panel
+- **`lib/screens/web/web_quote_detail_panel.dart`** — Quote detail slide-in panel: status timeline, items table with totals, permission-gated actions (Mark Sent, Approve, Decline, Convert to Job, Download PDF, Edit, Delete)
+- **`lib/screens/web/web_create_quote_screen.dart`** — Create/edit quote form: customer/site autocomplete from company data, dynamic line items with category, VAT toggle, company branding toggle, live total calculation
+- **`lib/screens/web/web_invoices_screen.dart`** — Invoices dashboard: same pattern as quotes, summary cards (Drafts/Sent/Paid/Outstanding), overdue date highlighting
+- **`lib/screens/web/web_invoice_detail_panel.dart`** — Invoice detail panel: status timeline, items table, actions (Download PDF, Email, Mark Sent, Mark Paid, Edit, Delete)
+- **`lib/screens/web/web_create_invoice_screen.dart`** — Create/edit invoice form: customer autocomplete, date pickers, dynamic line items, VAT/branding toggles
+
+#### Modified Files (2)
+- **`lib/screens/web/web_router.dart`** — Added 6 new routes: `/quotes`, `/quotes/create`, `/quotes/:id`, `/invoices`, `/invoices/create`, `/invoices/:id`. Quotes routes redirect to `/jobs` when `quotingEnabled` is false.
+- **`lib/screens/web/web_shell.dart`** — Added Quotes (conditional on `quotingEnabled`) and Invoices sidebar items. Updated `_selectedIndexFromPath()` for dynamic index calculation.
+
+#### Technical Notes
+- Firestore `collectionGroup` queries with `companyId` filter for company-wide visibility
+- Composite indexes needed: `quotes` and `invoices` collectionGroups for `companyId` + `createdAt` desc (manual Firebase Console setup)
+- `quote_helpers.dart` was created in previous session (Session 73)
+
+---
+
 ## 2026-04-18 (Session 73)
 
 ### Defect-to-Quote Workflow — Remaining Integration (Phases 4-6)

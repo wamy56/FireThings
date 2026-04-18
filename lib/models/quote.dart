@@ -124,7 +124,7 @@ class Quote {
     this.useCompanyBranding = false,
   });
 
-  double get subtotal => items.fold(0, (sum, item) => sum + item.total);
+  double get subtotal => items.fold(0, (acc, item) => acc + item.total);
   double get vatAmount => includeVat ? subtotal * 0.20 : 0;
   double get total => subtotal + vatAmount;
 

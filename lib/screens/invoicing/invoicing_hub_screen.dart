@@ -53,7 +53,7 @@ class _InvoicingHubScreenState extends State<InvoicingHubScreen> {
       final drafts = allInvoices.where((i) => i.status == InvoiceStatus.draft).toList();
       final sent = allInvoices.where((i) => i.status == InvoiceStatus.sent).toList();
       final paid = allInvoices.where((i) => i.status == InvoiceStatus.paid).toList();
-      final outstanding = sent.fold<double>(0, (sum, inv) => sum + inv.total);
+      final outstanding = sent.fold<double>(0, (acc, inv) => acc + inv.total);
 
       setState(() {
         _draftCount = drafts.length;

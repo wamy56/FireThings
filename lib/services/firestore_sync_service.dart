@@ -553,4 +553,68 @@ class FirestoreSyncService {
     final str = prefs.getString(_lastSyncKey);
     return str != null ? DateTime.tryParse(str) : null;
   }
+
+  // ── Web / company-wide invoice methods ──
+
+  /// Stream all invoices across the company using collectionGroup query.
+  Stream<List<Invoice>> getCompanyInvoicesStream(String companyId) {
+    return _firestore
+        .collectionGroup('invoices')
+        .where('companyId', isEqualTo: companyId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((doc) => Invoice.fromJson(doc.data()))
+            .toList());
+  }
+
+  /// Stream a single invoice document for the detail panel.
+  Stream<Invoice?> getInvoiceStream(String engineerId, String invoiceId) {
+    return _firestore
+        .collection('users')
+        .doc(engineerId)
+        .collection('invoices')
+        .doc(invoiceId)
+        .snapshots()
+        .map((doc) =>
+            doc.exists ? Invoice.fromJson(doc.data()!) : null);
+  }
+
+  /// Save an invoice directly to Firestore (web portal, bypasses SQLite).
+  Future<void> saveInvoiceToFirestore(Invoice invoice) async {
+    final data = invoice.toJson();
+    await _firestore
+        .collection('users')
+        .doc(invoice.engineerId)
+        .collection('invoices')
+        .doc(invoice.id)
+        .set(data, SetOptions(merge: true));
+  }
+
+  /// Delete an invoice directly from Firestore (web portal).
+  Future<void> deleteInvoiceFromFirestore(
+      String engineerId, String invoiceId) async {
+    await _firestore
+        .collection('users')
+        .doc(engineerId)
+        .collection('invoices')
+        .doc(invoiceId)
+        .delete();
+  }
+
+  /// Get the next invoice number from Firestore (web portal).
+  Future<String> getNextInvoiceNumberFromFirestore(String companyId) async {
+    final snap = await _firestore
+        .collectionGroup('invoices')
+        .where('companyId', isEqualTo: companyId)
+        .orderBy('invoiceNumber', descending: true)
+        .limit(1)
+        .get();
+
+    if (snap.docs.isEmpty) return 'INV-0001';
+    final lastNumber =
+        snap.docs.first.data()['invoiceNumber'] as String? ?? 'INV-0000';
+    final num = int.tryParse(lastNumber.replaceAll('INV-', '')) ?? 0;
+    return 'INV-${(num + 1).toString().padLeft(4, '0')}';
+  }
 }

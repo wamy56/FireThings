@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/user_profile_service.dart';
+import '../../services/remote_config_service.dart';
 import '../../models/permission.dart';
 import '../../services/company_service.dart';
 import '../../services/web_notification_service.dart';
@@ -115,14 +116,24 @@ class _WebShellState extends State<WebShell> {
     );
   }
 
-  int _selectedIndexFromPath(String path, bool canBrand) {
+  int _selectedIndexFromPath(String path, bool canBrand, bool quotingEnabled) {
     if (path.startsWith('/jobs') || path == '/') return 0;
     if (path.startsWith('/schedule')) return 1;
     if (path.startsWith('/team')) return 2;
     if (path.startsWith('/sites')) return 3;
     if (path.startsWith('/customers')) return 4;
-    if (canBrand && path.startsWith('/branding')) return 5;
-    if (path.startsWith('/settings')) return canBrand ? 6 : 5;
+    int idx = 5;
+    if (quotingEnabled) {
+      if (path.startsWith('/quotes')) return idx;
+      idx++;
+    }
+    if (path.startsWith('/invoices')) return idx;
+    idx++;
+    if (canBrand) {
+      if (path.startsWith('/branding')) return idx;
+      idx++;
+    }
+    if (path.startsWith('/settings')) return idx;
     return 0;
   }
 
@@ -131,6 +142,7 @@ class _WebShellState extends State<WebShell> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final width = MediaQuery.of(context).size.width;
     final canBrand = UserProfileService.instance.hasPermission(AppPermission.pdfBranding);
+    final quotingEnabled = RemoteConfigService.instance.quotingEnabled;
     final user = FirebaseAuth.instance.currentUser;
 
     // Very narrow window — suggest mobile app
@@ -174,7 +186,7 @@ class _WebShellState extends State<WebShell> {
     final extended = width >= 1200;
     final showDrawer = width < 900;
     final currentPath = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _selectedIndexFromPath(currentPath, canBrand);
+    final selectedIndex = _selectedIndexFromPath(currentPath, canBrand, quotingEnabled);
 
     final primaryColor = isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue;
     final unselectedColor = isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey;
@@ -206,6 +218,17 @@ class _WebShellState extends State<WebShell> {
         selectedIcon: Icon(AppIcons.userBold),
         label: const Text('Customers'),
       ),
+      if (quotingEnabled)
+        NavigationRailDestination(
+          icon: Icon(AppIcons.receipt),
+          selectedIcon: Icon(AppIcons.receiptBold),
+          label: const Text('Quotes'),
+        ),
+      NavigationRailDestination(
+        icon: Icon(AppIcons.wallet),
+        selectedIcon: Icon(AppIcons.walletBold),
+        label: const Text('Invoices'),
+      ),
       if (canBrand)
         NavigationRailDestination(
           icon: Icon(AppIcons.brush),
@@ -225,6 +248,8 @@ class _WebShellState extends State<WebShell> {
       '/team',
       '/sites',
       '/customers',
+      if (quotingEnabled) '/quotes',
+      '/invoices',
       if (canBrand) '/branding',
       '/settings',
     ];

@@ -27,10 +27,16 @@ import 'web_dashboard_screen.dart';
 import 'web_create_job_screen.dart';
 import 'web_schedule_screen.dart';
 import 'web_settings_screen.dart';
+import 'web_quotes_screen.dart';
+import 'web_create_quote_screen.dart';
+import 'web_invoices_screen.dart';
+import 'web_create_invoice_screen.dart';
 import '../company/team_management_screen.dart';
 import '../company/company_sites_screen.dart';
 import '../company/company_customers_screen.dart';
 import '../company/company_pdf_design_screen.dart';
+import '../../models/quote.dart';
+import '../../models/invoice.dart';
 
 /// Converts a [Stream] into a [Listenable] for GoRouter's refreshListenable.
 class GoRouterRefreshStream extends ChangeNotifier {
@@ -298,6 +304,54 @@ GoRouter createWebRouter() {
                 },
               ),
             ],
+          ),
+          GoRoute(
+            path: '/quotes',
+            redirect: (context, state) {
+              if (!RemoteConfigService.instance.quotingEnabled) return '/jobs';
+              return null;
+            },
+            builder: (context, state) => const WebQuotesScreen(),
+          ),
+          GoRoute(
+            path: '/quotes/create',
+            redirect: (context, state) {
+              if (!RemoteConfigService.instance.quotingEnabled) return '/jobs';
+              return null;
+            },
+            builder: (context, state) {
+              final editQuote = state.extra as Quote?;
+              return WebCreateQuoteScreen(editQuote: editQuote);
+            },
+          ),
+          GoRoute(
+            path: '/quotes/:id',
+            redirect: (context, state) {
+              if (!RemoteConfigService.instance.quotingEnabled) return '/jobs';
+              return null;
+            },
+            builder: (context, state) {
+              final quoteId = state.pathParameters['id'];
+              return WebQuotesScreen(initialQuoteId: quoteId);
+            },
+          ),
+          GoRoute(
+            path: '/invoices',
+            builder: (context, state) => const WebInvoicesScreen(),
+          ),
+          GoRoute(
+            path: '/invoices/create',
+            builder: (context, state) {
+              final editInvoice = state.extra as Invoice?;
+              return WebCreateInvoiceScreen(editInvoice: editInvoice);
+            },
+          ),
+          GoRoute(
+            path: '/invoices/:id',
+            builder: (context, state) {
+              final invoiceId = state.pathParameters['id'];
+              return WebInvoicesScreen(initialInvoiceId: invoiceId);
+            },
           ),
           GoRoute(
             path: '/customers',
