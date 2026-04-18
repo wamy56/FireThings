@@ -67,6 +67,27 @@ class InvoicePdfData {
   });
 }
 
+/// DTO for passing quote PDF data into a background isolate.
+class QuotePdfData {
+  final Map<String, dynamic> quoteJson;
+  final Uint8List? logoBytes;
+  final Map<String, dynamic> headerConfigJson;
+  final Map<String, dynamic> footerConfigJson;
+  final int colourSchemeValue;
+  final Uint8List? regularFontBytes;
+  final Uint8List? boldFontBytes;
+
+  QuotePdfData({
+    required this.quoteJson,
+    required this.logoBytes,
+    required this.headerConfigJson,
+    required this.footerConfigJson,
+    required this.colourSchemeValue,
+    this.regularFontBytes,
+    this.boldFontBytes,
+  });
+}
+
 /// DTO for passing template filled-PDF data into a background isolate.
 class TemplatePdfData {
   final Map<String, dynamic> templateJson;

@@ -266,8 +266,7 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildPreviewZone(isLeft: true),
-                      if (_config.centreLines.isNotEmpty ||
-                          _config.logoZone == LogoZone.centre) ...[
+                      if (_config.centreLines.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         _buildPreviewZone(isLeft: false),
                       ],
@@ -304,8 +303,7 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
   Widget _buildPreviewZone({required bool isLeft}) {
     final lines = isLeft ? _config.leftLines : _config.centreLines;
     final showLogo = _logoPath != null &&
-        ((isLeft && _config.logoZone == LogoZone.left) ||
-            (!isLeft && _config.logoZone == LogoZone.centre));
+        (isLeft && _config.logoZone == LogoZone.left);
 
     final previewSize = _config.logoSize.pixels * 0.5; // Scale down for preview
 
@@ -441,7 +439,6 @@ class _PdfHeaderDesignerScreenState extends State<PdfHeaderDesignerScreen>
         SegmentedButton<LogoZone>(
           segments: const [
             ButtonSegment(value: LogoZone.left, label: Text('Left')),
-            ButtonSegment(value: LogoZone.centre, label: Text('Centre')),
             ButtonSegment(value: LogoZone.none, label: Text('None')),
           ],
           selected: {_config.logoZone},

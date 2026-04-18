@@ -25,6 +25,7 @@ class Defect {
   final DateTime? rectifiedAt;
   final String? rectifiedNote;
   final String? serviceRecordId; // links to the service record that created it
+  final String? linkedQuoteId;
 
   Defect({
     required this.id,
@@ -44,6 +45,7 @@ class Defect {
     this.rectifiedAt,
     this.rectifiedNote,
     this.serviceRecordId,
+    this.linkedQuoteId,
   });
 
   Map<String, dynamic> toJson() {
@@ -65,6 +67,7 @@ class Defect {
       'rectifiedAt': rectifiedAt?.toIso8601String(),
       'rectifiedNote': rectifiedNote,
       'serviceRecordId': serviceRecordId,
+      'linkedQuoteId': linkedQuoteId,
     };
   }
 
@@ -92,6 +95,7 @@ class Defect {
           : null,
       rectifiedNote: json['rectifiedNote'] as String?,
       serviceRecordId: json['serviceRecordId'] as String?,
+      linkedQuoteId: json['linkedQuoteId'] as String?,
     );
   }
 
@@ -113,6 +117,7 @@ class Defect {
     DateTime? rectifiedAt,
     String? rectifiedNote,
     String? serviceRecordId,
+    String? linkedQuoteId,
   }) {
     return Defect(
       id: id ?? this.id,
@@ -132,6 +137,7 @@ class Defect {
       rectifiedAt: rectifiedAt ?? this.rectifiedAt,
       rectifiedNote: rectifiedNote ?? this.rectifiedNote,
       serviceRecordId: serviceRecordId ?? this.serviceRecordId,
+      linkedQuoteId: linkedQuoteId ?? this.linkedQuoteId,
     );
   }
 

@@ -41,6 +41,13 @@ enum AppPermission {
   // Branding
   pdfBranding('pdf_branding', 'PDF Branding', 'Branding'),
 
+  // Quoting
+  quotesCreate('quotes_create', 'Create Quotes', 'Quoting'),
+  quotesEdit('quotes_edit', 'Edit Quotes', 'Quoting'),
+  quotesSend('quotes_send', 'Send Quotes', 'Quoting'),
+  quotesApprove('quotes_approve', 'Approve/Decline Quotes', 'Quoting'),
+  quotesConvert('quotes_convert', 'Convert Quote to Job', 'Quoting'),
+
   // Company
   companyEdit('company_edit', 'Edit Company', 'Company'),
   companyDelete('company_delete', 'Delete Company', 'Company'),
@@ -82,6 +89,11 @@ enum AppPermission {
           floorPlansDelete.key: true,
           assetTypesManage.key: false,
           pdfBranding.key: false,
+          quotesCreate.key: true,
+          quotesEdit.key: true,
+          quotesSend.key: true,
+          quotesApprove.key: true,
+          quotesConvert.key: true,
           companyEdit.key: false,
           companyDelete.key: false,
           teamManage.key: false,
@@ -110,6 +122,11 @@ enum AppPermission {
           floorPlansDelete.key: false,
           assetTypesManage.key: false,
           pdfBranding.key: false,
+          quotesCreate.key: true,
+          quotesEdit.key: true,
+          quotesSend.key: false,
+          quotesApprove.key: false,
+          quotesConvert.key: false,
           companyEdit.key: false,
           companyDelete.key: false,
           teamManage.key: false,

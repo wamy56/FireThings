@@ -76,8 +76,6 @@ class UnifiedPdfPreview extends StatelessWidget {
 
   Widget _buildHeader() {
     switch (headerConfig.headerStyle) {
-      case HeaderStyle.modern:
-        return _buildModernHeader();
       case HeaderStyle.classic:
         return _buildClassicHeader();
       case HeaderStyle.minimal:
@@ -85,58 +83,7 @@ class UnifiedPdfPreview extends StatelessWidget {
     }
   }
 
-  Widget _buildModernHeader() {
-    final cornerRadius = headerConfig.cornerRadius.pixels * _scale;
-    final hasCentreLogo =
-        headerConfig.logoZone == LogoZone.centre && logoBytes != null;
-
-    final contentRow = Row(
-      children: [
-        if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
-          _buildLogo(),
-        if (headerConfig.logoZone == LogoZone.left && logoBytes != null)
-          SizedBox(width: 8 * _scale),
-        Expanded(child: _buildHeaderZone(headerConfig.leftLines, Colors.white)),
-        if (headerConfig.centreLines.isNotEmpty) ...[
-          SizedBox(width: 8 * _scale),
-          Expanded(
-              child:
-                  _buildHeaderZone(headerConfig.centreLines, Colors.white)),
-        ],
-        SizedBox(width: 8 * _scale),
-        _buildDocTypeBadge(isModern: true),
-      ],
-    );
-
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: headerConfig.horizontalPadding * _scale,
-        vertical: headerConfig.verticalPadding * _scale,
-      ),
-      decoration: BoxDecoration(
-        color: _primaryColor,
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(cornerRadius),
-          bottomRight: Radius.circular(cornerRadius),
-        ),
-      ),
-      child: hasCentreLogo
-          ? Column(
-              children: [
-                Center(
-                    child: Padding(
-                        padding: EdgeInsets.only(bottom: 6 * _scale),
-                        child: _buildLogo())),
-                contentRow,
-              ],
-            )
-          : contentRow,
-    );
-  }
-
   Widget _buildClassicHeader() {
-    final hasCentreLogo =
-        headerConfig.logoZone == LogoZone.centre && logoBytes != null;
 
     final contentRow = Row(
       children: [
@@ -153,7 +100,7 @@ class UnifiedPdfPreview extends StatelessWidget {
                   _buildHeaderZone(headerConfig.centreLines, _primaryColor)),
         ],
         SizedBox(width: 8 * _scale),
-        _buildDocTypeBadge(isModern: false),
+        _buildDocTypeBadge(),
       ],
     );
 
@@ -167,23 +114,11 @@ class UnifiedPdfPreview extends StatelessWidget {
           bottom: BorderSide(color: _primaryColor, width: 2),
         ),
       ),
-      child: hasCentreLogo
-          ? Column(
-              children: [
-                Center(
-                    child: Padding(
-                        padding: EdgeInsets.only(bottom: 6 * _scale),
-                        child: _buildLogo())),
-                contentRow,
-              ],
-            )
-          : contentRow,
+      child: contentRow,
     );
   }
 
   Widget _buildMinimalHeader() {
-    final hasCentreLogo =
-        headerConfig.logoZone == LogoZone.centre && logoBytes != null;
 
     final contentRow = Row(
       children: [
@@ -200,7 +135,7 @@ class UnifiedPdfPreview extends StatelessWidget {
                   _buildHeaderZone(headerConfig.centreLines, _primaryColor)),
         ],
         SizedBox(width: 8 * _scale),
-        _buildDocTypeBadge(isModern: false),
+        _buildDocTypeBadge(),
       ],
     );
 
@@ -209,17 +144,7 @@ class UnifiedPdfPreview extends StatelessWidget {
         horizontal: headerConfig.horizontalPadding * _scale,
         vertical: (headerConfig.verticalPadding + 4) * _scale,
       ),
-      child: hasCentreLogo
-          ? Column(
-              children: [
-                Center(
-                    child: Padding(
-                        padding: EdgeInsets.only(bottom: 6 * _scale),
-                        child: _buildLogo())),
-                contentRow,
-              ],
-            )
-          : contentRow,
+      child: contentRow,
     );
   }
 
@@ -293,29 +218,8 @@ class UnifiedPdfPreview extends StatelessWidget {
     }
   }
 
-  Widget _buildDocTypeBadge({required bool isModern}) {
+  Widget _buildDocTypeBadge() {
     final label = docType == PdfDocumentType.invoice ? 'INVOICE' : 'JOBSHEET';
-
-    if (isModern) {
-      return Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: 8 * _scale,
-          vertical: 4 * _scale,
-        ),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.2),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 10 * _scale,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      );
-    }
 
     return Container(
       padding: EdgeInsets.symmetric(

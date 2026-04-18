@@ -4,6 +4,31 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-18 (Session 73)
+
+### Defect-to-Quote Workflow — Remaining Integration (Phases 4-6)
+
+Completed the defect-to-quote feature implementation. Phases 1-3 (model, service, PDF) and partial Phase 4 (quote screen, quote list) were already done. This session added the quoting hub dashboard, integration points (defect bottom sheet, asset detail, home screen), and quote-to-job conversion.
+
+#### Changes
+- **`lib/screens/quoting/quoting_hub_screen.dart`** — New file. Dashboard with 4 stat cards (Drafts, Sent, Approved, Total Value) and quick actions (Create New Quote, View All Quotes). Tapping stat cards navigates to filtered quote list.
+- **`lib/widgets/defect_bottom_sheet.dart`** — After saving a defect, shows dialog offering to create a quote (gated behind `quotingEnabled` remote config flag). Passes site/customer info through to QuoteScreen.
+- **`lib/screens/assets/asset_detail_screen.dart`** — Added Create Quote / View Quote button to `_ActiveDefectCard` widget. View Quote loads the linked quote by ID.
+- **`lib/screens/home/home_screen.dart`** — Added Quotes card on home screen showing active quote count. Navigates to QuotingHubScreen. Gated behind `quotingEnabled`.
+- **`lib/services/quote_service.dart`** — Added `convertQuoteToJob()` method. Creates a DispatchedJob from an approved quote, updates quote status to converted, logs analytics.
+- **`lib/screens/quoting/quote_screen.dart`** — Added Convert to Job button for approved quotes (company users only). Fixed AppTheme/AppIcons naming issues. Replaced broken `showPremiumDialog` calls with standard `AlertDialog`.
+- **`lib/screens/quoting/quote_list_screen.dart`** — Fixed AppTheme/AppIcons naming (primary→primaryBlue, accent→accentOrange, etc.)
+
+#### Bug Fixes (pre-existing in quote screens)
+- Fixed `AppTheme.primary/accent/success/error` → `primaryBlue/accentOrange/successGreen/errorRed` across all quoting files
+- Fixed `AppIcons.documentText` → `document`, `AppIcons.closeCircle` → `close`, `AppIcons.userTag` → `user`
+- Fixed `AppTheme.darkCard` → `darkSurfaceElevated`
+- Fixed `UserProfileService.instance.currentProfile` → `.profile`
+- Fixed `AnimatedSaveButton` usage (removed non-existent `icon`/`isLoading` params)
+- Replaced `showPremiumDialog` with wrong params → standard `showDialog` + `AlertDialog`
+
+---
+
 ## 2026-04-18 (Session 72)
 
 ### PDF Customizer Overhaul — Template Presets + Bug Fixes

@@ -11,8 +11,10 @@ import '../services/asset_service.dart';
 import '../services/defect_service.dart';
 import '../services/service_history_service.dart';
 import '../services/analytics_service.dart';
+import '../services/remote_config_service.dart';
 import '../utils/theme.dart';
 import '../utils/icon_map.dart';
+import '../screens/quoting/quote_screen.dart';
 import 'custom_text_field.dart';
 import 'premium_toast.dart';
 
@@ -25,6 +27,11 @@ Future<bool?> showDefectBottomSheet({
   required Asset asset,
   AssetType? assetType,
   String? jobsheetId,
+  String? siteName,
+  String? customerName,
+  String? customerAddress,
+  String? customerEmail,
+  String? customerPhone,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -36,6 +43,11 @@ Future<bool?> showDefectBottomSheet({
       asset: asset,
       assetType: assetType,
       jobsheetId: jobsheetId,
+      siteName: siteName,
+      customerName: customerName,
+      customerAddress: customerAddress,
+      customerEmail: customerEmail,
+      customerPhone: customerPhone,
     ),
   );
 }
@@ -46,6 +58,11 @@ class DefectBottomSheet extends StatefulWidget {
   final Asset asset;
   final AssetType? assetType;
   final String? jobsheetId;
+  final String? siteName;
+  final String? customerName;
+  final String? customerAddress;
+  final String? customerEmail;
+  final String? customerPhone;
 
   const DefectBottomSheet({
     super.key,
@@ -54,6 +71,11 @@ class DefectBottomSheet extends StatefulWidget {
     required this.asset,
     this.assetType,
     this.jobsheetId,
+    this.siteName,
+    this.customerName,
+    this.customerAddress,
+    this.customerEmail,
+    this.customerPhone,
   });
 
   @override
@@ -188,13 +210,75 @@ class _DefectBottomSheetState extends State<DefectBottomSheet> {
         siteId: widget.siteId,
       );
 
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) {
+        if (RemoteConfigService.instance.quotingEnabled) {
+          _showSuccessWithQuoteOption(defect);
+        } else {
+          Navigator.of(context).pop(true);
+        }
+      }
     } catch (e) {
       if (mounted) {
         context.showErrorToast('Failed to save defect');
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  void _showSuccessWithQuoteOption(Defect defect) {
+    setState(() => _isSaving = false);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(AppIcons.tickCircle, color: AppTheme.successGreen, size: 22),
+            const SizedBox(width: 8),
+            const Text('Defect Recorded'),
+          ],
+        ),
+        content: const Text(
+          'Would you like to create a repair quote for this defect?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pop(true);
+            },
+            child: const Text('Not Now'),
+          ),
+          ElevatedButton.icon(
+            icon: Icon(AppIcons.receipt, size: 18),
+            label: const Text('Create Quote'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.accentOrange,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              Navigator.of(context).pop(true);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => QuoteScreen(
+                    fromDefect: defect,
+                    siteId: widget.siteId,
+                    siteName: widget.siteName,
+                    customerName: widget.customerName,
+                    customerAddress: widget.customerAddress,
+                    customerEmail: widget.customerEmail,
+                    customerPhone: widget.customerPhone,
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   @override

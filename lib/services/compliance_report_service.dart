@@ -9,7 +9,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
-import '../models/pdf_colour_scheme.dart';
 import 'auth_service.dart';
 import 'asset_service.dart';
 import 'asset_type_service.dart';

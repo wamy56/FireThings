@@ -376,4 +376,43 @@ class AnalyticsService {
         'is_custom': isCustom,
       });
 
+  // --- Quoting ---
+
+  Future<void> logQuoteCreated({
+    required bool fromDefect,
+    required double value,
+  }) =>
+      _analytics.logEvent(name: 'quote_created', parameters: {
+        'from_defect': fromDefect,
+        'value': value,
+      });
+
+  Future<void> logQuoteSent({
+    required String quoteId,
+    required double value,
+  }) =>
+      _analytics.logEvent(name: 'quote_sent', parameters: {
+        'quote_id': quoteId,
+        'value': value,
+      });
+
+  Future<void> logQuoteStatusChanged({
+    required String fromStatus,
+    required String toStatus,
+  }) =>
+      _analytics.logEvent(name: 'quote_status_changed', parameters: {
+        'from_status': fromStatus,
+        'to_status': toStatus,
+      });
+
+  Future<void> logQuoteConverted({
+    required String quoteId,
+    required String jobId,
+    required double value,
+  }) =>
+      _analytics.logEvent(name: 'quote_converted', parameters: {
+        'quote_id': quoteId,
+        'job_id': jobId,
+        'value': value,
+      });
 }

@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import '../../models/pdf_header_config.dart';
 import '../../models/pdf_colour_scheme.dart';
@@ -15,9 +14,6 @@ pw.Widget buildModernHeader({
   Map<String, String> fallbackValues = const {},
 }) {
   switch (config.headerStyle) {
-    case HeaderStyle.modern:
-      return _buildModernStyleHeader(
-          config, colors, logoBytes, documentType, documentRef, fallbackValues);
     case HeaderStyle.classic:
       return _buildClassicStyleHeader(
           config, colors, logoBytes, documentType, documentRef, fallbackValues);
@@ -27,93 +23,7 @@ pw.Widget buildModernHeader({
   }
 }
 
-/// Build a centred logo widget for use above the header content row
-pw.Widget? _buildCentredLogo(PdfHeaderConfig config, Uint8List? logoBytes) {
-  if (config.logoZone != LogoZone.centre || logoBytes == null) return null;
-  return pw.Center(
-    child: pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 8),
-      child: pw.Image(
-        pw.MemoryImage(logoBytes),
-        height: config.logoSize.pixels,
-      ),
-    ),
-  );
-}
-
-/// Modern style: Solid primary background with rounded bottom corners
-pw.Widget _buildModernStyleHeader(
-  PdfHeaderConfig config,
-  PdfColourScheme colors,
-  Uint8List? logoBytes,
-  String documentType,
-  String documentRef,
-  Map<String, String> fallbackValues,
-) {
-  final centredLogo = _buildCentredLogo(config, logoBytes);
-
-  final contentRow = pw.Row(
-    crossAxisAlignment: pw.CrossAxisAlignment.center,
-    children: [
-      // Logo + Company info
-      pw.Expanded(
-        flex: 3,
-        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues,
-            isModern: true),
-      ),
-      pw.SizedBox(width: 16),
-      // Document badge
-      pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: pw.BoxDecoration(
-          color: const PdfColor.fromInt(0x26FFFFFF), // 15% white overlay
-          borderRadius: pw.BorderRadius.circular(8),
-        ),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.center,
-          children: [
-            pw.Text(
-              documentType.toUpperCase(),
-              style: pw.TextStyle(
-                fontSize: 16,
-                fontWeight: pw.FontWeight.bold,
-                color: pdfWhite,
-                letterSpacing: 1.5,
-              ),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              'REF: $documentRef',
-              style: pw.TextStyle(
-                fontSize: 9,
-                color: const PdfColor.fromInt(0xCCFFFFFF),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ],
-  );
-
-  return pw.Container(
-    padding: pw.EdgeInsets.symmetric(
-      horizontal: config.horizontalPadding,
-      vertical: config.verticalPadding,
-    ),
-    decoration: pw.BoxDecoration(
-      color: colors.primaryColor,
-      borderRadius: pw.BorderRadius.only(
-        bottomLeft: pw.Radius.circular(config.cornerRadius.pixels),
-        bottomRight: pw.Radius.circular(config.cornerRadius.pixels),
-      ),
-    ),
-    child: centredLogo != null
-        ? pw.Column(children: [centredLogo, contentRow])
-        : contentRow,
-  );
-}
-
-/// Classic style: White background with bottom border (current look)
+/// Classic style: White background with bottom border
 pw.Widget _buildClassicStyleHeader(
   PdfHeaderConfig config,
   PdfColourScheme colors,
@@ -122,15 +32,12 @@ pw.Widget _buildClassicStyleHeader(
   String documentRef,
   Map<String, String> fallbackValues,
 ) {
-  final centredLogo = _buildCentredLogo(config, logoBytes);
-
   final contentRow = pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
       pw.Expanded(
         flex: 5,
-        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues,
-            isModern: false),
+        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues),
       ),
       pw.SizedBox(width: 12),
       pw.Container(
@@ -156,7 +63,7 @@ pw.Widget _buildClassicStyleHeader(
               'REF: $documentRef',
               style: pw.TextStyle(
                 fontSize: 9,
-                color: const PdfColor.fromInt(0xCCFFFFFF),
+                color: pdfWhite,
               ),
             ),
           ],
@@ -173,9 +80,7 @@ pw.Widget _buildClassicStyleHeader(
         bottom: pw.BorderSide(color: colors.primaryColor, width: 2),
       ),
     ),
-    child: centredLogo != null
-        ? pw.Column(children: [centredLogo, contentRow])
-        : contentRow,
+    child: contentRow,
   );
 }
 
@@ -188,15 +93,12 @@ pw.Widget _buildMinimalStyleHeader(
   String documentRef,
   Map<String, String> fallbackValues,
 ) {
-  final centredLogo = _buildCentredLogo(config, logoBytes);
-
   final contentRow = pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
       pw.Expanded(
         flex: 3,
-        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues,
-            isModern: false),
+        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues),
       ),
       pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -226,9 +128,7 @@ pw.Widget _buildMinimalStyleHeader(
   return pw.Container(
     padding: const pw.EdgeInsets.only(bottom: 16),
     margin: const pw.EdgeInsets.only(bottom: 8),
-    child: centredLogo != null
-        ? pw.Column(children: [centredLogo, contentRow])
-        : contentRow,
+    child: contentRow,
   );
 }
 
@@ -237,16 +137,10 @@ pw.Widget _buildLogoAndInfo(
   PdfHeaderConfig config,
   PdfColourScheme colors,
   Uint8List? logoBytes,
-  Map<String, String> fallbackValues, {
-  required bool isModern,
-}) {
-  final textColor = isModern ? pdfWhite : colors.textPrimary;
-  final secondaryTextColor =
-      isModern ? const PdfColor.fromInt(0xCCFFFFFF) : colors.textSecondary;
-
+  Map<String, String> fallbackValues,
+) {
   final children = <pw.Widget>[];
 
-  // Add logo if configured on left
   if (config.logoZone == LogoZone.left && logoBytes != null) {
     children.add(
       pw.Container(
@@ -259,7 +153,6 @@ pw.Widget _buildLogoAndInfo(
     );
   }
 
-  // Add text lines
   final textWidgets = <pw.Widget>[];
   for (final line in config.leftLines) {
     final value =
@@ -272,7 +165,7 @@ pw.Widget _buildLogoAndInfo(
         style: pw.TextStyle(
           fontSize: line.fontSize,
           fontWeight: line.bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-          color: line.fontSize > 12 ? textColor : secondaryTextColor,
+          color: line.fontSize > 12 ? colors.textPrimary : colors.textSecondary,
         ),
       ),
     );

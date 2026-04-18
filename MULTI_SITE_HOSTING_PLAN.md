@@ -6,9 +6,9 @@ This document outlines the plan to expand FireThings from a single dispatch port
 
 | Site | Purpose | Subdomain | Tech Stack |
 |------|---------|-----------|------------|
-| Marketing | Public landing page, feature showcase, app downloads | www.firethings.com | Static HTML/CSS or Next.js |
-| Dispatch Portal | Dispatcher dashboard (existing) | app.firethings.com | Flutter Web |
-| Customer Portal | Future customer-facing features | customers.firethings.com | TBD |
+| Marketing | Public landing page, feature showcase, app downloads | www.firethings.co.uk | Static HTML/CSS or Next.js |
+| Dispatch Portal | Dispatcher dashboard (existing) | app.firethings.co.uk | Flutter Web |
+| Customer Portal | Future customer-facing features | customers.firethings.co.uk | TBD |
 
 ## Current State
 
@@ -23,17 +23,17 @@ This document outlines the plan to expand FireThings from a single dispatch port
 Firebase Project: firethings-51e00
 │
 ├── Site: firethings-marketing (NEW)
-│   ├── Domain: www.firethings.com
+│   ├── Domain: www.firethings.co.uk
 │   ├── Purpose: Public marketing site
 │   └── Source: /marketing-site/public/
 │
 ├── Site: firethings-app (EXISTING - rename from default)
-│   ├── Domain: app.firethings.com
+│   ├── Domain: app.firethings.co.uk
 │   ├── Purpose: Dispatch portal
 │   └── Source: build/web/
 │
 └── Site: firethings-customers (FUTURE)
-    ├── Domain: customers.firethings.com
+    ├── Domain: customers.firethings.co.uk
     ├── Purpose: Customer portal
     └── Source: TBD
 ```
@@ -172,7 +172,7 @@ Suggested pages:
                 <li><a href="/features.html">Features</a></li>
                 <li><a href="/about.html">About</a></li>
                 <li><a href="/contact.html">Contact</a></li>
-                <li><a href="https://app.firethings.com" class="btn-primary">Dispatch Portal</a></li>
+                <li><a href="https://app.firethings.co.uk" class="btn-primary">Dispatch Portal</a></li>
             </ul>
         </nav>
     </header>
@@ -184,7 +184,7 @@ Suggested pages:
             <div class="cta-buttons">
                 <a href="#" class="btn-primary">Download on App Store</a>
                 <a href="#" class="btn-secondary">Get on Google Play</a>
-                <a href="https://app.firethings.com" class="btn-outline">Dispatch Portal</a>
+                <a href="https://app.firethings.co.uk" class="btn-outline">Dispatch Portal</a>
             </div>
         </section>
         
@@ -223,13 +223,13 @@ For each site:
 1. Go to Firebase Console > Hosting
 2. Select the site
 3. Click **Add custom domain**
-4. Enter the subdomain (e.g., `app.firethings.com`)
+4. Enter the subdomain (e.g., `app.firethings.co.uk`)
 5. Follow verification steps
 6. Wait for SSL provisioning (usually < 24 hours)
 
 ### Step 3.3: Redirect Root to WWW (Optional)
 
-If you want `firethings.com` to redirect to `www.firethings.com`:
+If you want `firethings.co.uk` to redirect to `www.firethings.co.uk`:
 
 ```json
 // In firebase.json under marketing target
@@ -239,7 +239,7 @@ If you want `firethings.com` to redirect to `www.firethings.com`:
   "redirects": [
     {
       "source": "/",
-      "destination": "https://www.firethings.com",
+      "destination": "https://www.firethings.co.uk",
       "type": 301
     }
   ]
@@ -354,8 +354,8 @@ Add to `firebase.json`:
 
 ### Domain Configuration
 - [ ] Configure DNS records for subdomains
-- [ ] Connect `www.firethings.com` to marketing site
-- [ ] Connect `app.firethings.com` to dispatch portal
+- [ ] Connect `www.firethings.co.uk` to marketing site
+- [ ] Connect `app.firethings.co.uk` to dispatch portal
 - [ ] Verify SSL certificates are active
 - [ ] Test all URLs
 
@@ -395,7 +395,7 @@ For a simple marketing site, plain HTML/CSS is recommended to start. You can alw
 
 ## Questions to Consider
 
-1. **Domain**: What domain will you use? (firethings.com, firethingsapp.com, etc.)
+1. **Domain**: What domain will you use? (firethings.co.uk, firethingsapp.com, etc.)
 2. **Branding**: Do you have logo assets, colour palette, and brand guidelines ready?
 3. **Content**: Who will write the marketing copy?
 4. **App Store Links**: Are the apps published yet, or will those be placeholder links?

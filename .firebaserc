@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "firethings-51e00"
-  }
+  },
+  "targets": {
+    "firethings-51e00": {
+      "hosting": {
+        "app": [
+          "firethings-51e00"
+        ],
+        "marketing": [
+          "firethings-marketing"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

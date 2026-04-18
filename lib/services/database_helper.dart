@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 16,
+      version: 17,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -98,6 +98,9 @@ class DatabaseHelper {
       await db.execute(
           'ALTER TABLE jobsheets ADD COLUMN useCompanyBranding INTEGER DEFAULT 0');
     }
+    if (oldVersion < 17) {
+      await _createQuotesTable(db);
+    }
   }
 
   /// Create database tables
@@ -144,6 +147,7 @@ class DatabaseHelper {
     await _createAssetTypeConfigTable(db);
     await _createFloorPlansTable(db);
     await _createAssetServiceHistoryTable(db);
+    await _createQuotesTable(db);
 
     debugPrint('Database tables created successfully');
   }
@@ -529,6 +533,181 @@ class DatabaseHelper {
   /// Simple JSON list parser
   List<dynamic> _parseJsonList(String jsonStr) {
     return jsonDecode(jsonStr) as List<dynamic>;
+  }
+
+  // ==================== QUOTES TABLE & METHODS ====================
+
+  /// Create quotes table
+  Future<void> _createQuotesTable(Database db) async {
+    const idType = 'TEXT PRIMARY KEY';
+    const textType = 'TEXT NOT NULL';
+    const textTypeNullable = 'TEXT';
+
+    await db.execute('''
+      CREATE TABLE quotes (
+        id $idType,
+        quoteNumber $textType,
+        engineerId $textType,
+        engineerName $textType,
+        companyId $textTypeNullable,
+        customerName $textType,
+        customerAddress $textType,
+        customerEmail $textTypeNullable,
+        customerPhone $textTypeNullable,
+        siteId $textType,
+        siteName $textType,
+        defectId $textTypeNullable,
+        defectDescription $textTypeNullable,
+        defectSeverity $textTypeNullable,
+        items $textType,
+        notes $textTypeNullable,
+        includeVat INTEGER NOT NULL DEFAULT 0,
+        status $textType,
+        validUntil $textType,
+        createdAt $textType,
+        lastModifiedAt $textTypeNullable,
+        sentAt $textTypeNullable,
+        respondedAt $textTypeNullable,
+        convertedJobId $textTypeNullable,
+        useCompanyBranding INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    debugPrint('Quotes table created successfully');
+  }
+
+  /// Insert a quote
+  Future<Quote> insertQuote(Quote quote) async {
+    final db = await database;
+    final stamped = quote.copyWith(lastModifiedAt: DateTime.now());
+
+    final json = stamped.toJson();
+    json['items'] = jsonEncode(json['items']);
+    json['includeVat'] = json['includeVat'] == true ? 1 : 0;
+    json['useCompanyBranding'] = json['useCompanyBranding'] == 1 ? 1 : 0;
+
+    await db.insert(
+      'quotes',
+      json,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    debugPrint('Quote inserted: ${stamped.id}');
+    FirestoreSyncService.instance.upsertQuote(stamped);
+    return stamped;
+  }
+
+  /// Get all quotes
+  Future<List<Quote>> getAllQuotes() async {
+    final db = await database;
+    final result = await db.query('quotes', orderBy: 'createdAt DESC');
+    return result.map((json) => _parseQuoteJson(json)).toList();
+  }
+
+  /// Get quotes by engineer ID
+  Future<List<Quote>> getQuotesByEngineerId(String engineerId) async {
+    final db = await database;
+    final result = await db.query(
+      'quotes',
+      where: 'engineerId = ?',
+      whereArgs: [engineerId],
+      orderBy: 'createdAt DESC',
+    );
+    return result.map((json) => _parseQuoteJson(json)).toList();
+  }
+
+  /// Get quotes by engineer ID and status
+  Future<List<Quote>> getQuotesByStatus(String engineerId, String status) async {
+    final db = await database;
+    final result = await db.query(
+      'quotes',
+      where: 'engineerId = ? AND status = ?',
+      whereArgs: [engineerId, status],
+      orderBy: 'createdAt DESC',
+    );
+    return result.map((json) => _parseQuoteJson(json)).toList();
+  }
+
+  /// Get draft quotes by engineer ID
+  Future<List<Quote>> getDraftQuotesByEngineerId(String engineerId) async {
+    return getQuotesByStatus(engineerId, 'draft');
+  }
+
+  /// Get a single quote by ID
+  Future<Quote?> getQuoteById(String id) async {
+    final db = await database;
+    final result = await db.query(
+      'quotes',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (result.isEmpty) return null;
+    return _parseQuoteJson(result.first);
+  }
+
+  /// Update a quote
+  Future<int> updateQuote(Quote quote) async {
+    final db = await database;
+    final stamped = quote.copyWith(lastModifiedAt: DateTime.now());
+
+    final json = stamped.toJson();
+    json['items'] = jsonEncode(json['items']);
+    json['includeVat'] = json['includeVat'] == true ? 1 : 0;
+    json['useCompanyBranding'] = json['useCompanyBranding'] == 1 ? 1 : 0;
+
+    final result = await db.update(
+      'quotes',
+      json,
+      where: 'id = ?',
+      whereArgs: [stamped.id],
+    );
+    FirestoreSyncService.instance.upsertQuote(stamped);
+    return result;
+  }
+
+  /// Delete a quote
+  Future<int> deleteQuote(String id) async {
+    final db = await database;
+    final result = await db.delete('quotes', where: 'id = ?', whereArgs: [id]);
+    FirestoreSyncService.instance.deleteDocument('quotes', id);
+    return result;
+  }
+
+  /// Get next quote number (Q-0001 format)
+  Future<String> getNextQuoteNumber() async {
+    final db = await database;
+    final result = await db.rawQuery(
+        "SELECT MAX(CAST(REPLACE(quoteNumber, 'Q-', '') AS INTEGER)) AS maxNum FROM quotes");
+    final maxNum = Sqflite.firstIntValue(result) ?? 0;
+    return 'Q-${(maxNum + 1).toString().padLeft(4, '0')}';
+  }
+
+  /// Delete all quotes
+  Future<int> deleteAllQuotes() async {
+    final db = await database;
+    return await db.delete('quotes');
+  }
+
+  /// Parse quote JSON from database (handles items string conversion)
+  Quote _parseQuoteJson(Map<String, dynamic> json) {
+    final mutableJson = Map<String, dynamic>.from(json);
+
+    if (mutableJson['items'] is String) {
+      final itemsStr = mutableJson['items'] as String;
+      final itemsList = _parseItemsString(itemsStr);
+      mutableJson['items'] = itemsList;
+    }
+
+    if (mutableJson['includeVat'] is int) {
+      mutableJson['includeVat'] = mutableJson['includeVat'] == 1;
+    }
+
+    if (mutableJson['useCompanyBranding'] is int) {
+      mutableJson['useCompanyBranding'] = mutableJson['useCompanyBranding'] == 1;
+    }
+
+    return Quote.fromJson(mutableJson);
   }
 
   // ==================== SAVED CUSTOMERS METHODS ====================
@@ -1060,6 +1239,7 @@ class DatabaseHelper {
   Future<void> deleteAllData() async {
     await deleteAllJobsheets();
     await deleteAllInvoices();
+    await deleteAllQuotes();
     await deleteAllSavedCustomers();
     await deleteAllSavedSites();
     await deleteAllJobTemplates();

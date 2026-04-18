@@ -4,28 +4,19 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
-import 'payment_settings_service.dart';
 import 'pdf_header_builder.dart';
 import 'pdf_footer_builder.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
 
-/// Top-level function for compute() — builds the invoice PDF in a background isolate.
-Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
-  final invoice = Invoice.fromJson(data.invoiceJson);
+/// Top-level function for compute() — builds the quote PDF in a background isolate.
+Future<Uint8List> _buildQuotePdf(QuotePdfData data) async {
+  final quote = Quote.fromJson(data.quoteJson);
   final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
   final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
-  final colourScheme = PdfColourScheme(primaryColorValue: data.colourSchemeValue);
+  final colourScheme =
+      PdfColourScheme(primaryColorValue: data.colourSchemeValue);
   final primaryColor = colourScheme.primaryColor;
-  final primaryLightColor = colourScheme.primaryLight;
-
-  final paymentDetails = PaymentDetails(
-    bankName: data.paymentDetailsMap['bankName'] ?? '',
-    accountName: data.paymentDetailsMap['accountName'] ?? '',
-    sortCode: data.paymentDetailsMap['sortCode'] ?? '',
-    accountNumber: data.paymentDetailsMap['accountNumber'] ?? '',
-    paymentTerms: data.paymentDetailsMap['paymentTerms'] ?? '',
-  );
 
   final regularFont = data.regularFontBytes != null
       ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
@@ -48,34 +39,31 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
       build: (context) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          _buildHeader(invoice, data.logoBytes, headerConfig, primaryColor),
+          _buildHeader(quote, data.logoBytes, headerConfig, primaryColor),
           pw.SizedBox(height: 24),
-          _buildInvoiceInfo(invoice),
+          _buildQuoteInfo(quote),
           pw.SizedBox(height: 24),
-          _buildCustomerSection(invoice, primaryColor),
-          pw.SizedBox(height: 24),
-          _buildItemsTable(invoice, primaryColor),
-          pw.SizedBox(height: 16),
-          _buildTotalsSection(invoice, primaryColor),
-          if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
+          _buildCustomerSection(quote, primaryColor),
+          if (quote.defectId != null && quote.defectDescription != null) ...[
             pw.SizedBox(height: 24),
-            _buildNotesSection(invoice),
+            _buildDefectSummary(quote),
+          ],
+          pw.SizedBox(height: 24),
+          _buildItemsTable(quote, primaryColor),
+          pw.SizedBox(height: 16),
+          _buildTotalsSection(quote, primaryColor),
+          if (quote.notes != null && quote.notes!.isNotEmpty) ...[
+            pw.SizedBox(height: 24),
+            _buildNotesSection(quote),
           ],
           pw.Spacer(),
-          if (!paymentDetails.isEmpty) _buildPaymentTerms(paymentDetails, primaryColor, primaryLightColor),
+          _buildTermsSection(quote, primaryColor),
           pw.SizedBox(height: 16),
           PdfFooterBuilder.buildFooter(
             config: footerConfig,
             pageNumber: 1,
             pagesCount: 1,
             primaryColor: primaryColor,
-          ),
-          pw.SizedBox(height: 8),
-          pw.Center(
-            child: pw.Text(
-              'Thank you for your business!',
-              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: primaryColor),
-            ),
           ),
         ],
       ),
@@ -87,13 +75,19 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
 
 // ── Constants ──
 
+const _coralAccent = PdfColor.fromInt(0xFFF97316);
 const PdfColor _darkGray = PdfColor.fromInt(0xFF424242);
 const PdfColor _lightGray = PdfColor.fromInt(0xFFE0E0E0);
 const PdfColor _white = PdfColors.white;
 
 // ── Builder helpers (top-level for isolate compatibility) ──
 
-pw.Widget _buildHeader(Invoice invoice, Uint8List? logoBytes, PdfHeaderConfig headerConfig, PdfColor primaryColor) {
+pw.Widget _buildHeader(
+  Quote quote,
+  Uint8List? logoBytes,
+  PdfHeaderConfig headerConfig,
+  PdfColor primaryColor,
+) {
   return pw.Container(
     decoration: pw.BoxDecoration(
       border: pw.Border(
@@ -111,20 +105,20 @@ pw.Widget _buildHeader(Invoice invoice, Uint8List? logoBytes, PdfHeaderConfig he
             logoBytes: logoBytes,
             primaryColor: primaryColor,
             fallbackValues: {
-              'companyName': invoice.engineerName,
-              'engineerName': invoice.engineerName,
+              'companyName': quote.engineerName,
+              'engineerName': quote.engineerName,
             },
           ),
         ),
         pw.SizedBox(width: 12),
         pw.Container(
           padding: const pw.EdgeInsets.all(12),
-          decoration: pw.BoxDecoration(
-            color: primaryColor,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+          decoration: const pw.BoxDecoration(
+            color: _coralAccent,
+            borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
           ),
           child: pw.Text(
-            'INVOICE',
+            'QUOTE',
             style: pw.TextStyle(
               fontSize: 24,
               fontWeight: pw.FontWeight.bold,
@@ -137,7 +131,7 @@ pw.Widget _buildHeader(Invoice invoice, Uint8List? logoBytes, PdfHeaderConfig he
   );
 }
 
-pw.Widget _buildInvoiceInfo(Invoice invoice) {
+pw.Widget _buildQuoteInfo(Quote quote) {
   final dateFormat = DateFormat('dd/MM/yyyy');
 
   return pw.Container(
@@ -152,22 +146,21 @@ pw.Widget _buildInvoiceInfo(Invoice invoice) {
         pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            _buildInfoRow('Invoice No:', invoice.invoiceNumber),
+            _buildInfoRow('Quote No:', quote.quoteNumber),
             pw.SizedBox(height: 4),
-            _buildInfoRow('Date:', dateFormat.format(invoice.date)),
+            _buildInfoRow('Date:', dateFormat.format(quote.createdAt)),
           ],
         ),
         pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            _buildInfoRow('Due Date:', dateFormat.format(invoice.dueDate)),
+            _buildInfoRow('Valid Until:', dateFormat.format(quote.validUntil)),
             pw.SizedBox(height: 4),
             _buildInfoRow(
               'Status:',
-              invoice.status.name.toUpperCase(),
-              valueColor: invoice.status == InvoiceStatus.paid
-                  ? PdfColors.green
-                  : _darkGray,
+              quote.status.name.toUpperCase(),
+              valueColor:
+                  quote.status == QuoteStatus.approved ? PdfColors.green : null,
             ),
           ],
         ),
@@ -204,7 +197,7 @@ pw.Widget _buildInfoRow(
   );
 }
 
-pw.Widget _buildCustomerSection(Invoice invoice, PdfColor primaryColor) {
+pw.Widget _buildCustomerSection(Quote quote, PdfColor primaryColor) {
   return pw.Container(
     width: double.infinity,
     padding: const pw.EdgeInsets.all(12),
@@ -216,7 +209,7 @@ pw.Widget _buildCustomerSection(Invoice invoice, PdfColor primaryColor) {
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Text(
-          'BILL TO:',
+          'QUOTATION FOR:',
           style: pw.TextStyle(
             fontSize: 10,
             fontWeight: pw.FontWeight.bold,
@@ -225,15 +218,84 @@ pw.Widget _buildCustomerSection(Invoice invoice, PdfColor primaryColor) {
         ),
         pw.SizedBox(height: 8),
         pw.Text(
-          invoice.customerName,
-          style: pw.TextStyle(
-            fontSize: 12,
-            fontWeight: pw.FontWeight.bold,
-          ),
+          quote.customerName,
+          style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
         ),
         pw.SizedBox(height: 4),
         pw.Text(
-          invoice.customerAddress,
+          quote.customerAddress,
+          style: const pw.TextStyle(fontSize: 10, color: _darkGray),
+        ),
+        if (quote.siteName.isNotEmpty) ...[
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'Site: ${quote.siteName}',
+            style: const pw.TextStyle(fontSize: 10, color: _darkGray),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+pw.Widget _buildDefectSummary(Quote quote) {
+  PdfColor severityColor;
+  switch (quote.defectSeverity) {
+    case 'critical':
+      severityColor = PdfColor.fromInt(0xFFD32F2F);
+      break;
+    case 'major':
+      severityColor = PdfColor.fromInt(0xFFF97316);
+      break;
+    default:
+      severityColor = PdfColor.fromInt(0xFF4CAF50);
+  }
+
+  return pw.Container(
+    width: double.infinity,
+    padding: const pw.EdgeInsets.all(12),
+    decoration: pw.BoxDecoration(
+      color: PdfColor.fromInt(0xFFFFF3E0),
+      border: pw.Border.all(color: PdfColor.fromInt(0xFFFFCC80)),
+      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+    ),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Row(
+          children: [
+            pw.Text(
+              'DEFECT FOUND DURING INSPECTION',
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: _darkGray,
+              ),
+            ),
+            pw.SizedBox(width: 8),
+            if (quote.defectSeverity != null)
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 2),
+                decoration: pw.BoxDecoration(
+                  color: severityColor,
+                  borderRadius:
+                      const pw.BorderRadius.all(pw.Radius.circular(2)),
+                ),
+                child: pw.Text(
+                  quote.defectSeverity!.toUpperCase(),
+                  style: pw.TextStyle(
+                    fontSize: 8,
+                    fontWeight: pw.FontWeight.bold,
+                    color: _white,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        pw.SizedBox(height: 8),
+        pw.Text(
+          quote.defectDescription!,
           style: const pw.TextStyle(fontSize: 10, color: _darkGray),
         ),
       ],
@@ -241,37 +303,53 @@ pw.Widget _buildCustomerSection(Invoice invoice, PdfColor primaryColor) {
   );
 }
 
-pw.Widget _buildItemsTable(Invoice invoice, PdfColor primaryColor) {
-  final currencyFormat = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+pw.Widget _buildItemsTable(Quote quote, PdfColor primaryColor) {
+  final currencyFormat =
+      NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
 
   return pw.Table(
     border: pw.TableBorder.all(color: _lightGray),
     columnWidths: {
-      0: const pw.FlexColumnWidth(4),
-      1: const pw.FlexColumnWidth(1),
-      2: const pw.FlexColumnWidth(1.5),
-      3: const pw.FlexColumnWidth(1.5),
+      0: const pw.FlexColumnWidth(3),
+      1: const pw.FlexColumnWidth(1.2),
+      2: const pw.FlexColumnWidth(1),
+      3: const pw.FlexColumnWidth(1.2),
+      4: const pw.FlexColumnWidth(1.2),
     },
     children: [
       pw.TableRow(
         decoration: pw.BoxDecoration(color: primaryColor),
         children: [
           _buildTableHeader('Description'),
+          _buildTableHeader('Category'),
           _buildTableHeader('Qty'),
           _buildTableHeader('Unit Price'),
           _buildTableHeader('Total'),
         ],
       ),
-      ...invoice.items.map((item) => pw.TableRow(
+      ...quote.items.map((item) => pw.TableRow(
             children: [
               _buildTableCell(item.description),
-              _buildTableCell(item.quantity == item.quantity.truncateToDouble() ? item.quantity.toInt().toString() : item.quantity.toString(), center: true),
-              _buildTableCell(currencyFormat.format(item.unitPrice), right: true),
-              _buildTableCell(currencyFormat.format(item.total), right: true),
+              _buildTableCell(
+                  _formatCategory(item.category)),
+              _buildTableCell(
+                  item.quantity == item.quantity.truncateToDouble()
+                      ? item.quantity.toInt().toString()
+                      : item.quantity.toString(),
+                  center: true),
+              _buildTableCell(currencyFormat.format(item.unitPrice),
+                  right: true),
+              _buildTableCell(currencyFormat.format(item.total),
+                  right: true),
             ],
           )),
     ],
   );
+}
+
+String _formatCategory(String? category) {
+  if (category == null || category.isEmpty) return '-';
+  return '${category[0].toUpperCase()}${category.substring(1)}';
 }
 
 pw.Widget _buildTableHeader(String text) {
@@ -307,8 +385,9 @@ pw.Widget _buildTableCell(
   );
 }
 
-pw.Widget _buildTotalsSection(Invoice invoice, PdfColor primaryColor) {
-  final currencyFormat = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+pw.Widget _buildTotalsSection(Quote quote, PdfColor primaryColor) {
+  final currencyFormat =
+      NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
 
   return pw.Row(
     mainAxisAlignment: pw.MainAxisAlignment.end,
@@ -317,15 +396,17 @@ pw.Widget _buildTotalsSection(Invoice invoice, PdfColor primaryColor) {
         width: 200,
         child: pw.Column(
           children: [
-            _buildTotalRow('Subtotal:', currencyFormat.format(invoice.subtotal)),
-            if (invoice.includeVat) ...[
+            _buildTotalRow(
+                'Subtotal:', currencyFormat.format(quote.subtotal)),
+            if (quote.includeVat) ...[
               pw.SizedBox(height: 4),
-              _buildTotalRow('VAT (20%):', currencyFormat.format(invoice.tax)),
+              _buildTotalRow(
+                  'VAT (20%):', currencyFormat.format(quote.vatAmount)),
             ],
             pw.Divider(color: _darkGray),
             _buildTotalRow(
               'TOTAL:',
-              currencyFormat.format(invoice.total),
+              currencyFormat.format(quote.total),
               isBold: true,
               isLarge: true,
               primaryColor: primaryColor,
@@ -367,7 +448,7 @@ pw.Widget _buildTotalRow(
   );
 }
 
-pw.Widget _buildNotesSection(Invoice invoice) {
+pw.Widget _buildNotesSection(Quote quote) {
   return pw.Container(
     width: double.infinity,
     padding: const pw.EdgeInsets.all(12),
@@ -389,7 +470,7 @@ pw.Widget _buildNotesSection(Invoice invoice) {
         ),
         pw.SizedBox(height: 4),
         pw.Text(
-          invoice.notes!,
+          quote.notes!,
           style: const pw.TextStyle(fontSize: 9, color: _darkGray),
         ),
       ],
@@ -397,7 +478,12 @@ pw.Widget _buildNotesSection(Invoice invoice) {
   );
 }
 
-pw.Widget _buildPaymentTerms(PaymentDetails paymentDetails, PdfColor primaryColor, PdfColor primaryLightColor) {
+pw.Widget _buildTermsSection(Quote quote, PdfColor primaryColor) {
+  final dateFormat = DateFormat('d MMMM yyyy');
+  final primaryLightColor = PdfColor.fromInt(
+    (primaryColor.toInt() & 0x00FFFFFF) | 0x1A000000,
+  );
+
   return pw.Container(
     width: double.infinity,
     padding: const pw.EdgeInsets.all(12),
@@ -409,7 +495,7 @@ pw.Widget _buildPaymentTerms(PaymentDetails paymentDetails, PdfColor primaryColo
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Text(
-          'Payment Details',
+          'Terms',
           style: pw.TextStyle(
             fontSize: 11,
             fontWeight: pw.FontWeight.bold,
@@ -417,23 +503,15 @@ pw.Widget _buildPaymentTerms(PaymentDetails paymentDetails, PdfColor primaryColo
           ),
         ),
         pw.SizedBox(height: 6),
-        if (paymentDetails.paymentTerms.isNotEmpty)
-          pw.Text(
-            paymentDetails.paymentTerms,
-            style: const pw.TextStyle(fontSize: 9, color: _darkGray),
-          ),
-        if (paymentDetails.bankName.isNotEmpty || paymentDetails.accountName.isNotEmpty) ...[
-          pw.SizedBox(height: 4),
-          pw.Text(
-            '${paymentDetails.bankName.isNotEmpty ? "Bank: ${paymentDetails.bankName}" : ""}${paymentDetails.bankName.isNotEmpty && paymentDetails.accountName.isNotEmpty ? " | " : ""}${paymentDetails.accountName.isNotEmpty ? "Account Name: ${paymentDetails.accountName}" : ""}',
-            style: const pw.TextStyle(fontSize: 9, color: _darkGray),
-          ),
-        ],
-        if (paymentDetails.sortCode.isNotEmpty || paymentDetails.accountNumber.isNotEmpty)
-          pw.Text(
-            '${paymentDetails.sortCode.isNotEmpty ? "Sort Code: ${paymentDetails.sortCode}" : ""}${paymentDetails.sortCode.isNotEmpty && paymentDetails.accountNumber.isNotEmpty ? " | " : ""}${paymentDetails.accountNumber.isNotEmpty ? "Account No: ${paymentDetails.accountNumber}" : ""}',
-            style: const pw.TextStyle(fontSize: 9, color: _darkGray),
-          ),
+        pw.Text(
+          'This quote is valid until ${dateFormat.format(quote.validUntil)}.',
+          style: const pw.TextStyle(fontSize: 9, color: _darkGray),
+        ),
+        pw.SizedBox(height: 4),
+        pw.Text(
+          'To accept, please reply to this email or call us.',
+          style: const pw.TextStyle(fontSize: 9, color: _darkGray),
+        ),
       ],
     ),
   );
@@ -443,16 +521,13 @@ pw.Widget _buildPaymentTerms(PaymentDetails paymentDetails, PdfColor primaryColo
 Uint8List _extractFontBytes(pw.Font font) {
   final ttf = font as pw.TtfFont;
   return Uint8List.fromList(
-    ttf.data.buffer.asUint8List(ttf.data.offsetInBytes, ttf.data.lengthInBytes),
+    ttf.data.buffer
+        .asUint8List(ttf.data.offsetInBytes, ttf.data.lengthInBytes),
   );
 }
 
-class InvoicePDFService {
-  static Future<Uint8List> generateInvoicePDF(
-    Invoice invoice,
-    PaymentDetails paymentDetails,
-  ) async {
-    // ── Gather phase (main thread) ──
+class QuotePdfService {
+  static Future<Uint8List> generateQuotePdf(Quote quote) async {
     Uint8List? regularFontBytes;
     Uint8List? boldFontBytes;
     try {
@@ -460,37 +535,28 @@ class InvoicePDFService {
       final boldFont = await PdfGoogleFonts.robotoBold();
       regularFontBytes = _extractFontBytes(regularFont);
       boldFontBytes = _extractFontBytes(boldFont);
-    } catch (_) {
-      // Google Fonts unavailable — isolate will fall back to Helvetica
-    }
+    } catch (_) {}
 
     final companyPdf = CompanyPdfConfigService.instance;
     final logoBytes = await companyPdf.getEffectiveLogoBytes(
-      useCompanyBranding: invoice.useCompanyBranding,
-      type: PdfDocumentType.invoice,
+      useCompanyBranding: quote.useCompanyBranding,
+      type: PdfDocumentType.quote,
     );
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(
-      PdfDocumentType.invoice,
-      useCompanyBranding: invoice.useCompanyBranding,
+      PdfDocumentType.quote,
+      useCompanyBranding: quote.useCompanyBranding,
     );
     final footerConfig = await companyPdf.getEffectiveFooterConfig(
-      PdfDocumentType.invoice,
-      useCompanyBranding: invoice.useCompanyBranding,
+      PdfDocumentType.quote,
+      useCompanyBranding: quote.useCompanyBranding,
     );
     final colourScheme = await companyPdf.getEffectiveColourScheme(
-      PdfDocumentType.invoice,
-      useCompanyBranding: invoice.useCompanyBranding,
+      PdfDocumentType.quote,
+      useCompanyBranding: quote.useCompanyBranding,
     );
 
-    final data = InvoicePdfData(
-      invoiceJson: invoice.toJson(),
-      paymentDetailsMap: {
-        'bankName': paymentDetails.bankName,
-        'accountName': paymentDetails.accountName,
-        'sortCode': paymentDetails.sortCode,
-        'accountNumber': paymentDetails.accountNumber,
-        'paymentTerms': paymentDetails.paymentTerms,
-      },
+    final data = QuotePdfData(
+      quoteJson: quote.toJson(),
       logoBytes: logoBytes,
       headerConfigJson: headerConfig.toJson(),
       footerConfigJson: footerConfig.toJson(),
@@ -499,16 +565,15 @@ class InvoicePDFService {
       boldFontBytes: boldFontBytes,
     );
 
-    // ── Build phase (background isolate) ──
-    if (kIsWeb) return _buildInvoicePdf(data);
-    return compute(_buildInvoicePdf, data);
+    if (kIsWeb) return _buildQuotePdf(data);
+    return compute(_buildQuotePdf, data);
   }
 
-  static Future<void> sharePDF(Uint8List pdfBytes, String filename) async {
+  static Future<void> sharePdf(Uint8List pdfBytes, String filename) async {
     await Printing.sharePdf(bytes: pdfBytes, filename: filename);
   }
 
-  static Future<void> printPDF(Uint8List pdfBytes) async {
+  static Future<void> printPdf(Uint8List pdfBytes) async {
     await Printing.layoutPdf(onLayout: (format) async => pdfBytes);
   }
 }

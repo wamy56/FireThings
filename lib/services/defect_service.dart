@@ -63,6 +63,21 @@ class DefectService {
     }
   }
 
+  /// Update specific fields on a defect document.
+  Future<void> updateDefectField(
+    String basePath,
+    String siteId,
+    String defectId,
+    Map<String, dynamic> fields,
+  ) async {
+    try {
+      await _defectsCol(basePath, siteId).doc(defectId).update(fields);
+    } catch (e) {
+      debugPrint('Error updating defect field: $e');
+      rethrow;
+    }
+  }
+
   /// Batch-rectify all open defects for an asset.
   Future<int> rectifyAllForAsset(
     String basePath,

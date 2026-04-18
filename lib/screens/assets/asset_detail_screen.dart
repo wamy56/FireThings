@@ -14,8 +14,11 @@ import '../../services/asset_type_service.dart';
 import '../../services/defect_service.dart';
 import '../../services/service_history_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/remote_config_service.dart';
+import '../../services/quote_service.dart';
 import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
+import '../quoting/quote_screen.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -1454,6 +1457,61 @@ class _ActiveDefectCard extends StatelessWidget {
                     ? AppTheme.darkTextSecondary
                     : AppTheme.textSecondary,
               ),
+            ),
+          ],
+          if (RemoteConfigService.instance.quotingEnabled) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 30,
+              child: defect.linkedQuoteId == null
+                  ? OutlinedButton.icon(
+                      icon: Icon(AppIcons.receipt, size: 14),
+                      label: const Text('Create Quote'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        side: BorderSide(color: AppTheme.accentOrange),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        textStyle: const TextStyle(fontSize: 11),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => QuoteScreen(
+                              fromDefect: defect,
+                              siteId: siteId,
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : OutlinedButton.icon(
+                      icon: Icon(AppIcons.receipt, size: 14),
+                      label: const Text('View Quote'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        side: BorderSide(color: AppTheme.primaryBlue),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        textStyle: const TextStyle(fontSize: 11),
+                      ),
+                      onPressed: () async {
+                        final quote = await QuoteService.instance
+                            .getQuoteById(defect.linkedQuoteId!);
+                        if (quote != null && context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  QuoteScreen(existingQuote: quote),
+                            ),
+                          );
+                        }
+                      },
+                    ),
             ),
           ],
         ],

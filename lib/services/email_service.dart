@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_email_sender/flutter_email_sender.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -97,6 +98,52 @@ $senderName''',
       await FlutterEmailSender.send(email);
     } catch (e) {
       debugPrint('Error sending email: $e');
+      rethrow;
+    }
+  }
+
+  /// Send a quote via email with PDF attachment
+  static Future<void> sendQuote({
+    required String recipientEmail,
+    required String recipientName,
+    required String quoteNumber,
+    required double total,
+    required DateTime validUntil,
+    required Uint8List pdfBytes,
+    required String senderName,
+    String? senderPhone,
+  }) async {
+    final tempDir = await getTemporaryDirectory();
+    final filePath = '${tempDir.path}/Quote_$quoteNumber.pdf';
+    final file = File(filePath);
+    await file.writeAsBytes(pdfBytes);
+
+    final formattedDate = DateFormat('d MMMM yyyy').format(validUntil);
+    final phoneLine =
+        senderPhone != null ? ' or call us on $senderPhone' : '';
+
+    final email = Email(
+      body:
+          '''Dear $recipientName,
+
+Please find attached our quotation $quoteNumber for the value of \u00A3${total.toStringAsFixed(2)}.
+
+This quote is valid until $formattedDate.
+
+To accept this quote, please reply to this email$phoneLine.
+
+Kind regards,
+$senderName''',
+      subject: 'Quote $quoteNumber from $senderName',
+      recipients: [recipientEmail],
+      attachmentPaths: [filePath],
+      isHTML: false,
+    );
+
+    try {
+      await FlutterEmailSender.send(email);
+    } catch (e) {
+      debugPrint('Error sending quote email: $e');
       rethrow;
     }
   }

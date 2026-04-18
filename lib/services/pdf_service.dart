@@ -202,23 +202,27 @@ pw.Widget _buildJobInfoOnly(
   final dateFormat = DateFormat('dd/MM/yyyy');
   final timeFormat = DateFormat('HH:mm');
 
+  final fields = [
+    ('Date', dateFormat.format(jobsheet.date)),
+    ('Time', timeFormat.format(jobsheet.date)),
+    ('Job No', jobsheet.jobNumber),
+    ('Category', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
+    ('Engineer', jobsheet.engineerName),
+  ];
+
   return buildSectionCard(
     title: 'Job Information',
     colors: colors,
     style: sectionStyle,
-    children: [
-      buildFieldGrid(
-        fields: [
-          ('Date', dateFormat.format(jobsheet.date)),
-          ('Time', timeFormat.format(jobsheet.date)),
-          ('Job No', jobsheet.jobNumber),
-          ('Category', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
-          ('Engineer', jobsheet.engineerName),
-        ],
+    children: fields.asMap().entries.map((entry) {
+      return buildCompactFieldRow(
+        label: entry.value.$1,
+        value: entry.value.$2,
         colors: colors,
         typography: typography,
-      ),
-    ],
+        isAlternate: entry.key.isOdd,
+      );
+    }).toList(),
   );
 }
 
@@ -228,21 +232,24 @@ pw.Widget _buildSiteDetailsOnly(
   PdfSectionStyleConfig sectionStyle,
   PdfTypographyConfig typography,
 ) {
+  final fields = [
+    ('Customer', jobsheet.customerName),
+    ('Address', jobsheet.siteAddress),
+  ];
+
   return buildSectionCard(
     title: 'Site Details',
     colors: colors,
     style: sectionStyle,
-    children: [
-      buildFieldGrid(
-        fields: [
-          ('Customer', jobsheet.customerName),
-          ('Address', jobsheet.siteAddress),
-        ],
+    children: fields.asMap().entries.map((entry) {
+      return buildCompactFieldRow(
+        label: entry.value.$1,
+        value: entry.value.$2,
         colors: colors,
         typography: typography,
-        twoColumn: false,
-      ),
-    ],
+        isAlternate: entry.key.isOdd,
+      );
+    }).toList(),
   );
 }
 
@@ -255,6 +262,19 @@ pw.Widget _buildSiteAndJobRow(
   final dateFormat = DateFormat('dd/MM/yyyy');
   final timeFormat = DateFormat('HH:mm');
 
+  final siteFields = [
+    ('Customer', jobsheet.customerName),
+    ('Address', jobsheet.siteAddress),
+  ];
+
+  final jobFields = [
+    ('Date', dateFormat.format(jobsheet.date)),
+    ('Time', timeFormat.format(jobsheet.date)),
+    ('Job No', jobsheet.jobNumber),
+    ('Category', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
+    ('Engineer', jobsheet.engineerName),
+  ];
+
   return pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
@@ -263,17 +283,15 @@ pw.Widget _buildSiteAndJobRow(
           title: 'Site Details',
           colors: colors,
           style: sectionStyle,
-          children: [
-            buildFieldGrid(
-              fields: [
-                ('Customer', jobsheet.customerName),
-                ('Address', jobsheet.siteAddress),
-              ],
+          children: siteFields.asMap().entries.map((entry) {
+            return buildCompactFieldRow(
+              label: entry.value.$1,
+              value: entry.value.$2,
               colors: colors,
               typography: typography,
-              twoColumn: false,
-            ),
-          ],
+              isAlternate: entry.key.isOdd,
+            );
+          }).toList(),
         ),
       ),
       pw.SizedBox(width: 12),
@@ -282,20 +300,15 @@ pw.Widget _buildSiteAndJobRow(
           title: 'Job Information',
           colors: colors,
           style: sectionStyle,
-          children: [
-            buildFieldGrid(
-              fields: [
-                ('Date', dateFormat.format(jobsheet.date)),
-                ('Time', timeFormat.format(jobsheet.date)),
-                ('Job No', jobsheet.jobNumber),
-                ('Category', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
-                ('Engineer', jobsheet.engineerName),
-              ],
+          children: jobFields.asMap().entries.map((entry) {
+            return buildCompactFieldRow(
+              label: entry.value.$1,
+              value: entry.value.$2,
               colors: colors,
               typography: typography,
-              twoColumn: false,
-            ),
-          ],
+              isAlternate: entry.key.isOdd,
+            );
+          }).toList(),
         ),
       ),
     ],
@@ -311,6 +324,19 @@ pw.Widget _buildJobAndSiteRow(
   final dateFormat = DateFormat('dd/MM/yyyy');
   final timeFormat = DateFormat('HH:mm');
 
+  final jobFields = [
+    ('Date', dateFormat.format(jobsheet.date)),
+    ('Time', timeFormat.format(jobsheet.date)),
+    ('Job No', jobsheet.jobNumber),
+    ('Category', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
+    ('Engineer', jobsheet.engineerName),
+  ];
+
+  final siteFields = [
+    ('Customer', jobsheet.customerName),
+    ('Address', jobsheet.siteAddress),
+  ];
+
   return pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
@@ -319,20 +345,15 @@ pw.Widget _buildJobAndSiteRow(
           title: 'Job Information',
           colors: colors,
           style: sectionStyle,
-          children: [
-            buildFieldGrid(
-              fields: [
-                ('Date', dateFormat.format(jobsheet.date)),
-                ('Time', timeFormat.format(jobsheet.date)),
-                ('Job No', jobsheet.jobNumber),
-                ('Category', jobsheet.systemCategory.isEmpty ? 'N/A' : jobsheet.systemCategory),
-                ('Engineer', jobsheet.engineerName),
-              ],
+          children: jobFields.asMap().entries.map((entry) {
+            return buildCompactFieldRow(
+              label: entry.value.$1,
+              value: entry.value.$2,
               colors: colors,
               typography: typography,
-              twoColumn: false,
-            ),
-          ],
+              isAlternate: entry.key.isOdd,
+            );
+          }).toList(),
         ),
       ),
       pw.SizedBox(width: 12),
@@ -341,17 +362,15 @@ pw.Widget _buildJobAndSiteRow(
           title: 'Site Details',
           colors: colors,
           style: sectionStyle,
-          children: [
-            buildFieldGrid(
-              fields: [
-                ('Customer', jobsheet.customerName),
-                ('Address', jobsheet.siteAddress),
-              ],
+          children: siteFields.asMap().entries.map((entry) {
+            return buildCompactFieldRow(
+              label: entry.value.$1,
+              value: entry.value.$2,
               colors: colors,
               typography: typography,
-              twoColumn: false,
-            ),
-          ],
+              isAlternate: entry.key.isOdd,
+            );
+          }).toList(),
         ),
       ),
     ],

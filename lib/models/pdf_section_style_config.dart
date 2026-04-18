@@ -39,7 +39,7 @@ class PdfSectionStyleConfig {
     this.headerStyle = SectionHeaderStyle.fullWidth,
     this.sectionSpacing = 12,
     this.innerPadding = 12,
-    this.headerFontSize = 11,
+    this.headerFontSize = 9,
   });
 
   factory PdfSectionStyleConfig.defaults() => const PdfSectionStyleConfig();
@@ -69,7 +69,7 @@ class PdfSectionStyleConfig {
         ),
         sectionSpacing: (json['sectionSpacing'] as num?)?.toDouble() ?? 12,
         innerPadding: (json['innerPadding'] as num?)?.toDouble() ?? 12,
-        headerFontSize: (json['headerFontSize'] as num?)?.toDouble() ?? 11,
+        headerFontSize: (json['headerFontSize'] as num?)?.toDouble() ?? 9,
       );
 
   String toJsonString() => jsonEncode(toJson());

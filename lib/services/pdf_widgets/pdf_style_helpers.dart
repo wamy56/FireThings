@@ -23,26 +23,17 @@ pw.BoxDecoration buildCardDecoration(
     case SectionCardStyle.shadowed:
       return pw.BoxDecoration(
         color: colors.cardBackground,
+        border: pw.Border.all(color: pdfLightGray, width: 0.5),
         borderRadius: pw.BorderRadius.circular(style.cornerRadius.pixels),
-        boxShadow: [
-          pw.BoxShadow(
-            color: const PdfColor.fromInt(0x1A000000),
-            blurRadius: 4,
-            offset: const PdfPoint(0, 2),
-          ),
-        ],
       );
     case SectionCardStyle.elevated:
       return pw.BoxDecoration(
         color: colors.cardBackground,
+        border: pw.Border.all(
+          color: const PdfColor.fromInt(0xFFBDBDBD),
+          width: 1,
+        ),
         borderRadius: pw.BorderRadius.circular(style.cornerRadius.pixels),
-        boxShadow: [
-          pw.BoxShadow(
-            color: const PdfColor.fromInt(0x33000000),
-            blurRadius: 8,
-            offset: const PdfPoint(0, 4),
-          ),
-        ],
       );
     case SectionCardStyle.flat:
       return pw.BoxDecoration(

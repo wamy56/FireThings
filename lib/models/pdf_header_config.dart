@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-enum PdfDocumentType { jobsheet, invoice }
+enum PdfDocumentType { jobsheet, invoice, quote }
 
-enum LogoZone { left, centre, none }
+enum LogoZone { left, none }
 
 enum LogoSize {
   small(40),
@@ -15,8 +15,7 @@ enum LogoSize {
 
 /// Header visual style
 enum HeaderStyle {
-  classic, // Bottom border only, white background (current look)
-  modern, // Solid primary background with rounded bottom corners
+  classic, // Bottom border only, white background
   minimal, // No border, clean separation with extra padding
 }
 
@@ -87,7 +86,7 @@ class PdfHeaderConfig {
     required this.logoSize,
     required this.leftLines,
     required this.centreLines,
-    this.headerStyle = HeaderStyle.modern,
+    this.headerStyle = HeaderStyle.classic,
     this.cornerRadius = HeaderCornerRadius.medium,
     this.verticalPadding = 16,
     this.horizontalPadding = 24,
@@ -104,7 +103,7 @@ class PdfHeaderConfig {
           HeaderTextLine(key: 'phone', fontSize: 9),
         ],
         centreLines: [],
-        headerStyle: HeaderStyle.modern,
+        headerStyle: HeaderStyle.classic,
         cornerRadius: HeaderCornerRadius.medium,
         verticalPadding: 16,
         horizontalPadding: 24,
@@ -141,7 +140,7 @@ class PdfHeaderConfig {
             [],
         headerStyle: HeaderStyle.values.firstWhere(
           (e) => e.name == json['headerStyle'],
-          orElse: () => HeaderStyle.modern,
+          orElse: () => HeaderStyle.classic,
         ),
         cornerRadius: HeaderCornerRadius.values.firstWhere(
           (e) => e.name == json['cornerRadius'],

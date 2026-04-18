@@ -25,4 +25,5 @@ export 'asset_type.dart';
 export 'floor_plan.dart';
 export 'service_record.dart';
 export 'defect.dart';
+export 'quote.dart';
 export 'permission.dart';

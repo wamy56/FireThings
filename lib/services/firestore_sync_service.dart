@@ -96,6 +96,11 @@ class FirestoreSyncService {
     await upsertDocument('filled_templates', filled.id, filled.toJson());
   }
 
+  Future<void> upsertQuote(Quote quote) async {
+    final data = quote.toJson();
+    await upsertDocument('quotes', quote.id, data);
+  }
+
   // ==================== PDF CONFIG SYNC ====================
 
   Future<void> syncPdfHeaderConfig(String jsonString, PdfDocumentType type) async {
@@ -280,6 +285,19 @@ class FirestoreSyncService {
             DatabaseHelper.instance.insertFilledPdfForm(item),
         updateLocal: (item) =>
             DatabaseHelper.instance.updateFilledPdfForm(item),
+      );
+
+      await _syncCollection<Quote>(
+        collection: 'quotes',
+        engineerId: engineerId,
+        fetchLocal: () =>
+            DatabaseHelper.instance.getQuotesByEngineerId(engineerId),
+        fromJson: (json) => Quote.fromJson(json),
+        toJson: (item) => item.toJson(),
+        getId: (item) => item.id,
+        getLastModified: (item) => item.lastModifiedAt,
+        insertLocal: (item) => DatabaseHelper.instance.insertQuote(item),
+        updateLocal: (item) => DatabaseHelper.instance.updateQuote(item),
       );
 
       // Sync PDF config (pull remote if newer)
@@ -491,6 +509,7 @@ class FirestoreSyncService {
     const collections = [
       'jobsheets',
       'invoices',
+      'quotes',
       'saved_customers',
       'saved_sites',
       'job_templates',

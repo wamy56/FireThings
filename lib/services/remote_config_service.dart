@@ -26,6 +26,7 @@ class RemoteConfigService {
     'barcode_scanning_enabled': false,
     'lifecycle_tracking_enabled': false,
     'compliance_report_enabled': false,
+    'quoting_enabled': false,
   };
 
   Future<void> initialize() async {
@@ -103,4 +104,6 @@ class RemoteConfigService {
 
   bool get complianceReportEnabled =>
       _remoteConfig.getBool('compliance_report_enabled');
+
+  bool get quotingEnabled => _remoteConfig.getBool('quoting_enabled');
 }

@@ -99,21 +99,6 @@ class PdfHeaderBuilder {
       children: rowChildren,
     );
 
-    // If logo is centred, place it above the content row
-    if (config.logoZone == LogoZone.centre && logoWidget != null) {
-      return pw.Column(
-        children: [
-          pw.Center(
-            child: pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 8),
-              child: logoWidget,
-            ),
-          ),
-          contentRow,
-        ],
-      );
-    }
-
     return contentRow;
   }
 

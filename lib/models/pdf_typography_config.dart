@@ -11,7 +11,7 @@ class PdfTypographyConfig {
 
   const PdfTypographyConfig({
     this.documentTitleSize = 24,
-    this.sectionHeaderSize = 11,
+    this.sectionHeaderSize = 9,
     this.fieldLabelSize = 8,
     this.fieldValueSize = 10,
     this.tableHeaderSize = 9,
@@ -36,7 +36,7 @@ class PdfTypographyConfig {
         documentTitleSize:
             (json['documentTitleSize'] as num?)?.toDouble() ?? 24,
         sectionHeaderSize:
-            (json['sectionHeaderSize'] as num?)?.toDouble() ?? 11,
+            (json['sectionHeaderSize'] as num?)?.toDouble() ?? 9,
         fieldLabelSize: (json['fieldLabelSize'] as num?)?.toDouble() ?? 8,
         fieldValueSize: (json['fieldValueSize'] as num?)?.toDouble() ?? 10,
         tableHeaderSize: (json['tableHeaderSize'] as num?)?.toDouble() ?? 9,

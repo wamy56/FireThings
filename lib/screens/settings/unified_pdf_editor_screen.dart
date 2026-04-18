@@ -575,7 +575,6 @@ class _UnifiedPdfEditorScreenState extends State<UnifiedPdfEditorScreen>
         SegmentedButton<LogoZone>(
           segments: const [
             ButtonSegment(value: LogoZone.left, label: Text('Left')),
-            ButtonSegment(value: LogoZone.centre, label: Text('Centre')),
             ButtonSegment(value: LogoZone.none, label: Text('None')),
           ],
           selected: {_headerConfig.logoZone},

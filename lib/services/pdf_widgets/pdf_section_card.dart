@@ -40,7 +40,7 @@ pw.Widget _buildSectionHeader(
     case SectionHeaderStyle.fullWidth:
       return pw.Container(
         width: double.infinity,
-        padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: pw.BoxDecoration(
           color: colors.primaryColor,
           borderRadius: style.cardStyle == SectionCardStyle.flat
@@ -64,7 +64,7 @@ pw.Widget _buildSectionHeader(
     case SectionHeaderStyle.leftAccent:
       return pw.Container(
         width: double.infinity,
-        padding: const pw.EdgeInsets.fromLTRB(12, 8, 12, 8),
+        padding: const pw.EdgeInsets.fromLTRB(12, 5, 12, 5),
         decoration: pw.BoxDecoration(
           border: pw.Border(
             left: pw.BorderSide(color: colors.primaryColor, width: 4),
@@ -84,7 +84,7 @@ pw.Widget _buildSectionHeader(
     case SectionHeaderStyle.underlined:
       return pw.Container(
         width: double.infinity,
-        padding: const pw.EdgeInsets.fromLTRB(0, 8, 0, 6),
+        padding: const pw.EdgeInsets.fromLTRB(0, 5, 0, 4),
         margin: pw.EdgeInsets.symmetric(horizontal: style.innerPadding),
         decoration: pw.BoxDecoration(
           border: pw.Border(
