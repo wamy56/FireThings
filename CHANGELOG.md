@@ -4,6 +4,31 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-19 (Session 75)
+
+### Navigation Overhaul, Notification Feed & Firestore Data Model
+
+Restructured bottom navigation from 4 tabs (+optional Dispatch) to 5 permanent tabs: Home | Jobs | Invoices | Quotes | Dispatch. Settings moved to an app bar icon. Added a notification bell with unread badge and a full notification feed screen. Redesigned quoting screens with animations and new card layouts. Migrated company quotes and invoices to company-level Firestore collections with dual-write.
+
+#### New Files (3)
+- **`lib/screens/notifications/notification_feed_screen.dart`** — Activity feed screen: merges Firestore dispatch job updates with local jobsheet/invoice data, grouped by date, tracks last-seen timestamp in SharedPreferences for unread indicators
+- **`lib/widgets/notification_bell.dart`** — App bar bell icon with animated unread count badge, streams dispatch job updates to compute unseen count
+- **`lib/screens/dispatch/dispatch_empty_screen.dart`** — Placeholder screen shown in Dispatch tab when dispatch is disabled or user has no company, with Create/Join Company CTAs
+
+#### Modified Files (10)
+- **`lib/main.dart`** — Bottom nav changed to 5 fixed tabs (Home/Jobs/Invoices/Quotes/Dispatch). Settings removed from nav bar, added as app bar icon button. NotificationBell added to app bar. Dispatch tab always visible (shows DispatchEmptyScreen when unavailable). Removed dynamic `_showDispatchTab` logic.
+- **`lib/screens/home/home_screen.dart`** — Removed quotes card (quotes now has own tab). Removed `onTabChanged` callback parameter.
+- **`lib/screens/quoting/quoting_hub_screen.dart`** — Full visual redesign: BackgroundDecoration, animated stat cards, skeleton loaders, new layout. Now serves as top-level tab screen.
+- **`lib/screens/quoting/quote_list_screen.dart`** — New card design using ListTile with status-coloured leading avatar, action sheet (edit/mark sent/approved/delete), skeleton loaders, adaptive refresh indicator, list item entrance animations.
+- **`lib/services/quote_service.dart`** — Company quotes stream now reads from `companies/{companyId}/quotes/` instead of `collectionGroup`. `saveQuoteToFirestore` dual-writes to both user and company subcollections. `getQuoteStream` uses companyId.
+- **`lib/services/firestore_sync_service.dart`** — Company invoices stream now reads from `companies/{companyId}/invoices/` instead of `collectionGroup`. `saveInvoiceToFirestore` dual-writes to both user and company subcollections. `getInvoiceStream` uses companyId.
+- **`firestore.rules`** — Added company-level security rules for `/invoices/{invoiceId}` (member read/write) and `/quotes/{quoteId}` (member read, permission-gated create/edit).
+- **`lib/screens/web/web_quote_detail_panel.dart`** — Stream and delete now use companyId instead of engineerId.
+- **`lib/screens/web/web_invoice_detail_panel.dart`** — Stream and delete now use companyId instead of engineerId.
+- **`lib/utils/icon_map.dart`** — Added 2 new icon entries for new nav items.
+
+---
+
 ## 2026-04-18 (Session 74)
 
 ### Web Portal: Quotes & Invoices Dashboard

@@ -329,9 +329,9 @@ class _InvoicingHubScreenState extends State<InvoicingHubScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildSectionTile(
-                          icon: AppIcons.document,
+                          icon: AppIcons.designtools,
                           label: 'PDF Design',
-                          color: Colors.deepOrange,
+                          color: Colors.pink,
                           isDark: isDark,
                           cardColor: cardColor,
                           shadow: shadow,

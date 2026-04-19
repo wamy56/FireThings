@@ -727,29 +727,62 @@ class _QuoteScreenState extends State<QuoteScreen> {
   Widget _buildItemRow(int index, bool isDark) {
     final c = _itemControllers[index];
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkSurfaceElevated : Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDark ? AppTheme.darkDivider : Colors.grey[200]!,
+        ),
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                flex: 3,
-                child: TextFormField(
-                  controller: c.description,
-                  decoration: InputDecoration(
-                    labelText: 'Description',
-                    border: const OutlineInputBorder(),
-                    hintText: index == _itemControllers.length - 1
-                        ? 'Add new item...'
-                        : null,
-                  ),
-                  onChanged: (_) => setState(() {}),
+              Text(
+                'Item ${index + 1}',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.primaryBlue,
                 ),
               ),
-              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(AppIcons.close, size: 20, color: AppTheme.errorRed),
+                onPressed: _itemControllers.length > 1
+                    ? () {
+                        setState(() {
+                          _itemControllers[index].dispose();
+                          _itemControllers.removeAt(index);
+                        });
+                      }
+                    : null,
+                tooltip: 'Remove',
+                constraints: const BoxConstraints(),
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: c.description,
+            decoration: InputDecoration(
+              labelText: 'Description',
+              border: const OutlineInputBorder(),
+              hintText: index == _itemControllers.length - 1
+                  ? 'Add new item...'
+                  : null,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
               SizedBox(
-                width: 110,
+                width: 100,
                 child: DropdownButtonFormField<String>(
                   initialValue: c.category,
                   decoration: const InputDecoration(
@@ -758,6 +791,7 @@ class _QuoteScreenState extends State<QuoteScreen> {
                     contentPadding:
                         EdgeInsets.symmetric(horizontal: 8, vertical: 12),
                   ),
+                  isExpanded: true,
                   items: const [
                     DropdownMenuItem(value: null, child: Text('-')),
                     DropdownMenuItem(
@@ -769,11 +803,7 @@ class _QuoteScreenState extends State<QuoteScreen> {
                   onChanged: (val) => setState(() => c.category = val),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
+              const SizedBox(width: 12),
               Expanded(
                 child: TextFormField(
                   controller: c.quantity,
@@ -782,32 +812,24 @@ class _QuoteScreenState extends State<QuoteScreen> {
                     border: OutlineInputBorder(),
                   ),
                   keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
                   onChanged: (_) => setState(() {}),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Expanded(
                 child: TextFormField(
                   controller: c.unitPrice,
                   decoration: const InputDecoration(
-                    labelText: 'Unit Price (\u00A3)',
+                    labelText: 'Unit Price',
                     border: OutlineInputBorder(),
+                    prefixText: '\u00A3',
                   ),
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (_) => setState(() {}),
                 ),
               ),
-              if (_itemControllers.length > 1)
-                IconButton(
-                  icon: Icon(AppIcons.trash, color: AppTheme.errorRed),
-                  onPressed: () {
-                    setState(() {
-                      _itemControllers[index].dispose();
-                      _itemControllers.removeAt(index);
-                    });
-                  },
-                ),
             ],
           ),
         ],

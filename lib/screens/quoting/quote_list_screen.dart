@@ -84,7 +84,7 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
           );
           _loadQuotes();
         },
-        backgroundColor: AppTheme.accentOrange,
+        backgroundColor: AppTheme.primaryBlue,
         child: const Icon(AppIcons.addCircle, color: Colors.white),
       ),
     );
