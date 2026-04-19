@@ -17,6 +17,8 @@ class AppIcons {
   static const IconData receiptBold = IconsaxPlusBold.receipt;
   static const IconData settingOutline = IconsaxPlusLinear.setting_2;
   static const IconData settingBold = IconsaxPlusBold.setting_2;
+  static const IconData receiptEditOutline = IconsaxPlusLinear.receipt_edit;
+  static const IconData receiptEditBold = IconsaxPlusBold.receipt_edit;
 
   // ============================================
   // Actions

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../models/models.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/theme.dart';
+import '../../utils/animate_helpers.dart';
+import '../../utils/adaptive_widgets.dart';
 import '../../services/quote_service.dart';
-import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/background_decoration.dart';
 import 'quote_screen.dart';
 import 'quote_list_screen.dart';
 
@@ -17,8 +19,11 @@ class QuotingHubScreen extends StatefulWidget {
 }
 
 class _QuotingHubScreenState extends State<QuotingHubScreen> {
-  Map<String, int> _counts = {};
+  int _draftCount = 0;
+  int _sentCount = 0;
+  int _approvedCount = 0;
   double _approvedValue = 0;
+  int _totalCount = 0;
   bool _isLoading = true;
 
   @override
@@ -33,7 +38,10 @@ class _QuotingHubScreenState extends State<QuotingHubScreen> {
       final counts = await QuoteService.instance.getQuoteCounts();
       final value = await QuoteService.instance.getApprovedValue();
       setState(() {
-        _counts = counts;
+        _draftCount = counts['drafts'] ?? 0;
+        _sentCount = counts['sent'] ?? 0;
+        _approvedCount = counts['approved'] ?? 0;
+        _totalCount = counts.values.fold(0, (a, b) => a + b);
         _approvedValue = value;
         _isLoading = false;
       });
@@ -46,249 +54,271 @@ class _QuotingHubScreenState extends State<QuotingHubScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite;
+    final shadow = isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow;
 
     return Scaffold(
-      appBar: AdaptiveNavigationBar(title: 'Quotes'),
-      body: _isLoading
-          ? _buildSkeleton()
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: ListView(
-                padding: EdgeInsets.all(AppTheme.screenPadding),
-                children: [
-                  _buildStatsGrid(isDark),
-                  SizedBox(height: AppTheme.sectionGap),
-                  _buildQuickActions(isDark),
-                ],
-              ),
-            ),
-    );
-  }
+      body: Stack(
+        children: [
+          const BackgroundDecoration(),
+          _isLoading
+              ? _buildSkeleton(isDark)
+              : AdaptiveRefreshIndicator(
+                  onRefresh: _loadData,
+                  child: ListView(
+                    padding: const EdgeInsets.all(AppTheme.screenPadding),
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildStatCard(
+                              '\u00A3${_approvedValue.toStringAsFixed(0)}',
+                              'Approved',
+                              AppIcons.wallet,
+                              AppTheme.accentOrange,
+                              isDark,
+                              cardColor,
+                              shadow,
+                              onTap: () => _navigateToList(
+                                  QuoteStatus.approved, 'Approved Quotes'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildStatCard(
+                              '$_draftCount',
+                              'Drafts',
+                              AppIcons.editNote,
+                              AppTheme.warningOrange,
+                              isDark,
+                              cardColor,
+                              shadow,
+                              onTap: () => _navigateToList(
+                                  QuoteStatus.draft, 'Draft Quotes'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildStatCard(
+                              '$_sentCount',
+                              'Sent',
+                              AppIcons.send,
+                              isDark
+                                  ? AppTheme.darkPrimaryBlue
+                                  : AppTheme.primaryBlue,
+                              isDark,
+                              cardColor,
+                              shadow,
+                              onTap: () => _navigateToList(
+                                  QuoteStatus.sent, 'Sent Quotes'),
+                            ),
+                          ),
+                        ],
+                      ).animateEntrance(),
+                      const SizedBox(height: 24),
 
-  Widget _buildSkeleton() {
-    return Padding(
-      padding: const EdgeInsets.all(AppTheme.screenPadding),
-      child: SkeletonShimmer(
-        child: Column(
-          children: [
-            Row(
-              children: const [
-                Expanded(child: SkeletonBox(height: 100, borderRadius: 16)),
-                SizedBox(width: 12),
-                Expanded(child: SkeletonBox(height: 100, borderRadius: 16)),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: const [
-                Expanded(child: SkeletonBox(height: 100, borderRadius: 16)),
-                SizedBox(width: 12),
-                Expanded(child: SkeletonBox(height: 100, borderRadius: 16)),
-              ],
-            ),
-            const SizedBox(height: 32),
-            const SkeletonBox(height: 56, borderRadius: 12),
-            const SizedBox(height: 12),
-            const SkeletonBox(height: 56, borderRadius: 12),
-          ],
-        ),
+                      // Create New Quote button
+                      Container(
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppTheme.darkPrimaryBlue
+                              : AppTheme.primaryBlue,
+                          borderRadius:
+                              BorderRadius.circular(AppTheme.cardRadius),
+                          boxShadow: shadow,
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                adaptivePageRoute(
+                                    builder: (_) => const QuoteScreen()),
+                              );
+                              _loadData();
+                            },
+                            borderRadius:
+                                BorderRadius.circular(AppTheme.cardRadius),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 18),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(AppIcons.addCircle,
+                                      color: Colors.white, size: 24),
+                                  SizedBox(width: 10),
+                                  Text(
+                                    'Create New Quote',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ).animateEntrance(delay: 80.ms),
+                      const SizedBox(height: 24),
+
+                      // Section tiles row 1
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildSectionTile(
+                              icon: AppIcons.editNote,
+                              label: 'Drafts',
+                              count: _draftCount,
+                              color: AppTheme.warningOrange,
+                              isDark: isDark,
+                              cardColor: cardColor,
+                              shadow: shadow,
+                              onTap: () => _navigateToList(
+                                  QuoteStatus.draft, 'Draft Quotes'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildSectionTile(
+                              icon: AppIcons.send,
+                              label: 'Sent',
+                              count: _sentCount,
+                              color: isDark
+                                  ? AppTheme.darkPrimaryBlue
+                                  : AppTheme.primaryBlue,
+                              isDark: isDark,
+                              cardColor: cardColor,
+                              shadow: shadow,
+                              onTap: () => _navigateToList(
+                                  QuoteStatus.sent, 'Sent Quotes'),
+                            ),
+                          ),
+                        ],
+                      ).animateEntrance(delay: 160.ms),
+                      const SizedBox(height: 12),
+
+                      // Section tiles row 2
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildSectionTile(
+                              icon: AppIcons.tickCircle,
+                              label: 'Approved',
+                              count: _approvedCount,
+                              color: AppTheme.successGreen,
+                              isDark: isDark,
+                              cardColor: cardColor,
+                              shadow: shadow,
+                              onTap: () => _navigateToList(
+                                  QuoteStatus.approved, 'Approved Quotes'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildSectionTile(
+                              icon: AppIcons.document,
+                              label: 'All Quotes',
+                              count: _totalCount,
+                              color: Colors.deepOrange,
+                              isDark: isDark,
+                              cardColor: cardColor,
+                              shadow: shadow,
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  adaptivePageRoute(
+                                      builder: (_) =>
+                                          const QuoteListScreen()),
+                                );
+                                _loadData();
+                              },
+                            ),
+                          ),
+                        ],
+                      ).animateEntrance(delay: 240.ms),
+                    ],
+                  ),
+                ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildStatsGrid(bool isDark) {
-    final currencyFormat =
-        NumberFormat.currency(symbol: '\u00A3', decimalDigits: 0);
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                label: 'Drafts',
-                value: '${_counts['drafts'] ?? 0}',
-                icon: AppIcons.edit,
-                color: Colors.grey,
-                isDark: isDark,
-                onTap: () => _navigateToList(QuoteStatus.draft, 'Drafts'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatCard(
-                label: 'Sent',
-                value: '${_counts['sent'] ?? 0}',
-                icon: AppIcons.send,
-                color: Colors.blue,
-                isDark: isDark,
-                onTap: () => _navigateToList(QuoteStatus.sent, 'Sent'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                label: 'Approved',
-                value: '${_counts['approved'] ?? 0}',
-                icon: AppIcons.tickCircle,
-                color: AppTheme.successGreen,
-                isDark: isDark,
-                onTap: () =>
-                    _navigateToList(QuoteStatus.approved, 'Approved'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatCard(
-                label: 'Total Value',
-                value: currencyFormat.format(_approvedValue),
-                icon: AppIcons.wallet,
-                color: AppTheme.primaryBlue,
-                isDark: isDark,
-                onTap: () =>
-                    _navigateToList(QuoteStatus.approved, 'Approved'),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuickActions(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Quick Actions',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-        ),
-        const SizedBox(height: 12),
-        _QuickActionTile(
-          icon: AppIcons.addCircle,
-          label: 'Create New Quote',
-          color: AppTheme.accentOrange,
-          isDark: isDark,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const QuoteScreen()),
-            );
-            _loadData();
-          },
-        ),
-        const SizedBox(height: 12),
-        _QuickActionTile(
-          icon: AppIcons.document,
-          label: 'View All Quotes',
-          color: AppTheme.primaryBlue,
-          isDark: isDark,
-          onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const QuoteListScreen()),
-            );
-            _loadData();
-          },
-        ),
-      ],
     );
   }
 
   void _navigateToList(QuoteStatus status, String title) async {
     await Navigator.push(
       context,
-      MaterialPageRoute(
+      adaptivePageRoute(
         builder: (_) => QuoteListScreen(statusFilter: status, title: title),
       ),
     );
     _loadData();
   }
-}
 
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(AppTheme.cardPadding),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
-          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-          boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
-        ),
+  Widget _buildSkeleton(bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.all(AppTheme.screenPadding),
+      child: SkeletonShimmer(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : AppTheme.textPrimary,
-                  ),
+            Row(
+              children: List.generate(
+                      3,
+                      (_) => const Expanded(
+                          child: SkeletonBox(height: 80, borderRadius: 16)))
+                  .expand((w) sync* {
+                    yield w;
+                    yield const SizedBox(width: 12);
+                  })
+                  .toList()
+                ..removeLast(),
             ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-              ),
+            const SizedBox(height: 24),
+            const SkeletonBox(height: 56, borderRadius: 16),
+            const SizedBox(height: 24),
+            Row(
+              children: const [
+                Expanded(
+                    child: SkeletonBox(height: 140, borderRadius: 16)),
+                SizedBox(width: 12),
+                Expanded(
+                    child: SkeletonBox(height: 140, borderRadius: 16)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: const [
+                Expanded(
+                    child: SkeletonBox(height: 140, borderRadius: 16)),
+                SizedBox(width: 12),
+                Expanded(
+                    child: SkeletonBox(height: 140, borderRadius: 16)),
+              ],
             ),
           ],
         ),
       ),
     );
   }
-}
 
-class _QuickActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  const _QuickActionTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildStatCard(
+    String value,
+    String label,
+    IconData icon,
+    Color color,
+    bool isDark,
+    Color cardColor,
+    List<BoxShadow> shadow, {
+    VoidCallback? onTap,
+  }) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
+        color: cardColor,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
+        boxShadow: shadow,
       ),
       child: Material(
         color: Colors.transparent,
@@ -296,28 +326,87 @@ class _QuickActionTile extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(AppTheme.cardRadius),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Row(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+            child: Column(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: color, size: 22),
+                Icon(icon, color: color, size: 22),
+                const SizedBox(height: 8),
+                Text(
+                  value,
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    label,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark
+                        ? AppTheme.darkTextSecondary
+                        : AppTheme.textSecondary,
                   ),
                 ),
-                Icon(AppIcons.arrowRight, color: AppTheme.textHint, size: 20),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTile({
+    required IconData icon,
+    required String label,
+    int? count,
+    required Color color,
+    required bool isDark,
+    required Color cardColor,
+    required List<BoxShadow> shadow,
+    required VoidCallback onTap,
+  }) {
+    return SizedBox(
+      height: 140,
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          boxShadow: shadow,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: color, size: 36),
+                  const SizedBox(height: 10),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (count != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '($count)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? AppTheme.darkTextSecondary
+                            : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ),

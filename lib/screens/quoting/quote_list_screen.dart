@@ -3,9 +3,13 @@ import 'package:intl/intl.dart';
 import '../../models/models.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/theme.dart';
+import '../../utils/animate_helpers.dart';
+import '../../utils/adaptive_widgets.dart';
 import '../../services/quote_service.dart';
 import '../../widgets/adaptive_app_bar.dart';
-import '../../utils/adaptive_widgets.dart';
+import '../../widgets/skeleton_loader.dart';
+import '../../widgets/premium_toast.dart';
+import '../../widgets/premium_dialog.dart';
 import 'quote_screen.dart';
 
 class QuoteListScreen extends StatefulWidget {
@@ -59,16 +63,15 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
           _buildFilterChips(),
           Expanded(
             child: _isLoading
-                ? const Center(child: AdaptiveLoadingIndicator())
+                ? const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: SkeletonList(itemCount: 5, showLeading: true),
+                  )
                 : _quotes.isEmpty
                     ? _buildEmptyState()
-                    : RefreshIndicator(
+                    : AdaptiveRefreshIndicator(
                         onRefresh: _loadQuotes,
-                        child: ListView.builder(
-                          padding: EdgeInsets.all(AppTheme.screenPadding),
-                          itemCount: _quotes.length,
-                          itemBuilder: (ctx, i) => _buildQuoteCard(_quotes[i]),
-                        ),
+                        child: _buildQuoteList(),
                       ),
           ),
         ],
@@ -77,12 +80,12 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
         onPressed: () async {
           await Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => const QuoteScreen()),
+            adaptivePageRoute(builder: (_) => const QuoteScreen()),
           );
           _loadQuotes();
         },
         backgroundColor: AppTheme.accentOrange,
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(AppIcons.addCircle, color: Colors.white),
       ),
     );
   }
@@ -121,170 +124,267 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
   }
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final iconColor = isDark ? AppTheme.darkTextSecondary : Colors.grey[400];
+    final textColor = isDark ? AppTheme.darkTextSecondary : Colors.grey[600];
+
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(AppIcons.document, size: 64, color: Colors.grey.shade400),
-          const SizedBox(height: 16),
-          Text(
-            _selectedFilter != null
-                ? 'No ${_selectedFilter!.name} quotes'
-                : 'No quotes yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Create your first quote to get started',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade500,
-                ),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(AppIcons.document, size: 80, color: iconColor),
+            const SizedBox(height: 16),
+            Text(
+              _selectedFilter != null
+                  ? 'No ${_selectedFilter!.name} quotes'
+                  : 'No quotes yet',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Quotes with this status will appear here',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: textColor),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildQuoteCard(Quote quote) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currencyFormat =
-        NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+  Widget _buildQuoteList() {
+    final currencyFormat = NumberFormat.currency(
+      symbol: '\u00A3',
+      decimalDigits: 2,
+    );
     final dateFormat = DateFormat('dd/MM/yyyy');
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(AppTheme.screenPadding),
+      itemCount: _quotes.length,
+      itemBuilder: (context, index) {
+        return _buildQuoteCard(_quotes[index], currencyFormat, dateFormat)
+            .animateListItem(index);
+      },
+    );
+  }
+
+  Widget _buildQuoteCard(
+    Quote quote,
+    NumberFormat currencyFormat,
+    DateFormat dateFormat,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite;
     final isOverdue = quote.status == QuoteStatus.sent &&
         quote.validUntil.isBefore(DateTime.now());
 
-    return Card(
+    final statusColor = _getStatusColor(quote.status);
+    final statusLabel =
+        quote.status.name[0].toUpperCase() + quote.status.name.substring(1);
+
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: isDark ? 0 : 1,
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: cardColor,
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        side: isOverdue
-            ? const BorderSide(color: AppTheme.errorRed, width: 1.5)
-            : BorderSide.none,
+        boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
+        border: isOverdue
+            ? Border.all(color: AppTheme.errorRed, width: 1.5)
+            : null,
       ),
-      child: InkWell(
-        onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => QuoteScreen(existingQuote: quote),
-            ),
-          );
-          _loadQuotes();
-        },
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        child: Padding(
-          padding: EdgeInsets.all(AppTheme.cardPadding),
-          child: Column(
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppTheme.cardPadding,
+            vertical: 8,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          ),
+          leading: CircleAvatar(
+            backgroundColor: statusColor.withValues(alpha: 0.1),
+            child:
+                Icon(AppIcons.receiptItem, color: statusColor, size: 22),
+          ),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  quote.quoteNumber,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          subtitle: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    quote.quoteNumber,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  _buildStatusBadge(quote.status),
-                ],
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
-                quote.customerName,
-                style: Theme.of(context).textTheme.bodyLarge,
+                quote.customerName.isNotEmpty
+                    ? quote.customerName
+                    : 'No customer',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              if (quote.siteName.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  quote.siteName,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: isDark
-                            ? AppTheme.darkTextSecondary
-                            : AppTheme.textSecondary,
-                      ),
-                ),
-              ],
-              const SizedBox(height: 8),
+              const SizedBox(height: 2),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     currencyFormat.format(quote.total),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryBlue,
-                        ),
+                    style: TextStyle(
+                      color: isDark
+                          ? AppTheme.darkPrimaryBlue
+                          : AppTheme.primaryBlue,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Created: ${dateFormat.format(quote.createdAt)}',
-                        style: Theme.of(context).textTheme.bodySmall,
+                  const SizedBox(width: 8),
+                  Text(
+                    dateFormat.format(quote.createdAt),
+                    style: TextStyle(
+                      color: isDark
+                          ? AppTheme.darkTextSecondary
+                          : Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (isOverdue) ...[
+                    const SizedBox(width: 8),
+                    const Text(
+                      'OVERDUE',
+                      style: TextStyle(
+                        color: AppTheme.errorRed,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
                       ),
-                      if (isOverdue)
-                        Text(
-                          'OVERDUE',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppTheme.errorRed,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                        )
-                      else
-                        Text(
-                          'Valid until: ${dateFormat.format(quote.validUntil)}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ],
               ),
             ],
           ),
+          isThreeLine: true,
+          trailing: IconButton(
+            icon: const Icon(AppIcons.more),
+            onPressed: () => _showQuoteActions(quote),
+          ),
+          onTap: () => _openQuote(quote),
         ),
       ),
     );
   }
 
-  Widget _buildStatusBadge(QuoteStatus status) {
-    Color color;
+  Color _getStatusColor(QuoteStatus status) {
     switch (status) {
       case QuoteStatus.draft:
-        color = Colors.grey;
-        break;
+        return AppTheme.warningOrange;
       case QuoteStatus.sent:
-        color = Colors.blue;
-        break;
+        return AppTheme.primaryBlue;
       case QuoteStatus.approved:
-        color = AppTheme.successGreen;
-        break;
+        return AppTheme.successGreen;
       case QuoteStatus.declined:
-        color = AppTheme.errorRed;
-        break;
+        return AppTheme.errorRed;
       case QuoteStatus.converted:
-        color = Colors.purple;
-        break;
+        return Colors.purple;
     }
+  }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        status.name.toUpperCase(),
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
+  void _showQuoteActions(Quote quote) {
+    showAdaptiveActionSheet(
+      context: context,
+      options: [
+        ActionSheetOption(
+          label: 'Edit',
+          icon: AppIcons.edit,
+          onTap: () => _openQuote(quote),
         ),
+        if (quote.status == QuoteStatus.draft)
+          ActionSheetOption(
+            label: 'Mark as Sent',
+            icon: AppIcons.send,
+            onTap: () => _updateStatus(quote, QuoteStatus.sent),
+          ),
+        if (quote.status == QuoteStatus.sent)
+          ActionSheetOption(
+            label: 'Mark as Approved',
+            icon: AppIcons.tickCircle,
+            onTap: () => _updateStatus(quote, QuoteStatus.approved),
+          ),
+        ActionSheetOption(
+          label: 'Delete',
+          icon: AppIcons.trash,
+          isDestructive: true,
+          onTap: () => _confirmDelete(quote),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _openQuote(Quote quote) async {
+    await Navigator.push(
+      context,
+      adaptivePageRoute(
+        builder: (_) => QuoteScreen(existingQuote: quote),
       ),
     );
+    _loadQuotes();
+  }
+
+  Future<void> _updateStatus(Quote quote, QuoteStatus newStatus) async {
+    try {
+      await QuoteService.instance.updateQuoteStatus(quote.id, newStatus);
+      _loadQuotes();
+      if (mounted) context.showSuccessToast('Quote marked as ${newStatus.name}');
+    } catch (e) {
+      if (mounted) context.showErrorToast('Error: $e');
+    }
+  }
+
+  void _confirmDelete(Quote quote) async {
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Delete Quote',
+      message: 'Are you sure you want to delete "${quote.quoteNumber}"?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm == true) {
+      try {
+        await QuoteService.instance.deleteQuote(quote.id);
+        if (mounted) {
+          _loadQuotes();
+          context.showSuccessToast('Quote deleted');
+        }
+      } catch (e) {
+        if (mounted) context.showErrorToast('Error: $e');
+      }
+    }
   }
 }

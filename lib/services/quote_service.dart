@@ -177,11 +177,12 @@ class QuoteService {
 
   final _firestore = FirebaseFirestore.instance;
 
-  /// Stream all quotes across the company using collectionGroup query.
+  /// Stream all quotes across the company.
   Stream<List<Quote>> getCompanyQuotesStream(String companyId) {
     return _firestore
-        .collectionGroup('quotes')
-        .where('companyId', isEqualTo: companyId)
+        .collection('companies')
+        .doc(companyId)
+        .collection('quotes')
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snap) => snap.docs
@@ -190,10 +191,10 @@ class QuoteService {
   }
 
   /// Stream a single quote document for the detail panel.
-  Stream<Quote?> getQuoteStream(String engineerId, String quoteId) {
+  Stream<Quote?> getQuoteStream(String companyId, String quoteId) {
     return _firestore
-        .collection('users')
-        .doc(engineerId)
+        .collection('companies')
+        .doc(companyId)
         .collection('quotes')
         .doc(quoteId)
         .snapshots()
@@ -203,30 +204,66 @@ class QuoteService {
 
   /// Save a quote directly to Firestore (web portal, bypasses SQLite).
   Future<void> saveQuoteToFirestore(Quote quote) async {
-    await _firestore
-        .collection('users')
-        .doc(quote.engineerId)
-        .collection('quotes')
-        .doc(quote.id)
-        .set(quote.toJson(), SetOptions(merge: true));
+    final data = quote.toJson();
+    final batch = _firestore.batch();
+
+    batch.set(
+      _firestore
+          .collection('users')
+          .doc(quote.engineerId)
+          .collection('quotes')
+          .doc(quote.id),
+      data,
+      SetOptions(merge: true),
+    );
+
+    if (quote.companyId != null && quote.companyId!.isNotEmpty) {
+      batch.set(
+        _firestore
+            .collection('companies')
+            .doc(quote.companyId!)
+            .collection('quotes')
+            .doc(quote.id),
+        data,
+        SetOptions(merge: true),
+      );
+    }
+
+    await batch.commit();
   }
 
   /// Delete a quote directly from Firestore (web portal).
   Future<void> deleteQuoteFromFirestore(
-      String engineerId, String quoteId) async {
-    await _firestore
-        .collection('users')
-        .doc(engineerId)
-        .collection('quotes')
-        .doc(quoteId)
-        .delete();
+      String engineerId, String quoteId, {String? companyId}) async {
+    final batch = _firestore.batch();
+
+    batch.delete(
+      _firestore
+          .collection('users')
+          .doc(engineerId)
+          .collection('quotes')
+          .doc(quoteId),
+    );
+
+    if (companyId != null && companyId.isNotEmpty) {
+      batch.delete(
+        _firestore
+            .collection('companies')
+            .doc(companyId)
+            .collection('quotes')
+            .doc(quoteId),
+      );
+    }
+
+    await batch.commit();
   }
 
   /// Get the next quote number from Firestore (web portal).
   Future<String> getNextQuoteNumberFromFirestore(String companyId) async {
     final snap = await _firestore
-        .collectionGroup('quotes')
-        .where('companyId', isEqualTo: companyId)
+        .collection('companies')
+        .doc(companyId)
+        .collection('quotes')
         .orderBy('quoteNumber', descending: true)
         .limit(1)
         .get();

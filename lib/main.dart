@@ -39,6 +39,9 @@ import 'screens/dispatch/dispatch_dashboard_screen.dart';
 import 'screens/dispatch/dispatched_job_detail_screen.dart';
 import 'screens/dispatch/engineer_job_detail_screen.dart';
 import 'screens/dispatch/engineer_jobs_screen.dart';
+import 'screens/dispatch/dispatch_empty_screen.dart';
+import 'screens/quoting/quoting_hub_screen.dart';
+import 'widgets/notification_bell.dart';
 
 // Web-only imports
 import 'package:go_router/go_router.dart';
@@ -445,15 +448,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   StreamSubscription<int>? _dispatchBadgeSub;
   int _dispatchBadgeCount = 0;
 
-  bool get _showDispatchTab {
-    return RemoteConfigService.instance.dispatchEnabled;
-  }
-
-  int get _dispatchTabIndex => _showDispatchTab ? 3 : -1;
-
   Widget _maybeBadgedIcon(int index, IconData icon, {Color? color}) {
     final child = Icon(icon, color: color);
-    if (index == _dispatchTabIndex && _dispatchBadgeCount > 0) {
+    if (index == 4 && _dispatchBadgeCount > 0) {
       return Badge(
         label: Text(
           _dispatchBadgeCount > 9 ? '9+' : '$_dispatchBadgeCount',
@@ -465,12 +462,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     return child;
   }
 
-  List<String> get _titles => [
+  List<String> get _titles => const [
     'Home',
     'Jobs',
     'Invoices',
-    if (_showDispatchTab) 'Dispatch',
-    'Settings',
+    'Quotes',
+    'Dispatch',
   ];
 
   void _switchTab(int newIndex) {
@@ -495,7 +492,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   void _subscribeToDispatchBadge() {
-    if (!_showDispatchTab) return;
+    if (!RemoteConfigService.instance.dispatchEnabled) return;
 
     final companyId = UserProfileService.instance.companyId;
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -584,7 +581,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   Widget get _dispatchScreen {
+    final rc = RemoteConfigService.instance;
     final profile = UserProfileService.instance;
+    if (!rc.dispatchEnabled || !profile.hasCompany) {
+      return const DispatchEmptyScreen();
+    }
     if (profile.hasPermission(AppPermission.dispatchViewAll)) {
       return const DispatchDashboardScreen();
     }
@@ -592,27 +593,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   List<Widget> get _screens => [
-    HomeScreen(onTabChanged: _switchTab),
+    const HomeScreen(),
     const JobsHubScreen(),
     const InvoicingHubScreen(),
-    if (_showDispatchTab) _dispatchScreen,
-    const SettingsScreen(),
+    const QuotingHubScreen(),
+    _dispatchScreen,
   ];
 
-  List<IconData> get _navIcons => [
+  List<IconData> get _navIcons => const [
     AppIcons.homeOutline,
     AppIcons.briefcaseOutline,
     AppIcons.receiptOutline,
-    if (_showDispatchTab) AppIcons.taskOutline,
-    AppIcons.settingOutline,
+    AppIcons.receiptEditOutline,
+    AppIcons.taskOutline,
   ];
 
-  List<IconData> get _navSelectedIcons => [
+  List<IconData> get _navSelectedIcons => const [
     AppIcons.homeBold,
     AppIcons.briefcaseBold,
     AppIcons.receiptBold,
-    if (_showDispatchTab) AppIcons.taskBold,
-    AppIcons.settingBold,
+    AppIcons.receiptEditBold,
+    AppIcons.taskBold,
   ];
 
   @override
@@ -634,7 +635,20 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     }
 
     final body = Scaffold(
-      appBar: AdaptiveNavigationBar(title: titles[safeIndex]),
+      appBar: AdaptiveNavigationBar(
+        title: titles[safeIndex],
+        actions: [
+          const NotificationBell(),
+          IconButton(
+            icon: Icon(AppIcons.settingOutline, size: 22),
+            tooltip: 'Settings',
+            onPressed: () => Navigator.push(
+              context,
+              adaptivePageRoute(builder: (_) => const SettingsScreen()),
+            ),
+          ),
+        ],
+      ),
       body: GestureDetector(
         onHorizontalDragEnd: (details) {
           final velocity = details.primaryVelocity ?? 0;

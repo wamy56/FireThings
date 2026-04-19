@@ -84,7 +84,7 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
         elevation: 8,
         color: isDark ? AppTheme.darkSurface : Colors.white,
         child: StreamBuilder<Quote?>(
-          stream: QuoteService.instance.getQuoteStream(widget.engineerId, widget.quoteId),
+          stream: QuoteService.instance.getQuoteStream(UserProfileService.instance.companyId!, widget.quoteId),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: AdaptiveLoadingIndicator());
@@ -541,7 +541,7 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
     );
 
     if (confirmed == true) {
-      await QuoteService.instance.deleteQuoteFromFirestore(quote.engineerId, quote.id);
+      await QuoteService.instance.deleteQuoteFromFirestore(quote.engineerId, quote.id, companyId: quote.companyId);
       _closePanel();
     }
   }

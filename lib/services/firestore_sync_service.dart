@@ -556,11 +556,12 @@ class FirestoreSyncService {
 
   // ── Web / company-wide invoice methods ──
 
-  /// Stream all invoices across the company using collectionGroup query.
+  /// Stream all invoices across the company.
   Stream<List<Invoice>> getCompanyInvoicesStream(String companyId) {
     return _firestore
-        .collectionGroup('invoices')
-        .where('companyId', isEqualTo: companyId)
+        .collection('companies')
+        .doc(companyId)
+        .collection('invoices')
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snap) => snap.docs
@@ -569,10 +570,10 @@ class FirestoreSyncService {
   }
 
   /// Stream a single invoice document for the detail panel.
-  Stream<Invoice?> getInvoiceStream(String engineerId, String invoiceId) {
+  Stream<Invoice?> getInvoiceStream(String companyId, String invoiceId) {
     return _firestore
-        .collection('users')
-        .doc(engineerId)
+        .collection('companies')
+        .doc(companyId)
         .collection('invoices')
         .doc(invoiceId)
         .snapshots()
@@ -583,30 +584,65 @@ class FirestoreSyncService {
   /// Save an invoice directly to Firestore (web portal, bypasses SQLite).
   Future<void> saveInvoiceToFirestore(Invoice invoice) async {
     final data = invoice.toJson();
-    await _firestore
-        .collection('users')
-        .doc(invoice.engineerId)
-        .collection('invoices')
-        .doc(invoice.id)
-        .set(data, SetOptions(merge: true));
+    final batch = _firestore.batch();
+
+    batch.set(
+      _firestore
+          .collection('users')
+          .doc(invoice.engineerId)
+          .collection('invoices')
+          .doc(invoice.id),
+      data,
+      SetOptions(merge: true),
+    );
+
+    if (invoice.companyId != null && invoice.companyId!.isNotEmpty) {
+      batch.set(
+        _firestore
+            .collection('companies')
+            .doc(invoice.companyId!)
+            .collection('invoices')
+            .doc(invoice.id),
+        data,
+        SetOptions(merge: true),
+      );
+    }
+
+    await batch.commit();
   }
 
   /// Delete an invoice directly from Firestore (web portal).
   Future<void> deleteInvoiceFromFirestore(
-      String engineerId, String invoiceId) async {
-    await _firestore
-        .collection('users')
-        .doc(engineerId)
-        .collection('invoices')
-        .doc(invoiceId)
-        .delete();
+      String engineerId, String invoiceId, {String? companyId}) async {
+    final batch = _firestore.batch();
+
+    batch.delete(
+      _firestore
+          .collection('users')
+          .doc(engineerId)
+          .collection('invoices')
+          .doc(invoiceId),
+    );
+
+    if (companyId != null && companyId.isNotEmpty) {
+      batch.delete(
+        _firestore
+            .collection('companies')
+            .doc(companyId)
+            .collection('invoices')
+            .doc(invoiceId),
+      );
+    }
+
+    await batch.commit();
   }
 
   /// Get the next invoice number from Firestore (web portal).
   Future<String> getNextInvoiceNumberFromFirestore(String companyId) async {
     final snap = await _firestore
-        .collectionGroup('invoices')
-        .where('companyId', isEqualTo: companyId)
+        .collection('companies')
+        .doc(companyId)
+        .collection('invoices')
         .orderBy('invoiceNumber', descending: true)
         .limit(1)
         .get();

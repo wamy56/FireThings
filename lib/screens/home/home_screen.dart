@@ -23,17 +23,16 @@ import '../company/company_sites_screen.dart';
 import '../../services/analytics_service.dart';
 import '../../services/remote_config_service.dart';
 import '../../services/dispatch_service.dart';
-import '../../services/quote_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/company_service.dart';
 import '../../widgets/background_decoration.dart';
 import '../../widgets/tools_disclaimer_gate.dart';
-import '../quoting/quoting_hub_screen.dart';
+import '../../models/permission.dart';
+import '../dispatch/dispatch_dashboard_screen.dart';
+import '../dispatch/engineer_jobs_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  final ValueChanged<int> onTabChanged;
-
-  const HomeScreen({super.key, required this.onTabChanged});
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -45,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int _siteCount = 0;
   int _pendingDispatchCount = 0;
-  int _activeQuoteCount = 0;
   bool _isLoading = true;
 
   @override
@@ -93,17 +91,9 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
 
-      // Load active quote count if quoting is enabled
-      int quoteCount = 0;
-      if (RemoteConfigService.instance.quotingEnabled) {
-        final counts = await QuoteService.instance.getQuoteCounts();
-        quoteCount = (counts['drafts'] ?? 0) + (counts['sent'] ?? 0) + (counts['approved'] ?? 0);
-      }
-
       setState(() {
         _siteCount = siteCount;
         _pendingDispatchCount = pendingCount;
-        _activeQuoteCount = quoteCount;
         _isLoading = false;
       });
     } catch (e) {
@@ -134,16 +124,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (RemoteConfigService.instance.assetRegisterEnabled)
                         _buildSitesCard().animateEntrance(delay: 100.ms),
 
-                      // Quotes Card
-                      if (RemoteConfigService.instance.quotingEnabled) ...[
-                        const SizedBox(height: 16),
-                        _buildQuotesCard().animateEntrance(delay: 125.ms),
-                      ],
-
                       // Dispatched Jobs Card
-                      if (_pendingDispatchCount > 0) ...[
+                      if (RemoteConfigService.instance.dispatchEnabled &&
+                          UserProfileService.instance.hasCompany &&
+                          _pendingDispatchCount > 0) ...[
                         const SizedBox(height: 16),
-                        _buildDispatchCard().animateEntrance(delay: 150.ms),
+                        _buildDispatchCard().animateEntrance(delay: 125.ms),
                       ],
                       const SizedBox(height: AppTheme.sectionGap),
 
@@ -203,12 +189,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () {
-        // Navigate to dispatch tab (index 3 or 4 depending on nav layout)
-        // The dispatch tab is the last tab before settings
-        final hasDispatch = RemoteConfigService.instance.dispatchEnabled &&
-            UserProfileService.instance.hasCompany;
-        if (hasDispatch) {
-          widget.onTabChanged(3);
+        final profile = UserProfileService.instance;
+        if (profile.hasPermission(AppPermission.dispatchViewAll)) {
+          Navigator.push(
+            context,
+            adaptivePageRoute(builder: (_) => const DispatchDashboardScreen()),
+          );
+        } else {
+          Navigator.push(
+            context,
+            adaptivePageRoute(builder: (_) => const EngineerJobsScreen()),
+          );
         }
       },
       child: Container(
@@ -481,93 +472,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            Icon(AppIcons.arrowRight, color: AppTheme.textHint),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuotesCard() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return GestureDetector(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          adaptivePageRoute(builder: (_) => const QuotingHubScreen()),
-        );
-        _loadDashboardData();
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(AppTheme.cardPadding),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
-          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-          boxShadow: isDark ? null : AppTheme.cardShadow,
-          border: Border.all(
-            color: AppTheme.accentOrange.withValues(alpha: 0.2),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppTheme.accentOrange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                AppIcons.receipt,
-                color: AppTheme.accentOrange,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Quotes',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _activeQuoteCount > 0
-                        ? '$_activeQuoteCount active ${_activeQuoteCount == 1 ? 'quote' : 'quotes'}'
-                        : 'Create and manage quotes',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_activeQuoteCount > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.accentOrange.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '$_activeQuoteCount',
-                  style: TextStyle(
-                    color: AppTheme.accentOrange,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-            const SizedBox(width: 8),
             Icon(AppIcons.arrowRight, color: AppTheme.textHint),
           ],
         ),

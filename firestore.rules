@@ -127,6 +127,19 @@ service cloud.firestore {
         allow write: if isCompanyMember(companyId);
       }
 
+      // Company invoices
+      match /invoices/{invoiceId} {
+        allow read: if isCompanyMember(companyId);
+        allow create, update, delete: if isCompanyMember(companyId);
+      }
+
+      // Company quotes
+      match /quotes/{quoteId} {
+        allow read: if isCompanyMember(companyId);
+        allow create: if hasPermission(companyId, 'quotes_create');
+        allow update, delete: if hasPermission(companyId, 'quotes_edit');
+      }
+
       // Company PDF config
       match /pdf_config/{configId} {
         allow read: if isCompanyMember(companyId);

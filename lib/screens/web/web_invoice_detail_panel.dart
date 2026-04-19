@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/invoice.dart';
 import '../../services/firestore_sync_service.dart';
+import '../../services/user_profile_service.dart';
 import '../../services/invoice_pdf_service.dart';
 import '../../services/payment_settings_service.dart';
 import '../../utils/theme.dart';
@@ -80,7 +81,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
         elevation: 8,
         color: isDark ? AppTheme.darkSurface : Colors.white,
         child: StreamBuilder<Invoice?>(
-          stream: FirestoreSyncService.instance.getInvoiceStream(widget.engineerId, widget.invoiceId),
+          stream: FirestoreSyncService.instance.getInvoiceStream(UserProfileService.instance.companyId!, widget.invoiceId),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: AdaptiveLoadingIndicator());
@@ -470,7 +471,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
     );
 
     if (confirmed == true) {
-      await FirestoreSyncService.instance.deleteInvoiceFromFirestore(invoice.engineerId, invoice.id);
+      await FirestoreSyncService.instance.deleteInvoiceFromFirestore(invoice.engineerId, invoice.id, companyId: invoice.companyId);
       _closePanel();
     }
   }
