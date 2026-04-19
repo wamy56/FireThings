@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 17,
+      version: 18,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -100,6 +100,9 @@ class DatabaseHelper {
     }
     if (oldVersion < 17) {
       await _createQuotesTable(db);
+    }
+    if (oldVersion < 18) {
+      await db.execute('ALTER TABLE invoices ADD COLUMN linkedJobsheetId TEXT');
     }
   }
 
@@ -220,7 +223,8 @@ class DatabaseHelper {
         status $textType,
         createdAt $textType,
         lastModifiedAt $textTypeNullable,
-        useCompanyBranding INTEGER NOT NULL DEFAULT 0
+        useCompanyBranding INTEGER NOT NULL DEFAULT 0,
+        linkedJobsheetId $textTypeNullable
       )
     ''');
 

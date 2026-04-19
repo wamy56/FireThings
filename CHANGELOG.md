@@ -4,6 +4,28 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-19 (Session 76)
+
+### Notification Overlay, Workflow Pipeline Fixes & Jobsheet-to-Invoice
+
+Replaced the full-screen notification feed with a premium overlay dropdown from the bell icon. Fixed self-notification bug. Added Settings app bar. Then performed a full workflow pipeline audit and fixed broken connections: dispatch-to-jobsheet now carries companySiteId and system details, asset basePath fixed to use company data, quote-to-job conversion enriched with siteId/jobType/sourceQuoteId back-link, and company customers now available in quote and invoice pickers. Added new Jobsheet-to-Invoice pipeline with "Create Invoice" button on completed jobsheets.
+
+#### Modified Files (11)
+- **`lib/models/dispatched_job.dart`** — Added `lastUpdatedBy` and `sourceQuoteId` fields
+- **`lib/models/invoice.dart`** — Added `linkedJobsheetId` field linking invoices to their source jobsheet
+- **`lib/services/dispatch_service.dart`** — All 6 update methods write `lastUpdatedBy`
+- **`lib/services/quote_service.dart`** — `convertQuoteToJob()` now sets `companySiteId`, `jobType: 'Quoted Works'`, and `sourceQuoteId` on the created dispatched job
+- **`lib/services/database_helper.dart`** — DB version 18: added `linkedJobsheetId` column to invoices table
+- **`lib/screens/new_job/job_form_screen.dart`** — `_prefillFromDispatchedJob()` now carries `companySiteId`, panel details, and description to notes. Fixed `_testSiteAssets()` and `_autoPopulateFromAssetRegister()` to use company basePath when in a company. Site picker shows company sites when available.
+- **`lib/screens/history/job_detail_screen.dart`** — Added "Create Invoice" button on completed jobsheets, pre-fills invoice with customer/site/job data
+- **`lib/screens/tools/invoice_screen.dart`** — Added `fromJobsheet` parameter for pre-filling from jobsheets. Customer picker now loads company customers alongside personal saved customers. `linkedJobsheetId` flows through to saved invoice.
+- **`lib/screens/quoting/quote_screen.dart`** — Customer picker now loads company customers alongside personal saved customers
+- **`functions/index.js`** — All 3 Cloud Functions skip FCM push for self-triggered changes
+- **`lib/widgets/notification_bell.dart`** — Full rewrite to overlay dropdown with animation, Clear All, self-notification filtering
+- **`lib/screens/settings/settings_screen.dart`** — Added AdaptiveNavigationBar app bar
+
+---
+
 ## 2026-04-19 (Session 75)
 
 ### Navigation Overhaul, Notification Feed & Firestore Data Model

@@ -16,6 +16,7 @@ import '../../data/default_asset_types.dart';
 import '../saved_sites/site_picker_screen.dart';
 import '../assets/batch_test_screen.dart';
 import '../../services/analytics_service.dart';
+import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/rotation_tracker.dart';
 import '../signature/signature_screen.dart';
@@ -133,6 +134,9 @@ class _JobFormScreenState extends State<JobFormScreen> {
     if (job.systemCategory != null) {
       _systemCategoryController.text = job.systemCategory!;
     }
+    if (job.companySiteId != null) {
+      _selectedSiteId = job.companySiteId;
+    }
     if (job.scheduledDate != null) {
       DateTime date = job.scheduledDate!;
       if (job.scheduledTime != null) {
@@ -147,11 +151,25 @@ class _JobFormScreenState extends State<JobFormScreen> {
           );
         }
       } else {
-        // No scheduled time - default to current time
         final now = DateTime.now();
         date = DateTime(date.year, date.month, date.day, now.hour, now.minute);
       }
       _selectedDate = date;
+    }
+    // Pre-fill notes with dispatch description and system details
+    final notesParts = <String>[];
+    if (job.description != null && job.description!.isNotEmpty) {
+      notesParts.add(job.description!);
+    }
+    final systemDetails = <String>[];
+    if (job.panelMake != null) systemDetails.add('Panel: ${job.panelMake}');
+    if (job.panelLocation != null) systemDetails.add('Location: ${job.panelLocation}');
+    if (job.numberOfZones != null) systemDetails.add('Zones: ${job.numberOfZones}');
+    if (systemDetails.isNotEmpty) {
+      notesParts.add(systemDetails.join(', '));
+    }
+    if (notesParts.isNotEmpty) {
+      _notesController.text = notesParts.join('\n');
     }
   }
 
@@ -415,7 +433,10 @@ class _JobFormScreenState extends State<JobFormScreen> {
     final user = _authService.currentUser;
     if (user == null || _selectedSiteId == null) return;
 
-    final basePath = 'users/${user.uid}';
+    final companyId = UserProfileService.instance.companyId;
+    final basePath = companyId != null
+        ? 'companies/$companyId'
+        : 'users/${user.uid}';
     final siteId = _selectedSiteId!;
 
     // Fetch assets and types for the site
@@ -1142,6 +1163,29 @@ class _JobFormScreenState extends State<JobFormScreen> {
   }
 
   Future<void> _selectFromSavedSites() async {
+    final profile = UserProfileService.instance;
+    if (profile.hasCompany && profile.companyId != null) {
+      final sites = await CompanyService.instance
+          .getSitesStream(profile.companyId!)
+          .first;
+      if (sites.isNotEmpty && mounted) {
+        final selected = await _showCompanySitePicker(sites);
+        if (selected != null) {
+          AnalyticsService.instance.logSiteSelected();
+          setState(() {
+            _siteAddressController.text = selected.address;
+            _selectedSiteId = selected.id;
+          });
+          if (RemoteConfigService.instance.assetRegisterEnabled) {
+            _autoPopulateFromAssetRegister(selected.id);
+          }
+          return;
+        }
+        return;
+      }
+    }
+
+    if (!mounted) return;
     final SavedSite? selected = await Navigator.push(
       context,
       adaptivePageRoute(builder: (_) => const SitePickerScreen()),
@@ -1153,11 +1197,85 @@ class _JobFormScreenState extends State<JobFormScreen> {
         _siteAddressController.text = selected.address;
         _selectedSiteId = selected.id;
       });
-      // Auto-populate from asset register for annual inspection
       if (RemoteConfigService.instance.assetRegisterEnabled) {
         _autoPopulateFromAssetRegister(selected.id);
       }
     }
+  }
+
+  Future<CompanySite?> _showCompanySitePicker(List<CompanySite> sites) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return showModalBottomSheet<CompanySite>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.5,
+          minChildSize: 0.3,
+          maxChildSize: 0.8,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 8),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkDivider : Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Company Sites',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+                Divider(height: 1, color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor),
+                Expanded(
+                  child: ListView.separated(
+                    controller: scrollController,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: sites.length,
+                    separatorBuilder: (_, _) => Divider(
+                      height: 1,
+                      indent: 56,
+                      color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
+                    ),
+                    itemBuilder: (context, index) {
+                      final site = sites[index];
+                      return ListTile(
+                        leading: Icon(AppIcons.location, color: AppTheme.primaryBlue),
+                        title: Text(
+                          site.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text(
+                          site.address,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onTap: () => Navigator.pop(context, site),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _autoPopulateFromAssetRegister(String siteId) async {
@@ -1169,7 +1287,10 @@ class _JobFormScreenState extends State<JobFormScreen> {
     final user = _authService.currentUser;
     if (user == null) return;
 
-    final basePath = 'users/${user.uid}';
+    final companyId = UserProfileService.instance.companyId;
+    final basePath = companyId != null
+        ? 'companies/$companyId'
+        : 'users/${user.uid}';
 
     try {
       final assets = await AssetService.instance

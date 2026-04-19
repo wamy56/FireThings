@@ -13,6 +13,7 @@ import '../common/pdf_preview_screen.dart';
 import '../pdf_forms/pdf_form_fill_screen.dart';
 import '../pdf_forms/minor_works_form_fill_screen.dart';
 import '../../services/analytics_service.dart';
+import '../tools/invoice_screen.dart';
 import 'edit_jobsheet_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
@@ -487,6 +488,20 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           onPressed: () => _sharePDF(context),
           isFullWidth: true,
         ),
+        if (isComplete) ...[
+          const SizedBox(height: 12),
+          CustomOutlinedButton(
+            text: 'Create Invoice',
+            icon: AppIcons.receiptOutline,
+            onPressed: () => Navigator.push(
+              context,
+              adaptivePageRoute(
+                builder: (_) => InvoiceScreen(fromJobsheet: _jobsheet),
+              ),
+            ),
+            isFullWidth: true,
+          ),
+        ],
       ],
     );
   }

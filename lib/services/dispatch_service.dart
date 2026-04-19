@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/dispatched_job.dart';
 
@@ -61,6 +62,7 @@ class DispatchService {
       'assignedToName': engineerName,
       'status': 'assigned',
       'updatedAt': now.toIso8601String(),
+      'lastUpdatedBy': FirebaseAuth.instance.currentUser?.uid,
     });
   }
 
@@ -76,6 +78,7 @@ class DispatchService {
     final updates = <String, dynamic>{
       'scheduledDate': newDate?.toIso8601String(),
       'updatedAt': now.toIso8601String(),
+      'lastUpdatedBy': FirebaseAuth.instance.currentUser?.uid,
     };
     if (newTime != null) {
       updates['scheduledTime'] = newTime.isEmpty ? null : newTime;
@@ -144,6 +147,7 @@ class DispatchService {
     final updates = <String, dynamic>{
       'status': _statusToFirestore(newStatus),
       'updatedAt': now.toIso8601String(),
+      'lastUpdatedBy': FirebaseAuth.instance.currentUser?.uid,
     };
 
     if (newStatus == DispatchedJobStatus.completed) {
@@ -201,10 +205,12 @@ class DispatchService {
   }) async {
     final batch = _firestore.batch();
     final now = DateTime.now().toIso8601String();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     for (final jobId in jobIds) {
       final updates = <String, dynamic>{
         'status': _statusToFirestore(newStatus),
         'updatedAt': now,
+        'lastUpdatedBy': uid,
       };
       if (newStatus == DispatchedJobStatus.completed) {
         updates['completedAt'] = now;
@@ -226,6 +232,7 @@ class DispatchService {
   }) async {
     final batch = _firestore.batch();
     final now = DateTime.now().toIso8601String();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     final priorityStr = newPriority == JobPriority.normal
         ? 'normal'
         : newPriority == JobPriority.urgent
@@ -235,6 +242,7 @@ class DispatchService {
       batch.update(_jobsCol(companyId).doc(jobId), {
         'priority': priorityStr,
         'updatedAt': now,
+        'lastUpdatedBy': uid,
       });
     }
     await batch.commit();
@@ -248,10 +256,12 @@ class DispatchService {
   }) async {
     final batch = _firestore.batch();
     final now = DateTime.now().toIso8601String();
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     for (final jobId in jobIds) {
       batch.update(_jobsCol(companyId).doc(jobId), {
         'scheduledDate': newDate.toIso8601String(),
         'updatedAt': now,
+        'lastUpdatedBy': uid,
       });
     }
     await batch.commit();

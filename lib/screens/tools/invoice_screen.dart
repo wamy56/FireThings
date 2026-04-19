@@ -16,13 +16,15 @@ import '../../widgets/premium_dialog.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../services/analytics_service.dart';
+import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
 import '../common/pdf_preview_screen.dart';
 
 class InvoiceScreen extends StatefulWidget {
   final Invoice? existingInvoice;
+  final Jobsheet? fromJobsheet;
 
-  const InvoiceScreen({super.key, this.existingInvoice});
+  const InvoiceScreen({super.key, this.existingInvoice, this.fromJobsheet});
 
   @override
   State<InvoiceScreen> createState() => _InvoiceScreenState();
@@ -88,11 +90,31 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       // Load payment details
       final details = await PaymentSettingsService.getPaymentDetails();
 
-      // Load saved customers
+      // Load saved customers (personal + company)
       final user = _authService.currentUser;
       List<SavedCustomer> customers = [];
       if (user != null) {
         customers = await _dbHelper.getSavedCustomersByEngineerId(user.uid);
+        final profile = UserProfileService.instance;
+        if (profile.hasCompany && profile.companyId != null) {
+          final companyCustomers = await CompanyService.instance
+              .getCustomersStream(profile.companyId!)
+              .first;
+          for (final cc in companyCustomers) {
+            final alreadyExists = customers.any((c) =>
+                c.customerName.toLowerCase() == cc.name.toLowerCase());
+            if (!alreadyExists) {
+              customers.add(SavedCustomer(
+                id: cc.id,
+                engineerId: user.uid,
+                customerName: cc.name,
+                customerAddress: cc.address ?? '',
+                email: cc.email,
+                createdAt: cc.createdAt,
+              ));
+            }
+          }
+        }
       }
 
       // Load saved engineer name or use user's display name
@@ -104,7 +126,11 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
 
       if (widget.existingInvoice != null) {
         _loadExistingInvoice();
-      } else {
+      } else if (widget.fromJobsheet != null) {
+        _prefillFromJobsheet(widget.fromJobsheet!);
+      }
+
+      if (widget.existingInvoice == null) {
         // Load last invoice number or generate new one
         String? lastNumber =
             await PaymentSettingsService.getLastInvoiceNumber();
@@ -160,6 +186,28 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       _itemControllers.add(controllers);
     }
     // Add one empty row at the end
+    _itemControllers.add(_ItemControllers());
+  }
+
+  void _prefillFromJobsheet(Jobsheet jobsheet) {
+    _customerNameController.text = jobsheet.customerName;
+    _customerAddressController.text = jobsheet.siteAddress;
+    _notesController.text = 'Job: ${jobsheet.jobNumber.isNotEmpty ? jobsheet.jobNumber : jobsheet.templateType}';
+    if (UserProfileService.instance.hasCompany) {
+      _useCompanyBranding = true;
+    }
+    final item = InvoiceItem(
+      description: '${jobsheet.templateType} — ${jobsheet.siteAddress}',
+      quantity: 1,
+      unitPrice: 0,
+    );
+    _items = [item];
+    _itemControllers.clear();
+    final controllers = _ItemControllers();
+    controllers.description.text = item.description;
+    controllers.quantity.text = '1';
+    controllers.unitPrice.text = '0.00';
+    _itemControllers.add(controllers);
     _itemControllers.add(_ItemControllers());
   }
 
@@ -1069,6 +1117,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       useCompanyBranding: _useCompanyBranding,
       status: _status,
       createdAt: DateTime.now(),
+      linkedJobsheetId: widget.fromJobsheet?.id ?? widget.existingInvoice?.linkedJobsheetId,
     );
   }
 

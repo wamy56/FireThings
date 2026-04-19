@@ -51,6 +51,7 @@ class Invoice {
   final DateTime createdAt;
   final DateTime? lastModifiedAt;
   final bool useCompanyBranding;
+  final String? linkedJobsheetId;
 
   Invoice({
     required this.id,
@@ -70,6 +71,7 @@ class Invoice {
     required this.createdAt,
     this.lastModifiedAt,
     this.useCompanyBranding = false,
+    this.linkedJobsheetId,
   });
 
   double get subtotal => items.fold(0, (acc, item) => acc + item.total);
@@ -95,6 +97,7 @@ class Invoice {
       'createdAt': createdAt.toIso8601String(),
       'lastModifiedAt': lastModifiedAt?.toIso8601String(),
       'useCompanyBranding': useCompanyBranding ? 1 : 0,
+      'linkedJobsheetId': linkedJobsheetId,
     };
   }
 
@@ -124,6 +127,7 @@ class Invoice {
           ? DateTime.tryParse(json['lastModifiedAt'] as String)
           : null,
       useCompanyBranding: json['useCompanyBranding'] == 1 || json['useCompanyBranding'] == true,
+      linkedJobsheetId: json['linkedJobsheetId'] as String?,
     );
   }
 
@@ -145,6 +149,7 @@ class Invoice {
     DateTime? createdAt,
     DateTime? lastModifiedAt,
     bool? useCompanyBranding,
+    String? linkedJobsheetId,
   }) {
     return Invoice(
       id: id ?? this.id,
@@ -164,6 +169,7 @@ class Invoice {
       createdAt: createdAt ?? this.createdAt,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
       useCompanyBranding: useCompanyBranding ?? this.useCompanyBranding,
+      linkedJobsheetId: linkedJobsheetId ?? this.linkedJobsheetId,
     );
   }
 }

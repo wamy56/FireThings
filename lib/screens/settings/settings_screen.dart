@@ -7,6 +7,7 @@ import '../../services/branding_service.dart';
 import '../../models/pdf_header_config.dart';
 import '../../services/database_helper.dart';
 import '../../services/firestore_sync_service.dart';
+import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/responsive_scaffold.dart';
@@ -113,6 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final isApple = PlatformUtils.isApple;
 
     return Scaffold(
+      appBar: AdaptiveNavigationBar(title: 'Settings'),
       body: ResponsiveListView(
         padding: const EdgeInsets.all(16),
         children: [

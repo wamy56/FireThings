@@ -53,10 +53,12 @@ class DispatchedJob {
   final DispatchedJobStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? lastUpdatedBy;
   final DateTime? completedAt;
 
-  // Linked jobsheet
+  // Linked records
   final String? linkedJobsheetId;
+  final String? sourceQuoteId;
   final String? declineReason;
 
   // Priority
@@ -96,8 +98,10 @@ class DispatchedJob {
     this.status = DispatchedJobStatus.created,
     required this.createdAt,
     required this.updatedAt,
+    this.lastUpdatedBy,
     this.completedAt,
     this.linkedJobsheetId,
+    this.sourceQuoteId,
     this.declineReason,
     this.priority = JobPriority.normal,
     this.systemCategory,
@@ -161,8 +165,10 @@ class DispatchedJob {
       'status': _statusToString[status],
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      'lastUpdatedBy': lastUpdatedBy,
       'completedAt': completedAt?.toIso8601String(),
       'linkedJobsheetId': linkedJobsheetId,
+      'sourceQuoteId': sourceQuoteId,
       'declineReason': declineReason,
       'priority': priority.name,
       'systemCategory': systemCategory,
@@ -204,10 +210,12 @@ class DispatchedJob {
           DispatchedJobStatus.created,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
+      lastUpdatedBy: json['lastUpdatedBy'] as String?,
       completedAt: json['completedAt'] != null
           ? DateTime.parse(json['completedAt'] as String)
           : null,
       linkedJobsheetId: json['linkedJobsheetId'] as String?,
+      sourceQuoteId: json['sourceQuoteId'] as String?,
       declineReason: json['declineReason'] as String?,
       priority: _priorityMap[json['priority'] as String?] ??
           JobPriority.normal,
@@ -246,8 +254,10 @@ class DispatchedJob {
     DispatchedJobStatus? status,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? lastUpdatedBy,
     DateTime? completedAt,
     String? linkedJobsheetId,
+    String? sourceQuoteId,
     String? declineReason,
     JobPriority? priority,
     String? systemCategory,
@@ -283,8 +293,10 @@ class DispatchedJob {
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastUpdatedBy: lastUpdatedBy ?? this.lastUpdatedBy,
       completedAt: completedAt ?? this.completedAt,
       linkedJobsheetId: linkedJobsheetId ?? this.linkedJobsheetId,
+      sourceQuoteId: sourceQuoteId ?? this.sourceQuoteId,
       declineReason: declineReason ?? this.declineReason,
       priority: priority ?? this.priority,
       systemCategory: systemCategory ?? this.systemCategory,

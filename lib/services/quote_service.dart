@@ -143,8 +143,10 @@ class QuoteService {
       title: 'Defect Repair: ${quote.siteName}',
       description:
           '${quote.defectDescription ?? ''}\n\nQuote: ${quote.quoteNumber}\nValue: \u00A3${quote.total.toStringAsFixed(2)}',
+      jobType: 'Quoted Works',
       siteName: quote.siteName,
       siteAddress: quote.customerAddress,
+      companySiteId: quote.siteId.isNotEmpty ? quote.siteId : null,
       contactName: quote.customerName,
       contactEmail: quote.customerEmail,
       contactPhone: quote.customerPhone,
@@ -154,6 +156,7 @@ class QuoteService {
       updatedAt: now,
       createdBy: user.uid,
       createdByName: user.displayName ?? user.email?.split('@')[0] ?? '',
+      sourceQuoteId: quote.id,
     );
 
     await DispatchService.instance.createJob(job);

@@ -10,6 +10,7 @@ import '../../services/email_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/database_helper.dart';
 import '../../services/analytics_service.dart';
+import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../widgets/animated_save_button.dart';
 import '../../widgets/premium_toast.dart';
@@ -85,6 +86,26 @@ class _QuoteScreenState extends State<QuoteScreen> {
       if (user != null) {
         customers =
             await DatabaseHelper.instance.getSavedCustomersByEngineerId(user.uid);
+        final profile = UserProfileService.instance;
+        if (profile.hasCompany && profile.companyId != null) {
+          final companyCustomers = await CompanyService.instance
+              .getCustomersStream(profile.companyId!)
+              .first;
+          for (final cc in companyCustomers) {
+            final alreadyExists = customers.any((c) =>
+                c.customerName.toLowerCase() == cc.name.toLowerCase());
+            if (!alreadyExists) {
+              customers.add(SavedCustomer(
+                id: cc.id,
+                engineerId: user.uid,
+                customerName: cc.name,
+                customerAddress: cc.address ?? '',
+                email: cc.email,
+                createdAt: cc.createdAt,
+              ));
+            }
+          }
+        }
       }
 
       String engineerName = user?.displayName ?? user?.email?.split('@')[0] ?? '';

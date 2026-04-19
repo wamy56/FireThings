@@ -26,6 +26,10 @@ exports.onJobAssigned = onDocumentWritten(
     // Only send notification if assignee changed and new assignee exists
     if (!newAssignee || newAssignee === oldAssignee) return;
 
+    // Don't notify if assigning to self
+    const lastUpdatedBy = afterData.lastUpdatedBy;
+    if (lastUpdatedBy && lastUpdatedBy === newAssignee) return;
+
     // Get the engineer's FCM token from the company members subcollection
     const memberDoc = await db
       .collection("companies")
@@ -86,6 +90,10 @@ exports.onJobStatusChanged = onDocumentUpdated(
 
     // Notify the job creator (dispatcher)
     const creatorUid = afterData.createdBy;
+
+    // Don't notify if the person who changed the status is the creator
+    const lastUpdatedBy = afterData.lastUpdatedBy;
+    if (lastUpdatedBy && lastUpdatedBy === creatorUid) return;
     if (!creatorUid) return;
 
     const memberDoc = await db
@@ -166,6 +174,10 @@ exports.onJobRescheduled = onDocumentUpdated(
 
     const assignee = afterData.assignedTo;
     if (!assignee) return; // No one to notify
+
+    // Don't notify if the person who rescheduled is the assigned engineer
+    const lastUpdatedBy = afterData.lastUpdatedBy;
+    if (lastUpdatedBy && lastUpdatedBy === assignee) return;
 
     const memberDoc = await db
       .collection("companies")
