@@ -9,6 +9,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../mixins/multi_select_mixin.dart';
 import '../../services/remote_config_service.dart';
 import '../assets/site_asset_register_screen.dart';
 
@@ -19,7 +20,8 @@ class SavedSitesScreen extends StatefulWidget {
   State<SavedSitesScreen> createState() => _SavedSitesScreenState();
 }
 
-class _SavedSitesScreenState extends State<SavedSitesScreen> {
+class _SavedSitesScreenState extends State<SavedSitesScreen>
+    with MultiSelectMixin {
   final _authService = AuthService();
   final _dbHelper = DatabaseHelper.instance;
   final _searchController = TextEditingController();
@@ -62,6 +64,7 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
   }
 
   void _filterSites(String query) {
+    if (isSelectionMode) exitSelectionMode();
     setState(() {
       _searchQuery = query;
       if (query.isEmpty) {
@@ -216,153 +219,243 @@ class _SavedSitesScreenState extends State<SavedSitesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AdaptiveNavigationBar(title: 'Saved Sites'),
-      body: KeyboardDismissWrapper(child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search sites...',
-                prefixIcon: const Icon(AppIcons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(AppIcons.close),
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterSites('');
-                        },
-                      )
-                    : null,
-              ),
-              onChanged: _filterSites,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  '${_filteredSites.length} site${_filteredSites.length == 1 ? '' : 's'}',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _isLoading
-                ? const LoadingIndicator()
-                : _filteredSites.isEmpty
-                ? EmptyState(
-                    icon: _searchQuery.isEmpty
-                        ? AppIcons.locationSlash
-                        : AppIcons.searchOff,
-                    title: _searchQuery.isEmpty
-                        ? 'No Saved Sites'
-                        : 'No Results Found',
-                    message: _searchQuery.isEmpty
-                        ? 'Save frequently visited sites for quick access'
-                        : 'Try a different search term',
-                  )
-                : AdaptiveRefreshIndicator(
-                    onRefresh: _loadSavedSites,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: _filteredSites.length,
-                      itemBuilder: (context, index) {
-                        final site = _filteredSites[index];
-                        return _buildSiteCard(site).animateListItem(index);
-                      },
-                    ),
+    return PopScope(
+      canPop: !isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) exitSelectionMode();
+      },
+      child: Scaffold(
+        appBar: isSelectionMode
+            ? SelectionAppBar(
+                selectedCount: selectedCount,
+                isAllSelected: _filteredSites.isNotEmpty &&
+                    selectedCount == _filteredSites.length,
+                onClose: exitSelectionMode,
+                onSelectAll: (selectAll) {
+                  if (selectAll) {
+                    this.selectAll(
+                        _filteredSites.map((s) => s.id).toList());
+                  } else {
+                    deselectAll();
+                  }
+                },
+                onDelete: _bulkDelete,
+              )
+            : AdaptiveNavigationBar(
+                title: 'Saved Sites',
+                actions: [
+                  TextButton(
+                    onPressed: _filteredSites.isEmpty
+                        ? null
+                        : enterSelectionMode,
+                    child: const Text('Select'),
                   ),
-          ),
-        ],
-      )),
-      floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _showSiteDialog(),
-              icon: const Icon(AppIcons.add),
-              label: const Text('Add Site'),
+                ],
+              ),
+        body: KeyboardDismissWrapper(child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search sites...',
+                  prefixIcon: const Icon(AppIcons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(AppIcons.close),
+                          onPressed: () {
+                            _searchController.clear();
+                            _filterSites('');
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: _filterSites,
+              ),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Text(
+                    '${_filteredSites.length} site${_filteredSites.length == 1 ? '' : 's'}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _isLoading
+                  ? const LoadingIndicator()
+                  : _filteredSites.isEmpty
+                  ? EmptyState(
+                      icon: _searchQuery.isEmpty
+                          ? AppIcons.locationSlash
+                          : AppIcons.searchOff,
+                      title: _searchQuery.isEmpty
+                          ? 'No Saved Sites'
+                          : 'No Results Found',
+                      message: _searchQuery.isEmpty
+                          ? 'Save frequently visited sites for quick access'
+                          : 'Try a different search term',
+                    )
+                  : AdaptiveRefreshIndicator(
+                      onRefresh: _loadSavedSites,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _filteredSites.length,
+                        itemBuilder: (context, index) {
+                          final site = _filteredSites[index];
+                          return _buildSiteCard(site).animateListItem(index);
+                        },
+                      ),
+                    ),
+            ),
+          ],
+        )),
+        floatingActionButton: isSelectionMode ||
+                MediaQuery.of(context).viewInsets.bottom > 0
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: () => _showSiteDialog(),
+                icon: const Icon(AppIcons.add),
+                label: const Text('Add Site'),
+              ),
+      ),
     );
   }
 
   Widget _buildSiteCard(SavedSite site) {
-    return Card(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selected = isSelected(site.id);
+
+    return AnimatedContainer(
+      duration: AppTheme.fastAnimation,
+      curve: AppTheme.defaultCurve,
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
-              child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    site.siteName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      decoration: BoxDecoration(
+        color: selected
+            ? (isDark
+                ? AppTheme.primaryBlue.withValues(alpha: 0.15)
+                : AppTheme.primaryBlue.withValues(alpha: 0.06))
+            : null,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+      ),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          onTap: isSelectionMode
+              ? () => toggleSelection(site.id)
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                SelectableAvatar(
+                  isSelectionMode: isSelectionMode,
+                  isSelected: selected,
+                  child: CircleAvatar(
+                    backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                    child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    site.address,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                  if (site.notes != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      site.notes!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                        fontStyle: FontStyle.italic,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        site.siteName,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            IntrinsicWidth(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (RemoteConfigService.instance.assetRegisterEnabled) ...[
-                    CardActionButton(
-                      label: 'Assets',
-                      onPressed: () => _viewAssets(site),
-                    ),
-                    const SizedBox(height: 6),
-                  ],
-                  CardActionButton(
-                    label: 'Edit',
-                    onPressed: () => _showSiteDialog(site: site),
+                      const SizedBox(height: 4),
+                      Text(
+                        site.address,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                      if (site.notes != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          site.notes!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 6),
-                  CardActionButton(
-                    label: 'Delete',
-                    onPressed: () => _deleteSite(site),
-                    isDestructive: true,
+                ),
+                if (!isSelectionMode) ...[
+                  const SizedBox(width: 8),
+                  IntrinsicWidth(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (RemoteConfigService.instance.assetRegisterEnabled) ...[
+                          CardActionButton(
+                            label: 'Assets',
+                            onPressed: () => _viewAssets(site),
+                          ),
+                          const SizedBox(height: 6),
+                        ],
+                        CardActionButton(
+                          label: 'Edit',
+                          onPressed: () => _showSiteDialog(site: site),
+                        ),
+                        const SizedBox(height: 6),
+                        CardActionButton(
+                          label: 'Delete',
+                          onPressed: () => _deleteSite(site),
+                          isDestructive: true,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _bulkDelete() async {
+    final count = selectedCount;
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Delete $count Site${count == 1 ? '' : 's'}',
+      message:
+          'Are you sure you want to delete $count selected ${count == 1 ? 'item' : 'items'}? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm == true) {
+      try {
+        await _dbHelper.deleteSavedSites(selectedIds.toList());
+        if (mounted) {
+          exitSelectionMode();
+          _loadSavedSites();
+          context.showSuccessToast(
+              '$count site${count == 1 ? '' : 's'} deleted');
+        }
+      } catch (e) {
+        if (mounted) {
+          context.showErrorToast('Error deleting sites: $e');
+        }
+      }
+    }
   }
 }

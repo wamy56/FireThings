@@ -60,7 +60,7 @@ service cloud.firestore {
                       || (isCompanyMember(companyId)
                           && resource.data.assignedTo == request.auth.uid
                           && request.resource.data.diff(resource.data).affectedKeys()
-                             .hasOnly(['status', 'updatedAt', 'completedAt', 'linkedJobsheetId', 'declineReason', 'assignedTo', 'assignedToName']));
+                             .hasOnly(['status', 'updatedAt', 'completedAt', 'linkedJobsheetId', 'lastUpdatedBy', 'declineReason', 'assignedTo', 'assignedToName']));
         allow delete: if hasPermission(companyId, 'dispatch_delete');
       }
 

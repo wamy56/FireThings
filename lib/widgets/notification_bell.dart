@@ -29,8 +29,8 @@ class _NotificationBellState extends State<NotificationBell>
   static const _clearedAtKey = 'notification_feed_cleared_at';
 
   final _overlayController = OverlayPortalController();
-  final _layerLink = LayerLink();
   late final AnimationController _animController;
+  double _bellBottom = 0;
 
   StreamSubscription<List<DispatchedJob>>? _dispatchSub;
   List<DispatchedJob> _dispatchJobs = [];
@@ -218,6 +218,11 @@ class _NotificationBellState extends State<NotificationBell>
   }
 
   Future<void> _openOverlay() async {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box != null) {
+      final pos = box.localToGlobal(Offset.zero);
+      _bellBottom = pos.dy + box.size.height;
+    }
     await _loadLocalItems();
     _overlayController.show();
     _animController.forward();
@@ -309,23 +314,20 @@ class _NotificationBellState extends State<NotificationBell>
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _isOpen) _closeOverlay();
       },
-      child: CompositedTransformTarget(
-        link: _layerLink,
-        child: OverlayPortal(
-          controller: _overlayController,
-          overlayChildBuilder: (_) => _buildOverlay(),
-          child: IconButton(
-            onPressed: _toggleFeed,
-            tooltip: 'Notifications',
-            icon: Badge(
-              isLabelVisible: _unreadCount > 0,
-              label: Text(
-                _unreadCount > 9 ? '9+' : '$_unreadCount',
-                style: const TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-              child: Icon(AppIcons.notification, size: 22),
+      child: OverlayPortal(
+        controller: _overlayController,
+        overlayChildBuilder: (_) => _buildOverlay(),
+        child: IconButton(
+          onPressed: _toggleFeed,
+          tooltip: 'Notifications',
+          icon: Badge(
+            isLabelVisible: _unreadCount > 0,
+            label: Text(
+              _unreadCount > 9 ? '9+' : '$_unreadCount',
+              style: const TextStyle(
+                  fontSize: 10, fontWeight: FontWeight.bold),
             ),
+            child: Icon(AppIcons.notification, size: 22),
           ),
         ),
       ),
@@ -355,11 +357,9 @@ class _NotificationBellState extends State<NotificationBell>
               child: const ColoredBox(color: Colors.black26),
             ),
           ),
-          CompositedTransformFollower(
-            link: _layerLink,
-            targetAnchor: Alignment.bottomRight,
-            followerAnchor: Alignment.topRight,
-            offset: const Offset(0, 4),
+          Positioned(
+            top: _bellBottom + 4,
+            right: 16,
             child: GestureDetector(
               onTap: () {},
               child: FadeTransition(

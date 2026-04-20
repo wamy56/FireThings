@@ -8,6 +8,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../mixins/multi_select_mixin.dart';
 import '../../widgets/widgets.dart';
 
 class SavedCustomersScreen extends StatefulWidget {
@@ -17,7 +18,8 @@ class SavedCustomersScreen extends StatefulWidget {
   State<SavedCustomersScreen> createState() => _SavedCustomersScreenState();
 }
 
-class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
+class _SavedCustomersScreenState extends State<SavedCustomersScreen>
+    with MultiSelectMixin {
   final _dbHelper = DatabaseHelper.instance;
   final _authService = AuthService();
   final _searchController = TextEditingController();
@@ -61,6 +63,7 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
   }
 
   void _filterCustomers(String query) {
+    if (isSelectionMode) exitSelectionMode();
     setState(() {
       _searchQuery = query;
       if (query.isEmpty) {
@@ -78,149 +81,208 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AdaptiveNavigationBar(
-        title: 'Saved Customers',
-      ),
-      body: KeyboardDismissWrapper(child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search customers...',
-                prefixIcon: const Icon(AppIcons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(AppIcons.close),
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterCustomers('');
-                        },
-                      )
-                    : null,
+    return PopScope(
+      canPop: !isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) exitSelectionMode();
+      },
+      child: Scaffold(
+        appBar: isSelectionMode
+            ? SelectionAppBar(
+                selectedCount: selectedCount,
+                isAllSelected: _filteredCustomers.isNotEmpty &&
+                    selectedCount == _filteredCustomers.length,
+                onClose: exitSelectionMode,
+                onSelectAll: (selectAll) {
+                  if (selectAll) {
+                    this.selectAll(
+                        _filteredCustomers.map((c) => c.id).toList());
+                  } else {
+                    deselectAll();
+                  }
+                },
+                onDelete: _bulkDelete,
+              )
+            : AdaptiveNavigationBar(
+                title: 'Saved Customers',
+                actions: [
+                  TextButton(
+                    onPressed: _filteredCustomers.isEmpty
+                        ? null
+                        : enterSelectionMode,
+                    child: const Text('Select'),
+                  ),
+                ],
               ),
-              onChanged: _filterCustomers,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  '${_filteredCustomers.length} customer${_filteredCustomers.length == 1 ? '' : 's'}',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: _isLoading
-                ? const LoadingIndicator()
-                : _filteredCustomers.isEmpty
-                    ? EmptyState(
-                        icon: _searchQuery.isNotEmpty ? AppIcons.searchOff : AppIcons.people,
-                        title: _searchQuery.isNotEmpty ? 'No Results Found' : 'No Saved Customers',
-                        message: _searchQuery.isNotEmpty
-                            ? 'Try a different search term'
-                            : 'Add customers here for quick selection when creating invoices',
-                      )
-                    : AdaptiveRefreshIndicator(
-                        onRefresh: _loadCustomers,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _filteredCustomers.length,
-                          itemBuilder: (context, index) {
-                            final customer = _filteredCustomers[index];
-                            return _buildCustomerCard(customer).animateListItem(index);
+        body: KeyboardDismissWrapper(child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search customers...',
+                  prefixIcon: const Icon(AppIcons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(AppIcons.close),
+                          onPressed: () {
+                            _searchController.clear();
+                            _filterCustomers('');
                           },
-                        ),
-                      ),
-          ),
-        ],
-      )),
-      floatingActionButton: MediaQuery.of(context).viewInsets.bottom > 0
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _showCustomerDialog(),
-              icon: const Icon(AppIcons.add),
-              label: const Text('Add Customer'),
+                        )
+                      : null,
+                ),
+                onChanged: _filterCustomers,
+              ),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Text(
+                    '${_filteredCustomers.length} customer${_filteredCustomers.length == 1 ? '' : 's'}',
+                    style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _isLoading
+                  ? const LoadingIndicator()
+                  : _filteredCustomers.isEmpty
+                      ? EmptyState(
+                          icon: _searchQuery.isNotEmpty ? AppIcons.searchOff : AppIcons.people,
+                          title: _searchQuery.isNotEmpty ? 'No Results Found' : 'No Saved Customers',
+                          message: _searchQuery.isNotEmpty
+                              ? 'Try a different search term'
+                              : 'Add customers here for quick selection when creating invoices',
+                        )
+                      : AdaptiveRefreshIndicator(
+                          onRefresh: _loadCustomers,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _filteredCustomers.length,
+                            itemBuilder: (context, index) {
+                              final customer = _filteredCustomers[index];
+                              return _buildCustomerCard(customer).animateListItem(index);
+                            },
+                          ),
+                        ),
+            ),
+          ],
+        )),
+        floatingActionButton: isSelectionMode ||
+                MediaQuery.of(context).viewInsets.bottom > 0
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: () => _showCustomerDialog(),
+                icon: const Icon(AppIcons.add),
+                label: const Text('Add Customer'),
+              ),
+      ),
     );
   }
 
   Widget _buildCustomerCard(SavedCustomer customer) {
-    return Card(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selected = isSelected(customer.id);
+
+    return AnimatedContainer(
+      duration: AppTheme.fastAnimation,
+      curve: AppTheme.defaultCurve,
       margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
-              child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    customer.customerName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+      decoration: BoxDecoration(
+        color: selected
+            ? (isDark
+                ? AppTheme.primaryBlue.withValues(alpha: 0.15)
+                : AppTheme.primaryBlue.withValues(alpha: 0.06))
+            : null,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+      ),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          onTap: isSelectionMode
+              ? () => toggleSelection(customer.id)
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                SelectableAvatar(
+                  isSelectionMode: isSelectionMode,
+                  isSelected: selected,
+                  child: CircleAvatar(
+                    backgroundColor: AppTheme.primaryBlue.withValues(alpha: 0.1),
+                    child: Icon(AppIcons.building, color: AppTheme.primaryBlue),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    customer.customerAddress,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                  ),
-                  if (customer.email != null && customer.email!.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      customer.email!,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                    ),
-                  ],
-                  if (customer.notes != null && customer.notes!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      customer.notes!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[500],
-                        fontStyle: FontStyle.italic,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        customer.customerName,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        customer.customerAddress,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      ),
+                      if (customer.email != null && customer.email!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          customer.email!,
+                          style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                        ),
+                      ],
+                      if (customer.notes != null && customer.notes!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          customer.notes!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (!isSelectionMode) ...[
+                  const SizedBox(width: 8),
+                  IntrinsicWidth(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        CardActionButton(
+                          label: 'Edit',
+                          onPressed: () => _showCustomerDialog(customer: customer),
+                        ),
+                        const SizedBox(height: 6),
+                        CardActionButton(
+                          label: 'Delete',
+                          onPressed: () => _confirmDelete(customer),
+                          isDestructive: true,
+                        ),
+                      ],
                     ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            IntrinsicWidth(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  CardActionButton(
-                    label: 'Edit',
-                    onPressed: () => _showCustomerDialog(customer: customer),
-                  ),
-                  const SizedBox(height: 6),
-                  CardActionButton(
-                    label: 'Delete',
-                    onPressed: () => _confirmDelete(customer),
-                    isDestructive: true,
                   ),
                 ],
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -350,6 +412,35 @@ class _SavedCustomersScreenState extends State<SavedCustomersScreen> {
       } catch (e) {
         if (mounted) {
           context.showErrorToast('Error: $e');
+        }
+      }
+    }
+  }
+
+  Future<void> _bulkDelete() async {
+    final count = selectedCount;
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Delete $count Customer${count == 1 ? '' : 's'}',
+      message:
+          'Are you sure you want to delete $count selected ${count == 1 ? 'item' : 'items'}? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm == true) {
+      try {
+        await _dbHelper.deleteSavedCustomers(selectedIds.toList());
+        if (mounted) {
+          exitSelectionMode();
+          _loadCustomers();
+          context.showSuccessToast(
+              '$count customer${count == 1 ? '' : 's'} deleted');
+        }
+      } catch (e) {
+        if (mounted) {
+          context.showErrorToast('Error deleting customers: $e');
         }
       }
     }

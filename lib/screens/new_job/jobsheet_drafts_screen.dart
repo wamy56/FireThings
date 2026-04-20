@@ -7,11 +7,15 @@ import '../../services/auth_service.dart';
 import '../../services/template_service.dart';
 import '../../utils/pdf_form_templates.dart';
 import '../../utils/icon_map.dart';
+import '../../utils/theme.dart';
 import '../../utils/animate_helpers.dart';
+import '../../mixins/multi_select_mixin.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/selection_app_bar.dart';
+import '../../widgets/selectable_avatar.dart';
 import '../pdf_forms/pdf_form_fill_screen.dart';
 import '../pdf_forms/minor_works_form_fill_screen.dart';
 import 'job_form_screen.dart';
@@ -23,7 +27,8 @@ class JobsheetDraftsScreen extends StatefulWidget {
   State<JobsheetDraftsScreen> createState() => _JobsheetDraftsScreenState();
 }
 
-class _JobsheetDraftsScreenState extends State<JobsheetDraftsScreen> {
+class _JobsheetDraftsScreenState extends State<JobsheetDraftsScreen>
+    with MultiSelectMixin {
   final _dbHelper = DatabaseHelper.instance;
   final _authService = AuthService();
   final _templateService = TemplateService.instance;
@@ -59,10 +64,36 @@ class _JobsheetDraftsScreenState extends State<JobsheetDraftsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AdaptiveNavigationBar(
-        title: 'Saved Drafts',
-      ),
+    return PopScope(
+      canPop: !isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) exitSelectionMode();
+      },
+      child: Scaffold(
+      appBar: isSelectionMode
+          ? SelectionAppBar(
+              selectedCount: selectedCount,
+              isAllSelected: _drafts.isNotEmpty &&
+                  selectedCount == _drafts.length,
+              onClose: exitSelectionMode,
+              onSelectAll: (selectAll) {
+                if (selectAll) {
+                  this.selectAll(_drafts.map((d) => d.id).toList());
+                } else {
+                  deselectAll();
+                }
+              },
+              onDelete: _bulkDelete,
+            )
+          : AdaptiveNavigationBar(
+              title: 'Saved Drafts',
+              actions: [
+                TextButton(
+                  onPressed: _drafts.isEmpty ? null : enterSelectionMode,
+                  child: const Text('Select'),
+                ),
+              ],
+            ),
       body: _isLoading
           ? const Padding(
               padding: EdgeInsets.all(16),
@@ -71,6 +102,7 @@ class _JobsheetDraftsScreenState extends State<JobsheetDraftsScreen> {
           : _drafts.isEmpty
               ? _buildEmptyState()
               : _buildDraftList(),
+    ),
     );
   }
 
@@ -117,15 +149,33 @@ class _JobsheetDraftsScreenState extends State<JobsheetDraftsScreen> {
 
   Widget _buildDraftCard(Jobsheet draft) {
     final dateFormat = DateFormat('dd/MM/yyyy');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selected = isSelected(draft.id);
 
-    return Card(
+    return AnimatedContainer(
+          duration: AppTheme.fastAnimation,
+          curve: AppTheme.defaultCurve,
           margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? (isDark
+                    ? AppTheme.primaryBlue.withValues(alpha: 0.15)
+                    : AppTheme.primaryBlue.withValues(alpha: 0.06))
+                : null,
+            borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          ),
+          child: Card(
+          margin: EdgeInsets.zero,
           child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-              child: Icon(
-                AppIcons.document,
-                color: Theme.of(context).primaryColor,
+            leading: SelectableAvatar(
+              isSelectionMode: isSelectionMode,
+              isSelected: selected,
+              child: CircleAvatar(
+                backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                child: Icon(
+                  AppIcons.document,
+                  color: Theme.of(context).primaryColor,
+                ),
               ),
             ),
             title: Text(
@@ -161,27 +211,36 @@ class _JobsheetDraftsScreenState extends State<JobsheetDraftsScreen> {
               ],
             ),
             isThreeLine: true,
-            trailing: IconButton(
-              icon: Icon(AppIcons.more),
-              onPressed: () => showAdaptiveActionSheet(
-                context: context,
-                options: [
-                  ActionSheetOption(
-                    label: 'Edit',
-                    icon: AppIcons.edit,
-                    onTap: () => _openDraft(draft),
+            trailing: isSelectionMode
+                ? null
+                : IconButton(
+                    icon: Icon(AppIcons.more),
+                    onPressed: () => showAdaptiveActionSheet(
+                      context: context,
+                      options: [
+                        ActionSheetOption(
+                          label: 'Edit',
+                          icon: AppIcons.edit,
+                          onTap: () => _openDraft(draft),
+                        ),
+                        ActionSheetOption(
+                          label: 'Delete',
+                          icon: AppIcons.trash,
+                          isDestructive: true,
+                          onTap: () => _confirmDelete(draft),
+                        ),
+                      ],
+                    ),
                   ),
-                  ActionSheetOption(
-                    label: 'Delete',
-                    icon: AppIcons.trash,
-                    isDestructive: true,
-                    onTap: () => _confirmDelete(draft),
-                  ),
-                ],
-              ),
-            ),
-            onTap: () => _openDraft(draft),
+            onTap: () {
+              if (isSelectionMode) {
+                toggleSelection(draft.id);
+              } else {
+                _openDraft(draft);
+              }
+            },
           ),
+        ),
         );
   }
 
@@ -253,6 +312,33 @@ class _JobsheetDraftsScreenState extends State<JobsheetDraftsScreen> {
       } catch (e) {
         if (mounted) {
           context.showErrorToast('Error: $e');
+        }
+      }
+    }
+  }
+
+  Future<void> _bulkDelete() async {
+    final count = selectedCount;
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Delete $count ${count == 1 ? 'Draft' : 'Drafts'}',
+      message: 'Are you sure you want to delete $count selected ${count == 1 ? 'item' : 'items'}? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm == true) {
+      try {
+        await _dbHelper.deleteJobsheets(selectedIds.toList());
+        if (mounted) {
+          exitSelectionMode();
+          _loadDrafts();
+          context.showSuccessToast('$count ${count == 1 ? 'draft' : 'drafts'} deleted');
+        }
+      } catch (e) {
+        if (mounted) {
+          context.showErrorToast('Error deleting drafts: $e');
         }
       }
     }

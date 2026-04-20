@@ -353,54 +353,6 @@ class _QuoteScreenState extends State<QuoteScreen> {
     }
   }
 
-  Future<void> _markApproved() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Mark Approved?'),
-        content: const Text('This will mark the quote as approved by the customer.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.successGreen, foregroundColor: Colors.white),
-            child: const Text('Approve'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    await _quoteService.updateQuoteStatus(
-        widget.existingQuote!.id, QuoteStatus.approved);
-    setState(() => _status = QuoteStatus.approved);
-    if (mounted) context.showSuccessToast('Quote marked as approved');
-  }
-
-  Future<void> _markDeclined() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Mark Declined?'),
-        content: const Text('This will mark the quote as declined by the customer.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed, foregroundColor: Colors.white),
-            child: const Text('Decline'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    await _quoteService.updateQuoteStatus(
-        widget.existingQuote!.id, QuoteStatus.declined);
-    setState(() => _status = QuoteStatus.declined);
-    if (mounted) context.showSuccessToast('Quote marked as declined');
-  }
-
   Future<void> _convertToJob() async {
     final quote = _buildQuote();
     final confirmed = await showDialog<bool>(
@@ -949,26 +901,6 @@ class _QuoteScreenState extends State<QuoteScreen> {
               icon: Icon(AppIcons.eye),
               label: const Text('Preview PDF'),
               onPressed: _isLoading ? null : _previewPdf,
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              icon: Icon(AppIcons.tickCircle),
-              label: const Text('Mark Approved'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.successGreen,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: _isLoading ? null : _markApproved,
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              icon: Icon(AppIcons.close),
-              label: const Text('Mark Declined'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppTheme.errorRed,
-                side: const BorderSide(color: AppTheme.errorRed),
-              ),
-              onPressed: _isLoading ? null : _markDeclined,
             ),
           ],
         );

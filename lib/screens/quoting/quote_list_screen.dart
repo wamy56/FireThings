@@ -5,11 +5,14 @@ import '../../utils/icon_map.dart';
 import '../../utils/theme.dart';
 import '../../utils/animate_helpers.dart';
 import '../../utils/adaptive_widgets.dart';
+import '../../mixins/multi_select_mixin.dart';
 import '../../services/quote_service.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/selection_app_bar.dart';
+import '../../widgets/selectable_avatar.dart';
 import 'quote_screen.dart';
 
 class QuoteListScreen extends StatefulWidget {
@@ -26,7 +29,8 @@ class QuoteListScreen extends StatefulWidget {
   State<QuoteListScreen> createState() => _QuoteListScreenState();
 }
 
-class _QuoteListScreenState extends State<QuoteListScreen> {
+class _QuoteListScreenState extends State<QuoteListScreen>
+    with MultiSelectMixin {
   List<Quote> _quotes = [];
   bool _isLoading = true;
   QuoteStatus? _selectedFilter;
@@ -56,36 +60,67 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AdaptiveNavigationBar(title: widget.title),
-      body: Column(
-        children: [
-          _buildFilterChips(),
-          Expanded(
-            child: _isLoading
-                ? const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: SkeletonList(itemCount: 5, showLeading: true),
-                  )
-                : _quotes.isEmpty
-                    ? _buildEmptyState()
-                    : AdaptiveRefreshIndicator(
-                        onRefresh: _loadQuotes,
-                        child: _buildQuoteList(),
-                      ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            adaptivePageRoute(builder: (_) => const QuoteScreen()),
-          );
-          _loadQuotes();
-        },
-        backgroundColor: AppTheme.primaryBlue,
-        child: const Icon(AppIcons.addCircle, color: Colors.white),
+    return PopScope(
+      canPop: !isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) exitSelectionMode();
+      },
+      child: Scaffold(
+        appBar: isSelectionMode
+            ? SelectionAppBar(
+                selectedCount: selectedCount,
+                isAllSelected:
+                    _quotes.isNotEmpty && selectedCount == _quotes.length,
+                onClose: exitSelectionMode,
+                onSelectAll: (selectAll) {
+                  if (selectAll) {
+                    this.selectAll(_quotes.map((q) => q.id).toList());
+                  } else {
+                    deselectAll();
+                  }
+                },
+                onDelete: _bulkDelete,
+              )
+            : AdaptiveNavigationBar(
+                title: widget.title,
+                actions: [
+                  TextButton(
+                    onPressed: _quotes.isEmpty ? null : enterSelectionMode,
+                    child: const Text('Select'),
+                  ),
+                ],
+              ),
+        body: Column(
+          children: [
+            _buildFilterChips(),
+            Expanded(
+              child: _isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: SkeletonList(itemCount: 5, showLeading: true),
+                    )
+                  : _quotes.isEmpty
+                      ? _buildEmptyState()
+                      : AdaptiveRefreshIndicator(
+                          onRefresh: _loadQuotes,
+                          child: _buildQuoteList(),
+                        ),
+            ),
+          ],
+        ),
+        floatingActionButton: isSelectionMode
+            ? null
+            : FloatingActionButton(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    adaptivePageRoute(builder: (_) => const QuoteScreen()),
+                  );
+                  _loadQuotes();
+                },
+                backgroundColor: AppTheme.primaryBlue,
+                child: const Icon(AppIcons.addCircle, color: Colors.white),
+              ),
       ),
     );
   }
@@ -108,13 +143,14 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
   }
 
   Widget _buildChip(String label, QuoteStatus? status) {
-    final isSelected = _selectedFilter == status;
+    final isActive = _selectedFilter == status;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: ChoiceChip(
         label: Text(label),
-        selected: isSelected,
+        selected: isActive,
         onSelected: (_) {
+          if (isSelectionMode) exitSelectionMode();
           setState(() => _selectedFilter = status);
           _loadQuotes();
         },
@@ -181,7 +217,7 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
     DateFormat dateFormat,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite;
+    final selected = isSelected(quote.id);
     final isOverdue = quote.status == QuoteStatus.sent &&
         quote.validUntil.isBefore(DateTime.now());
 
@@ -189,10 +225,16 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
     final statusLabel =
         quote.status.name[0].toUpperCase() + quote.status.name.substring(1);
 
-    return Container(
+    return AnimatedContainer(
+      duration: AppTheme.fastAnimation,
+      curve: AppTheme.defaultCurve,
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: cardColor,
+        color: selected
+            ? (isDark
+                ? AppTheme.primaryBlue.withValues(alpha: 0.15)
+                : AppTheme.primaryBlue.withValues(alpha: 0.06))
+            : (isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite),
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
         boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
         border: isOverdue
@@ -209,10 +251,14 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppTheme.cardRadius),
           ),
-          leading: CircleAvatar(
-            backgroundColor: statusColor.withValues(alpha: 0.1),
-            child:
-                Icon(AppIcons.receiptItem, color: statusColor, size: 22),
+          leading: SelectableAvatar(
+            isSelectionMode: isSelectionMode,
+            isSelected: selected,
+            child: CircleAvatar(
+              backgroundColor: statusColor.withValues(alpha: 0.1),
+              child:
+                  Icon(AppIcons.receiptItem, color: statusColor, size: 22),
+            ),
           ),
           title: Row(
             children: [
@@ -289,11 +335,19 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
             ],
           ),
           isThreeLine: true,
-          trailing: IconButton(
-            icon: const Icon(AppIcons.more),
-            onPressed: () => _showQuoteActions(quote),
-          ),
-          onTap: () => _openQuote(quote),
+          trailing: isSelectionMode
+              ? null
+              : IconButton(
+                  icon: const Icon(AppIcons.more),
+                  onPressed: () => _showQuoteActions(quote),
+                ),
+          onTap: () {
+            if (isSelectionMode) {
+              toggleSelection(quote.id);
+            } else {
+              _openQuote(quote);
+            }
+          },
         ),
       ),
     );
@@ -334,6 +388,12 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
             label: 'Mark as Approved',
             icon: AppIcons.tickCircle,
             onTap: () => _updateStatus(quote, QuoteStatus.approved),
+          ),
+        if (quote.status == QuoteStatus.sent)
+          ActionSheetOption(
+            label: 'Mark as Declined',
+            icon: AppIcons.close,
+            onTap: () => _updateStatus(quote, QuoteStatus.declined),
           ),
         ActionSheetOption(
           label: 'Delete',
@@ -384,6 +444,35 @@ class _QuoteListScreenState extends State<QuoteListScreen> {
         }
       } catch (e) {
         if (mounted) context.showErrorToast('Error: $e');
+      }
+    }
+  }
+
+  Future<void> _bulkDelete() async {
+    final count = selectedCount;
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Delete $count Quote${count == 1 ? '' : 's'}',
+      message:
+          'Are you sure you want to delete $count selected ${count == 1 ? 'item' : 'items'}? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm == true) {
+      try {
+        await QuoteService.instance.deleteQuotes(selectedIds.toList());
+        if (mounted) {
+          exitSelectionMode();
+          _loadQuotes();
+          context.showSuccessToast(
+              '$count quote${count == 1 ? '' : 's'} deleted');
+        }
+      } catch (e) {
+        if (mounted) {
+          context.showErrorToast('Error deleting quotes: $e');
+        }
       }
     }
   }

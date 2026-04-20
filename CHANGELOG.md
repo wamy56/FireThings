@@ -4,6 +4,38 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-20 (Session 77)
+
+### Quote Fixes, Dispatch Status Fix & Multi-Select Bulk Delete
+
+Fixed three quote bugs: company branding toggle not applying to quotes (added Quote PDF sections to both PDF design screens), approve/decline buttons crashing from defect-to-quote flow (removed buttons from quote_screen entirely), and approve/decline appearing prematurely after sending. Fixed dispatched job status not updating on completion by adding `lastUpdatedBy` to Firestore rules whitelist. Then implemented multi-select bulk delete across 9 list screens with a reusable mixin, selection app bar, and selectable avatar widget.
+
+#### New Files (3)
+- **`lib/mixins/multi_select_mixin.dart`** — Reusable mixin providing selection state (toggle, selectAll, enterSelectionMode, exitSelectionMode)
+- **`lib/widgets/selection_app_bar.dart`** — Platform-adaptive selection bar (close, count, Select All, Delete)
+- **`lib/widgets/selectable_avatar.dart`** — Animated checkbox overlay wrapping CircleAvatar in selection mode
+
+#### Modified Files (17)
+- **`lib/widgets/widgets.dart`** — Barrel exports for selection_app_bar and selectable_avatar
+- **`lib/services/database_helper.dart`** — Added 5 batch delete methods (deleteJobsheets, deleteInvoices, deleteQuotes, deleteSavedCustomers, deleteSavedSites)
+- **`lib/services/quote_service.dart`** — Added `deleteQuotes(List<String> ids)`
+- **`lib/services/company_service.dart`** — Added `deleteCustomers()` and `deleteSites()` batch methods
+- **`lib/screens/quoting/quote_screen.dart`** — Removed approve/decline buttons from sent quote view
+- **`lib/screens/quoting/quote_list_screen.dart`** — Added Mark as Declined option + multi-select with filter chip interaction
+- **`lib/screens/invoicing/pdf_design_screen.dart`** — Added Quote PDF section
+- **`lib/screens/company/company_pdf_design_screen.dart`** — Added Quote PDF section
+- **`firestore.rules`** — Added `lastUpdatedBy` to dispatched_jobs update whitelist
+- **`lib/screens/new_job/jobsheet_drafts_screen.dart`** — Multi-select bulk delete
+- **`lib/screens/tools/saved_drafts_screen.dart`** — Multi-select bulk delete
+- **`lib/screens/history/history_screen.dart`** — Multi-select bulk delete (clears selection on search)
+- **`lib/screens/invoicing/invoice_list_screen.dart`** — Multi-select bulk delete
+- **`lib/screens/saved_customers/saved_customers_screen.dart`** — Multi-select bulk delete (clears selection on search, hides FAB)
+- **`lib/screens/saved_sites/saved_sites_screen.dart`** — Multi-select bulk delete (clears selection on search, hides FAB)
+- **`lib/screens/company/company_customers_screen.dart`** — Multi-select bulk delete (permission-gated, StreamBuilder)
+- **`lib/screens/company/company_sites_screen.dart`** — Multi-select bulk delete (permission-gated, StreamBuilder)
+
+---
+
 ## 2026-04-19 (Session 76)
 
 ### Notification Overlay, Workflow Pipeline Fixes & Jobsheet-to-Invoice

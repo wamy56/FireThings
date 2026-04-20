@@ -38,6 +38,10 @@ class QuoteService {
     await _db.deleteQuote(quoteId);
   }
 
+  Future<void> deleteQuotes(List<String> ids) async {
+    await _db.deleteQuotes(ids);
+  }
+
   /// Get all quotes for the current engineer.
   Future<List<Quote>> getQuotes() async {
     return _db.getQuotesByEngineerId(_currentEngineerId);

@@ -15,9 +15,14 @@ class PdfDesignScreen extends StatelessWidget {
 
   String get _title {
     if (docType == null) return 'PDF Branding';
-    return docType == PdfDocumentType.jobsheet
-        ? 'Jobsheet PDF Design'
-        : 'Invoice PDF Design';
+    switch (docType!) {
+      case PdfDocumentType.jobsheet:
+        return 'Jobsheet PDF Design';
+      case PdfDocumentType.invoice:
+        return 'Invoice PDF Design';
+      case PdfDocumentType.quote:
+        return 'Quote PDF Design';
+    }
   }
 
   @override
@@ -31,7 +36,7 @@ class PdfDesignScreen extends StatelessWidget {
         children: [
           if (docType == null) ...[
             Text(
-              'Customise the PDF branding used for your jobsheets and invoices.',
+              'Customise the PDF branding used for your jobsheets, invoices, and quotes.',
               style: TextStyle(
                 fontSize: 14,
                 color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
@@ -78,6 +83,29 @@ class PdfDesignScreen extends StatelessWidget {
                 adaptivePageRoute(
                   builder: (_) => const UnifiedPdfEditorScreen(
                     docType: PdfDocumentType.invoice,
+                  ),
+                ),
+              ),
+            ),
+          ],
+
+          if (docType == null) const SizedBox(height: 32),
+
+          // Quote section
+          if (docType == null || docType == PdfDocumentType.quote) ...[
+            _buildSectionTitle('Quote PDF', isDark),
+            const SizedBox(height: 12),
+            _buildConfigCard(
+              context,
+              isDark,
+              'Design',
+              AppIcons.edit,
+              'Customise header, footer, colours, sections, and typography',
+              () => Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => const UnifiedPdfEditorScreen(
+                    docType: PdfDocumentType.quote,
                   ),
                 ),
               ),

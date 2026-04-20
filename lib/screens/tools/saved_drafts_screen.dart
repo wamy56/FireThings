@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/models.dart';
 import '../../utils/icon_map.dart';
+import '../../utils/theme.dart';
 import '../../services/database_helper.dart';
 import '../../services/auth_service.dart';
+import '../../mixins/multi_select_mixin.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/selection_app_bar.dart';
+import '../../widgets/selectable_avatar.dart';
 import '../../utils/adaptive_widgets.dart';
 import 'invoice_screen.dart';
 
@@ -17,7 +21,8 @@ class SavedDraftsScreen extends StatefulWidget {
   State<SavedDraftsScreen> createState() => _SavedDraftsScreenState();
 }
 
-class _SavedDraftsScreenState extends State<SavedDraftsScreen> {
+class _SavedDraftsScreenState extends State<SavedDraftsScreen>
+    with MultiSelectMixin {
   final _dbHelper = DatabaseHelper.instance;
   final _authService = AuthService();
 
@@ -52,15 +57,42 @@ class _SavedDraftsScreenState extends State<SavedDraftsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AdaptiveNavigationBar(
-        title: 'Saved Drafts',
+    return PopScope(
+      canPop: !isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) exitSelectionMode();
+      },
+      child: Scaffold(
+        appBar: isSelectionMode
+            ? SelectionAppBar(
+                selectedCount: selectedCount,
+                isAllSelected:
+                    _drafts.isNotEmpty && selectedCount == _drafts.length,
+                onClose: exitSelectionMode,
+                onSelectAll: (selectAll) {
+                  if (selectAll) {
+                    this.selectAll(_drafts.map((d) => d.id).toList());
+                  } else {
+                    deselectAll();
+                  }
+                },
+                onDelete: _bulkDelete,
+              )
+            : AdaptiveNavigationBar(
+                title: 'Saved Drafts',
+                actions: [
+                  TextButton(
+                    onPressed: _drafts.isEmpty ? null : enterSelectionMode,
+                    child: const Text('Select'),
+                  ),
+                ],
+              ),
+        body: _isLoading
+            ? const Center(child: AdaptiveLoadingIndicator())
+            : _drafts.isEmpty
+                ? _buildEmptyState()
+                : _buildDraftList(),
       ),
-      body: _isLoading
-          ? const Center(child: AdaptiveLoadingIndicator())
-          : _drafts.isEmpty
-              ? _buildEmptyState()
-              : _buildDraftList(),
     );
   }
 
@@ -94,7 +126,8 @@ class _SavedDraftsScreenState extends State<SavedDraftsScreen> {
   }
 
   Widget _buildDraftList() {
-    final currencyFormat = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+    final currencyFormat =
+        NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
     final dateFormat = DateFormat('dd/MM/yyyy');
 
     return ListView.builder(
@@ -103,68 +136,99 @@ class _SavedDraftsScreenState extends State<SavedDraftsScreen> {
       itemBuilder: (context, index) {
         final draft = _drafts[index];
         final total = draft.total;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final selected = isSelected(draft.id);
 
-        return Card(
+        return AnimatedContainer(
+          duration: AppTheme.fastAnimation,
+          curve: AppTheme.defaultCurve,
           margin: const EdgeInsets.only(bottom: 12),
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-              child: Icon(
-                AppIcons.document,
-                color: Theme.of(context).primaryColor,
-              ),
-            ),
-            title: Text(
-              draft.invoiceNumber,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  draft.customerName.isNotEmpty ? draft.customerName : 'No customer',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Row(
-                  children: [
-                    Text(
-                      currencyFormat.format(total),
-                      style: TextStyle(
-                        color: Theme.of(context).primaryColor,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      dateFormat.format(draft.date),
-                      style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            isThreeLine: true,
-            trailing: IconButton(
-              icon: Icon(AppIcons.more),
-              onPressed: () => showAdaptiveActionSheet(
-                context: context,
-                options: [
-                  ActionSheetOption(
-                    label: 'Edit',
-                    icon: AppIcons.edit,
-                    onTap: () => _openDraft(draft),
+          decoration: BoxDecoration(
+            color: selected
+                ? (isDark
+                    ? AppTheme.primaryBlue.withValues(alpha: 0.15)
+                    : AppTheme.primaryBlue.withValues(alpha: 0.06))
+                : null,
+            borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          ),
+          child: Card(
+            margin: EdgeInsets.zero,
+            child: ListTile(
+              leading: SelectableAvatar(
+                isSelectionMode: isSelectionMode,
+                isSelected: selected,
+                child: CircleAvatar(
+                  backgroundColor:
+                      Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                  child: Icon(
+                    AppIcons.document,
+                    color: Theme.of(context).primaryColor,
                   ),
-                  ActionSheetOption(
-                    label: 'Delete',
-                    icon: AppIcons.trash,
-                    isDestructive: true,
-                    onTap: () => _confirmDelete(draft),
+                ),
+              ),
+              title: Text(
+                draft.invoiceNumber,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    draft.customerName.isNotEmpty
+                        ? draft.customerName
+                        : 'No customer',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Row(
+                    children: [
+                      Text(
+                        currencyFormat.format(total),
+                        style: TextStyle(
+                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        dateFormat.format(draft.date),
+                        style:
+                            TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
+                    ],
                   ),
                 ],
               ),
+              isThreeLine: true,
+              trailing: isSelectionMode
+                  ? null
+                  : IconButton(
+                      icon: Icon(AppIcons.more),
+                      onPressed: () => showAdaptiveActionSheet(
+                        context: context,
+                        options: [
+                          ActionSheetOption(
+                            label: 'Edit',
+                            icon: AppIcons.edit,
+                            onTap: () => _openDraft(draft),
+                          ),
+                          ActionSheetOption(
+                            label: 'Delete',
+                            icon: AppIcons.trash,
+                            isDestructive: true,
+                            onTap: () => _confirmDelete(draft),
+                          ),
+                        ],
+                      ),
+                    ),
+              onTap: () {
+                if (isSelectionMode) {
+                  toggleSelection(draft.id);
+                } else {
+                  _openDraft(draft);
+                }
+              },
             ),
-            onTap: () => _openDraft(draft),
           ),
         );
       },
@@ -178,7 +242,6 @@ class _SavedDraftsScreenState extends State<SavedDraftsScreen> {
         builder: (_) => InvoiceScreen(existingInvoice: draft),
       ),
     );
-    // Reload list when returning
     _loadDrafts();
   }
 
@@ -202,6 +265,35 @@ class _SavedDraftsScreenState extends State<SavedDraftsScreen> {
       } catch (e) {
         if (mounted) {
           context.showErrorToast('Error: $e');
+        }
+      }
+    }
+  }
+
+  Future<void> _bulkDelete() async {
+    final count = selectedCount;
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Delete $count ${count == 1 ? 'Draft' : 'Drafts'}',
+      message:
+          'Are you sure you want to delete $count selected ${count == 1 ? 'item' : 'items'}? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm == true) {
+      try {
+        await _dbHelper.deleteInvoices(selectedIds.toList());
+        if (mounted) {
+          exitSelectionMode();
+          _loadDrafts();
+          context.showSuccessToast(
+              '$count ${count == 1 ? 'draft' : 'drafts'} deleted');
+        }
+      } catch (e) {
+        if (mounted) {
+          context.showErrorToast('Error deleting drafts: $e');
         }
       }
     }

@@ -324,6 +324,21 @@ class DatabaseHelper {
     return result;
   }
 
+  Future<int> deleteJobsheets(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    final db = await database;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    final result = await db.delete(
+      'jobsheets',
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+    );
+    for (final id in ids) {
+      FirestoreSyncService.instance.deleteDocument('jobsheets', id);
+    }
+    return result;
+  }
+
   /// Search jobsheets by customer name or job number
   Future<List<Jobsheet>> searchJobsheets(String query) async {
     final db = await database;
@@ -485,6 +500,21 @@ class DatabaseHelper {
 
     final result = await db.delete('invoices', where: 'id = ?', whereArgs: [id]);
     FirestoreSyncService.instance.deleteDocument('invoices', id);
+    return result;
+  }
+
+  Future<int> deleteInvoices(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    final db = await database;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    final result = await db.delete(
+      'invoices',
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+    );
+    for (final id in ids) {
+      FirestoreSyncService.instance.deleteDocument('invoices', id);
+    }
     return result;
   }
 
@@ -678,6 +708,21 @@ class DatabaseHelper {
     return result;
   }
 
+  Future<int> deleteQuotes(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    final db = await database;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    final result = await db.delete(
+      'quotes',
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+    );
+    for (final id in ids) {
+      FirestoreSyncService.instance.deleteDocument('quotes', id);
+    }
+    return result;
+  }
+
   /// Get next quote number (Q-0001 format)
   Future<String> getNextQuoteNumber() async {
     final db = await database;
@@ -783,6 +828,21 @@ class DatabaseHelper {
 
     final result = await db.delete('saved_customers', where: 'id = ?', whereArgs: [id]);
     FirestoreSyncService.instance.deleteDocument('saved_customers', id);
+    return result;
+  }
+
+  Future<int> deleteSavedCustomers(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    final db = await database;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    final result = await db.delete(
+      'saved_customers',
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+    );
+    for (final id in ids) {
+      FirestoreSyncService.instance.deleteDocument('saved_customers', id);
+    }
     return result;
   }
 
@@ -1198,6 +1258,21 @@ class DatabaseHelper {
 
     final result = await db.delete('saved_sites', where: 'id = ?', whereArgs: [id]);
     FirestoreSyncService.instance.deleteDocument('saved_sites', id);
+    return result;
+  }
+
+  Future<int> deleteSavedSites(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    final db = await database;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    final result = await db.delete(
+      'saved_sites',
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+    );
+    for (final id in ids) {
+      FirestoreSyncService.instance.deleteDocument('saved_sites', id);
+    }
     return result;
   }
 

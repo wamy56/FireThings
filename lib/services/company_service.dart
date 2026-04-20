@@ -403,6 +403,16 @@ class CompanyService {
         .delete();
   }
 
+  Future<void> deleteSites(String companyId, List<String> ids) async {
+    final batch = FirebaseFirestore.instance.batch();
+    for (final id in ids) {
+      batch.delete(
+        _companiesCol.doc(companyId).collection('sites').doc(id),
+      );
+    }
+    await batch.commit();
+  }
+
   /// One-shot fetch of a single company site by ID.
   Future<CompanySite?> getSite(String companyId, String siteId) async {
     final doc = await _companiesCol
@@ -455,6 +465,16 @@ class CompanyService {
         .collection('customers')
         .doc(customerId)
         .delete();
+  }
+
+  Future<void> deleteCustomers(String companyId, List<String> ids) async {
+    final batch = FirebaseFirestore.instance.batch();
+    for (final id in ids) {
+      batch.delete(
+        _companiesCol.doc(companyId).collection('customers').doc(id),
+      );
+    }
+    await batch.commit();
   }
 
   /// Stream of all company customers (real-time).

@@ -25,7 +25,7 @@ class CompanyPdfDesignScreen extends StatelessWidget {
             padding: const EdgeInsets.all(AppTheme.screenPadding),
             children: [
               Text(
-                'Configure the PDF branding used for jobsheets and invoices created from dispatched jobs.',
+                'Configure the PDF branding used for jobsheets, invoices, and quotes created from dispatched jobs.',
                 style: TextStyle(
                   fontSize: 14,
                   color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
@@ -70,6 +70,29 @@ class CompanyPdfDesignScreen extends StatelessWidget {
                   adaptivePageRoute(
                     builder: (_) => UnifiedPdfEditorScreen(
                       docType: PdfDocumentType.invoice,
+                      isCompany: true,
+                      companyId: companyId,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Quote section
+              _buildSectionTitle('Quote PDF', isDark),
+              const SizedBox(height: 12),
+              _buildConfigCard(
+                context,
+                isDark,
+                'Design',
+                AppIcons.edit,
+                'Customise header, footer, colours, sections, and typography',
+                () => Navigator.push(
+                  context,
+                  adaptivePageRoute(
+                    builder: (_) => UnifiedPdfEditorScreen(
+                      docType: PdfDocumentType.quote,
                       isCompany: true,
                       companyId: companyId,
                     ),

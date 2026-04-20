@@ -6,12 +6,15 @@ import '../../services/auth_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
+import '../../mixins/multi_select_mixin.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/premium_toast.dart';
 import '../tools/invoice_screen.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_dialog.dart';
+import '../../widgets/selection_app_bar.dart';
+import '../../widgets/selectable_avatar.dart';
 import '../../services/invoice_export_service.dart';
 import '../../widgets/premium_bottom_sheet.dart';
 
@@ -29,7 +32,8 @@ class InvoiceListScreen extends StatefulWidget {
   State<InvoiceListScreen> createState() => _InvoiceListScreenState();
 }
 
-class _InvoiceListScreenState extends State<InvoiceListScreen> {
+class _InvoiceListScreenState extends State<InvoiceListScreen>
+    with MultiSelectMixin {
   final _dbHelper = DatabaseHelper.instance;
   final _authService = AuthService();
   final _exportButtonKey = GlobalKey();
@@ -82,41 +86,66 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AdaptiveNavigationBar(
-        title: widget.title,
-        actions: widget.statusFilter == InvoiceStatus.paid
-            ? [
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Center(
-                    child: OutlinedButton(
-                      key: _exportButtonKey,
-                      onPressed: _isExporting ? null : _exportInvoices,
-                      child: _isExporting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Export'),
+    return PopScope(
+      canPop: !isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) exitSelectionMode();
+      },
+      child: Scaffold(
+        appBar: isSelectionMode
+            ? SelectionAppBar(
+                selectedCount: selectedCount,
+                isAllSelected: _invoices.isNotEmpty &&
+                    selectedCount == _invoices.length,
+                onClose: exitSelectionMode,
+                onSelectAll: (selectAll) {
+                  if (selectAll) {
+                    this.selectAll(_invoices.map((i) => i.id).toList());
+                  } else {
+                    deselectAll();
+                  }
+                },
+                onDelete: _bulkDelete,
+              )
+            : AdaptiveNavigationBar(
+                title: widget.title,
+                actions: [
+                  if (widget.statusFilter == InvoiceStatus.paid)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Center(
+                        child: OutlinedButton(
+                          key: _exportButtonKey,
+                          onPressed: _isExporting ? null : _exportInvoices,
+                          child: _isExporting
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                )
+                              : const Text('Export'),
+                        ),
+                      ),
                     ),
+                  TextButton(
+                    onPressed: _invoices.isEmpty ? null : enterSelectionMode,
+                    child: const Text('Select'),
                   ),
-                ),
-              ]
-            : null,
+                ],
+              ),
+        body: _isLoading
+            ? const Padding(
+                padding: EdgeInsets.all(16),
+                child: SkeletonList(itemCount: 5, showLeading: true),
+              )
+            : _invoices.isEmpty
+                ? _buildEmptyState()
+                : AdaptiveRefreshIndicator(
+                    onRefresh: _loadInvoices,
+                    child: _buildInvoiceList(),
+                  ),
       ),
-      body: _isLoading
-          ? const Padding(
-              padding: EdgeInsets.all(16),
-              child: SkeletonList(itemCount: 5, showLeading: true),
-            )
-          : _invoices.isEmpty
-          ? _buildEmptyState()
-          : AdaptiveRefreshIndicator(
-              onRefresh: _loadInvoices,
-              child: _buildInvoiceList(),
-            ),
     );
   }
 
@@ -182,7 +211,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       itemCount: _invoices.length,
       itemBuilder: (context, index) {
         final invoice = _invoices[index];
-        return _buildInvoiceCard(invoice, currencyFormat, dateFormat).animateListItem(index);
+        return _buildInvoiceCard(invoice, currencyFormat, dateFormat)
+            .animateListItem(index);
       },
     );
   }
@@ -193,7 +223,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     DateFormat dateFormat,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite;
+    final selected = isSelected(invoice.id);
 
     Color statusColor;
     String statusLabel;
@@ -212,10 +242,16 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         break;
     }
 
-    return Container(
+    return AnimatedContainer(
+      duration: AppTheme.fastAnimation,
+      curve: AppTheme.defaultCurve,
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: cardColor,
+        color: selected
+            ? (isDark
+                ? AppTheme.primaryBlue.withValues(alpha: 0.15)
+                : AppTheme.primaryBlue.withValues(alpha: 0.06))
+            : (isDark ? AppTheme.darkSurface : AppTheme.surfaceWhite),
         borderRadius: BorderRadius.circular(AppTheme.cardRadius),
         boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
       ),
@@ -229,9 +265,13 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppTheme.cardRadius),
           ),
-          leading: CircleAvatar(
-            backgroundColor: statusColor.withValues(alpha: 0.1),
-            child: Icon(AppIcons.receipt, color: statusColor, size: 22),
+          leading: SelectableAvatar(
+            isSelectionMode: isSelectionMode,
+            isSelected: selected,
+            child: CircleAvatar(
+              backgroundColor: statusColor.withValues(alpha: 0.1),
+              child: Icon(AppIcons.receipt, color: statusColor, size: 22),
+            ),
           ),
           title: Row(
             children: [
@@ -242,7 +282,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -296,32 +337,40 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
             ],
           ),
           isThreeLine: true,
-          trailing: IconButton(
-            icon: Icon(AppIcons.more),
-            onPressed: () => showAdaptiveActionSheet(
-              context: context,
-              options: [
-                ActionSheetOption(
-                  label: 'Edit',
-                  icon: AppIcons.edit,
-                  onTap: () => _openInvoice(invoice),
-                ),
-                if (invoice.status == InvoiceStatus.sent)
-                  ActionSheetOption(
-                    label: 'Mark as Paid',
-                    icon: AppIcons.tickCircle,
-                    onTap: () => _markAsPaid(invoice),
+          trailing: isSelectionMode
+              ? null
+              : IconButton(
+                  icon: Icon(AppIcons.more),
+                  onPressed: () => showAdaptiveActionSheet(
+                    context: context,
+                    options: [
+                      ActionSheetOption(
+                        label: 'Edit',
+                        icon: AppIcons.edit,
+                        onTap: () => _openInvoice(invoice),
+                      ),
+                      if (invoice.status == InvoiceStatus.sent)
+                        ActionSheetOption(
+                          label: 'Mark as Paid',
+                          icon: AppIcons.tickCircle,
+                          onTap: () => _markAsPaid(invoice),
+                        ),
+                      ActionSheetOption(
+                        label: 'Delete',
+                        icon: AppIcons.trash,
+                        isDestructive: true,
+                        onTap: () => _confirmDelete(invoice),
+                      ),
+                    ],
                   ),
-                ActionSheetOption(
-                  label: 'Delete',
-                  icon: AppIcons.trash,
-                  isDestructive: true,
-                  onTap: () => _confirmDelete(invoice),
                 ),
-              ],
-            ),
-          ),
-          onTap: () => _openInvoice(invoice),
+          onTap: () {
+            if (isSelectionMode) {
+              toggleSelection(invoice.id);
+            } else {
+              _openInvoice(invoice);
+            }
+          },
         ),
       ),
     );
@@ -356,11 +405,10 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       selectedYear = picked;
     }
 
-    // Compute the button rect for iPad share popover anchoring.
-    final box = _exportButtonKey.currentContext?.findRenderObject() as RenderBox?;
-    final shareOrigin = box != null
-        ? box.localToGlobal(Offset.zero) & box.size
-        : null;
+    final box =
+        _exportButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    final shareOrigin =
+        box != null ? box.localToGlobal(Offset.zero) & box.size : null;
 
     setState(() => _isExporting = true);
     try {
@@ -426,6 +474,35 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       } catch (e) {
         if (mounted) {
           context.showErrorToast('Error: $e');
+        }
+      }
+    }
+  }
+
+  Future<void> _bulkDelete() async {
+    final count = selectedCount;
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Delete $count Invoice${count == 1 ? '' : 's'}',
+      message:
+          'Are you sure you want to delete $count selected ${count == 1 ? 'item' : 'items'}? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm == true) {
+      try {
+        await _dbHelper.deleteInvoices(selectedIds.toList());
+        if (mounted) {
+          exitSelectionMode();
+          _loadInvoices();
+          context.showSuccessToast(
+              '$count invoice${count == 1 ? '' : 's'} deleted');
+        }
+      } catch (e) {
+        if (mounted) {
+          context.showErrorToast('Error deleting invoices: $e');
         }
       }
     }

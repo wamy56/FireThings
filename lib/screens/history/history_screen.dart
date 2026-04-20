@@ -9,11 +9,14 @@ import '../../utils/pdf_form_templates.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/animate_helpers.dart';
+import '../../mixins/multi_select_mixin.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/adaptive_app_bar.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
+import '../../widgets/selection_app_bar.dart';
+import '../../widgets/selectable_avatar.dart';
 import '../pdf_forms/pdf_form_fill_screen.dart';
 import '../pdf_forms/minor_works_form_fill_screen.dart';
 import 'edit_jobsheet_screen.dart';
@@ -26,7 +29,8 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class _HistoryScreenState extends State<HistoryScreen>
+    with MultiSelectMixin {
   final _authService = AuthService();
   final _dbHelper = DatabaseHelper.instance;
   final _searchController = TextEditingController();
@@ -72,6 +76,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _filterJobsheets(String query) {
+    if (isSelectionMode) exitSelectionMode();
     setState(() {
       _searchQuery = query;
       if (query.isEmpty) {
@@ -173,162 +178,221 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AdaptiveNavigationBar(title: 'Job History'),
-      body: Column(
-        children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search jobsheets...',
-                prefixIcon: const Icon(AppIcons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(AppIcons.close),
-                        onPressed: () {
-                          _searchController.clear();
-                          _filterJobsheets('');
-                        },
-                      )
-                    : null,
-              ),
-              onChanged: _filterJobsheets,
-            ),
-          ),
-
-          // Jobsheets count
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  '${_filteredJobsheets.length} jobsheet${_filteredJobsheets.length == 1 ? '' : 's'}',
-                  style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // Jobsheets list
-          Expanded(
-            child: _isLoading
-                ? Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SkeletonList(itemCount: 6, showLeading: true),
-                  )
-                : _filteredJobsheets.isEmpty
-                ? _buildEmptyState()
-                : AdaptiveRefreshIndicator(
-                    onRefresh: _loadJobsheets,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: _filteredJobsheets.length,
-                      itemBuilder: (context, index) {
-                        final jobsheet = _filteredJobsheets[index];
-                        return _buildJobsheetCard(jobsheet).animateListItem(index);
-                      },
-                    ),
+    return PopScope(
+      canPop: !isSelectionMode,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) exitSelectionMode();
+      },
+      child: Scaffold(
+        appBar: isSelectionMode
+            ? SelectionAppBar(
+                selectedCount: selectedCount,
+                isAllSelected: _filteredJobsheets.isNotEmpty &&
+                    selectedCount == _filteredJobsheets.length,
+                onClose: exitSelectionMode,
+                onSelectAll: (selectAll) {
+                  if (selectAll) {
+                    this.selectAll(
+                        _filteredJobsheets.map((j) => j.id).toList());
+                  } else {
+                    deselectAll();
+                  }
+                },
+                onDelete: _bulkDelete,
+              )
+            : AdaptiveNavigationBar(
+                title: 'Job History',
+                actions: [
+                  TextButton(
+                    onPressed: _filteredJobsheets.isEmpty
+                        ? null
+                        : enterSelectionMode,
+                    child: const Text('Select'),
                   ),
-          ),
-        ],
+                ],
+              ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search jobsheets...',
+                  prefixIcon: const Icon(AppIcons.search),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(AppIcons.close),
+                          onPressed: () {
+                            _searchController.clear();
+                            _filterJobsheets('');
+                          },
+                        )
+                      : null,
+                ),
+                onChanged: _filterJobsheets,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Text(
+                    '${_filteredJobsheets.length} jobsheet${_filteredJobsheets.length == 1 ? '' : 's'}',
+                    style:
+                        TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _isLoading
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: SkeletonList(itemCount: 6, showLeading: true),
+                    )
+                  : _filteredJobsheets.isEmpty
+                      ? _buildEmptyState()
+                      : AdaptiveRefreshIndicator(
+                          onRefresh: _loadJobsheets,
+                          child: ListView.builder(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: _filteredJobsheets.length,
+                            itemBuilder: (context, index) {
+                              final jobsheet = _filteredJobsheets[index];
+                              return _buildJobsheetCard(jobsheet)
+                                  .animateListItem(index);
+                            },
+                          ),
+                        ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildJobsheetCard(Jobsheet jobsheet) {
     final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final selected = isSelected(jobsheet.id);
 
-    return Card(
+    return AnimatedContainer(
+      duration: AppTheme.fastAnimation,
+      curve: AppTheme.defaultCurve,
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-          child: Text(
-            jobsheet.customerName.isNotEmpty
-                ? jobsheet.customerName[0].toUpperCase()
-                : '?',
-            style: TextStyle(
-              color: Theme.of(context).primaryColor,
-              fontWeight: FontWeight.bold,
+      decoration: BoxDecoration(
+        color: selected
+            ? (isDark
+                ? AppTheme.primaryBlue.withValues(alpha: 0.15)
+                : AppTheme.primaryBlue.withValues(alpha: 0.06))
+            : null,
+        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+      ),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(12),
+          leading: SelectableAvatar(
+            isSelectionMode: isSelectionMode,
+            isSelected: selected,
+            child: CircleAvatar(
+              backgroundColor:
+                  Theme.of(context).primaryColor.withValues(alpha: 0.1),
+              child: Text(
+                jobsheet.customerName.isNotEmpty
+                    ? jobsheet.customerName[0].toUpperCase()
+                    : '?',
+                style: TextStyle(
+                  color: Theme.of(context).primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
-        ),
-        title: Text(
-          jobsheet.customerName,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              jobsheet.siteAddress,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '${jobsheet.jobNumber} \u2022 ${jobsheet.templateType}',
-              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              dateFormat.format(jobsheet.date),
-              style: TextStyle(fontSize: 11, color: AppTheme.textHint),
-            ),
-          ],
-        ),
-        trailing: IconButton(
-          icon: Icon(AppIcons.more),
-          onPressed: () => showAdaptiveActionSheet(
-            context: context,
-            options: [
-              ActionSheetOption(
-                label: 'View Details',
-                icon: AppIcons.eye,
-                onTap: () async {
-                  await Navigator.push(
-                    context,
-                    adaptivePageRoute(
-                      builder: (_) => JobDetailScreen(jobsheet: jobsheet),
-                    ),
-                  );
-                  _loadJobsheets();
-                },
+          title: Text(
+            jobsheet.customerName,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text(
+                jobsheet.siteAddress,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                    TextStyle(fontSize: 12, color: AppTheme.textSecondary),
               ),
-              ActionSheetOption(
-                label: 'Edit',
-                icon: AppIcons.edit,
-                onTap: () => _editJobsheet(jobsheet),
+              const SizedBox(height: 2),
+              Text(
+                '${jobsheet.jobNumber} \u2022 ${jobsheet.templateType}',
+                style:
+                    TextStyle(fontSize: 12, color: AppTheme.textSecondary),
               ),
-              ActionSheetOption(
-                label: 'Generate PDF',
-                icon: AppIcons.document,
-                onTap: () => _generateAndSharePDF(jobsheet),
-              ),
-              ActionSheetOption(
-                label: 'Delete',
-                icon: AppIcons.trash,
-                isDestructive: true,
-                onTap: () => _deleteJobsheet(jobsheet),
+              const SizedBox(height: 2),
+              Text(
+                dateFormat.format(jobsheet.date),
+                style: TextStyle(fontSize: 11, color: AppTheme.textHint),
               ),
             ],
           ),
+          trailing: isSelectionMode
+              ? null
+              : IconButton(
+                  icon: Icon(AppIcons.more),
+                  onPressed: () => showAdaptiveActionSheet(
+                    context: context,
+                    options: [
+                      ActionSheetOption(
+                        label: 'View Details',
+                        icon: AppIcons.eye,
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            adaptivePageRoute(
+                              builder: (_) =>
+                                  JobDetailScreen(jobsheet: jobsheet),
+                            ),
+                          );
+                          _loadJobsheets();
+                        },
+                      ),
+                      ActionSheetOption(
+                        label: 'Edit',
+                        icon: AppIcons.edit,
+                        onTap: () => _editJobsheet(jobsheet),
+                      ),
+                      ActionSheetOption(
+                        label: 'Generate PDF',
+                        icon: AppIcons.document,
+                        onTap: () => _generateAndSharePDF(jobsheet),
+                      ),
+                      ActionSheetOption(
+                        label: 'Delete',
+                        icon: AppIcons.trash,
+                        isDestructive: true,
+                        onTap: () => _deleteJobsheet(jobsheet),
+                      ),
+                    ],
+                  ),
+                ),
+          onTap: () {
+            if (isSelectionMode) {
+              toggleSelection(jobsheet.id);
+            } else {
+              Navigator.push(
+                context,
+                adaptivePageRoute(
+                  builder: (_) => JobDetailScreen(jobsheet: jobsheet),
+                ),
+              );
+            }
+          },
         ),
-        onTap: () {
-          Navigator.push(
-            context,
-            adaptivePageRoute(
-              builder: (_) => JobDetailScreen(jobsheet: jobsheet),
-            ),
-          );
-        },
       ),
     );
   }
@@ -341,7 +405,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              _searchQuery.isEmpty ? AppIcons.briefcaseOutline : AppIcons.searchOff,
+              _searchQuery.isEmpty
+                  ? AppIcons.briefcaseOutline
+                  : AppIcons.searchOff,
               size: 64,
               color: AppTheme.textHint,
             ),
@@ -366,5 +432,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _bulkDelete() async {
+    final count = selectedCount;
+    final confirm = await showAdaptiveAlertDialog<bool>(
+      context: context,
+      title: 'Delete $count Jobsheet${count == 1 ? '' : 's'}',
+      message:
+          'Are you sure you want to delete $count selected ${count == 1 ? 'item' : 'items'}? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      isDestructive: true,
+    );
+
+    if (confirm == true) {
+      try {
+        await _dbHelper.deleteJobsheets(selectedIds.toList());
+        if (mounted) {
+          exitSelectionMode();
+          _loadJobsheets();
+          context.showSuccessToast(
+              '$count jobsheet${count == 1 ? '' : 's'} deleted');
+        }
+      } catch (e) {
+        if (mounted) {
+          context.showErrorToast('Error deleting jobsheets: $e');
+        }
+      }
+    }
   }
 }
