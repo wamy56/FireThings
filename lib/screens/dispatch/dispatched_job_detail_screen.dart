@@ -20,7 +20,6 @@ import '../history/job_detail_screen.dart';
 import '../assets/site_asset_register_screen.dart';
 import '../new_job/new_job_screen.dart';
 import 'create_job_screen.dart';
-import 'decline_job_dialog.dart';
 
 class DispatchedJobDetailScreen extends StatelessWidget {
   final String companyId;
@@ -286,31 +285,6 @@ class _JobDetailContent extends StatelessWidget {
   List<Widget> _buildAssigneeActions(BuildContext context) {
     switch (job.status) {
       case DispatchedJobStatus.assigned:
-        return [
-          _section('Your Assignment', []),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: () => _updateStatus(context, DispatchedJobStatus.accepted),
-              child: const Text('Accept Job'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: OutlinedButton(
-              onPressed: () => _declineJob(context),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.red,
-                side: const BorderSide(color: Colors.red),
-              ),
-              child: const Text('Decline'),
-            ),
-          ),
-          const SizedBox(height: 24),
-        ];
       case DispatchedJobStatus.accepted:
         return [
           _section('Your Assignment', []),
@@ -434,31 +408,6 @@ class _JobDetailContent extends StatelessWidget {
     }
   }
 
-  Future<void> _declineJob(BuildContext context) async {
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (_) => const DeclineJobDialog(),
-    );
-
-    if (reason == null) return;
-
-    try {
-      await DispatchService.instance.updateJobStatus(
-        companyId: job.companyId,
-        jobId: job.id,
-        newStatus: DispatchedJobStatus.declined,
-        declineReason: reason,
-      );
-      AnalyticsService.instance.logDispatchJobDeclined(
-        job.companyId,
-        reason,
-      );
-    } catch (e) {
-      if (context.mounted) {
-        context.showErrorToast('Failed to decline job');
-      }
-    }
-  }
 
   Widget _buildSiteAssetsSection(BuildContext context) {
     final basePath = 'companies/${job.companyId}';

@@ -399,7 +399,7 @@ class _NotificationBellState extends State<NotificationBell>
                     'Notifications',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: 16,
                       color: isDark ? Colors.white : AppTheme.darkGrey,
                     ),
                   ),
@@ -414,7 +414,7 @@ class _NotificationBellState extends State<NotificationBell>
                       child: Text(
                         'Clear All',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: isDark
                               ? AppTheme.darkTextSecondary
                               : AppTheme.mediumGrey,
@@ -463,7 +463,7 @@ class _NotificationBellState extends State<NotificationBell>
                   itemCount: items.length,
                   separatorBuilder: (_, _) => Divider(
                     height: 1,
-                    indent: 52,
+                    indent: 56,
                     color:
                         isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
                   ),
@@ -484,19 +484,19 @@ class _NotificationBellState extends State<NotificationBell>
       onTap: () => _onItemTap(item),
       borderRadius: BorderRadius.circular(12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
         child: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: item.color.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(item.icon, size: 18, color: item.color),
+              child: Icon(item.icon, size: 20, color: item.color),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -506,7 +506,7 @@ class _NotificationBellState extends State<NotificationBell>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 15,
                       fontWeight:
                           unread ? FontWeight.w600 : FontWeight.w400,
                       color: isDark
@@ -514,13 +514,13 @@ class _NotificationBellState extends State<NotificationBell>
                           : AppTheme.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     item.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 11,
+                      fontSize: 13,
                       color: isDark
                           ? AppTheme.darkTextSecondary
                           : AppTheme.textSecondary,
@@ -536,7 +536,7 @@ class _NotificationBellState extends State<NotificationBell>
                 Text(
                   _relativeTime(item.timestamp),
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: isDark ? AppTheme.darkTextHint : AppTheme.textHint,
                   ),
                 ),

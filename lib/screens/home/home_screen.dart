@@ -27,12 +27,11 @@ import '../../services/user_profile_service.dart';
 import '../../services/company_service.dart';
 import '../../widgets/background_decoration.dart';
 import '../../widgets/tools_disclaimer_gate.dart';
-import '../../models/permission.dart';
-import '../dispatch/dispatch_dashboard_screen.dart';
-import '../dispatch/engineer_jobs_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final void Function(int)? onSwitchTab;
+
+  const HomeScreen({super.key, this.onSwitchTab});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -189,18 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () {
-        final profile = UserProfileService.instance;
-        if (profile.hasPermission(AppPermission.dispatchViewAll)) {
-          Navigator.push(
-            context,
-            adaptivePageRoute(builder: (_) => const DispatchDashboardScreen()),
-          );
-        } else {
-          Navigator.push(
-            context,
-            adaptivePageRoute(builder: (_) => const EngineerJobsScreen()),
-          );
-        }
+        widget.onSwitchTab?.call(4);
       },
       child: Container(
         width: double.infinity,

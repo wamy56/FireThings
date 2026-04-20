@@ -593,7 +593,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   }
 
   List<Widget> get _screens => [
-    const HomeScreen(),
+    HomeScreen(onSwitchTab: _switchTab),
     const JobsHubScreen(),
     const InvoicingHubScreen(),
     const QuotingHubScreen(),
