@@ -273,11 +273,11 @@ class _CustomTextFieldState extends State<CustomTextField>
           ),
           errorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: const BorderSide(color: AppTheme.errorRed),
+            borderSide: BorderSide(color: AppTheme.errorRed),
           ),
           focusedErrorBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppTheme.inputRadius),
-            borderSide: const BorderSide(color: AppTheme.errorRed, width: 2),
+            borderSide: BorderSide(color: AppTheme.errorRed, width: 2),
           ),
           disabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppTheme.inputRadius),

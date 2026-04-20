@@ -151,7 +151,7 @@ class _ComplianceReportScreenState extends State<ComplianceReportScreen> {
                       color: AppTheme.primaryBlue.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(AppIcons.building,
+                    child: Icon(AppIcons.building,
                         color: AppTheme.primaryBlue, size: 22),
                   ),
                   const SizedBox(width: 12),

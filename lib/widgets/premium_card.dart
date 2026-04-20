@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../utils/theme.dart';
+import '../utils/theme_style.dart';
 
 /// A premium card widget with press animations, elevation changes,
 /// and optional accent border
@@ -118,6 +119,7 @@ class _PremiumCardState extends State<PremiumCard>
           child: AnimatedBuilder(
             animation: _elevationAnimation,
             builder: (context, child) {
+              final isSiteOps = themeStyleNotifier.value == ThemeStyle.siteOps;
               return Container(
                 margin: widget.margin,
                 decoration: BoxDecoration(
@@ -130,7 +132,9 @@ class _PremiumCardState extends State<PremiumCard>
                             width: 4,
                           ),
                         )
-                      : null,
+                      : isSiteOps
+                          ? Border.all(color: const Color(0x14FFFFFF))
+                          : null,
                   boxShadow: _buildShadow(isDark),
                 ),
                 child: ClipRRect(
@@ -160,6 +164,7 @@ class _PremiumCardState extends State<PremiumCard>
   }
 
   List<BoxShadow> _buildShadow(bool isDark) {
+    if (themeStyleNotifier.value == ThemeStyle.siteOps) return const [];
     if (isDark) {
       // Dark mode - subtle glow effect
       return [
@@ -220,6 +225,7 @@ class SimpleCard extends StatelessWidget {
     final effectiveAccentColor = accentColor ??
         (isDark ? AppTheme.darkPrimaryBlue : AppTheme.primaryBlue);
 
+    final isSiteOps = themeStyleNotifier.value == ThemeStyle.siteOps;
     return Container(
       margin: margin,
       padding: padding ?? EdgeInsets.all(AppTheme.cardPadding),
@@ -233,7 +239,9 @@ class SimpleCard extends StatelessWidget {
                   width: 4,
                 ),
               )
-            : null,
+            : isSiteOps
+                ? Border.all(color: const Color(0x14FFFFFF))
+                : null,
         boxShadow: isDark ? AppTheme.darkCardShadow : AppTheme.cardShadow,
       ),
       child: child,

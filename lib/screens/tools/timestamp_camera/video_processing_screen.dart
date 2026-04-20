@@ -293,7 +293,7 @@ class _VideoProcessingScreenState extends State<VideoProcessingScreen> {
                         value: _progress > 0 ? _progress : null,
                         minHeight: 8,
                         backgroundColor: Colors.white.withValues(alpha: 0.2),
-                        valueColor: const AlwaysStoppedAnimation<Color>(
+                        valueColor: AlwaysStoppedAnimation<Color>(
                           AppTheme.accentOrange,
                         ),
                       ),

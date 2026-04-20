@@ -311,7 +311,7 @@ class _NotificationFeedScreenState extends State<NotificationFeedScreen> {
                     margin: const EdgeInsets.only(top: 4),
                     width: 8,
                     height: 8,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppTheme.primaryBlue,
                       shape: BoxShape.circle,
                     ),

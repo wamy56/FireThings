@@ -545,7 +545,7 @@ class _NotificationBellState extends State<NotificationBell>
                     margin: const EdgeInsets.only(top: 4),
                     width: 7,
                     height: 7,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppTheme.primaryBlue,
                       shape: BoxShape.circle,
                     ),

@@ -257,7 +257,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
         if (_isProcessing)
           Container(
             color: Colors.black54,
-            child: const Center(
+            child: Center(
               child: CircularProgressIndicator(color: AppTheme.accentOrange),
             ),
           ),

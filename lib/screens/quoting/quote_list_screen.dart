@@ -321,7 +321,7 @@ class _QuoteListScreenState extends State<QuoteListScreen>
                   ),
                   if (isOverdue) ...[
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'OVERDUE',
                       style: TextStyle(
                         color: AppTheme.errorRed,

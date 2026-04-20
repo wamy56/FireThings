@@ -731,7 +731,7 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
               children: [
                 Icon(AppIcons.document, color: AppTheme.successGreen, size: 18),
                 const SizedBox(width: 8),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Jobsheet completed and linked (data not yet synced)',
                     style: TextStyle(fontSize: 13, color: AppTheme.successGreen),
@@ -779,7 +779,7 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Completed Jobsheet',
                             style: TextStyle(
                               fontSize: 13,

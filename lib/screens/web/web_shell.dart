@@ -7,6 +7,7 @@ import '../../models/permission.dart';
 import '../../services/company_service.dart';
 import '../../services/web_notification_service.dart';
 import '../../utils/theme.dart';
+import '../../utils/theme_style.dart';
 import '../../utils/icon_map.dart';
 import '../../main.dart' show themeNotifier, saveThemePreference;
 import 'web_notification_feed.dart';
@@ -70,6 +71,12 @@ class _WebShellState extends State<WebShell> {
   }
 
   void _cycleTheme() {
+    if (themeStyleNotifier.value == ThemeStyle.siteOps) {
+      themeStyleNotifier.value = ThemeStyle.classic;
+      saveThemeStylePreference(ThemeStyle.classic);
+      setState(() {});
+      return;
+    }
     final current = themeNotifier.value;
     ThemeMode next;
     switch (current) {
@@ -85,7 +92,35 @@ class _WebShellState extends State<WebShell> {
     setState(() {});
   }
 
+  void _toggleSiteOps() {
+    final isSiteOps = themeStyleNotifier.value == ThemeStyle.siteOps;
+    themeStyleNotifier.value =
+        isSiteOps ? ThemeStyle.classic : ThemeStyle.siteOps;
+    saveThemeStylePreference(themeStyleNotifier.value);
+    setState(() {});
+  }
+
   Widget _buildThemeToggle(bool extended, Color color) {
+    final isSiteOps = themeStyleNotifier.value == ThemeStyle.siteOps;
+
+    if (isSiteOps) {
+      if (extended) {
+        return TextButton.icon(
+          onPressed: _toggleSiteOps,
+          icon: Icon(AppIcons.colorSwatch, size: 18),
+          label: const Text('SiteOps'),
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFFFFB020),
+          ),
+        );
+      }
+      return IconButton(
+        onPressed: _toggleSiteOps,
+        icon: Icon(AppIcons.colorSwatch, color: const Color(0xFFFFB020)),
+        tooltip: 'Theme: SiteOps (tap for Classic)',
+      );
+    }
+
     final mode = themeNotifier.value;
     final IconData icon;
     final String label;

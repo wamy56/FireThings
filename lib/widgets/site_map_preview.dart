@@ -161,7 +161,7 @@ class _SiteMapPreviewState extends State<SiteMapPreview> {
                 point: _location!,
                 width: 40,
                 height: 40,
-                child: const Icon(
+                child: Icon(
                   Icons.location_pin,
                   color: AppTheme.errorRed,
                   size: 40,

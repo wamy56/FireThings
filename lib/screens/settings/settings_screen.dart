@@ -13,6 +13,7 @@ import '../../widgets/premium_toast.dart';
 import '../../widgets/responsive_scaffold.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/theme.dart';
+import '../../utils/theme_style.dart';
 import '../../utils/animate_helpers.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../saved_sites/saved_sites_screen.dart';
@@ -208,6 +209,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ).animateEntrance(delay: const Duration(milliseconds: 80)),
           const SizedBox(height: 24),
 
+          // Appearance Section
+          _buildAdaptiveSection(
+            context,
+            header: 'Appearance',
+            isApple: isApple,
+            tiles: [
+              _SettingsTileData(
+                title: 'Theme',
+                subtitle: themeStyleNotifier.value == ThemeStyle.siteOps
+                    ? 'SiteOps'
+                    : 'Classic',
+                icon: AppIcons.colorSwatch,
+                onTap: () => _showThemeStyleSelector(context),
+              ),
+            ],
+          ).animateEntrance(delay: const Duration(milliseconds: 120)),
+          const SizedBox(height: 24),
+
           // PDF Settings Section
           _buildAdaptiveSection(
             context,
@@ -228,12 +247,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
             ],
-          ).animateEntrance(delay: const Duration(milliseconds: 160)),
+          ).animateEntrance(delay: const Duration(milliseconds: 200)),
           const SizedBox(height: 24),
 
           // Notifications Section
           _buildAdaptiveNotificationsSection(context, isApple: isApple)
-              .animateEntrance(delay: const Duration(milliseconds: 240)),
+              .animateEntrance(delay: const Duration(milliseconds: 280)),
           const SizedBox(height: 24),
 
           // Data Section
@@ -546,6 +565,132 @@ class _SettingsScreenState extends State<SettingsScreen> {
           tiles: tiles,
         ),
       ],
+    );
+  }
+
+  void _showThemeStyleSelector(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final current = themeStyleNotifier.value;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Choose theme',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildThemeOption(
+                context: ctx,
+                title: 'Classic',
+                subtitle: 'Blue & coral, light and dark modes',
+                isSelected: current == ThemeStyle.classic,
+                accentColor: const Color(0xFF1E3A5F),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  themeStyleNotifier.value = ThemeStyle.classic;
+                  saveThemeStylePreference(ThemeStyle.classic);
+                  setState(() {});
+                },
+              ),
+              const SizedBox(height: 8),
+              _buildThemeOption(
+                context: ctx,
+                title: 'SiteOps',
+                subtitle: 'Dark instrument panel, amber accent',
+                isSelected: current == ThemeStyle.siteOps,
+                accentColor: const Color(0xFFFFB020),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  themeStyleNotifier.value = ThemeStyle.siteOps;
+                  saveThemeStylePreference(ThemeStyle.siteOps);
+                  setState(() {});
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeOption({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required bool isSelected,
+    required Color accentColor,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? accentColor : (isDark ? AppTheme.darkDivider : AppTheme.dividerColor),
+            width: isSelected ? 2 : 1,
+          ),
+          color: isSelected
+              ? accentColor.withValues(alpha: 0.08)
+              : Colors.transparent,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: accentColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, color: Colors.white, size: 20)
+                  : null,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

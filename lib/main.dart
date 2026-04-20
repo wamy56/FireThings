@@ -17,6 +17,7 @@ import 'services/firestore_sync_service.dart';
 import 'services/user_profile_service.dart';
 import 'models/permission.dart';
 import 'utils/theme.dart';
+import 'utils/theme_style.dart';
 import 'utils/responsive.dart';
 import 'utils/adaptive_widgets.dart';
 import 'utils/icon_map.dart';
@@ -118,8 +119,9 @@ void main() {
       // Initialize Remote Config
       await RemoteConfigService.instance.initialize();
 
-      // Load persisted theme preference
+      // Load persisted theme preferences
       await _loadThemePreference();
+      await loadThemeStylePreference();
 
       // Mobile-only initialization
       if (!kIsWeb) {
@@ -183,12 +185,14 @@ class _JobsheetAppState extends State<JobsheetApp> {
   void initState() {
     super.initState();
     themeNotifier.addListener(_onThemeChanged);
+    themeStyleNotifier.addListener(_onThemeChanged);
     _webRouter = kIsWeb ? createWebRouter() : null;
   }
 
   @override
   void dispose() {
     themeNotifier.removeListener(_onThemeChanged);
+    themeStyleNotifier.removeListener(_onThemeChanged);
     _webRouter?.dispose();
     super.dispose();
   }
@@ -199,13 +203,14 @@ class _JobsheetAppState extends State<JobsheetApp> {
   Widget build(BuildContext context) {
     // Web: use GoRouter for proper URL routing
     if (kIsWeb) {
+      final isSiteOps = themeStyleNotifier.value == ThemeStyle.siteOps;
       return MaterialApp.router(
         title: 'FireThings - Dispatcher Portal',
         debugShowCheckedModeBanner: false,
         routerConfig: _webRouter!,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: themeNotifier.value,
+        theme: isSiteOps ? AppTheme.siteOpsTheme : AppTheme.lightTheme,
+        darkTheme: isSiteOps ? AppTheme.siteOpsTheme : AppTheme.darkTheme,
+        themeMode: isSiteOps ? ThemeMode.dark : themeNotifier.value,
         builder: (context, child) {
           final scale = AppTheme.responsiveTextScale(context.screenSize);
           return MediaQuery(
@@ -219,14 +224,15 @@ class _JobsheetAppState extends State<JobsheetApp> {
     }
 
     // Mobile: use standard Navigator with AuthWrapper
+    final isSiteOps = themeStyleNotifier.value == ThemeStyle.siteOps;
     return MaterialApp(
       title: 'FireThings',
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       navigatorObservers: [AnalyticsService.instance.observer],
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: themeNotifier.value,
+      theme: isSiteOps ? AppTheme.siteOpsTheme : AppTheme.lightTheme,
+      darkTheme: isSiteOps ? AppTheme.siteOpsTheme : AppTheme.darkTheme,
+      themeMode: isSiteOps ? ThemeMode.dark : themeNotifier.value,
       builder: (context, child) {
         final scale = AppTheme.responsiveTextScale(context.screenSize);
         return MediaQuery(
