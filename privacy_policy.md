@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 21 March 2026
+Last updated: 21 April 2026
 
 FireThings ("we", "us", or "our") is committed to protecting your privacy. This policy explains what data we collect, why we collect it, where it is stored, how long we keep it, and what rights you have over your data.
 
@@ -18,6 +18,12 @@ FireThings ("we", "us", or "our") is committed to protecting your privacy. This 
 - **Push notification tokens** — Firebase Cloud Messaging (FCM) device tokens, used to deliver push notifications for job assignments and status updates when you are part of a company using the dispatch feature.
 - **Company data** — if you join a company within FireThings, your display name, email, and role are shared with other members of that company to enable dispatch and team coordination.
 - **Dispatched job data** — job details including site addresses, contact names, phone numbers, and job descriptions created and shared between company members (dispatchers, admins, and engineers) for job assignment and tracking purposes.
+- **BS 5839 compliance data** — if you use the BS 5839-1:2025 compliance features, we collect and store:
+  - **Responsible person details** — name, role, email address, and phone number of the person responsible for the fire alarm system at each site, as required by BS 5839-1:2025.
+  - **Digital signatures** — engineer and responsible person signatures captured during inspection visits, stored as part of the inspection record.
+  - **Professional qualifications and competency records** — qualification types, certificate numbers, issuing bodies, expiry dates, and continuing professional development (CPD) records including training topics, hours, and providers.
+  - **Inspection and audit records** — inspection visit details, compliance declarations, variation records, cause-and-effect test results, and structured logbook entries.
+  - **Evidence photographs** — photos uploaded as evidence for defects, variations, and cause-and-effect tests, stored in cloud storage.
 
 ## 2. Why We Collect It
 
@@ -26,6 +32,7 @@ FireThings ("we", "us", or "our") is committed to protecting your privacy. This 
 - **Crash monitoring** — to identify and fix errors that affect your experience, using Firebase Crashlytics.
 - **Usage analytics** — to understand which features are used so we can prioritise improvements and make the app better for fire alarm engineers.
 - **Dispatch and team coordination** — to assign jobs to engineers, track job status, and send push notifications for job updates within your company.
+- **BS 5839 compliance** — to facilitate fire alarm system inspection reporting against BS 5839-1:2025, including recording inspection outcomes, tracking system variations, managing engineer competency records, and generating compliance report PDFs.
 
 ## 3. Where Your Data Is Stored
 
@@ -42,6 +49,8 @@ Your data is retained for as long as your account is active and you continue to 
 
 Crash reports and analytics data are retained by Google in accordance with their standard retention policies (typically 90 days for Crashlytics, 14 months for Analytics).
 
+BS 5839 compliance records (inspection visits, variations, and cause-and-effect tests) are stored as immutable audit records and cannot be individually edited or deleted while your account is active. This is by design, as fire safety compliance records must be preserved for audit purposes. These records are permanently deleted when you delete your account.
+
 ## 5. Who Can Access Your Data
 
 Your personal data (jobsheets, invoices, saved customers, saved sites, and templates) is stored under your unique user account and protected by security rules that prevent any other user from reading or writing it.
@@ -52,6 +61,8 @@ If you join a company within FireThings, certain data is shared with other membe
 - Dispatched job data (site addresses, contact details, job descriptions, and status updates) is shared between dispatchers, admins, and engineers within the company.
 - Shared company sites and customers are accessible to all company members.
 - Your FCM push notification token is stored to enable job assignment notifications.
+- BS 5839 compliance data (inspection records, variations, logbook entries, cause-and-effect test results) is shared between company members according to their roles and permissions.
+- Engineer competency records (qualifications and CPD) are visible to team managers and the engineer themselves.
 
 Company data is protected by security rules that restrict access to authenticated members of that company only. No data is shared outside your company.
 
@@ -82,6 +93,7 @@ We use the following third-party services provided by Google, each governed by t
 - **Firebase Analytics** — anonymous usage analytics. Collects interaction events and screen views to help us understand feature usage.
 - **Firebase Remote Config** — server-side feature configuration. Does not collect personal data; it delivers configuration values to the app.
 - **Firebase Cloud Messaging (FCM)** — push notifications for job assignment and status updates. Collects and stores a device token to route notifications to your device. Tokens are stored in Firestore and are only accessible to your company.
+- **Firebase Cloud Storage** — secure file storage for uploaded images (asset photos, defect evidence, floor plans, zone plans) and generated PDF reports. Files are stored encrypted at rest and protected by access rules that restrict access to authorised users.
 
 All Firebase services are subject to the Google Cloud Privacy Notice and the Firebase Terms of Service.
 

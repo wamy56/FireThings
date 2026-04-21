@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import '../../models/company.dart';
+import '../../models/permission.dart';
 import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
@@ -31,6 +33,17 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
   void initState() {
     super.initState();
     _loadCompany();
+    UserProfileService.instance.addListener(_onProfileChanged);
+  }
+
+  void _onProfileChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    UserProfileService.instance.removeListener(_onProfileChanged);
+    super.dispose();
   }
 
   Future<void> _loadCompany() async {
@@ -49,7 +62,7 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
     }
   }
 
-  bool get _isAdmin => UserProfileService.instance.isAdmin;
+  UserProfileService get _profile => UserProfileService.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -71,20 +84,23 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                     const SizedBox(height: 24),
                     _buildTeamSection(isDark),
                     const SizedBox(height: 24),
-                    if (_isAdmin || UserProfileService.instance.isDispatcherOrAdmin) ...[
+                    if (_profile.hasPermission(AppPermission.sitesEdit) ||
+                        _profile.hasPermission(AppPermission.customersEdit)) ...[
                       _buildSharedDataSection(isDark),
                       const SizedBox(height: 24),
                     ],
-                    if (_isAdmin) ...[
+                    if (_profile.hasPermission(AppPermission.pdfBranding)) ...[
                       _buildPdfBrandingSection(isDark),
                       const SizedBox(height: 24),
                     ],
-                    if (!_isAdmin) _buildLeaveButton(),
-                    if (_isAdmin) ...[
+                    if (!_profile.hasPermission(AppPermission.companyDelete))
+                      _buildLeaveButton(),
+                    if (_profile.hasPermission(AppPermission.companyEdit)) ...[
                       _buildEditButton(),
                       const SizedBox(height: 12),
-                      _buildDeleteButton(),
                     ],
+                    if (_profile.hasPermission(AppPermission.companyDelete))
+                      _buildDeleteButton(),
                   ],
                 ),
       ),
@@ -124,6 +140,10 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
   }
 
   Widget _buildInviteCodeSection(bool isDark) {
+    final expiresAt = _company!.inviteCodeExpiresAt;
+    final isExpired = expiresAt != null && expiresAt.isBefore(DateTime.now());
+    final daysLeft = expiresAt?.difference(DateTime.now()).inDays;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -142,33 +162,55 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
             color: isDark ? AppTheme.darkSurfaceElevated : AppTheme.lightGrey,
             borderRadius: BorderRadius.circular(AppTheme.cardRadius),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  _company!.inviteCode ?? 'N/A',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2,
-                      ),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _company!.inviteCode ?? 'N/A',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 2,
+                            color: isExpired ? Colors.red : null,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(AppIcons.copy),
+                    onPressed: () {
+                      if (_company!.inviteCode != null) {
+                        Clipboard.setData(
+                          ClipboardData(text: _company!.inviteCode!),
+                        );
+                        context.showSuccessToast('Invite code copied');
+                      }
+                    },
+                  ),
+                  if (_profile.hasPermission(AppPermission.inviteCodeRegenerate))
+                    IconButton(
+                      icon: Icon(AppIcons.refresh),
+                      onPressed: _regenerateInviteCode,
+                    ),
+                ],
               ),
-              IconButton(
-                icon: Icon(AppIcons.copy),
-                onPressed: () {
-                  if (_company!.inviteCode != null) {
-                    Clipboard.setData(
-                      ClipboardData(text: _company!.inviteCode!),
-                    );
-                    context.showSuccessToast('Invite code copied');
-                  }
-                },
-              ),
-              if (_isAdmin)
-                IconButton(
-                  icon: Icon(AppIcons.refresh),
-                  onPressed: _regenerateInviteCode,
+              if (expiresAt != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  isExpired
+                      ? 'Expired ${DateFormat.yMMMd().format(expiresAt)}'
+                      : 'Expires ${DateFormat.yMMMd().format(expiresAt)} ($daysLeft days left)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isExpired
+                        ? Colors.red
+                        : daysLeft != null && daysLeft <= 14
+                            ? Colors.orange
+                            : (isDark ? AppTheme.darkTextSecondary : Colors.grey),
+                  ),
                 ),
+              ],
             ],
           ),
         ),
@@ -355,12 +397,15 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
     if (confirm != true) return;
 
     try {
-      final newCode = await CompanyService.instance
+      final result = await CompanyService.instance
           .regenerateInviteCode(_company!.id);
       setState(() {
-        _company = _company!.copyWith(inviteCode: newCode);
+        _company = _company!.copyWith(
+          inviteCode: result['code'] as String,
+          inviteCodeExpiresAt: result['expiresAt'] as DateTime,
+        );
       });
-      if (mounted) context.showSuccessToast('New invite code generated');
+      if (mounted) context.showSuccessToast('New invite code generated (valid 90 days)');
     } catch (e) {
       if (mounted) context.showErrorToast('Failed to regenerate code');
     }

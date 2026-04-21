@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../models/inspection_visit.dart';
+import '../../services/inspection_visit_service.dart';
 import '../../widgets/premium_dialog.dart';
 import 'package:flutter/services.dart';
 import '../../utils/icon_map.dart';
@@ -7,7 +9,18 @@ import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/standard_info_box.dart';
 
 class BatteryLoadTestScreen extends StatefulWidget {
-  const BatteryLoadTestScreen({super.key});
+  final String? basePath;
+  final String? siteId;
+  final String? visitId;
+  final String? psuAssetId;
+
+  const BatteryLoadTestScreen({
+    super.key,
+    this.basePath,
+    this.siteId,
+    this.visitId,
+    this.psuAssetId,
+  });
 
   @override
   State<BatteryLoadTestScreen> createState() => _BatteryLoadTestScreenState();
@@ -17,16 +30,24 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
   final _formKey = GlobalKey<FormState>();
   final _scrollController = ScrollController();
 
-  // Input controllers
   final _batteryCapacityController = TextEditingController(text: '7');
   final _standbyCurrentController = TextEditingController(text: '0.1');
   final _alarmCurrentController = TextEditingController(text: '0.5');
+  final _restingVoltageController = TextEditingController();
+  final _loadedVoltageController = TextEditingController();
+  final _loadCurrentController = TextEditingController();
 
-  // Results
-  double _requiredStandbyTime = 24; // hours (T1)
-  double _requiredCapacity = 0; // Cmin
+  double _requiredStandbyTime = 24;
+  double _requiredCapacity = 0;
   bool _passesTest = false;
   bool _calculated = false;
+  bool _saving = false;
+  bool _includesNetworkModule = false;
+
+  bool get _hasVisitContext =>
+      widget.basePath != null &&
+      widget.siteId != null &&
+      widget.visitId != null;
 
   @override
   void dispose() {
@@ -34,6 +55,9 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
     _batteryCapacityController.dispose();
     _standbyCurrentController.dispose();
     _alarmCurrentController.dispose();
+    _restingVoltageController.dispose();
+    _loadedVoltageController.dispose();
+    _loadCurrentController.dispose();
     super.dispose();
   }
 
@@ -48,8 +72,8 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
       // BS 5839-1:2025 Annex E formula
       // Cmin = 1.25 × ((T1 × I1) + D × (I2 × T2))
       const ageingFactor = 1.25;
-      const deratingFactor = 1.75; // D — battery inefficiency under alarm load
-      const alarmDuration = 0.5; // T2 — 30 minutes in hours
+      const deratingFactor = 1.75;
+      const alarmDuration = 0.5;
 
       final cMin = ageingFactor *
           ((_requiredStandbyTime * standbyCurrent) +
@@ -60,7 +84,6 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
       _calculated = true;
     });
 
-    // Scroll to show results after a short delay
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
         _scrollController.animateTo(
@@ -77,9 +100,80 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
       _batteryCapacityController.text = '7';
       _standbyCurrentController.text = '0.1';
       _alarmCurrentController.text = '0.5';
+      _restingVoltageController.clear();
+      _loadedVoltageController.clear();
+      _loadCurrentController.clear();
       _requiredStandbyTime = 24;
       _calculated = false;
+      _includesNetworkModule = false;
     });
+  }
+
+  Future<void> _saveToVisit() async {
+    if (!_hasVisitContext || !_calculated) return;
+
+    final restingV = double.tryParse(_restingVoltageController.text);
+    final loadedV = double.tryParse(_loadedVoltageController.text);
+    final loadCurrent = double.tryParse(_loadCurrentController.text);
+
+    if (restingV == null || loadedV == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter resting and loaded voltage to save'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+
+    try {
+      final visit = await InspectionVisitService.instance
+          .getVisit(widget.basePath!, widget.siteId!, widget.visitId!);
+      if (visit == null) throw Exception('Visit not found');
+
+      final reading = BatteryLoadTestReading(
+        powerSupplyAssetId: widget.psuAssetId ?? 'unknown',
+        restingVoltage: restingV,
+        loadedVoltage: loadedV,
+        loadCurrentAmps: loadCurrent,
+        passed: _passesTest,
+        notes:
+            'Cmin=${_requiredCapacity.toStringAsFixed(2)}Ah, '
+            'Installed=${_batteryCapacityController.text}Ah, '
+            'Standby=${_requiredStandbyTime.toStringAsFixed(0)}h',
+      );
+
+      final updatedReadings = [
+        ...visit.batteryTestReadings
+            .where((r) => r.powerSupplyAssetId != reading.powerSupplyAssetId),
+        reading,
+      ];
+
+      await InspectionVisitService.instance.updateVisit(
+        widget.basePath!,
+        widget.siteId!,
+        widget.visitId!,
+        {
+          'batteryTestReadings':
+              updatedReadings.map((r) => r.toJson()).toList(),
+        },
+      );
+
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Battery reading saved to visit')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e')),
+        );
+      }
+    }
   }
 
   Color _getResultColor() {
@@ -113,6 +207,10 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
               _buildInfoCard(),
               const SizedBox(height: 20),
               _buildInputSection(),
+              if (_hasVisitContext) ...[
+                const SizedBox(height: 20),
+                _buildVoltageSection(),
+              ],
               const SizedBox(height: 20),
               _buildCalculateButton(),
               if (_calculated) ...[const SizedBox(height: 24), _buildResults()],
@@ -153,7 +251,8 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Calculate the minimum required battery capacity (Cmin) per BS 5839-1 and compare against the installed battery.',
+              'Calculate the minimum required battery capacity (Cmin) per '
+              'BS 5839-1:2025 Annex E and compare against the installed battery.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -163,6 +262,8 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
   }
 
   Widget _buildInputSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Card(
       elevation: 2,
       child: Padding(
@@ -178,7 +279,6 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Battery Capacity
             TextFormField(
               controller: _batteryCapacityController,
               decoration: InputDecoration(
@@ -210,7 +310,6 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Standby Current
             TextFormField(
               controller: _standbyCurrentController,
               decoration: InputDecoration(
@@ -232,9 +331,48 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 return null;
               },
             ),
+            const SizedBox(height: 8),
+            CheckboxListTile(
+              value: _includesNetworkModule,
+              onChanged: (v) =>
+                  setState(() => _includesNetworkModule = v ?? false),
+              title: const Text(
+                'Includes always-on network module',
+                style: TextStyle(fontSize: 13),
+              ),
+              subtitle: const Text(
+                'Include any IP communicator or remote access module current draw in the standby figure above',
+                style: TextStyle(fontSize: 11),
+              ),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            if (_includesNetworkModule)
+              Padding(
+                padding: const EdgeInsets.only(left: 40, top: 4, bottom: 4),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.blue.shade900.withValues(alpha: 0.3)
+                        : Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Typical network module draw: 0.02–0.08A. Check '
+                    'manufacturer specs for your IP communicator / DualCom.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? Colors.blue.shade200
+                          : Colors.blue.shade800,
+                    ),
+                  ),
+                ),
+              ),
             const SizedBox(height: 16),
 
-            // Alarm Current
             TextFormField(
               controller: _alarmCurrentController,
               decoration: InputDecoration(
@@ -258,7 +396,6 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Required Standby Time
             Row(
               children: [
                 Expanded(
@@ -279,6 +416,81 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                     });
                   },
                 ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVoltageSection() {
+    return Card(
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Voltage Readings',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Record actual readings to save with the inspection visit',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _restingVoltageController,
+              decoration: InputDecoration(
+                labelText: 'Resting Voltage (V)',
+                prefixIcon: Icon(AppIcons.batteryFull),
+                border: const OutlineInputBorder(),
+                suffixText: 'V',
+              ),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.done,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _loadedVoltageController,
+              decoration: InputDecoration(
+                labelText: 'Loaded Voltage (V)',
+                prefixIcon: Icon(AppIcons.batteryCharging),
+                border: const OutlineInputBorder(),
+                suffixText: 'V',
+              ),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.done,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _loadCurrentController,
+              decoration: InputDecoration(
+                labelText: 'Load Current (A)',
+                prefixIcon: Icon(AppIcons.flash),
+                border: const OutlineInputBorder(),
+                suffixText: 'A',
+                helperText: 'Optional — measured current under load',
+              ),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.done,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
               ],
             ),
           ],
@@ -320,7 +532,6 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
     final alarmCurrent = double.parse(_alarmCurrentController.text);
     final margin = batteryCapacity - _requiredCapacity;
 
-    // Formula component breakdowns
     final standbyComponent = _requiredStandbyTime * standbyCurrent;
     const deratingFactor = 1.75;
     const alarmDuration = 0.5;
@@ -329,7 +540,6 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
 
     return Column(
       children: [
-        // Pass/Fail Card
         Card(
           elevation: 4,
           color: resultColor.withValues(alpha: 0.1),
@@ -354,8 +564,8 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _passesTest
-                      ? 'Battery meets BS 5839 requirements'
-                      : 'Battery does NOT meet requirements',
+                      ? 'Battery meets BS 5839-1:2025 Annex E requirements'
+                      : 'Battery does NOT meet BS 5839-1:2025 requirements',
                   style: TextStyle(fontSize: 14, color: resultColor),
                   textAlign: TextAlign.center,
                 ),
@@ -365,7 +575,6 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Calculation Breakdown
         Card(
           elevation: 2,
           child: Padding(
@@ -400,9 +609,8 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 ),
                 const Divider(height: 24),
 
-                // Formula breakdown
                 Text(
-                  'Formula: Cmin = 1.25 \u00d7 ((T\u2081 \u00d7 I\u2081) + D \u00d7 (I\u2082 \u00d7 T\u2082))',
+                  'Formula (BS 5839-1:2025 Annex E): Cmin = 1.25 \u00d7 ((T\u2081 \u00d7 I\u2081) + D \u00d7 (I\u2082 \u00d7 T\u2082))',
                   style: TextStyle(
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
@@ -439,8 +647,28 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Recommendations
         if (!_passesTest) _buildRecommendations(),
+
+        if (_hasVisitContext && _calculated) ...[
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _saving ? null : _saveToVisit,
+              icon: _saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(AppIcons.tickCircle),
+              label: Text(_saving ? 'Saving...' : 'Save Reading to Visit'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -579,7 +807,7 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
               const StandardInfoBox(toolKey: 'battery_load_test'),
               const SizedBox(height: 12),
               const Text(
-                'BS 5839-1 Formula',
+                'BS 5839-1:2025 Annex E Formula',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
@@ -605,19 +833,30 @@ class _BatteryLoadTestScreenState extends State<BatteryLoadTestScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text('\u2022 24 hours — typical systems'),
-              const Text('\u2022 72 hours — critical systems / no monitored link'),
+              const Text('\u2022 24 hours \u2014 typical systems'),
+              const Text('\u2022 72 hours \u2014 critical systems / no monitored link'),
               const Text('\u2022 30 minutes alarm operation'),
+              const SizedBox(height: 12),
+              const Text(
+                'ARC / Remote Access (2025)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '\u2022 Include always-on network module current draw in standby figure\n'
+                '\u2022 Typical IP communicator draw: 0.02\u20130.08A\n'
+                '\u2022 Check manufacturer specs for your signalling equipment',
+              ),
               const SizedBox(height: 12),
               const Text(
                 'Common Battery Sizes',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-              const Text('\u2022 7 Ah — Small panels'),
-              const Text('\u2022 12 Ah — Medium panels'),
-              const Text('\u2022 17 Ah — Large panels'),
-              const Text('\u2022 24 Ah — Very large systems'),
+              const Text('\u2022 7 Ah \u2014 Small panels'),
+              const Text('\u2022 12 Ah \u2014 Medium panels'),
+              const Text('\u2022 17 Ah \u2014 Large panels'),
+              const Text('\u2022 24 Ah \u2014 Very large systems'),
               const SizedBox(height: 12),
               const Text(
                 'Typical Current Draw',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../data/bs5839_2025_reference.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/adaptive_app_bar.dart';
@@ -51,6 +52,8 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
     'Testing & Maintenance',
     'Fire Detection Zones',
     'False Alarm Management',
+    'Cyber Security',
+    'ARC Signalling',
   ];
 
   static final List<ReferenceCard> _referenceCards = [
@@ -1049,6 +1052,140 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
         ),
       ],
     ),
+
+    // ── Cyber Security (NEW IN 2025) ──
+    ReferenceCard(
+      title: 'Remote Access Authentication',
+      category: 'Cyber Security',
+      icon: AppIcons.lock,
+      summary:
+          'NEW IN 2025 — Remote access to fire alarm systems must require authentication with role-based access control.',
+      items: [
+        ReferenceItem(
+          heading: 'Authentication requirement',
+          content:
+              'Any remote diagnostic, configuration, or monitoring access to the fire alarm system must require individual authentication. Default factory passwords must be changed before handover.',
+        ),
+        ReferenceItem(
+          heading: 'Role-based access',
+          content:
+              'Access levels should be appropriate to the user role: read-only for monitoring, limited write for engineers, full access for system administrators. Access logs should be maintained.',
+        ),
+        ReferenceItem(
+          heading: 'Session management',
+          content:
+              'Remote sessions should time out after a period of inactivity. Multiple concurrent sessions from different locations should be flagged. All remote access events should be logged with timestamp, user, and actions performed.',
+        ),
+      ],
+    ),
+    ReferenceCard(
+      title: 'Tamper-Resistant Fittings',
+      category: 'Cyber Security',
+      icon: AppIcons.shield,
+      summary:
+          'NEW IN 2025 — Network connection points on fire alarm panels must use tamper-resistant fittings.',
+      items: [
+        ReferenceItem(
+          heading: 'Physical security',
+          content:
+              'All network ports (Ethernet, USB, serial) on fire alarm panels and associated equipment must be protected with tamper-resistant fittings. Unused ports should be physically blocked or disabled.',
+        ),
+        ReferenceItem(
+          heading: 'Network connection labelling',
+          content:
+              'Every network connection to the fire alarm system must be labelled with: its purpose (e.g. "ARC signalling", "remote diagnostics"), the responsible party, and the date of installation. Labels must be tamper-evident.',
+        ),
+        ReferenceItem(
+          heading: 'Inspection requirements',
+          content:
+              'During service visits, engineers should verify that all network connections are labelled, tamper-resistant fittings are intact, and no unauthorised connections have been made. Report any anomalies.',
+        ),
+      ],
+    ),
+
+    // ── ARC Signalling (NEW IN 2025) ──
+    ReferenceCard(
+      title: 'ARC Signal Transmission Times',
+      category: 'ARC Signalling',
+      icon: AppIcons.wifi,
+      summary:
+          'NEW IN 2025 — Maximum transmission times specified for fire, fault, and pre-alarm signals to ARC.',
+      items: [
+        ReferenceItem(
+          heading: 'Fire signal',
+          content:
+              'Must be received by the ARC within 60 seconds of the panel entering fire alarm condition. This is the most critical signal and has the shortest permitted delay.',
+        ),
+        ReferenceItem(
+          heading: 'Fault signal',
+          content:
+              'Must be received by the ARC within 100 seconds. Includes: mains failure, battery fault, communication path failure, sounder circuit fault, and detector circuit faults.',
+        ),
+        ReferenceItem(
+          heading: 'Pre-alarm signal',
+          content:
+              'Must be received by the ARC within 100 seconds. Pre-alarm allows the ARC to take preliminary action (e.g. call-challenge) before full alarm escalation.',
+        ),
+        ReferenceItem(
+          heading: 'Testing transmission time',
+          content:
+              'During service visits, measure the actual transmission time from panel activation to ARC acknowledgement. Record the measured time. If it exceeds the permitted maximum, investigate and remedy the communication path.',
+        ),
+      ],
+    ),
+    ReferenceCard(
+      title: 'ARC Fault Reporting',
+      category: 'ARC Signalling',
+      icon: AppIcons.notification,
+      summary:
+          'NEW IN 2025 — ARC signalling equipment must report its own faults including path failures.',
+      items: [
+        ReferenceItem(
+          heading: 'Self-monitoring',
+          content:
+              'ARC signalling equipment must monitor its own communication paths and report failures to both the ARC and the local fire alarm panel. Single-path failure on a dual-path system must be reported as a fault.',
+        ),
+        ReferenceItem(
+          heading: 'Fault types to report',
+          content:
+              'Communication path failure (primary or secondary), tamper detection on signalling equipment, power loss to signalling equipment, and any condition that could prevent signal transmission.',
+        ),
+        ReferenceItem(
+          heading: 'Dual-path requirements',
+          content:
+              'Where dual-path signalling is installed, failure of either path must generate a fault condition. The system should continue to transmit via the remaining path while the fault is reported. Both paths should be tested at each service visit.',
+        ),
+      ],
+    ),
+    ReferenceCard(
+      title: 'All-IP Transition',
+      category: 'ARC Signalling',
+      icon: AppIcons.global,
+      summary:
+          'NEW IN 2025 — Guidance on migrating from PSTN/ISDN to IP-based ARC signalling.',
+      items: [
+        ReferenceItem(
+          heading: 'PSTN/ISDN decommissioning',
+          content:
+              'BT and other providers are decommissioning PSTN and ISDN networks. Systems relying on these technologies for ARC signalling must plan migration to IP-based communication before network shutdown.',
+        ),
+        ReferenceItem(
+          heading: 'IP signalling options',
+          content:
+              'Digital communicator over IP (DualCom, RedCare IP), pure IP signalling via managed network, or cellular (4G/5G) backup. Consider dual-path: primary broadband + secondary cellular for resilience.',
+        ),
+        ReferenceItem(
+          heading: 'Migration assessment',
+          content:
+              'During service visits, identify systems still using PSTN-dependent signalling. Advise the responsible person on migration options and timescales. Record the current signalling method and any migration plan in the service report.',
+        ),
+        ReferenceItem(
+          heading: 'Compatibility',
+          content:
+              'Not all existing fire alarm panels support IP signalling natively. An external IP communicator may be needed. Verify compatibility with the ARC provider and ensure the signalling equipment is approved for the purpose.',
+        ),
+      ],
+    ),
   ];
 
   List<ReferenceCard> get _filteredCards {
@@ -1066,6 +1203,16 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
       }
       return false;
     }).toList();
+  }
+
+  String? get _renumberingHint {
+    if (_searchQuery.isEmpty) return null;
+    final q = _searchQuery.trim();
+    final newClause = Bs58392025Reference.get2025ClauseFor2017(q);
+    if (newClause != null) {
+      return 'Looking for clause $q? In BS 5839-1:2025 this is now clause $newClause.';
+    }
+    return null;
   }
 
   @override
@@ -1142,6 +1289,34 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
           const SizedBox(height: 8),
 
           // Reference cards list
+          if (_renumberingHint != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(AppIcons.infoCircle,
+                        size: 16, color: Colors.blue.shade700),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _renumberingHint!,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Expanded(
             child: filtered.isEmpty
                 ? Center(
@@ -1173,6 +1348,7 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
 
   Widget _buildReferenceCard(ReferenceCard card) {
     final color = _categoryColor(card.category);
+    final isNew2025 = card.summary.startsWith('NEW IN 2025');
 
     return Card(
       key: ValueKey(card.title),
@@ -1180,13 +1356,37 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       child: ExpansionTile(
         leading: Icon(card.icon, color: color),
-        title: Text(
-          card.title,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: color,
-            fontSize: 15,
-          ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                card.title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            if (isNew2025) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '2025',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.orange.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
@@ -1267,6 +1467,10 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
         return Colors.teal;
       case 'False Alarm Management':
         return Colors.amber.shade800;
+      case 'Cyber Security':
+        return Colors.deepPurple;
+      case 'ARC Signalling':
+        return Colors.cyan.shade700;
       default:
         return Colors.grey;
     }
@@ -1308,6 +1512,19 @@ class _BS5839ReferenceScreenState extends State<BS5839ReferenceScreen> {
               const Text('\u2022 Testing & Maintenance (intervals & logbook)'),
               const Text('\u2022 Fire Detection Zones (size limits)'),
               const Text('\u2022 False Alarm Management'),
+              const Text('\u2022 Cyber Security (NEW in 2025)'),
+              const Text('\u2022 ARC Signalling (NEW in 2025)'),
+              const SizedBox(height: 12),
+              const Text(
+                'Clause Renumbering:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'BS 5839-1:2025 renumbered many clauses from the 2017 edition. '
+                'Search for an old clause number and the app will show you the '
+                'new 2025 reference.',
+              ),
             ],
           ),
         ),

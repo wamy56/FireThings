@@ -106,11 +106,22 @@ class FloorPlanListScreen extends StatelessWidget {
   }
 
   Future<void> _deletePlan(BuildContext context, FloorPlan plan) async {
+    final affectedCount = await FloorPlanService.instance
+        .getAffectedAssetCount(basePath, siteId, plan.id);
+
+    if (!context.mounted) return;
+
+    final message = affectedCount > 0
+        ? 'Delete "${plan.name}"? This will remove pin positions for '
+            '$affectedCount asset${affectedCount == 1 ? '' : 's'}. '
+            'The assets themselves will not be deleted, but they will '
+            'need to be re-pinned to a floor plan.'
+        : 'Delete "${plan.name}"? No assets are pinned to this floor plan.';
+
     final confirmed = await showAdaptiveAlertDialog<bool>(
       context: context,
       title: 'Delete Floor Plan',
-      message:
-          'Delete "${plan.name}"? This will remove the image but won\'t delete any assets.',
+      message: message,
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel',
       isDestructive: true,

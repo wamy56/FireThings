@@ -18,7 +18,8 @@
       "Bash(firebase deploy:*)",
       "Bash(git ls-tree:*)",
       "Bash(git checkout:*)",
-      "Bash(flutter build *)"
+      "Bash(flutter build *)",
+      "Bash(flutter test *)"
     ]
   }
 }

@@ -38,13 +38,13 @@ class AssetPin extends StatelessWidget {
 
   Color get _statusColor {
     switch (asset.complianceStatus) {
-      case Asset.statusPass:
+      case AssetComplianceStatus.pass:
         return const Color(0xFF4CAF50);
-      case Asset.statusFail:
+      case AssetComplianceStatus.fail:
         return const Color(0xFFD32F2F);
-      case Asset.statusDecommissioned:
+      case AssetComplianceStatus.decommissioned:
         return const Color(0xFF9E9E9E).withValues(alpha: 0.5);
-      default:
+      case AssetComplianceStatus.untested:
         return const Color(0xFF9E9E9E);
     }
   }

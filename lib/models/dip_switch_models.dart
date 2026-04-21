@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 // ============================================================================
 // DIP SWITCH MODELS
 // ============================================================================
@@ -97,7 +99,7 @@ class SavedDipConfiguration {
       switchStates: (json['switchStates'] as List).map((s) => s == 1).toList(),
       address: json['address'],
       zone: json['zone'] ?? '',
-      dateCreated: DateTime.parse(json['dateCreated']),
+      dateCreated: jsonDateRequired(json['dateCreated']),
     );
   }
 }

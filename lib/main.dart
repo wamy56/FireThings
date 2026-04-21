@@ -356,7 +356,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (nav == null) return;
 
     final profile = UserProfileService.instance;
-    if (profile.hasPermission(AppPermission.dispatchViewAll)) {
+    final canViewFull = profile.hasPermission(AppPermission.dispatchViewAll) ||
+        profile.hasPermission(AppPermission.dispatchEdit);
+    if (canViewFull) {
       nav.push(
         MaterialPageRoute(
           builder: (_) =>
@@ -495,6 +497,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     }
 
     _subscribeToDispatchBadge();
+    UserProfileService.instance.addListener(_onPermissionsChanged);
+  }
+
+  void _onPermissionsChanged() {
+    if (!mounted) return;
+    _dispatchBadgeSub?.cancel();
+    _subscribeToDispatchBadge();
+    setState(() {});
   }
 
   void _subscribeToDispatchBadge() {
@@ -504,8 +514,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (companyId == null || uid == null) return;
 
+    final profile = UserProfileService.instance;
+    final hasManagementAccess =
+        profile.hasPermission(AppPermission.dispatchViewAll) ||
+        profile.hasPermission(AppPermission.dispatchCreate) ||
+        profile.hasPermission(AppPermission.dispatchEdit) ||
+        profile.hasPermission(AppPermission.dispatchDelete);
+
     final Stream<int> countStream;
-    if (UserProfileService.instance.hasPermission(AppPermission.dispatchViewAll)) {
+    if (hasManagementAccess) {
       countStream =
           DispatchService.instance.streamUnassignedJobCount(companyId);
     } else {
@@ -522,6 +539,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
 
   @override
   void dispose() {
+    UserProfileService.instance.removeListener(_onPermissionsChanged);
     _dispatchBadgeSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     if (!kIsWeb) {
@@ -546,7 +564,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         final companyId = parts[2];
         if (jobId.isNotEmpty && companyId.isNotEmpty) {
           final profile = UserProfileService.instance;
-          if (profile.hasPermission(AppPermission.dispatchViewAll)) {
+          final canViewFull = profile.hasPermission(AppPermission.dispatchViewAll) ||
+              profile.hasPermission(AppPermission.dispatchEdit);
+          if (canViewFull) {
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -592,7 +612,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     if (!rc.dispatchEnabled || !profile.hasCompany) {
       return const DispatchEmptyScreen();
     }
-    if (profile.hasPermission(AppPermission.dispatchViewAll)) {
+
+    final hasAnyDispatchAccess =
+        profile.hasPermission(AppPermission.dispatchViewAll) ||
+        profile.hasPermission(AppPermission.dispatchCreate) ||
+        profile.hasPermission(AppPermission.dispatchEdit) ||
+        profile.hasPermission(AppPermission.dispatchDelete);
+
+    if (hasAnyDispatchAccess) {
       return const DispatchDashboardScreen();
     }
     return const EngineerJobsScreen();

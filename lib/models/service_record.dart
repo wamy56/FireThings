@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// The result of a single checklist item during an inspection.
 class ChecklistResult {
   final String checklistItemId;
@@ -52,6 +54,15 @@ class ServiceRecord {
   final String? defectAction; // "rectified_on_site", "quote_required", "replacement_needed"
   final String? notes;
   final DateTime createdAt;
+  final int? checklistVersionTested;
+  final String? visitId;
+  final String? clauseReference;
+  final double? sounderDbReadingAt1m;
+  final double? sounderDbReadingAtFurthestPoint;
+  final bool mcpTestedThisVisit;
+  final double? batteryVoltageResting;
+  final double? batteryVoltageUnderLoad;
+  final String? cyberSecurityNotes;
 
   ServiceRecord({
     required this.id,
@@ -70,6 +81,15 @@ class ServiceRecord {
     this.defectAction,
     this.notes,
     required this.createdAt,
+    this.checklistVersionTested,
+    this.visitId,
+    this.clauseReference,
+    this.sounderDbReadingAt1m,
+    this.sounderDbReadingAtFurthestPoint,
+    this.mcpTestedThisVisit = false,
+    this.batteryVoltageResting,
+    this.batteryVoltageUnderLoad,
+    this.cyberSecurityNotes,
   });
 
   Map<String, dynamic> toJson() {
@@ -91,6 +111,15 @@ class ServiceRecord {
       'defectAction': defectAction,
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
+      'checklistVersionTested': checklistVersionTested,
+      'visitId': visitId,
+      'clauseReference': clauseReference,
+      'sounderDbReadingAt1m': sounderDbReadingAt1m,
+      'sounderDbReadingAtFurthestPoint': sounderDbReadingAtFurthestPoint,
+      'mcpTestedThisVisit': mcpTestedThisVisit,
+      'batteryVoltageResting': batteryVoltageResting,
+      'batteryVoltageUnderLoad': batteryVoltageUnderLoad,
+      'cyberSecurityNotes': cyberSecurityNotes,
     };
   }
 
@@ -103,7 +132,7 @@ class ServiceRecord {
       dispatchedJobId: json['dispatchedJobId'] as String?,
       engineerId: json['engineerId'] as String,
       engineerName: json['engineerName'] as String,
-      serviceDate: DateTime.parse(json['serviceDate'] as String),
+      serviceDate: jsonDateRequired(json['serviceDate']),
       overallResult: json['overallResult'] as String,
       checklistResults: (json['checklistResults'] as List<dynamic>?)
               ?.map((r) =>
@@ -118,7 +147,20 @@ class ServiceRecord {
       defectSeverity: json['defectSeverity'] as String?,
       defectAction: json['defectAction'] as String?,
       notes: json['notes'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: jsonDateRequired(json['createdAt']),
+      checklistVersionTested: json['checklistVersionTested'] as int?,
+      visitId: json['visitId'] as String?,
+      clauseReference: json['clauseReference'] as String?,
+      sounderDbReadingAt1m:
+          (json['sounderDbReadingAt1m'] as num?)?.toDouble(),
+      sounderDbReadingAtFurthestPoint:
+          (json['sounderDbReadingAtFurthestPoint'] as num?)?.toDouble(),
+      mcpTestedThisVisit: json['mcpTestedThisVisit'] as bool? ?? false,
+      batteryVoltageResting:
+          (json['batteryVoltageResting'] as num?)?.toDouble(),
+      batteryVoltageUnderLoad:
+          (json['batteryVoltageUnderLoad'] as num?)?.toDouble(),
+      cyberSecurityNotes: json['cyberSecurityNotes'] as String?,
     );
   }
 

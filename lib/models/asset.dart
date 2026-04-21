@@ -1,11 +1,45 @@
 import 'dart:convert';
 
+import '../utils/json_helpers.dart';
+
+enum AssetComplianceStatus {
+  pass,
+  fail,
+  untested,
+  decommissioned;
+
+  String get displayLabel {
+    switch (this) {
+      case AssetComplianceStatus.pass:
+        return 'Pass';
+      case AssetComplianceStatus.fail:
+        return 'Fail';
+      case AssetComplianceStatus.untested:
+        return 'Untested';
+      case AssetComplianceStatus.decommissioned:
+        return 'Decommissioned';
+    }
+  }
+
+  static AssetComplianceStatus fromString(String? value) {
+    if (value == null) return AssetComplianceStatus.untested;
+    for (final s in AssetComplianceStatus.values) {
+      if (s.name == value.toLowerCase()) return s;
+    }
+    return AssetComplianceStatus.untested;
+  }
+}
+
 /// Represents a fire safety asset (detector, call point, extinguisher, etc.)
 /// belonging to a site's asset register.
 class Asset {
+  @Deprecated('Use AssetComplianceStatus.pass.name instead')
   static const String statusPass = 'pass';
+  @Deprecated('Use AssetComplianceStatus.fail.name instead')
   static const String statusFail = 'fail';
+  @Deprecated('Use AssetComplianceStatus.untested.name instead')
   static const String statusUntested = 'untested';
+  @Deprecated('Use AssetComplianceStatus.decommissioned.name instead')
   static const String statusDecommissioned = 'decommissioned';
 
   final String id;
@@ -27,12 +61,16 @@ class Asset {
   final int? expectedLifespanYears;
   final DateTime? decommissionDate;
   final String? decommissionReason;
-  final String complianceStatus;
+  final AssetComplianceStatus complianceStatus;
   final DateTime? lastServiceDate;
   final String? lastServiceBy;
   final String? lastServiceByName;
   final DateTime? nextServiceDue;
+  final int? lastChecklistVersionTested;
   final List<String> photoUrls;
+  final String? bs5839ClauseReference;
+  final bool isInSleepingRoom;
+  final bool hasRemoteAccess;
   final String createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -59,12 +97,16 @@ class Asset {
     this.expectedLifespanYears,
     this.decommissionDate,
     this.decommissionReason,
-    this.complianceStatus = statusUntested,
+    this.complianceStatus = AssetComplianceStatus.untested,
     this.lastServiceDate,
     this.lastServiceBy,
     this.lastServiceByName,
     this.nextServiceDue,
+    this.lastChecklistVersionTested,
     this.photoUrls = const [],
+    this.bs5839ClauseReference,
+    this.isInSleepingRoom = false,
+    this.hasRemoteAccess = false,
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
@@ -93,12 +135,16 @@ class Asset {
       'expectedLifespanYears': expectedLifespanYears,
       'decommissionDate': decommissionDate?.toIso8601String(),
       'decommissionReason': decommissionReason,
-      'complianceStatus': complianceStatus,
+      'complianceStatus': complianceStatus.name,
       'lastServiceDate': lastServiceDate?.toIso8601String(),
       'lastServiceBy': lastServiceBy,
       'lastServiceByName': lastServiceByName,
       'nextServiceDue': nextServiceDue?.toIso8601String(),
+      'lastChecklistVersionTested': lastChecklistVersionTested,
       'photoUrls': photoUrls,
+      'bs5839ClauseReference': bs5839ClauseReference,
+      'isInSleepingRoom': isInSleepingRoom,
+      'hasRemoteAccess': hasRemoteAccess,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -123,35 +169,27 @@ class Asset {
       yPercent: (json['yPercent'] as num?)?.toDouble(),
       locationDescription: json['locationDescription'] as String?,
       zone: json['zone'] as String?,
-      installDate: json['installDate'] != null
-          ? DateTime.tryParse(json['installDate'] as String)
-          : null,
-      warrantyExpiry: json['warrantyExpiry'] != null
-          ? DateTime.tryParse(json['warrantyExpiry'] as String)
-          : null,
+      installDate: jsonDateOptional(json['installDate']),
+      warrantyExpiry: jsonDateOptional(json['warrantyExpiry']),
       expectedLifespanYears: json['expectedLifespanYears'] as int?,
-      decommissionDate: json['decommissionDate'] != null
-          ? DateTime.tryParse(json['decommissionDate'] as String)
-          : null,
+      decommissionDate: jsonDateOptional(json['decommissionDate']),
       decommissionReason: json['decommissionReason'] as String?,
       complianceStatus:
-          json['complianceStatus'] as String? ?? statusUntested,
-      lastServiceDate: json['lastServiceDate'] != null
-          ? DateTime.tryParse(json['lastServiceDate'] as String)
-          : null,
+          AssetComplianceStatus.fromString(json['complianceStatus'] as String?),
+      lastServiceDate: jsonDateOptional(json['lastServiceDate']),
       lastServiceBy: json['lastServiceBy'] as String?,
       lastServiceByName: json['lastServiceByName'] as String?,
-      nextServiceDue: json['nextServiceDue'] != null
-          ? DateTime.tryParse(json['nextServiceDue'] as String)
-          : null,
+      nextServiceDue: jsonDateOptional(json['nextServiceDue']),
+      lastChecklistVersionTested: json['lastChecklistVersionTested'] as int?,
       photoUrls: _parsePhotoUrls(json),
+      bs5839ClauseReference: json['bs5839ClauseReference'] as String?,
+      isInSleepingRoom: json['isInSleepingRoom'] as bool? ?? false,
+      hasRemoteAccess: json['hasRemoteAccess'] as bool? ?? false,
       createdBy: json['createdBy'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: jsonDateRequired(json['createdAt']),
+      updatedAt: jsonDateRequired(json['updatedAt']),
       notes: json['notes'] as String?,
-      lastModifiedAt: json['lastModifiedAt'] != null
-          ? DateTime.tryParse(json['lastModifiedAt'] as String)
-          : null,
+      lastModifiedAt: jsonDateOptional(json['lastModifiedAt']),
     );
   }
 
@@ -201,12 +239,16 @@ class Asset {
     int? expectedLifespanYears,
     DateTime? decommissionDate,
     String? decommissionReason,
-    String? complianceStatus,
+    AssetComplianceStatus? complianceStatus,
     DateTime? lastServiceDate,
     String? lastServiceBy,
     String? lastServiceByName,
     DateTime? nextServiceDue,
+    int? lastChecklistVersionTested,
     List<String>? photoUrls,
+    String? bs5839ClauseReference,
+    bool? isInSleepingRoom,
+    bool? hasRemoteAccess,
     String? createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -239,7 +281,13 @@ class Asset {
       lastServiceBy: lastServiceBy ?? this.lastServiceBy,
       lastServiceByName: lastServiceByName ?? this.lastServiceByName,
       nextServiceDue: nextServiceDue ?? this.nextServiceDue,
+      lastChecklistVersionTested:
+          lastChecklistVersionTested ?? this.lastChecklistVersionTested,
       photoUrls: photoUrls ?? this.photoUrls,
+      bs5839ClauseReference:
+          bs5839ClauseReference ?? this.bs5839ClauseReference,
+      isInSleepingRoom: isInSleepingRoom ?? this.isInSleepingRoom,
+      hasRemoteAccess: hasRemoteAccess ?? this.hasRemoteAccess,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

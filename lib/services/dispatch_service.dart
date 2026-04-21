@@ -105,10 +105,15 @@ class DispatchService {
     query = query.orderBy('createdAt', descending: true);
 
     return query.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return DispatchedJob.fromJson(data);
-      }).toList();
+      final jobs = <DispatchedJob>[];
+      for (final doc in snapshot.docs) {
+        try {
+          jobs.add(DispatchedJob.fromJson(doc.data() as Map<String, dynamic>));
+        } catch (e) {
+          debugPrint('Skipping malformed dispatched job ${doc.id}: $e');
+        }
+      }
+      return jobs;
     });
   }
 
@@ -129,10 +134,17 @@ class DispatchService {
         .where('assignedTo', isEqualTo: engineerUid)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) =>
-                DispatchedJob.fromJson(doc.data() as Map<String, dynamic>))
-            .toList());
+        .map((snapshot) {
+      final jobs = <DispatchedJob>[];
+      for (final doc in snapshot.docs) {
+        try {
+          jobs.add(DispatchedJob.fromJson(doc.data() as Map<String, dynamic>));
+        } catch (e) {
+          debugPrint('Skipping malformed dispatched job ${doc.id}: $e');
+        }
+      }
+      return jobs;
+    });
   }
 
   /// Update job status with validation.

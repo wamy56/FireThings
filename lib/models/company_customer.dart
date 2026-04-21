@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// Represents a shared company customer for dispatch job creation
 class CompanyCustomer {
   final String id;
@@ -45,10 +47,8 @@ class CompanyCustomer {
       phone: json['phone'] as String?,
       notes: json['notes'] as String?,
       createdBy: json['createdBy'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.tryParse(json['updatedAt'] as String)
-          : null,
+      createdAt: jsonDateRequired(json['createdAt']),
+      updatedAt: jsonDateOptional(json['updatedAt']),
     );
   }
 

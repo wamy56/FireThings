@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// Status of a dispatched job
 enum DispatchedJobStatus {
   created,
@@ -201,19 +203,15 @@ class DispatchedJob {
       assignedToName: json['assignedToName'] as String?,
       createdBy: json['createdBy'] as String,
       createdByName: json['createdByName'] as String,
-      scheduledDate: json['scheduledDate'] != null
-          ? DateTime.parse(json['scheduledDate'] as String)
-          : null,
+      scheduledDate: jsonDateOptional(json['scheduledDate']),
       scheduledTime: json['scheduledTime'] as String?,
       estimatedDuration: json['estimatedDuration'] as String?,
       status: _statusMap[json['status'] as String] ??
           DispatchedJobStatus.created,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: jsonDateRequired(json['createdAt']),
+      updatedAt: jsonDateRequired(json['updatedAt']),
       lastUpdatedBy: json['lastUpdatedBy'] as String?,
-      completedAt: json['completedAt'] != null
-          ? DateTime.parse(json['completedAt'] as String)
-          : null,
+      completedAt: jsonDateOptional(json['completedAt']),
       linkedJobsheetId: json['linkedJobsheetId'] as String?,
       sourceQuoteId: json['sourceQuoteId'] as String?,
       declineReason: json['declineReason'] as String?,

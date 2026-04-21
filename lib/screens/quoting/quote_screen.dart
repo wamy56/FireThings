@@ -173,8 +173,10 @@ class _QuoteScreenState extends State<QuoteScreen> {
 
     // Add a suggested line item based on the defect
     final controllers = _ItemControllers();
-    controllers.description.text =
-        'Repair: ${defect.description}';
+    final clauseRef = defect.bs5839ClauseReference;
+    controllers.description.text = clauseRef != null
+        ? 'Repair: ${defect.description} (BS 5839-1:2025 cl. $clauseRef)'
+        : 'Repair: ${defect.description}';
     controllers.quantity.text = '1';
     controllers.category = 'labour';
     _itemControllers = [controllers, _ItemControllers()];
@@ -217,6 +219,13 @@ class _QuoteScreenState extends State<QuoteScreen> {
           widget.fromDefect?.description ?? widget.existingQuote?.defectDescription,
       defectSeverity:
           widget.fromDefect?.severity ?? widget.existingQuote?.defectSeverity,
+      defectClauseReference:
+          widget.fromDefect?.bs5839ClauseReference ??
+              widget.existingQuote?.defectClauseReference,
+      defectTriggeredProhibitedRule:
+          widget.fromDefect?.triggeredProhibitedRule ??
+              widget.existingQuote?.defectTriggeredProhibitedRule ??
+              false,
       items: items,
       notes: _notesController.text.trim().isNotEmpty
           ? _notesController.text.trim()

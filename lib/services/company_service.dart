@@ -1,12 +1,12 @@
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../models/company.dart';
 import '../models/company_member.dart';
 import '../models/company_site.dart';
 import '../models/company_customer.dart';
-import '../models/permission.dart';
 import '../models/user_profile.dart';
 import 'geocoding_service.dart';
 import 'user_profile_service.dart';
@@ -22,13 +22,11 @@ class CompanyService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   String? get _uid => _auth.currentUser?.uid;
-  String? get _displayName => _auth.currentUser?.displayName;
-  String? get _email => _auth.currentUser?.email;
 
   CollectionReference get _companiesCol =>
       _firestore.collection('companies');
 
-  /// Create a new company. The current user becomes admin.
+  /// Create a new company via Cloud Function. The current user becomes admin.
   Future<Company> createCompany({
     required String name,
     String? address,
@@ -38,142 +36,68 @@ class CompanyService {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
 
-    final docRef = _companiesCol.doc();
-    final now = DateTime.now();
-    final inviteCode = _generateInviteCode();
+    final callable = FirebaseFunctions.instance.httpsCallable('createCompany');
+    final result = await callable.call<Map<String, dynamic>>({
+      'name': name,
+      'address': address,
+      'phone': phone,
+      'email': email,
+    });
 
-    final company = Company(
-      id: docRef.id,
-      name: name,
-      address: address,
-      phone: phone,
-      email: email,
-      createdBy: uid,
-      createdAt: now,
-      inviteCode: inviteCode,
-    );
+    final companyId = result.data['companyId'] as String;
 
-    final member = CompanyMember(
-      uid: uid,
-      displayName: _displayName ?? 'Admin',
-      email: _email ?? '',
-      role: CompanyRole.admin,
-      joinedAt: now,
-    );
+    await UserProfileService.instance.loadProfile(uid);
+    AnalyticsService.instance.logCompanyCreated(companyId);
 
-    // Batch write: company doc + member doc + user profile
-    final batch = _firestore.batch();
-    batch.set(docRef, company.toJson());
-    batch.set(
-      docRef.collection('members').doc(uid),
-      member.toJson(),
-    );
-    batch.set(
-      _firestore.collection('users').doc(uid).collection('profile').doc('main'),
-      {
-        'uid': uid,
-        'companyId': docRef.id,
-        'companyRole': CompanyRole.admin.name,
-      },
-      SetOptions(merge: true),
-    );
-    await batch.commit();
-
-    // Update local profile cache
-    await UserProfileService.instance.saveProfile(
-      UserProfile(
-        uid: uid,
-        companyId: docRef.id,
-        companyRole: CompanyRole.admin,
-        fcmToken: UserProfileService.instance.profile?.fcmToken,
-      ),
-    );
-
-    AnalyticsService.instance.logCompanyCreated(docRef.id);
-
-    return company;
+    return (await getCompany(companyId))!;
   }
 
-  /// Join a company using an invite code.
+  /// Join a company via Cloud Function using an invite code.
   Future<Company> joinCompany(String inviteCode) async {
     final uid = _uid;
     if (uid == null) throw Exception('Not signed in');
 
-    // Look up company by invite code
-    final query = await _companiesCol
-        .where('inviteCode', isEqualTo: inviteCode.trim().toUpperCase())
-        .limit(1)
-        .get();
+    final callable = FirebaseFunctions.instance.httpsCallable('joinCompany');
+    final result = await callable.call<Map<String, dynamic>>({
+      'inviteCode': inviteCode,
+    });
 
-    if (query.docs.isEmpty) {
-      throw Exception('Invalid invite code');
-    }
+    final companyId = result.data['companyId'] as String;
 
-    final companyDoc = query.docs.first;
-    final company = Company.fromJson(
-      companyDoc.data() as Map<String, dynamic>,
-    );
+    await UserProfileService.instance.loadProfile(uid);
+    AnalyticsService.instance.logCompanyJoined(companyId, CompanyRole.engineer.name);
 
-    // Check if already a member
-    final existingMember = await companyDoc.reference
-        .collection('members')
-        .doc(uid)
-        .get();
-    if (existingMember.exists) {
-      throw Exception('You are already a member of this company');
-    }
-
-    final now = DateTime.now();
-    final member = CompanyMember(
-      uid: uid,
-      displayName: _displayName ?? 'Engineer',
-      email: _email ?? '',
-      role: CompanyRole.engineer,
-      joinedAt: now,
-    );
-
-    // Batch write: member doc + user profile
-    final batch = _firestore.batch();
-    batch.set(
-      companyDoc.reference.collection('members').doc(uid),
-      member.toJson(),
-    );
-    batch.set(
-      _firestore.collection('users').doc(uid).collection('profile').doc('main'),
-      {
-        'uid': uid,
-        'companyId': company.id,
-        'companyRole': CompanyRole.engineer.name,
-      },
-      SetOptions(merge: true),
-    );
-    await batch.commit();
-
-    // Update local profile cache
-    await UserProfileService.instance.saveProfile(
-      UserProfile(
-        uid: uid,
-        companyId: company.id,
-        companyRole: CompanyRole.engineer,
-        fcmToken: UserProfileService.instance.profile?.fcmToken,
-      ),
-    );
-
-    AnalyticsService.instance.logCompanyJoined(company.id, CompanyRole.engineer.name);
-
-    return company;
+    return (await getCompany(companyId))!;
   }
 
-  /// Leave the current company.
+  /// Leave the current company. Soft-deletes the member doc to preserve audit trail.
   Future<void> leaveCompany() async {
     final uid = _uid;
     if (uid == null) return;
     final cId = UserProfileService.instance.companyId;
     if (cId == null) return;
 
+    final selfDoc = await _companiesCol.doc(cId).collection('members').doc(uid).get();
+    if (selfDoc.exists) {
+      final self = CompanyMember.fromJson(selfDoc.data()!);
+      if (self.role == CompanyRole.admin) {
+        final adminCount = await getAdminCount(cId);
+        if (adminCount <= 1) {
+          throw LastAdminException(
+            'You are the only admin. Promote another member to admin or '
+            'delete the company before leaving.',
+          );
+        }
+      }
+    }
+
     final batch = _firestore.batch();
-    batch.delete(
+    batch.update(
       _companiesCol.doc(cId).collection('members').doc(uid),
+      {
+        'isActive': false,
+        'leftAt': DateTime.now().toIso8601String(),
+      },
     );
     batch.set(
       _firestore.collection('users').doc(uid).collection('profile').doc('main'),
@@ -232,61 +156,80 @@ class CompanyService {
             .toList());
   }
 
-  /// Update a member's role and apply default permissions for the new role.
+  /// Update a member's role via Cloud Function. Only admins can change roles.
   Future<void> updateMemberRole(
     String companyId,
     String memberUid,
-    CompanyRole newRole, {
-    Map<String, bool>? permissions,
-  }) async {
-    final perms = permissions ?? AppPermission.defaultsForRole(newRole);
-    await _companiesCol
-        .doc(companyId)
-        .collection('members')
-        .doc(memberUid)
-        .update({
-      'role': newRole.name,
-      'permissions': perms,
+    CompanyRole newRole,
+  ) async {
+    final callable = FirebaseFunctions.instance.httpsCallable('updateMemberRole');
+    await callable.call({
+      'companyId': companyId,
+      'memberUid': memberUid,
+      'newRole': newRole.name,
     });
-
-    // If updating self, refresh local cache
-    if (memberUid == _uid) {
-      final profile = UserProfileService.instance.profile;
-      if (profile != null) {
-        await UserProfileService.instance.saveProfile(
-          profile.copyWith(companyRole: newRole),
-        );
-      }
-    }
   }
 
-  /// Update a member's granular permissions without changing their role.
+  /// Update a member's granular permissions via Cloud Function. Only admins can change permissions.
   Future<void> updateMemberPermissions(
     String companyId,
     String memberUid,
     Map<String, bool> permissions,
   ) async {
-    await _companiesCol
-        .doc(companyId)
-        .collection('members')
-        .doc(memberUid)
-        .update({'permissions': permissions});
+    final callable = FirebaseFunctions.instance.httpsCallable('updateMemberPermissions');
+    await callable.call({
+      'companyId': companyId,
+      'memberUid': memberUid,
+      'permissions': permissions,
+    });
   }
 
-  /// Remove a member from the company. Admin only.
+  /// Remove a member from the company. Soft-deletes and clears their profile.
   Future<void> removeMember(String companyId, String memberUid) async {
-    await _companiesCol
-        .doc(companyId)
-        .collection('members')
-        .doc(memberUid)
-        .update({'isActive': false});
+    if (memberUid == _uid) {
+      throw SelfRemovalException(
+        'You cannot remove yourself. Use "Leave Company" instead.',
+      );
+    }
+
+    final targetDoc = await _companiesCol
+        .doc(companyId).collection('members').doc(memberUid).get();
+    if (targetDoc.exists) {
+      final target = CompanyMember.fromJson(targetDoc.data()!);
+      if (target.role == CompanyRole.admin) {
+        final adminCount = await getAdminCount(companyId);
+        if (adminCount <= 1) {
+          throw LastAdminException('Cannot remove the only admin.');
+        }
+      }
+    }
+
+    final batch = _firestore.batch();
+    batch.update(
+      _companiesCol.doc(companyId).collection('members').doc(memberUid),
+      {
+        'isActive': false,
+        'removedAt': DateTime.now().toIso8601String(),
+        'removedBy': _uid,
+      },
+    );
+    batch.set(
+      _firestore.collection('users').doc(memberUid).collection('profile').doc('main'),
+      {'companyId': null, 'companyRole': null},
+      SetOptions(merge: true),
+    );
+    await batch.commit();
   }
 
-  /// Regenerate the invite code. Admin only.
-  Future<String> regenerateInviteCode(String companyId) async {
+  /// Regenerate the invite code. Admin only. Sets 90-day expiry.
+  Future<Map<String, dynamic>> regenerateInviteCode(String companyId) async {
     final newCode = _generateInviteCode();
-    await _companiesCol.doc(companyId).update({'inviteCode': newCode});
-    return newCode;
+    final expiresAt = DateTime.now().add(const Duration(days: 90));
+    await _companiesCol.doc(companyId).update({
+      'inviteCode': newCode,
+      'inviteCodeExpiresAt': expiresAt.toIso8601String(),
+    });
+    return {'code': newCode, 'expiresAt': expiresAt};
   }
 
   /// Update company details. Admin only.
@@ -489,6 +432,17 @@ class CompanyService {
             .toList());
   }
 
+  /// Count active admins in a company.
+  Future<int> getAdminCount(String companyId) async {
+    final snap = await _companiesCol
+        .doc(companyId)
+        .collection('members')
+        .where('role', isEqualTo: 'admin')
+        .where('isActive', isEqualTo: true)
+        .get();
+    return snap.docs.length;
+  }
+
   /// Generate a random invite code like "FT-ABC123".
   String _generateInviteCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -497,4 +451,18 @@ class CompanyService {
         .join();
     return 'FT-$code';
   }
+}
+
+class LastAdminException implements Exception {
+  final String message;
+  const LastAdminException(this.message);
+  @override
+  String toString() => 'LastAdminException: $message';
+}
+
+class SelfRemovalException implements Exception {
+  final String message;
+  const SelfRemovalException(this.message);
+  @override
+  String toString() => 'SelfRemovalException: $message';
 }

@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// Represents a line item on an invoice
 class InvoiceItem {
   final String description;
@@ -111,8 +113,8 @@ class Invoice {
       customerName: json['customerName'] as String,
       customerAddress: json['customerAddress'] as String,
       customerEmail: json['customerEmail'] as String?,
-      date: DateTime.parse(json['date'] as String),
-      dueDate: DateTime.parse(json['dueDate'] as String),
+      date: jsonDateRequired(json['date']),
+      dueDate: jsonDateRequired(json['dueDate']),
       items: (json['items'] as List)
           .map((item) => InvoiceItem.fromJson(item as Map<String, dynamic>))
           .toList(),
@@ -122,10 +124,8 @@ class Invoice {
         (s) => s.name == json['status'],
         orElse: () => InvoiceStatus.draft,
       ),
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      lastModifiedAt: json['lastModifiedAt'] != null
-          ? DateTime.tryParse(json['lastModifiedAt'] as String)
-          : null,
+      createdAt: jsonDateRequired(json['createdAt']),
+      lastModifiedAt: jsonDateOptional(json['lastModifiedAt']),
       useCompanyBranding: json['useCompanyBranding'] == 1 || json['useCompanyBranding'] == true,
       linkedJobsheetId: json['linkedJobsheetId'] as String?,
     );

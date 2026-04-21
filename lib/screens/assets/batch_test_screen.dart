@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:uuid/uuid.dart';
 import '../../models/asset.dart';
 import '../../models/asset_type.dart';
-import '../../models/service_record.dart';
 import '../../data/default_asset_types.dart';
-import '../../services/asset_service.dart';
 import '../../services/defect_service.dart';
-import '../../services/service_history_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/asset_test_service.dart';
+import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/defect_bottom_sheet.dart';
@@ -114,42 +112,16 @@ class _BatchTestScreenState extends State<BatchTestScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('Not signed in');
 
-      final now = DateTime.now();
-      final record = ServiceRecord(
-        id: const Uuid().v4(),
-        assetId: asset.id,
+      final rectifiedIds = await AssetTestService.instance.markAssetPassed(
+        basePath: widget.basePath,
         siteId: widget.siteId,
-        jobsheetId: widget.jobsheetId,
+        asset: asset,
+        assetType: _getAssetType(asset.assetTypeId),
         engineerId: user.uid,
-        engineerName: user.displayName ?? 'Unknown',
-        serviceDate: now,
-        overallResult: 'pass',
-        createdAt: now,
+        engineerName: UserProfileService.instance.resolveEngineerName(),
+        jobsheetId: widget.jobsheetId,
       );
-
-      await ServiceHistoryService.instance
-          .createRecord(widget.basePath, widget.siteId, record);
-
-      await AssetService.instance.updateAsset(
-        widget.basePath,
-        widget.siteId,
-        asset.copyWith(
-          complianceStatus: Asset.statusPass,
-          lastServiceDate: now,
-          lastServiceBy: user.uid,
-          lastServiceByName: user.displayName ?? 'Unknown',
-          nextServiceDue: DateTime(now.year + 1, now.month, now.day),
-        ),
-      );
-
-      final rectifiedCount = await DefectService.instance.rectifyAllForAsset(
-        widget.basePath,
-        widget.siteId,
-        asset.id,
-        rectifiedBy: user.uid,
-        rectifiedByName: user.displayName ?? 'Unknown',
-      );
-      if (rectifiedCount > 0) _openDefectCounts.remove(asset.id);
+      if (rectifiedIds.isNotEmpty) _openDefectCounts.remove(asset.id);
 
       AnalyticsService.instance.logAssetTested(
         assetType: asset.assetTypeId,

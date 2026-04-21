@@ -92,6 +92,51 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
+    // Solo user zone plans: users/{uid}/sites/{siteId}/zone_plans/{filename}
+    match /users/{userId}/sites/{siteId}/zone_plans/{filename} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Solo user BS 5839 evidence: users/{uid}/sites/{siteId}/bs5839_evidence/{filename}
+    match /users/{userId}/sites/{siteId}/bs5839_evidence/{filename} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Company zone plans: companies/{companyId}/sites/{siteId}/zone_plans/{filename}
+    match /companies/{companyId}/sites/{siteId}/zone_plans/{filename} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 10 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // Company BS 5839 evidence: companies/{companyId}/sites/{siteId}/bs5839_evidence/{filename}
+    match /companies/{companyId}/sites/{siteId}/bs5839_evidence/{filename} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null;
+    }
+
+    // Company BS 5839 reports (PDF): companies/{companyId}/sites/{siteId}/bs5839_reports/{filename}
+    match /companies/{companyId}/sites/{siteId}/bs5839_reports/{filename} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.resource.size < 20 * 1024 * 1024
+                   && request.resource.contentType.matches('application/pdf');
+      allow delete: if request.auth != null;
+    }
+
     // Company logos: companies/{companyId}/logo/{filename}
     match /companies/{companyId}/logo/{filename} {
       allow read: if request.auth != null;

@@ -9,7 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
-import 'auth_service.dart';
+import 'user_profile_service.dart';
 import 'asset_service.dart';
 import 'asset_type_service.dart';
 import 'defect_service.dart';
@@ -18,6 +18,9 @@ import 'floor_plan_service.dart';
 import 'jobsheet_settings_service.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
+import 'bs5839_config_service.dart';
+import 'inspection_visit_service.dart';
+import 'remote_config_service.dart';
 import 'pdf_footer_builder.dart';
 
 // ── Colour constants for the isolate ──
@@ -70,6 +73,20 @@ class _ReportContext {
       return null;
     }
   }
+
+  int get checklistDriftCount {
+    return active.where((a) {
+      if (a.complianceStatus != AssetComplianceStatus.pass &&
+          a.complianceStatus != AssetComplianceStatus.fail) {
+        return false;
+      }
+      final type = getType(a.assetTypeId);
+      if (type == null) return false;
+      final tested = a.lastChecklistVersionTested;
+      if (tested == null) return false;
+      return tested < type.checklistVersion;
+    }).length;
+  }
 }
 
 _ReportContext _buildReportContext(ComplianceReportPdfData data) {
@@ -83,7 +100,7 @@ _ReportContext _buildReportContext(ComplianceReportPdfData data) {
   final floorPlans =
       data.floorPlansJson.map((j) => FloorPlan.fromJson(j)).toList();
   final active =
-      assets.where((a) => a.complianceStatus != Asset.statusDecommissioned).toList();
+      assets.where((a) => a.complianceStatus != AssetComplianceStatus.decommissioned).toList();
 
   return _ReportContext(
     data: data,
@@ -92,10 +109,10 @@ _ReportContext _buildReportContext(ComplianceReportPdfData data) {
     records: records,
     floorPlans: floorPlans,
     active: active,
-    decom: assets.where((a) => a.complianceStatus == Asset.statusDecommissioned).toList(),
-    pass: active.where((a) => a.complianceStatus == Asset.statusPass).toList(),
-    fail: active.where((a) => a.complianceStatus == Asset.statusFail).toList(),
-    untested: active.where((a) => a.complianceStatus == Asset.statusUntested).toList(),
+    decom: assets.where((a) => a.complianceStatus == AssetComplianceStatus.decommissioned).toList(),
+    pass: active.where((a) => a.complianceStatus == AssetComplianceStatus.pass).toList(),
+    fail: active.where((a) => a.complianceStatus == AssetComplianceStatus.fail).toList(),
+    untested: active.where((a) => a.complianceStatus == AssetComplianceStatus.untested).toList(),
     primaryColor: colourScheme.primaryColor,
     primaryLight: colourScheme.primaryLight,
   );
@@ -159,6 +176,70 @@ pw.Page _buildCoverPage(ComplianceReportPdfData data, _ReportContext ctx) {
             _statBox('Untested', '${ctx.untested.length}', _untestedAmber),
           ],
         ),
+        if (ctx.checklistDriftCount > 0) ...[
+          pw.SizedBox(height: 24),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: pw.BoxDecoration(
+              color: const PdfColor.fromInt(0xFFFFF3CD),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+              border: pw.Border.all(
+                  color: const PdfColor.fromInt(0xFFF59E0B), width: 0.5),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              mainAxisSize: pw.MainAxisSize.min,
+              children: [
+                pw.Text(
+                  '${ctx.checklistDriftCount} asset${ctx.checklistDriftCount == 1 ? '' : 's'} tested against an outdated checklist version',
+                  style: pw.TextStyle(
+                    fontSize: 10,
+                    fontWeight: pw.FontWeight.bold,
+                    color: const PdfColor.fromInt(0xFF92400E),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (data.bs5839LastDeclaration != null) ...[
+          pw.SizedBox(height: 24),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: pw.BoxDecoration(
+              color: ctx.primaryColor,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+            ),
+            child: pw.Text(
+              'BS 5839: ${data.bs5839LastDeclaration}',
+              style: pw.TextStyle(
+                fontSize: 11,
+                fontWeight: pw.FontWeight.bold,
+                color: const PdfColor.fromInt(0xFFFFFFFF),
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            'For full BS 5839 reporting, generate a BS 5839 Inspection Report instead.',
+            style: const pw.TextStyle(
+              fontSize: 9,
+              color: PdfColors.grey600,
+            ),
+          ),
+        ],
+        if (data.bs5839ModeEnabled && data.bs5839LastDeclaration == null) ...[
+          pw.SizedBox(height: 24),
+          pw.Text(
+            'This is a general site compliance summary. It is not a BS 5839-1:2025 inspection report. '
+            'To produce a BS 5839 report, configure the system category from the site detail screen.',
+            style: const pw.TextStyle(
+              fontSize: 9,
+              color: PdfColors.grey600,
+            ),
+            textAlign: pw.TextAlign.center,
+          ),
+        ],
       ],
     ),
   );
@@ -275,9 +356,9 @@ void _addFloorPlans(List<pw.Widget> widgets, _ReportContext ctx) {
             if (a.xPercent == null || a.yPercent == null) {
               return pw.SizedBox();
             }
-            final statusColor = a.complianceStatus == Asset.statusPass
+            final statusColor = a.complianceStatus == AssetComplianceStatus.pass
                 ? _passGreen
-                : a.complianceStatus == Asset.statusFail
+                : a.complianceStatus == AssetComplianceStatus.fail
                     ? _failRed
                     : _untestedAmber;
 
@@ -369,23 +450,32 @@ void _addAssetRegister(List<pw.Widget> widgets, _ReportContext ctx) {
     final lifespan = a.expectedLifespanYears != null
         ? '${a.expectedLifespanYears}y'
         : '-';
-    final statusLabel = a.complianceStatus == Asset.statusPass
+    final statusLabel = a.complianceStatus == AssetComplianceStatus.pass
         ? 'PASS'
-        : a.complianceStatus == Asset.statusFail
+        : a.complianceStatus == AssetComplianceStatus.fail
             ? 'FAIL'
             : 'UNTESTED';
-    final statusColor = a.complianceStatus == Asset.statusPass
+    final statusColor = a.complianceStatus == AssetComplianceStatus.pass
         ? _passGreen
-        : a.complianceStatus == Asset.statusFail
+        : a.complianceStatus == AssetComplianceStatus.fail
             ? _failRed
             : _untestedAmber;
 
+    String locationText = a.locationDescription ?? '';
+    if (locationText.isEmpty && a.floorPlanId != null) {
+      final fp = ctx.floorPlans
+          .where((f) => f.id == a.floorPlanId)
+          .firstOrNull;
+      if (fp != null) locationText = fp.name;
+    }
+    if (locationText.isEmpty) locationText = '\u2014';
+
     widgets.add(_tableRow(
       [
-        a.reference ?? '-',
-        type?.name ?? '-',
-        a.locationDescription ?? '-',
-        a.zone ?? '-',
+        a.reference ?? '\u2014',
+        type?.name ?? '\u2014',
+        locationText,
+        a.zone ?? '\u2014',
         statusLabel,
         lastService,
         lifespan,
@@ -680,19 +770,35 @@ void _addServiceHistory(List<pw.Widget> widgets, _ReportContext ctx) {
 
     final sortedRecords = List<ServiceRecord>.from(ctx.records)
       ..sort((a, b) => b.serviceDate.compareTo(a.serviceDate));
-    final recentRecords = sortedRecords.take(20).toList();
     final dateFormat = DateFormat('dd/MM/yy');
+
+    // Collapse same-asset same-day records into one row
+    final grouped = <String, List<ServiceRecord>>{};
+    for (final r in sortedRecords) {
+      final key = '${r.assetId}_${dateFormat.format(r.serviceDate)}';
+      (grouped[key] ??= []).add(r);
+    }
+    final collapsed = grouped.values
+        .map((g) => g.first) // latest attempt (already sorted desc)
+        .toList();
+    final recentRecords = collapsed.take(20).toList();
+
     for (int i = 0; i < recentRecords.length; i++) {
       final r = recentRecords[i];
+      final key = '${r.assetId}_${dateFormat.format(r.serviceDate)}';
+      final groupCount = grouped[key]!.length;
       final asset =
           ctx.assets.where((a) => a.id == r.assetId).firstOrNull;
       final resultColor =
           r.overallResult == 'pass' ? _passGreen : _failRed;
+      final dateLabel = groupCount > 1
+          ? '${dateFormat.format(r.serviceDate)} ($groupCount attempts)'
+          : dateFormat.format(r.serviceDate);
 
       widgets.add(_tableRow(
         [
-          dateFormat.format(r.serviceDate),
-          asset?.reference ?? '-',
+          dateLabel,
+          asset?.reference ?? '\u2014',
           r.engineerName,
           r.overallResult.toUpperCase(),
         ],
@@ -1008,8 +1114,7 @@ class ComplianceReportService {
     );
 
     // User info
-    final user = AuthService().currentUser;
-    final engineerName = user?.displayName ?? 'Unknown';
+    final engineerName = UserProfileService.instance.resolveEngineerName();
     final companyName = settings.companyName;
 
     // Assets & types
@@ -1147,6 +1252,24 @@ class ComplianceReportService {
       }
     }
 
+    // BS 5839 status for cover badge/disclaimer
+    String? bs5839LastDeclaration;
+    final bs5839Enabled = RemoteConfigService.instance.bs5839ModeEnabled;
+    if (bs5839Enabled) {
+      try {
+        final config = await Bs5839ConfigService.instance.getConfig(basePath, siteId);
+        if (config != null) {
+          final lastVisit = await InspectionVisitService.instance
+              .getLastVisit(basePath, siteId);
+          if (lastVisit?.completedAt != null) {
+            bs5839LastDeclaration = lastVisit!.declaration.displayLabel;
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading BS 5839 data for report: $e');
+      }
+    }
+
     final data = ComplianceReportPdfData(
       siteName: siteName,
       siteAddress: siteAddress,
@@ -1168,6 +1291,8 @@ class ComplianceReportService {
       defectsJson: allDefects.map((d) => d.toJson()).toList(),
       rectifiedCount: rectifiedCount,
       lastReportDateStr: lastReportDate?.toIso8601String(),
+      bs5839LastDeclaration: bs5839LastDeclaration,
+      bs5839ModeEnabled: bs5839Enabled,
     );
 
     // Store last report date for rectified-count tracking

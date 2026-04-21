@@ -7,8 +7,10 @@ class AssetType {
   final String defaultColor; // hex colour for pins
   final List<String> variants;
   final int? defaultLifespanYears;
+  final int? defaultServiceIntervalMonths;
   final List<String> commonFaults;
   final bool isBuiltIn;
+  final int checklistVersion;
 
   AssetType({
     required this.id,
@@ -18,8 +20,10 @@ class AssetType {
     required this.defaultColor,
     this.variants = const [],
     this.defaultLifespanYears,
+    this.defaultServiceIntervalMonths,
     this.commonFaults = const [],
     this.isBuiltIn = false,
+    this.checklistVersion = 1,
   });
 
   Map<String, dynamic> toJson() {
@@ -31,8 +35,10 @@ class AssetType {
       'defaultColor': defaultColor,
       'variants': variants,
       'defaultLifespanYears': defaultLifespanYears,
+      'defaultServiceIntervalMonths': defaultServiceIntervalMonths,
       'commonFaults': commonFaults,
       'isBuiltIn': isBuiltIn,
+      'checklistVersion': checklistVersion,
     };
   }
 
@@ -48,11 +54,13 @@ class AssetType {
               .toList() ??
           [],
       defaultLifespanYears: json['defaultLifespanYears'] as int?,
+      defaultServiceIntervalMonths: json['defaultServiceIntervalMonths'] as int?,
       commonFaults: (json['commonFaults'] as List<dynamic>?)
               ?.map((f) => f as String)
               .toList() ??
           [],
       isBuiltIn: json['isBuiltIn'] as bool? ?? false,
+      checklistVersion: json['checklistVersion'] as int? ?? 1,
     );
   }
 
@@ -64,8 +72,10 @@ class AssetType {
     String? defaultColor,
     List<String>? variants,
     int? defaultLifespanYears,
+    int? defaultServiceIntervalMonths,
     List<String>? commonFaults,
     bool? isBuiltIn,
+    int? checklistVersion,
   }) {
     return AssetType(
       id: id ?? this.id,
@@ -75,8 +85,10 @@ class AssetType {
       defaultColor: defaultColor ?? this.defaultColor,
       variants: variants ?? this.variants,
       defaultLifespanYears: defaultLifespanYears ?? this.defaultLifespanYears,
+      defaultServiceIntervalMonths: defaultServiceIntervalMonths ?? this.defaultServiceIntervalMonths,
       commonFaults: commonFaults ?? this.commonFaults,
       isBuiltIn: isBuiltIn ?? this.isBuiltIn,
+      checklistVersion: checklistVersion ?? this.checklistVersion,
     );
   }
 

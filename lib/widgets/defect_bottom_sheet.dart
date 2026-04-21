@@ -6,11 +6,10 @@ import 'package:uuid/uuid.dart';
 import '../models/asset.dart';
 import '../models/asset_type.dart';
 import '../models/defect.dart';
-import '../models/service_record.dart';
-import '../services/asset_service.dart';
 import '../services/defect_service.dart';
-import '../services/service_history_service.dart';
 import '../services/analytics_service.dart';
+import '../services/asset_test_service.dart';
+import '../services/user_profile_service.dart';
 import '../services/remote_config_service.dart';
 import '../utils/theme.dart';
 import '../utils/icon_map.dart';
@@ -124,6 +123,10 @@ class _DefectBottomSheetState extends State<DefectBottomSheet> {
       context.showErrorToast('Select a fault or add a description');
       return;
     }
+    if (_selectedCommonFault == null && description.length < 5) {
+      context.showErrorToast('Description must be at least 5 characters');
+      return;
+    }
 
     setState(() => _isSaving = true);
 
@@ -132,8 +135,8 @@ class _DefectBottomSheetState extends State<DefectBottomSheet> {
       if (user == null) throw Exception('Not signed in');
 
       final now = DateTime.now();
-      final recordId = const Uuid().v4();
       final defectId = const Uuid().v4();
+      final engineerName = UserProfileService.instance.resolveEngineerName();
 
       List<String> photoUrls = [];
       if (_photos.isNotEmpty) {
@@ -146,24 +149,6 @@ class _DefectBottomSheetState extends State<DefectBottomSheet> {
         );
       }
 
-      final record = ServiceRecord(
-        id: recordId,
-        assetId: widget.asset.id,
-        siteId: widget.siteId,
-        jobsheetId: widget.jobsheetId,
-        engineerId: user.uid,
-        engineerName: user.displayName ?? 'Unknown',
-        serviceDate: now,
-        overallResult: 'fail',
-        defectNote: description,
-        defectPhotoUrls: photoUrls,
-        defectSeverity: _severity,
-        createdAt: now,
-      );
-
-      await ServiceHistoryService.instance
-          .createRecord(widget.basePath, widget.siteId, record);
-
       final defect = Defect(
         id: defectId,
         assetId: widget.asset.id,
@@ -174,35 +159,20 @@ class _DefectBottomSheetState extends State<DefectBottomSheet> {
         photoUrls: photoUrls,
         status: Defect.statusOpen,
         createdBy: user.uid,
-        createdByName: user.displayName ?? 'Unknown',
+        createdByName: engineerName,
         createdAt: now,
-        serviceRecordId: recordId,
       );
 
-      await DefectService.instance
-          .createDefect(widget.basePath, widget.siteId, defect);
-
-      // Defect and service record are now saved. Update asset status
-      // in a separate try/catch so a failure here doesn't show a
-      // misleading "Failed to save defect" message.
-      try {
-        await AssetService.instance.updateAsset(
-          widget.basePath,
-          widget.siteId,
-          widget.asset.copyWith(
-            complianceStatus: Asset.statusFail,
-            lastServiceDate: now,
-            lastServiceBy: user.uid,
-            lastServiceByName: user.displayName ?? 'Unknown',
-            nextServiceDue: DateTime(now.year + 1, now.month, now.day),
-          ),
-        );
-      } catch (e) {
-        debugPrint('Failed to update asset status after defect save: $e');
-        if (mounted) {
-          context.showErrorToast('Defect saved but failed to update asset status');
-        }
-      }
+      await AssetTestService.instance.markAssetFailed(
+        basePath: widget.basePath,
+        siteId: widget.siteId,
+        asset: widget.asset,
+        assetType: widget.assetType,
+        engineerId: user.uid,
+        engineerName: engineerName,
+        defect: defect,
+        jobsheetId: widget.jobsheetId,
+      );
 
       AnalyticsService.instance.logAssetTested(
         assetType: widget.asset.assetTypeId,

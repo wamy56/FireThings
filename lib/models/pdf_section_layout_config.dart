@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 /// Identifies each section in the PDF body.
-enum PdfSectionId { jobInfo, siteDetails, workDetails, notes, defects, compliance, signatures, assetSummary }
+enum PdfSectionId { jobInfo, siteDetails, workDetails, notes, defects, compliance, signatures, assetSummary, bs5839Summary }
 
 /// How Job Info and Site Details are arranged relative to each other.
 enum SectionLayoutMode { sideBySide, stacked }

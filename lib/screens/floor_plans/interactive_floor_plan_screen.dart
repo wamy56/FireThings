@@ -6,18 +6,17 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 import '../../models/asset.dart';
 import '../../models/asset_type.dart';
 import '../../models/floor_plan.dart';
-import '../../models/service_record.dart';
 import '../../data/default_asset_types.dart';
 import '../../services/asset_service.dart';
 import '../../services/asset_type_service.dart';
 import '../../services/defect_service.dart';
 import '../../services/floor_plan_service.dart';
-import '../../services/service_history_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/asset_test_service.dart';
+import '../../services/user_profile_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -50,7 +49,7 @@ class _InteractiveFloorPlanScreenState
   bool _isPlacementMode = false;
   String? _selectedAssetId;
   String? _filterType;
-  String? _filterStatus;
+  AssetComplianceStatus? _filterStatus;
   String? _draggingAssetId;
   Offset? _dragPosition; // Current drag position in image coordinates
   late double _pinScale;
@@ -255,36 +254,13 @@ class _InteractiveFloorPlanScreenState
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      final now = DateTime.now();
-      final record = ServiceRecord(
-        id: const Uuid().v4(),
-        assetId: asset.id,
+      await AssetTestService.instance.markAssetPassed(
+        basePath: widget.basePath,
         siteId: widget.siteId,
+        asset: asset,
+        assetType: _getAssetType(asset.assetTypeId),
         engineerId: user.uid,
-        engineerName: user.displayName ?? 'Unknown',
-        serviceDate: now,
-        overallResult: 'pass',
-        createdAt: now,
-      );
-      await ServiceHistoryService.instance
-          .createRecord(widget.basePath, widget.siteId, record);
-      await AssetService.instance.updateAsset(
-        widget.basePath,
-        widget.siteId,
-        asset.copyWith(
-          complianceStatus: Asset.statusPass,
-          lastServiceDate: now,
-          lastServiceBy: user.uid,
-          lastServiceByName: user.displayName ?? 'Unknown',
-          nextServiceDue: DateTime(now.year + 1, now.month, now.day),
-        ),
-      );
-      await DefectService.instance.rectifyAllForAsset(
-        widget.basePath,
-        widget.siteId,
-        asset.id,
-        rectifiedBy: user.uid,
-        rectifiedByName: user.displayName ?? 'Unknown',
+        engineerName: UserProfileService.instance.resolveEngineerName(),
       );
       AnalyticsService.instance.logAssetTested(
         assetType: asset.assetTypeId,
@@ -542,15 +518,15 @@ class _InteractiveFloorPlanScreenState
     }
   }
 
-  Color _colorForStatus(String status) {
+  Color _colorForStatus(AssetComplianceStatus status) {
     switch (status) {
-      case Asset.statusPass:
+      case AssetComplianceStatus.pass:
         return const Color(0xFF4CAF50);
-      case Asset.statusFail:
+      case AssetComplianceStatus.fail:
         return const Color(0xFFD32F2F);
-      case Asset.statusDecommissioned:
+      case AssetComplianceStatus.decommissioned:
         return Colors.grey;
-      default:
+      case AssetComplianceStatus.untested:
         return const Color(0xFF9E9E9E);
     }
   }
@@ -966,34 +942,34 @@ class _InteractiveFloorPlanScreenState
                   const SizedBox(width: 6),
                   _PinFilterChip(
                     label: 'Pass',
-                    selected: _filterStatus == Asset.statusPass,
+                    selected: _filterStatus == AssetComplianceStatus.pass,
                     color: const Color(0xFF4CAF50),
                     onTap: () => setState(() {
-                      _filterStatus = _filterStatus == Asset.statusPass
+                      _filterStatus = _filterStatus == AssetComplianceStatus.pass
                           ? null
-                          : Asset.statusPass;
+                          : AssetComplianceStatus.pass;
                     }),
                   ),
                   const SizedBox(width: 6),
                   _PinFilterChip(
                     label: 'Fail',
-                    selected: _filterStatus == Asset.statusFail,
+                    selected: _filterStatus == AssetComplianceStatus.fail,
                     color: const Color(0xFFD32F2F),
                     onTap: () => setState(() {
-                      _filterStatus = _filterStatus == Asset.statusFail
+                      _filterStatus = _filterStatus == AssetComplianceStatus.fail
                           ? null
-                          : Asset.statusFail;
+                          : AssetComplianceStatus.fail;
                     }),
                   ),
                   const SizedBox(width: 6),
                   _PinFilterChip(
                     label: 'Untested',
-                    selected: _filterStatus == Asset.statusUntested,
+                    selected: _filterStatus == AssetComplianceStatus.untested,
                     color: const Color(0xFF9E9E9E),
                     onTap: () => setState(() {
-                      _filterStatus = _filterStatus == Asset.statusUntested
+                      _filterStatus = _filterStatus == AssetComplianceStatus.untested
                           ? null
-                          : Asset.statusUntested;
+                          : AssetComplianceStatus.untested;
                     }),
                   ),
                 ],
@@ -1103,13 +1079,8 @@ class _FloorPlanAssetSheetState extends State<_FloorPlanAssetSheet> {
     if (mounted) setState(() => _openDefectCount = defects.length);
   }
 
-  String _statusLabel(String? status) {
-    switch (status) {
-      case Asset.statusPass: return 'Pass';
-      case Asset.statusFail: return 'Fail';
-      case Asset.statusDecommissioned: return 'Decommissioned';
-      default: return 'Untested';
-    }
+  String _statusLabel(AssetComplianceStatus status) {
+    return status.displayLabel;
   }
 
   @override
@@ -1222,7 +1193,7 @@ class _FloorPlanAssetSheetState extends State<_FloorPlanAssetSheet> {
         ],
 
         // Pass / Fail buttons
-        if (asset.complianceStatus != Asset.statusDecommissioned) ...[
+        if (asset.complianceStatus != AssetComplianceStatus.decommissioned) ...[
           const SizedBox(height: 16),
           if (_isSaving)
             const Center(

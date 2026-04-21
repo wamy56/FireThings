@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/dispatched_job.dart';
 import '../../models/asset.dart';
+import '../../models/permission.dart';
 import '../../services/dispatch_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/asset_service.dart';
 import '../../services/remote_config_service.dart';
+import '../../services/bs5839_config_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -34,7 +37,9 @@ class _ComplianceSnapshot {
 
 class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
   String? _statusFilter;
+  bool _bs5839Filter = false;
   final Map<String, _ComplianceSnapshot> _complianceCache = {};
+  final Set<String> _bs5839SiteIds = {};
 
   String? get _companyId => UserProfileService.instance.companyId;
 
@@ -53,7 +58,10 @@ class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
           _buildFilterBar(isDark),
           Expanded(
             child: StreamBuilder<List<DispatchedJob>>(
-              stream: DispatchService.instance.getJobsStream(companyId),
+              stream: UserProfileService.instance.hasPermission(AppPermission.dispatchViewAll)
+                  ? DispatchService.instance.getJobsStream(companyId)
+                  : DispatchService.instance.getEngineerJobsStream(
+                      companyId, FirebaseAuth.instance.currentUser!.uid),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: AdaptiveLoadingIndicator());
@@ -61,11 +69,21 @@ class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
 
                 final allJobs = snapshot.data ?? [];
                 _loadComplianceData(allJobs, companyId);
-                final jobs = _statusFilter == null
+                if (RemoteConfigService.instance.bs5839ModeEnabled) {
+                  _loadBs5839SiteIds(allJobs, companyId);
+                }
+                var jobs = _statusFilter == null
                     ? allJobs
                     : allJobs
                         .where((j) => _statusToString(j.status) == _statusFilter)
                         .toList();
+                if (_bs5839Filter) {
+                  jobs = jobs
+                      .where((j) =>
+                          j.companySiteId != null &&
+                          _bs5839SiteIds.contains(j.companySiteId))
+                      .toList();
+                }
 
                 if (jobs.isEmpty) {
                   return Center(
@@ -99,15 +117,17 @@ class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            adaptivePageRoute(builder: (_) => const CreateJobScreen()),
-          );
-        },
-        child: Icon(AppIcons.add),
-      ),
+      floatingActionButton: UserProfileService.instance.hasPermission(AppPermission.dispatchCreate)
+          ? FloatingActionButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  adaptivePageRoute(builder: (_) => const CreateJobScreen()),
+                );
+              },
+              child: Icon(AppIcons.add),
+            )
+          : null,
     );
   }
 
@@ -220,23 +240,41 @@ class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
-        children: List.generate(filters.length, (i) {
-          final isSelected = _statusFilter == filters[i];
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              label: Text(labels[i]),
-              selected: isSelected,
-              onSelected: (_) {
-                setState(() => _statusFilter = filters[i]);
-              },
-              selectedColor: (isDark
-                      ? AppTheme.darkPrimaryBlue
-                      : AppTheme.primaryBlue)
-                  .withValues(alpha: 0.2),
+        children: [
+          ...List.generate(filters.length, (i) {
+            final isSelected = _statusFilter == filters[i];
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                label: Text(labels[i]),
+                selected: isSelected,
+                onSelected: (_) {
+                  setState(() => _statusFilter = filters[i]);
+                },
+                selectedColor: (isDark
+                        ? AppTheme.darkPrimaryBlue
+                        : AppTheme.primaryBlue)
+                    .withValues(alpha: 0.2),
+              ),
+            );
+          }),
+          if (RemoteConfigService.instance.bs5839ModeEnabled)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilterChip(
+                avatar: Icon(AppIcons.shield, size: 16),
+                label: const Text('BS 5839'),
+                selected: _bs5839Filter,
+                onSelected: (_) {
+                  setState(() => _bs5839Filter = !_bs5839Filter);
+                },
+                selectedColor: (isDark
+                        ? AppTheme.darkPrimaryBlue
+                        : AppTheme.primaryBlue)
+                    .withValues(alpha: 0.2),
+              ),
             ),
-          );
-        }),
+        ],
       ),
     );
   }
@@ -259,13 +297,32 @@ class _DispatchDashboardScreenState extends State<DispatchDashboardScreen> {
           .then((assets) {
         if (!mounted) return;
         final active = assets.where(
-            (a) => a.complianceStatus != Asset.statusDecommissioned);
+            (a) => a.complianceStatus != AssetComplianceStatus.decommissioned);
         final snap = _ComplianceSnapshot(
-          pass: active.where((a) => a.complianceStatus == Asset.statusPass).length,
-          fail: active.where((a) => a.complianceStatus == Asset.statusFail).length,
-          untested: active.where((a) => a.complianceStatus == Asset.statusUntested).length,
+          pass: active.where((a) => a.complianceStatus == AssetComplianceStatus.pass).length,
+          fail: active.where((a) => a.complianceStatus == AssetComplianceStatus.fail).length,
+          untested: active.where((a) => a.complianceStatus == AssetComplianceStatus.untested).length,
         );
         setState(() => _complianceCache[siteId] = snap);
+      }).catchError((_) {});
+    }
+  }
+
+  void _loadBs5839SiteIds(List<DispatchedJob> jobs, String companyId) {
+    final basePath = 'companies/$companyId';
+    final siteIds = jobs
+        .where((j) => j.companySiteId != null)
+        .map((j) => j.companySiteId!)
+        .toSet();
+
+    for (final siteId in siteIds) {
+      if (_bs5839SiteIds.contains(siteId)) continue;
+
+      Bs5839ConfigService.instance
+          .getConfig(basePath, siteId)
+          .then((config) {
+        if (!mounted || config == null) return;
+        setState(() => _bs5839SiteIds.add(siteId));
       }).catchError((_) {});
     }
   }

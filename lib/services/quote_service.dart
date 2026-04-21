@@ -33,13 +33,53 @@ class QuoteService {
     await _db.updateQuote(quote);
   }
 
-  /// Delete a quote.
+  /// Delete a quote. Clears any linked defect's back-reference.
+  /// Blocks deletion of converted quotes (they have a linked dispatched job).
   Future<void> deleteQuote(String quoteId) async {
+    final quote = await _db.getQuoteById(quoteId);
+    if (quote != null) {
+      if (quote.status == QuoteStatus.converted) {
+        throw ConvertedQuoteDeletionException(
+          'This quote has been converted to a job and cannot be deleted.',
+        );
+      }
+      if (quote.defectId != null && quote.siteId.isNotEmpty) {
+        await _clearDefectQuoteLink(quote);
+      }
+    }
     await _db.deleteQuote(quoteId);
   }
 
   Future<void> deleteQuotes(List<String> ids) async {
+    for (final id in ids) {
+      final quote = await _db.getQuoteById(id);
+      if (quote != null &&
+          quote.status == QuoteStatus.converted) {
+        continue;
+      }
+      if (quote != null &&
+          quote.defectId != null &&
+          quote.siteId.isNotEmpty) {
+        await _clearDefectQuoteLink(quote);
+      }
+    }
     await _db.deleteQuotes(ids);
+  }
+
+  Future<void> _clearDefectQuoteLink(Quote quote) async {
+    final basePath = quote.companyId != null && quote.companyId!.isNotEmpty
+        ? 'companies/${quote.companyId}'
+        : 'users/${quote.engineerId}';
+    try {
+      await DefectService.instance.updateDefectField(
+        basePath,
+        quote.siteId,
+        quote.defectId!,
+        {'linkedQuoteId': null},
+      );
+    } catch (_) {
+      // Defect may already be deleted — non-blocking
+    }
   }
 
   /// Get all quotes for the current engineer.
@@ -280,4 +320,11 @@ class QuoteService {
     final num = int.tryParse(lastNumber.replaceAll('Q-', '')) ?? 0;
     return 'Q-${(num + 1).toString().padLeft(4, '0')}';
   }
+}
+
+class ConvertedQuoteDeletionException implements Exception {
+  final String message;
+  const ConvertedQuoteDeletionException(this.message);
+  @override
+  String toString() => 'ConvertedQuoteDeletionException: $message';
 }

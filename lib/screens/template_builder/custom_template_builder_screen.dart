@@ -64,6 +64,8 @@ class _CustomTemplateBuilderScreenState
         return 'Signatures';
       case PdfSectionId.assetSummary:
         return 'Asset Inspection Summary';
+      case PdfSectionId.bs5839Summary:
+        return 'BS 5839 Inspection Summary';
     }
   }
 

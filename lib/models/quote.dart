@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// Status lifecycle for quotes
 enum QuoteStatus { draft, sent, approved, declined, converted }
 
@@ -78,6 +80,8 @@ class Quote {
   final String? defectId;
   final String? defectDescription;
   final String? defectSeverity;
+  final String? defectClauseReference;
+  final bool defectTriggeredProhibitedRule;
 
   // Quote content
   final List<QuoteItem> items;
@@ -111,6 +115,8 @@ class Quote {
     this.defectId,
     this.defectDescription,
     this.defectSeverity,
+    this.defectClauseReference,
+    this.defectTriggeredProhibitedRule = false,
     required this.items,
     this.notes,
     this.includeVat = false,
@@ -144,6 +150,8 @@ class Quote {
       'defectId': defectId,
       'defectDescription': defectDescription,
       'defectSeverity': defectSeverity,
+      'defectClauseReference': defectClauseReference,
+      'defectTriggeredProhibitedRule': defectTriggeredProhibitedRule ? 1 : 0,
       'items': items.map((item) => item.toJson()).toList(),
       'notes': notes,
       'includeVat': includeVat,
@@ -174,6 +182,10 @@ class Quote {
       defectId: json['defectId'] as String?,
       defectDescription: json['defectDescription'] as String?,
       defectSeverity: json['defectSeverity'] as String?,
+      defectClauseReference: json['defectClauseReference'] as String?,
+      defectTriggeredProhibitedRule:
+          json['defectTriggeredProhibitedRule'] == 1 ||
+              json['defectTriggeredProhibitedRule'] == true,
       items: (json['items'] as List)
           .map((item) => QuoteItem.fromJson(item as Map<String, dynamic>))
           .toList(),
@@ -183,17 +195,11 @@ class Quote {
         (s) => s.name == json['status'],
         orElse: () => QuoteStatus.draft,
       ),
-      validUntil: DateTime.parse(json['validUntil'] as String),
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      lastModifiedAt: json['lastModifiedAt'] != null
-          ? DateTime.tryParse(json['lastModifiedAt'] as String)
-          : null,
-      sentAt: json['sentAt'] != null
-          ? DateTime.tryParse(json['sentAt'] as String)
-          : null,
-      respondedAt: json['respondedAt'] != null
-          ? DateTime.tryParse(json['respondedAt'] as String)
-          : null,
+      validUntil: jsonDateRequired(json['validUntil']),
+      createdAt: jsonDateRequired(json['createdAt']),
+      lastModifiedAt: jsonDateOptional(json['lastModifiedAt']),
+      sentAt: jsonDateOptional(json['sentAt']),
+      respondedAt: jsonDateOptional(json['respondedAt']),
       convertedJobId: json['convertedJobId'] as String?,
       useCompanyBranding:
           json['useCompanyBranding'] == 1 || json['useCompanyBranding'] == true,
@@ -215,6 +221,8 @@ class Quote {
     String? defectId,
     String? defectDescription,
     String? defectSeverity,
+    String? defectClauseReference,
+    bool? defectTriggeredProhibitedRule,
     List<QuoteItem>? items,
     String? notes,
     bool? includeVat,
@@ -242,6 +250,10 @@ class Quote {
       defectId: defectId ?? this.defectId,
       defectDescription: defectDescription ?? this.defectDescription,
       defectSeverity: defectSeverity ?? this.defectSeverity,
+      defectClauseReference:
+          defectClauseReference ?? this.defectClauseReference,
+      defectTriggeredProhibitedRule:
+          defectTriggeredProhibitedRule ?? this.defectTriggeredProhibitedRule,
       items: items ?? this.items,
       notes: notes ?? this.notes,
       includeVat: includeVat ?? this.includeVat,

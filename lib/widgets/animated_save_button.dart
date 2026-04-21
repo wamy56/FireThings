@@ -137,7 +137,6 @@ class AnimatedSaveButtonState extends State<AnimatedSaveButton>
     final successColor = AppTheme.successGreen;
 
     final isSuccess = _state == _ButtonState.success;
-    final activeBorderColor = isSuccess ? successColor : borderColor;
     final activeFgColor = isSuccess ? successColor : fgColor;
 
     return SizedBox(
@@ -149,7 +148,6 @@ class AnimatedSaveButtonState extends State<AnimatedSaveButton>
         decoration: BoxDecoration(
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: activeBorderColor, width: 1.5),
         ),
         child: Material(
           color: Colors.transparent,

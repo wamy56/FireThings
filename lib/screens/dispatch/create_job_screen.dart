@@ -12,7 +12,12 @@ import '../../services/user_profile_service.dart';
 import '../../services/analytics_service.dart';
 import '../../services/asset_service.dart';
 import '../../services/remote_config_service.dart';
+import '../../services/bs5839_config_service.dart';
+import '../../services/inspection_visit_service.dart';
 import '../../models/asset.dart';
+import '../../models/bs5839_system_config.dart';
+import '../../models/bs5839_variation.dart';
+import '../../models/inspection_visit.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -329,6 +334,11 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
               const SizedBox(height: 8),
               _buildComplianceSummary(),
             ],
+            if (_selectedSiteId != null &&
+                RemoteConfigService.instance.bs5839ModeEnabled) ...[
+              const SizedBox(height: 8),
+              _buildBs5839Summary(),
+            ],
             const SizedBox(height: 12),
             CustomTextField(
               controller: _siteAddressController,
@@ -611,10 +621,10 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
         final assets = snapshot.data ?? [];
         if (assets.isEmpty) return const SizedBox.shrink();
 
-        final active = assets.where((a) => a.complianceStatus != Asset.statusDecommissioned).toList();
-        final pass = active.where((a) => a.complianceStatus == Asset.statusPass).length;
-        final fail = active.where((a) => a.complianceStatus == Asset.statusFail).length;
-        final untested = active.where((a) => a.complianceStatus == Asset.statusUntested).length;
+        final active = assets.where((a) => a.complianceStatus != AssetComplianceStatus.decommissioned).toList();
+        final pass = active.where((a) => a.complianceStatus == AssetComplianceStatus.pass).length;
+        final fail = active.where((a) => a.complianceStatus == AssetComplianceStatus.fail).length;
+        final untested = active.where((a) => a.complianceStatus == AssetComplianceStatus.untested).length;
         final hasWarning = fail > 0 || untested > 0;
 
         return Container(
@@ -680,6 +690,141 @@ class _CreateJobScreenState extends State<CreateJobScreen> {
         );
       },
     );
+  }
+
+  Widget _buildBs5839Summary() {
+    final companyId = UserProfileService.instance.companyId;
+    if (companyId == null || _selectedSiteId == null) {
+      return const SizedBox.shrink();
+    }
+
+    final basePath = 'companies/$companyId';
+    final siteId = _selectedSiteId!;
+
+    return FutureBuilder<Bs5839SystemConfig?>(
+      future: Bs5839ConfigService.instance.getConfig(basePath, siteId),
+      builder: (context, configSnap) {
+        if (configSnap.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        final config = configSnap.data;
+        if (config == null) return const SizedBox.shrink();
+
+        return FutureBuilder<List<dynamic>>(
+          future: Future.wait([
+            InspectionVisitService.instance.getLastVisit(basePath, siteId),
+            Bs5839ConfigService.instance
+                .getActiveVariations(basePath, siteId)
+                .first,
+          ]),
+          builder: (context, snap) {
+            final lastVisit = snap.data?[0] as InspectionVisit?;
+            final variations =
+                (snap.data?[1] as List?)?.cast<Bs5839Variation>() ?? [];
+            final prohibitedCount =
+                variations.where((v) => v.isProhibited).length;
+
+            final declaration = lastVisit?.declaration;
+            final isUnsatisfactory =
+                declaration == InspectionDeclaration.unsatisfactory;
+            final hasProhibited = prohibitedCount > 0;
+            final hasWarning = isUnsatisfactory || hasProhibited;
+
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: hasWarning
+                    ? AppTheme.errorRed.withValues(alpha: 0.08)
+                    : AppTheme.primaryBlue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: hasWarning
+                      ? AppTheme.errorRed.withValues(alpha: 0.3)
+                      : AppTheme.primaryBlue.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(AppIcons.shield, size: 18,
+                          color: hasWarning
+                              ? AppTheme.errorRed
+                              : AppTheme.primaryBlue),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          config.category.displayLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'BS 5839-1:2025',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (hasProhibited)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppTheme.errorRed,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '$prohibitedCount prohibited',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (lastVisit != null) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'Last: ${declaration?.displayLabel ?? 'Not declared'}'
+                      '${lastVisit.nextServiceDueDate != null ? ' · Next service: ${_formatDate(lastVisit.nextServiceDueDate!)}' : ''}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isUnsatisfactory
+                            ? AppTheme.errorRed
+                            : Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.color,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
   }
 
   Widget _buildCustomerAutocomplete() {

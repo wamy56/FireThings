@@ -114,7 +114,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen>
                     Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: Center(
-                        child: OutlinedButton(
+                        child: TextButton(
                           key: _exportButtonKey,
                           onPressed: _isExporting ? null : _exportInvoices,
                           child: _isExporting

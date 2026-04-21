@@ -298,6 +298,36 @@ pw.Widget _buildDefectSummary(Quote quote) {
           quote.defectDescription!,
           style: const pw.TextStyle(fontSize: 10, color: _darkGray),
         ),
+        if (quote.defectClauseReference != null) ...[
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'BS 5839-1:2025 cl. ${quote.defectClauseReference}',
+            style: pw.TextStyle(
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+              color: _darkGray,
+            ),
+          ),
+        ],
+        if (quote.defectTriggeredProhibitedRule) ...[
+          pw.SizedBox(height: 6),
+          pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromInt(0xFFFFEBEE),
+              border: pw.Border.all(color: PdfColor.fromInt(0xFFD32F2F)),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+            ),
+            child: pw.Text(
+              'PROHIBITED VARIATION — This defect violates a mandatory requirement of BS 5839-1:2025 and must be rectified.',
+              style: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColor.fromInt(0xFFD32F2F),
+              ),
+            ),
+          ),
+        ],
       ],
     ),
   );

@@ -1,12 +1,21 @@
-const { onDocumentWritten, onDocumentUpdated } = require("firebase-functions/v2/firestore");
-const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
-const { getMessaging } = require("firebase-admin/messaging");
+const { onDocumentWritten, onDocumentUpdated, onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { db, messaging } = require("./shared");
 
-initializeApp();
+// Callable functions
+const { joinCompany } = require("./company_join");
+const { createCompany } = require("./company_create");
+const { previewCompanyByCode } = require("./company_preview");
+const { updateMemberRole } = require("./update_member_role");
+const { updateMemberPermissions } = require("./update_member_permissions");
+const { storageJanitor } = require("./storage_janitor");
 
-const db = getFirestore();
-const messaging = getMessaging();
+exports.joinCompany = joinCompany;
+exports.createCompany = createCompany;
+exports.previewCompanyByCode = previewCompanyByCode;
+exports.updateMemberRole = updateMemberRole;
+exports.updateMemberPermissions = updateMemberPermissions;
+exports.storageJanitor = storageJanitor;
 
 /**
  * Triggered when a dispatched job is created or updated.
@@ -234,6 +243,164 @@ exports.onJobRescheduled = onDocumentUpdated(
       console.log(`Reschedule notification sent to engineer ${assignee} for job ${event.params.jobId}`);
     } catch (error) {
       console.error("Error sending reschedule notification:", error);
+    }
+  }
+);
+
+/**
+ * BS 5839: Notify dispatchers when a visit is declared unsatisfactory.
+ */
+exports.onVisitDeclarationUnsatisfactory = onDocumentUpdated(
+  "companies/{companyId}/sites/{siteId}/inspection_visits/{visitId}",
+  async (event) => {
+    const before = event.data.before.data();
+    const after = event.data.after.data();
+
+    if (!after || after.declaration !== "unsatisfactory") return;
+    if (before && before.declaration === "unsatisfactory") return;
+
+    const { companyId, siteId } = event.params;
+
+    const membersSnap = await db
+      .collection("companies").doc(companyId)
+      .collection("members")
+      .get();
+
+    const tokens = [];
+    membersSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      const perms = data.permissions || {};
+      if (
+        data.fcmToken &&
+        (data.role === "admin" || data.role === "dispatcher" || perms.dispatch_view_all)
+      ) {
+        tokens.push(data.fcmToken);
+      }
+    });
+
+    if (tokens.length === 0) return;
+
+    const siteName = after.siteId || siteId;
+    const engineer = after.engineerName || "An engineer";
+
+    for (const token of tokens) {
+      try {
+        await messaging.send({
+          token,
+          notification: {
+            title: "Unsatisfactory Declaration",
+            body: `${engineer} declared site ${siteName} unsatisfactory under BS 5839-1:2025`,
+          },
+          data: { type: "bs5839_unsatisfactory", companyId, siteId },
+          android: { priority: "high", notification: { channelId: "firethings_dispatch", sound: "default" } },
+        });
+      } catch (_) {}
+    }
+  }
+);
+
+/**
+ * BS 5839: Notify dispatchers when a prohibited variation is logged.
+ */
+exports.onProhibitedVariationDetected = onDocumentCreated(
+  "companies/{companyId}/sites/{siteId}/variations/{variationId}",
+  async (event) => {
+    const data = event.data.data();
+    if (!data || !data.isProhibited) return;
+
+    const { companyId, siteId } = event.params;
+
+    const membersSnap = await db
+      .collection("companies").doc(companyId)
+      .collection("members")
+      .get();
+
+    const tokens = [];
+    membersSnap.docs.forEach((doc) => {
+      const d = doc.data();
+      if (d.fcmToken && (d.role === "admin" || d.role === "dispatcher")) {
+        tokens.push(d.fcmToken);
+      }
+    });
+
+    if (tokens.length === 0) return;
+
+    const clause = data.clauseReference || "unknown clause";
+    for (const token of tokens) {
+      try {
+        await messaging.send({
+          token,
+          notification: {
+            title: "Prohibited Variation Detected",
+            body: `A prohibited variation (cl. ${clause}) was logged at a BS 5839 site`,
+          },
+          data: { type: "bs5839_prohibited_variation", companyId, siteId },
+          android: { priority: "high", notification: { channelId: "firethings_dispatch", sound: "default" } },
+        });
+      } catch (_) {}
+    }
+  }
+);
+
+/**
+ * BS 5839: Check daily for approaching service windows and notify dispatchers.
+ * Runs at 08:00 UTC every day.
+ */
+exports.onServiceWindowApproaching = onSchedule(
+  { schedule: "0 8 * * *", timeZone: "Europe/London" },
+  async () => {
+    const companiesSnap = await db.collection("companies").get();
+
+    for (const companyDoc of companiesSnap.docs) {
+      const companyId = companyDoc.id;
+      const sitesSnap = await db
+        .collection("companies").doc(companyId)
+        .collection("sites")
+        .where("isBs5839Site", "==", true)
+        .get();
+
+      const approaching = [];
+      const now = new Date();
+      const warningDays = 30;
+      const warningDate = new Date(now.getTime() + warningDays * 24 * 60 * 60 * 1000);
+
+      for (const siteDoc of sitesSnap.docs) {
+        const site = siteDoc.data();
+        if (!site.nextServiceDueDate) continue;
+        const dueDate = new Date(site.nextServiceDueDate);
+        if (dueDate <= warningDate && dueDate >= now) {
+          approaching.push({ name: site.name || siteDoc.id, dueDate: site.nextServiceDueDate });
+        }
+      }
+
+      if (approaching.length === 0) continue;
+
+      const membersSnap = await db
+        .collection("companies").doc(companyId)
+        .collection("members")
+        .get();
+
+      const tokens = [];
+      membersSnap.docs.forEach((doc) => {
+        const d = doc.data();
+        if (d.fcmToken && (d.role === "admin" || d.role === "dispatcher")) {
+          tokens.push(d.fcmToken);
+        }
+      });
+
+      for (const token of tokens) {
+        try {
+          await messaging.send({
+            token,
+            notification: {
+              title: "BS 5839 Services Due",
+              body: `${approaching.length} site(s) have services due within ${warningDays} days`,
+            },
+            data: { type: "bs5839_service_approaching", companyId },
+            android: { priority: "normal", notification: { channelId: "firethings_dispatch" } },
+          });
+        } catch (_) {}
+      }
     }
   }
 );

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/json_helpers.dart';
 import 'pdf_section_layout_config.dart';
 
 /// Status of a jobsheet
@@ -91,7 +92,7 @@ class Jobsheet {
       id: json['id'] as String,
       engineerId: json['engineerId'] as String,
       engineerName: json['engineerName'] as String,
-      date: DateTime.parse(json['date'] as String),
+      date: jsonDateRequired(json['date']),
       customerName: json['customerName'] as String,
       siteAddress: json['siteAddress'] as String,
       jobNumber: json['jobNumber'] as String,
@@ -113,7 +114,7 @@ class Jobsheet {
       defects: json['defects'] is String
           ? List<String>.from(jsonDecode(json['defects'] as String) as List)
           : List<String>.from(json['defects'] as List? ?? []),
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: jsonDateRequired(json['createdAt']),
       status: JobsheetStatus.values.firstWhere(
         (e) => e.name == json['status'],
         orElse: () => JobsheetStatus.completed,
@@ -123,9 +124,7 @@ class Jobsheet {
           ? PdfSectionLayoutConfig.fromJsonString(
               json['sectionLayout'] as String)
           : null,
-      lastModifiedAt: json['lastModifiedAt'] != null
-          ? DateTime.tryParse(json['lastModifiedAt'] as String)
-          : null,
+      lastModifiedAt: jsonDateOptional(json['lastModifiedAt']),
       dispatchedJobId: json['dispatchedJobId'] as String?,
       siteId: json['siteId'] as String?,
       useCompanyBranding: json['useCompanyBranding'] == 1 || json['useCompanyBranding'] == true,

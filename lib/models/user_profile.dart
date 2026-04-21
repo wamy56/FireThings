@@ -45,16 +45,18 @@ class UserProfile {
     );
   }
 
+  static const _sentinel = Object();
+
   UserProfile copyWith({
     String? uid,
-    String? companyId,
-    CompanyRole? companyRole,
+    Object? companyId = _sentinel,
+    Object? companyRole = _sentinel,
     String? fcmToken,
   }) {
     return UserProfile(
       uid: uid ?? this.uid,
-      companyId: companyId ?? this.companyId,
-      companyRole: companyRole ?? this.companyRole,
+      companyId: companyId == _sentinel ? this.companyId : companyId as String?,
+      companyRole: companyRole == _sentinel ? this.companyRole : companyRole as CompanyRole?,
       fcmToken: fcmToken ?? this.fcmToken,
     );
   }

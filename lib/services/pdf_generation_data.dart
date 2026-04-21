@@ -18,6 +18,7 @@ class JobsheetPdfData {
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
   final List<Map<String, dynamic>>? assetServiceRecords;
+  final Map<String, dynamic>? bs5839VisitJson;
 
   JobsheetPdfData({
     required this.jobsheetJson,
@@ -35,6 +36,7 @@ class JobsheetPdfData {
     this.regularFontBytes,
     this.boldFontBytes,
     this.assetServiceRecords,
+    this.bs5839VisitJson,
   });
 }
 
@@ -156,6 +158,8 @@ class ComplianceReportPdfData {
   final List<Map<String, dynamic>> defectsJson;
   final int rectifiedCount;
   final String? lastReportDateStr;
+  final String? bs5839LastDeclaration;
+  final bool bs5839ModeEnabled;
 
   ComplianceReportPdfData({
     required this.siteName,
@@ -181,5 +185,66 @@ class ComplianceReportPdfData {
     this.defectsJson = const [],
     this.rectifiedCount = 0,
     this.lastReportDateStr,
+    this.bs5839LastDeclaration,
+    this.bs5839ModeEnabled = false,
+  });
+}
+
+class Bs5839ReportPdfData {
+  final String siteName;
+  final String siteAddress;
+  final String engineerName;
+  final String companyName;
+  final Uint8List? logoBytes;
+  final Map<String, dynamic> headerConfigJson;
+  final Map<String, dynamic> footerConfigJson;
+  final int colourSchemeValue;
+  final int? secondaryColourValue;
+  final Map<String, dynamic>? sectionStyleJson;
+  final Map<String, dynamic>? typographyJson;
+  final Uint8List? regularFontBytes;
+  final Uint8List? boldFontBytes;
+
+  final Map<String, dynamic> configJson;
+  final Map<String, dynamic> visitJson;
+  final List<Map<String, dynamic>> serviceRecordsJson;
+  final List<Map<String, dynamic>> assetsJson;
+  final List<Map<String, dynamic>> assetTypesJson;
+  final List<Map<String, dynamic>> causeEffectTestsJson;
+  final List<Map<String, dynamic>> variationsJson;
+  final List<Map<String, dynamic>> logbookEntriesJson;
+  final Map<String, dynamic>? competencyJson;
+  final List<Map<String, dynamic>> defectsJson;
+  final List<Map<String, dynamic>> floorPlansJson;
+  final Map<String, Uint8List> floorPlanImages;
+  final Map<String, Uint8List> defectPhotos;
+
+  Bs5839ReportPdfData({
+    required this.siteName,
+    required this.siteAddress,
+    required this.engineerName,
+    required this.companyName,
+    this.logoBytes,
+    required this.headerConfigJson,
+    required this.footerConfigJson,
+    required this.colourSchemeValue,
+    this.secondaryColourValue,
+    this.sectionStyleJson,
+    this.typographyJson,
+    this.regularFontBytes,
+    this.boldFontBytes,
+    required this.configJson,
+    required this.visitJson,
+    required this.serviceRecordsJson,
+    required this.assetsJson,
+    required this.assetTypesJson,
+    required this.causeEffectTestsJson,
+    required this.variationsJson,
+    required this.logbookEntriesJson,
+    this.competencyJson,
+    this.defectsJson = const [],
+    required this.floorPlansJson,
+    required this.floorPlanImages,
+    required this.defectPhotos,
   });
 }

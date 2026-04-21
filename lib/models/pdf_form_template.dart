@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/json_helpers.dart';
 
 /// Enum for different PDF form field types
 enum FormFieldDefinitionType {
@@ -170,10 +171,8 @@ class PdfFormTemplate {
       isBundled: json['isBundled'] as bool? ?? false,
       fields: fieldsList,
       pageCount: json['pageCount'] as int? ?? 1,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
-          : null,
+      createdAt: jsonDateRequired(json['createdAt']),
+      updatedAt: jsonDateOptional(json['updatedAt']),
     );
   }
 
@@ -257,14 +256,10 @@ class FilledPdfForm {
       engineerName: json['engineerName'] as String? ?? '',
       jobReference: json['jobReference'] as String? ?? '',
       fieldValues: values,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      completedAt: json['completedAt'] != null
-          ? DateTime.parse(json['completedAt'] as String)
-          : null,
+      createdAt: jsonDateRequired(json['createdAt']),
+      completedAt: jsonDateOptional(json['completedAt']),
       isComplete: json['isComplete'] == 1 || json['isComplete'] == true,
-      lastModifiedAt: json['lastModifiedAt'] != null
-          ? DateTime.tryParse(json['lastModifiedAt'] as String)
-          : null,
+      lastModifiedAt: jsonDateOptional(json['lastModifiedAt']),
     );
   }
 

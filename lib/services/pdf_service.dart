@@ -13,6 +13,8 @@ import 'service_history_service.dart';
 import 'asset_service.dart';
 import 'asset_type_service.dart';
 import '../data/default_asset_types.dart';
+import 'inspection_visit_service.dart';
+import 'user_profile_service.dart';
 import 'pdf_widgets/pdf_modern_header.dart';
 import 'pdf_widgets/pdf_section_card.dart';
 import 'pdf_widgets/pdf_field_row.dart';
@@ -190,6 +192,8 @@ pw.Widget? _buildSection(
       return _buildSignaturesSection(jobsheet, colors, sectionStyle, typography);
     case PdfSectionId.assetSummary:
       return _buildAssetSummarySection(data, colors, sectionStyle, typography);
+    case PdfSectionId.bs5839Summary:
+      return _buildBs5839SummarySection(data, colors, sectionStyle, typography);
   }
 }
 
@@ -936,6 +940,86 @@ pw.Widget? _buildAssetSummarySection(
   );
 }
 
+pw.Widget? _buildBs5839SummarySection(
+  JobsheetPdfData data,
+  PdfColourScheme colors,
+  PdfSectionStyleConfig sectionStyle,
+  PdfTypographyConfig typography,
+) {
+  final visitJson = data.bs5839VisitJson;
+  if (visitJson == null) return null;
+
+  final visitType = visitJson['visitType'] as String? ?? 'routineService';
+  final declaration = visitJson['declaration'] as String? ?? 'notDeclared';
+  final reportPdfUrl = visitJson['reportPdfUrl'] as String?;
+
+  String visitTypeLabel;
+  switch (visitType) {
+    case 'commissioning':
+      visitTypeLabel = 'Commissioning';
+    case 'routineService':
+      visitTypeLabel = 'Routine Service';
+    case 'modification':
+      visitTypeLabel = 'Modification';
+    case 'reInspection':
+      visitTypeLabel = 'Re-inspection';
+    case 'emergencyCallOut':
+      visitTypeLabel = 'Emergency Call Out';
+    default:
+      visitTypeLabel = visitType;
+  }
+
+  String declarationLabel;
+  switch (declaration) {
+    case 'satisfactory':
+      declarationLabel = 'Satisfactory';
+    case 'satisfactoryWithVariations':
+      declarationLabel = 'Satisfactory with Variations';
+    case 'unsatisfactory':
+      declarationLabel = 'Unsatisfactory';
+    default:
+      declarationLabel = 'Not Declared';
+  }
+
+  final isUnsatisfactory = declaration == 'unsatisfactory';
+
+  return buildSectionCard(
+    title: 'BS 5839-1:2025 Inspection Report',
+    colors: colors,
+    style: sectionStyle,
+    children: [
+      buildFieldGrid(
+        fields: [
+          ('Visit Type', visitTypeLabel),
+          ('Declaration', declarationLabel),
+          ('Full Report', reportPdfUrl != null ? 'Attached separately' : 'Not yet generated'),
+        ],
+        colors: colors,
+        typography: typography,
+      ),
+      if (isUnsatisfactory) ...[
+        pw.SizedBox(height: 10),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(
+            color: PdfColor.fromInt(0x20FF0000),
+            borderRadius: pw.BorderRadius.circular(sectionStyle.cornerRadius.pixels),
+            border: pw.Border.all(color: PdfColor.fromInt(0xFFCC0000), width: 0.5),
+          ),
+          child: pw.Text(
+            'Site is currently non-compliant with BS 5839-1:2025 \u2014 see attached report',
+            style: pw.TextStyle(
+              fontSize: typography.fieldLabelSize + 1,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColor.fromInt(0xFFCC0000),
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
 class PDFService {
   static Future<Uint8List> generateJobsheetPDF(Jobsheet jobsheet) async {
     // ── Gather phase (main thread) ──
@@ -1019,6 +1103,27 @@ class PDFService {
       }
     }
 
+    // ── Fetch BS 5839 visit data if jobsheet has a linked site ──
+    Map<String, dynamic>? bs5839VisitJson;
+    if (jobsheet.siteId != null) {
+      try {
+        final user = AuthService().currentUser;
+        if (user != null) {
+          final profile = UserProfileService.instance;
+          final bp = profile.companyId != null
+              ? 'companies/${profile.companyId}'
+              : 'users/${user.uid}';
+          final visit = await InspectionVisitService.instance
+              .getVisitByJobsheetId(bp, jobsheet.siteId!, jobsheet.id);
+          if (visit != null) {
+            bs5839VisitJson = visit.toJson();
+          }
+        }
+      } catch (e) {
+        debugPrint('Error fetching BS 5839 visit for PDF: $e');
+      }
+    }
+
     final data = JobsheetPdfData(
       jobsheetJson: jobsheet.toJson(),
       logoBytes: logoBytes,
@@ -1035,6 +1140,7 @@ class PDFService {
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
       assetServiceRecords: assetServiceRecords,
+      bs5839VisitJson: bs5839VisitJson,
     );
 
     // ── Build phase ──

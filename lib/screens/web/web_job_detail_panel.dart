@@ -345,10 +345,10 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
         final assets = snapshot.data ?? [];
         if (assets.isEmpty) return const SizedBox.shrink();
 
-        final active = assets.where((a) => a.complianceStatus != Asset.statusDecommissioned).toList();
-        final pass = active.where((a) => a.complianceStatus == Asset.statusPass).length;
-        final fail = active.where((a) => a.complianceStatus == Asset.statusFail).length;
-        final untested = active.where((a) => a.complianceStatus == Asset.statusUntested).length;
+        final active = assets.where((a) => a.complianceStatus != AssetComplianceStatus.decommissioned).toList();
+        final pass = active.where((a) => a.complianceStatus == AssetComplianceStatus.pass).length;
+        final fail = active.where((a) => a.complianceStatus == AssetComplianceStatus.fail).length;
+        final untested = active.where((a) => a.complianceStatus == AssetComplianceStatus.untested).length;
 
         final now = DateTime.now();
         final lifecycleWarnings = active.where((a) {

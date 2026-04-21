@@ -16,51 +16,46 @@ service cloud.firestore {
     // Company data
     match /companies/{companyId} {
 
-      // Company document: readable by any authenticated user (needed for join-by-invite-code query)
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
+      // Company document: only members can read (join/create via Cloud Functions)
+      allow read: if isCompanyMember(companyId);
+      allow create: if false;
       allow update: if hasPermission(companyId, 'company_edit');
       allow delete: if hasPermission(companyId, 'company_delete');
 
       // Members subcollection
       match /members/{memberId} {
-        // Members can read all members (to see team list)
+        // Members can read all members (team list)
         allow read: if isCompanyMember(companyId);
-        // Allow users to check their own membership status (needed for join flow)
+        // Allow users to check their own membership status
         allow get: if request.auth != null && request.auth.uid == memberId;
-        // Team managers can remove members, or members can leave (self-delete)
-        allow delete: if hasPermission(companyId, 'team_manage')
-                      || request.auth.uid == memberId;
-        // Team managers can create members, OR users can create their own member doc
-        allow create: if hasPermission(companyId, 'team_manage')
-                      || (request.auth.uid == memberId
-                          && request.resource.data.isActive == true
-                          && (
-                            // Founder: can self-add as admin when company doc doesn't exist yet (same batch)
-                            (request.resource.data.role == "admin"
-                              && !exists(/databases/$(database)/documents/companies/$(companyId)))
-                            // Joiner: can self-add as engineer to an existing company
-                            || request.resource.data.role == "engineer"
-                          ));
-        // Team managers can update any member
-        allow update: if hasPermission(companyId, 'team_manage');
-        // Members can update their own fcmToken
+        // Only team managers can remove members (via soft-delete)
+        allow delete: if hasPermission(companyId, 'team_manage');
+        // Joining and founding are now via Cloud Functions only
+        allow create: if hasPermission(companyId, 'team_manage');
+        // Team managers can update members, but cannot change role or permissions directly
+        allow update: if hasPermission(companyId, 'team_manage')
+                      && !request.resource.data.diff(resource.data).affectedKeys()
+                          .hasAny(['role', 'permissions']);
+        // Members can update their own fcmToken only
         allow update: if request.auth.uid == memberId
                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmToken']);
+        // Members can self-soft-delete (leave company)
+        allow update: if request.auth.uid == memberId
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['isActive', 'leftAt'])
+                      && request.resource.data.isActive == false;
       }
 
       // Dispatched jobs
       match /dispatched_jobs/{jobId} {
-        // All company members can read all jobs
         allow read: if isCompanyMember(companyId);
-        // Members with dispatch_create permission can create jobs
         allow create: if hasPermission(companyId, 'dispatch_create');
-        // Members with dispatch_edit can fully update, engineers can update status fields on their assigned jobs
+        // Engineers can update status fields on their assigned jobs (no reassignment)
         allow update: if hasPermission(companyId, 'dispatch_edit')
                       || (isCompanyMember(companyId)
                           && resource.data.assignedTo == request.auth.uid
                           && request.resource.data.diff(resource.data).affectedKeys()
-                             .hasOnly(['status', 'updatedAt', 'completedAt', 'linkedJobsheetId', 'lastUpdatedBy', 'declineReason', 'assignedTo', 'assignedToName']));
+                             .hasOnly(['status', 'updatedAt', 'completedAt', 'linkedJobsheetId', 'lastUpdatedBy', 'declineReason']));
         allow delete: if hasPermission(companyId, 'dispatch_delete');
       }
 
@@ -90,20 +85,64 @@ service cloud.firestore {
         // Asset service history (immutable audit trail)
         match /asset_service_history/{recordId} {
           allow read: if isCompanyMember(companyId);
-          allow create: if isCompanyMember(companyId);
+          allow create: if hasPermission(companyId, 'assets_test');
         }
 
         // Asset defects
         match /defects/{defectId} {
           allow read: if isCompanyMember(companyId);
-          allow create, update: if isCompanyMember(companyId);
-          allow delete: if hasPermission(companyId, 'assets_delete');
+          allow create: if hasPermission(companyId, 'defects_log');
+          allow update: if hasPermission(companyId, 'defects_rectify');
+          allow delete: if hasPermission(companyId, 'defects_delete');
         }
 
-        // Compliance metadata
+        // Compliance metadata (immutable audit — admin can update)
         match /compliance_meta/{docId} {
           allow read: if isCompanyMember(companyId);
-          allow write: if isCompanyMember(companyId);
+          allow create: if isCompanyMember(companyId);
+          allow update: if hasPermission(companyId, 'company_edit');
+          allow delete: if false;
+        }
+
+        // BS 5839 system config (singleton per site)
+        match /bs5839_config/{docId} {
+          allow read: if isCompanyMember(companyId);
+          allow create, update: if hasPermission(companyId, 'bs5839_config_edit');
+          allow delete: if false;
+        }
+
+        // Inspection visits (immutable once declared)
+        match /inspection_visits/{visitId} {
+          allow read: if isCompanyMember(companyId);
+          allow create: if hasPermission(companyId, 'assets_test');
+          allow update: if hasPermission(companyId, 'assets_test')
+                        && resource.data.declaration == 'notDeclared';
+          allow delete: if false;
+        }
+
+        // Variations register (corrections via new records, not edits)
+        match /variations/{variationId} {
+          allow read: if isCompanyMember(companyId);
+          allow create: if isCompanyMember(companyId);
+          allow update: if hasPermission(companyId, 'bs5839_approve_variations')
+                        || (isCompanyMember(companyId)
+                            && resource.data.loggedByEngineerId == request.auth.uid);
+          allow delete: if false;
+        }
+
+        // Cause-and-effect tests (fully immutable audit trail)
+        match /cause_effect_tests/{testId} {
+          allow read: if isCompanyMember(companyId);
+          allow create: if hasPermission(companyId, 'assets_test');
+          allow update, delete: if false;
+        }
+
+        // Logbook entries
+        match /logbook_entries/{entryId} {
+          allow read: if isCompanyMember(companyId);
+          allow create: if isCompanyMember(companyId);
+          allow delete: if hasPermission(companyId, 'company_edit');
+          allow update: if false;
         }
       }
 
@@ -124,13 +163,17 @@ service cloud.firestore {
       // Completed jobsheets shared with the company
       match /completed_jobsheets/{jobsheetId} {
         allow read: if isCompanyMember(companyId);
-        allow write: if isCompanyMember(companyId);
+        allow create: if isCompanyMember(companyId);
+        allow update: if hasPermission(companyId, 'jobsheets_edit');
+        allow delete: if hasPermission(companyId, 'jobsheets_delete');
       }
 
       // Company invoices
       match /invoices/{invoiceId} {
         allow read: if isCompanyMember(companyId);
-        allow create, update, delete: if isCompanyMember(companyId);
+        allow create: if hasPermission(companyId, 'invoices_create');
+        allow update: if hasPermission(companyId, 'invoices_edit');
+        allow delete: if hasPermission(companyId, 'invoices_delete');
       }
 
       // Company quotes
@@ -144,6 +187,13 @@ service cloud.firestore {
       match /pdf_config/{configId} {
         allow read: if isCompanyMember(companyId);
         allow write: if hasPermission(companyId, 'pdf_branding');
+      }
+
+      // Engineer competency (per member)
+      match /members/{memberId}/competency/{docId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if request.auth.uid == memberId
+                     || hasPermission(companyId, 'team_manage');
       }
     }
 

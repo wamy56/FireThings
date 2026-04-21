@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -10,7 +11,8 @@ import '../models/user_profile.dart';
 
 /// Manages the current user's profile (company association, FCM token).
 /// Caches companyId and role in SharedPreferences for quick startup checks.
-class UserProfileService {
+/// Extends ChangeNotifier so UI can react to real-time permission updates.
+class UserProfileService extends ChangeNotifier {
   UserProfileService._();
   static final UserProfileService instance = UserProfileService._();
 
@@ -24,6 +26,7 @@ class UserProfileService {
 
   UserProfile? _cachedProfile;
   CompanyMember? _cachedMember;
+  StreamSubscription<DocumentSnapshot>? _memberSub;
 
   /// The current cached profile.
   UserProfile? get profile => _cachedProfile;
@@ -55,6 +58,33 @@ class UserProfileService {
     return _cachedMember!.hasPermission(perm);
   }
 
+  /// Resolves the display name for the current user, falling back through:
+  /// 1. CompanyMember.displayName (Firestore)
+  /// 2. FirebaseAuth.currentUser.displayName
+  /// 3. The local-part of the email address (capitalised)
+  /// Never returns 'Unknown' — throws if no name can be resolved.
+  String resolveEngineerName() {
+    if (_cachedMember?.displayName.isNotEmpty == true) {
+      return _cachedMember!.displayName;
+    }
+
+    final user = _auth.currentUser;
+    if (user?.displayName?.isNotEmpty == true) return user!.displayName!;
+
+    final email = user?.email;
+    if (email != null && email.contains('@')) {
+      final localPart = email.split('@').first;
+      if (localPart.isNotEmpty) {
+        return localPart[0].toUpperCase() + localPart.substring(1);
+      }
+    }
+
+    throw ProfileNotLoadedException(
+      'Engineer name cannot be resolved. Profile must be loaded before '
+      'recording audit data.',
+    );
+  }
+
   String? get _uid => _auth.currentUser?.uid;
 
   DocumentReference? get _profileDoc {
@@ -66,8 +96,11 @@ class UserProfileService {
   /// Load user profile from Firestore + SharedPreferences cache.
   /// Call this after login from AuthWrapper.
   Future<void> loadProfile(String uid) async {
+    _cachedMember = null;
+    _cachedProfile = null;
+    notifyListeners();
+
     try {
-      // Try Firestore first
       final doc = await _firestore
           .collection('users')
           .doc(uid)
@@ -83,14 +116,13 @@ class UserProfileService {
         _cachedProfile = UserProfile(uid: uid);
       }
 
-      // Load member doc if user belongs to a company
       await _loadMemberDoc(uid, _cachedProfile!.companyId);
 
-      // Cache to SharedPreferences
       await _cacheToPrefs(_cachedProfile!);
+
+      _setupMemberListener(uid, _cachedProfile!.companyId);
     } catch (e) {
       debugPrint('UserProfileService: loadProfile failed: $e');
-      // Fall back to SharedPreferences
       await _loadFromPrefs(uid);
     }
   }
@@ -110,16 +142,85 @@ class UserProfileService {
           .get();
 
       if (memberDoc.exists && memberDoc.data() != null) {
-        _cachedMember = CompanyMember.fromJson(memberDoc.data()!);
-        // Sync role back to profile cache
-        _cachedProfile = _cachedProfile?.copyWith(companyRole: _cachedMember!.role);
+        final member = CompanyMember.fromJson(memberDoc.data()!);
+
+        if (!member.isActive) {
+          debugPrint('UserProfileService: member is inactive — clearing profile');
+          _cachedMember = null;
+          _cachedProfile = _cachedProfile?.copyWith(
+            companyId: null,
+            companyRole: null,
+          );
+          if (_cachedProfile != null) await _cacheToPrefs(_cachedProfile!);
+          return;
+        }
+
+        _cachedMember = member;
+        _cachedProfile = _cachedProfile?.copyWith(companyRole: member.role);
       } else {
         _cachedMember = null;
+        _cachedProfile = _cachedProfile?.copyWith(
+          companyId: null,
+          companyRole: null,
+        );
+        if (_cachedProfile != null) await _cacheToPrefs(_cachedProfile!);
       }
     } catch (e) {
       debugPrint('UserProfileService: _loadMemberDoc failed: $e');
-      // _cachedMember stays as whatever it was (possibly loaded from prefs)
     }
+  }
+
+  void _setupMemberListener(String uid, String? companyId) {
+    _memberSub?.cancel();
+    _memberSub = null;
+    if (companyId == null) return;
+
+    _memberSub = _firestore
+        .collection('companies')
+        .doc(companyId)
+        .collection('members')
+        .doc(uid)
+        .snapshots()
+        .listen((doc) async {
+      if (!doc.exists || doc.data() == null) {
+        _cachedMember = null;
+        _cachedProfile = _cachedProfile?.copyWith(
+          companyId: null,
+          companyRole: null,
+        );
+        if (_cachedProfile != null) await _cacheToPrefs(_cachedProfile!);
+        notifyListeners();
+        return;
+      }
+
+      final newMember = CompanyMember.fromJson(doc.data()!);
+      if (!newMember.isActive) {
+        _cachedMember = null;
+        _cachedProfile = _cachedProfile?.copyWith(
+          companyId: null,
+          companyRole: null,
+        );
+        if (_cachedProfile != null) await _cacheToPrefs(_cachedProfile!);
+        notifyListeners();
+        return;
+      }
+
+      final roleChanged = newMember.role != _cachedMember?.role;
+      final permsChanged = !mapEquals(
+        newMember.permissions,
+        _cachedMember?.permissions,
+      );
+
+      _cachedMember = newMember;
+      if (roleChanged) {
+        _cachedProfile = _cachedProfile?.copyWith(companyRole: newMember.role);
+        if (_cachedProfile != null) await _cacheToPrefs(_cachedProfile!);
+      }
+
+      if (roleChanged || permsChanged) {
+        notifyListeners();
+      }
+    });
   }
 
   /// Save profile to Firestore and update local cache.
@@ -145,13 +246,11 @@ class UserProfileService {
         UserProfile(uid: uid, fcmToken: token);
 
     try {
-      // Update user profile
       final doc = _profileDoc;
       if (doc != null) {
         await doc.set({'fcmToken': token}, SetOptions(merge: true));
       }
 
-      // Update company member doc if in a company
       final cId = companyId;
       if (cId != null) {
         await _firestore
@@ -168,6 +267,8 @@ class UserProfileService {
 
   /// Clear cached profile (on sign out).
   Future<void> clearProfile() async {
+    _memberSub?.cancel();
+    _memberSub = null;
     _cachedProfile = null;
     _cachedMember = null;
     final prefs = await SharedPreferences.getInstance();
@@ -192,7 +293,6 @@ class UserProfileService {
     if (profile.fcmToken != null) {
       await prefs.setString(_fcmTokenKey, profile.fcmToken!);
     }
-    // Cache permissions
     if (_cachedMember != null) {
       await prefs.setString(
         _permissionsKey,
@@ -225,7 +325,6 @@ class UserProfileService {
       fcmToken: token,
     );
 
-    // Restore cached member from SharedPreferences
     if (memberJson != null) {
       try {
         _cachedMember = CompanyMember.fromJson(
@@ -237,4 +336,11 @@ class UserProfileService {
       }
     }
   }
+}
+
+class ProfileNotLoadedException implements Exception {
+  final String message;
+  ProfileNotLoadedException(this.message);
+  @override
+  String toString() => 'ProfileNotLoadedException: $message';
 }

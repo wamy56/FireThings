@@ -117,9 +117,17 @@ class DefectService {
         .where('assetId', isEqualTo: assetId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Defect.fromJson(doc.data()))
-            .toList());
+        .map((snapshot) {
+      final defects = <Defect>[];
+      for (final doc in snapshot.docs) {
+        try {
+          defects.add(Defect.fromJson(doc.data()));
+        } catch (e) {
+          debugPrint('Skipping malformed defect ${doc.id}: $e');
+        }
+      }
+      return defects;
+    });
   }
 
   /// One-shot fetch of open defects for an asset.
@@ -146,9 +154,17 @@ class DefectService {
         .where('status', isEqualTo: Defect.statusOpen)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Defect.fromJson(doc.data()))
-            .toList());
+        .map((snapshot) {
+      final defects = <Defect>[];
+      for (final doc in snapshot.docs) {
+        try {
+          defects.add(Defect.fromJson(doc.data()));
+        } catch (e) {
+          debugPrint('Skipping malformed defect ${doc.id}: $e');
+        }
+      }
+      return defects;
+    });
   }
 
   /// One-shot fetch of all defects for a site.

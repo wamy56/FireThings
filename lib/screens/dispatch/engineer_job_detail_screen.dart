@@ -8,6 +8,8 @@ import '../../services/analytics_service.dart';
 import '../../services/asset_service.dart';
 import '../../services/remote_config_service.dart';
 import '../../services/user_profile_service.dart';
+import '../../services/bs5839_config_service.dart';
+import '../../services/inspection_visit_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
@@ -118,6 +120,13 @@ class _EngineerJobContent extends StatelessWidget {
         if (job.companySiteId != null &&
             RemoteConfigService.instance.assetRegisterEnabled) ...[
           _buildSiteAssetsSection(context),
+          const SizedBox(height: 16),
+        ],
+
+        // BS 5839 Inspection section (conditional)
+        if (job.companySiteId != null &&
+            RemoteConfigService.instance.bs5839ModeEnabled) ...[
+          _Bs5839InspectionSection(job: job, isDark: isDark),
           const SizedBox(height: 16),
         ],
 
@@ -399,10 +408,10 @@ class _EngineerJobContent extends StatelessWidget {
           ]);
         }
 
-        final active = assets.where((a) => a.complianceStatus != Asset.statusDecommissioned).toList();
-        final pass = active.where((a) => a.complianceStatus == Asset.statusPass).length;
-        final fail = active.where((a) => a.complianceStatus == Asset.statusFail).length;
-        final untested = active.where((a) => a.complianceStatus == Asset.statusUntested).length;
+        final active = assets.where((a) => a.complianceStatus != AssetComplianceStatus.decommissioned).toList();
+        final pass = active.where((a) => a.complianceStatus == AssetComplianceStatus.pass).length;
+        final fail = active.where((a) => a.complianceStatus == AssetComplianceStatus.fail).length;
+        final untested = active.where((a) => a.complianceStatus == AssetComplianceStatus.untested).length;
 
         // Lifecycle warnings
         final now = DateTime.now();
@@ -621,5 +630,217 @@ class _EngineerJobContent extends StatelessWidget {
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
+  }
+}
+
+class _Bs5839InspectionSection extends StatefulWidget {
+  final DispatchedJob job;
+  final bool isDark;
+
+  const _Bs5839InspectionSection({required this.job, required this.isDark});
+
+  @override
+  State<_Bs5839InspectionSection> createState() =>
+      _Bs5839InspectionSectionState();
+}
+
+class _Bs5839InspectionSectionState extends State<_Bs5839InspectionSection> {
+  bool _creating = false;
+
+  String get _basePath => 'companies/${widget.job.companyId}';
+  String get _siteId => widget.job.companySiteId!;
+
+  Future<void> _startVisit() async {
+    setState(() => _creating = true);
+    try {
+      final profile = UserProfileService.instance;
+      final visitId = InspectionVisitService.instance
+          .generateId(_basePath, _siteId);
+      final visit = InspectionVisit(
+        id: visitId,
+        siteId: _siteId,
+        engineerId: profile.profile?.uid ?? '',
+        engineerName: profile.resolveEngineerName(),
+        visitType: InspectionVisitType.routineService,
+        visitDate: DateTime.now(),
+        jobsheetId: widget.job.linkedJobsheetId,
+        dispatchedJobId: widget.job.id,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await InspectionVisitService.instance
+          .saveVisit(_basePath, _siteId, visit);
+      if (mounted) {
+        context.showSuccessToast('Compliance visit started');
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        context.showErrorToast('Failed to start visit: $e');
+      }
+    } finally {
+      if (mounted) setState(() => _creating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Bs5839SystemConfig?>(
+      future: Bs5839ConfigService.instance.getConfig(_basePath, _siteId),
+      builder: (context, configSnap) {
+        if (configSnap.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        final config = configSnap.data;
+        if (config == null) return const SizedBox.shrink();
+
+        return StreamBuilder<List<InspectionVisit>>(
+          stream: InspectionVisitService.instance
+              .getVisitsStream(_basePath, _siteId),
+          builder: (context, visitSnap) {
+            final visits = visitSnap.data ?? [];
+            final linkedVisit = visits
+                .where((v) => v.dispatchedJobId == widget.job.id)
+                .toList();
+            final activeVisit = linkedVisit.isNotEmpty
+                ? linkedVisit.first
+                : null;
+            final isCompleted = activeVisit?.completedAt != null;
+
+            return Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppTheme.cardPadding),
+              decoration: BoxDecoration(
+                color: widget.isDark
+                    ? AppTheme.darkSurfaceElevated
+                    : Colors.white,
+                borderRadius:
+                    BorderRadius.circular(AppTheme.cardRadius),
+                boxShadow:
+                    widget.isDark ? null : AppTheme.cardShadow,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(AppIcons.shield, size: 18,
+                          color: AppTheme.mediumGrey),
+                      const SizedBox(width: 8),
+                      Text(
+                        'BS 5839 Inspection',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: widget.isDark
+                              ? AppTheme.darkTextSecondary
+                              : AppTheme.mediumGrey,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlue,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          config.category.displayLabel,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (activeVisit == null)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _creating ? null : _startVisit,
+                        icon: _creating
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2),
+                              )
+                            : Icon(AppIcons.play),
+                        label: const Text(
+                            'Start Compliance Visit'),
+                      ),
+                    )
+                  else ...[
+                    _visitRow(
+                      'Visit Type',
+                      activeVisit.visitType.displayLabel,
+                    ),
+                    _visitRow(
+                      'Status',
+                      isCompleted
+                          ? activeVisit.declaration.displayLabel
+                          : 'In Progress',
+                    ),
+                    if (isCompleted &&
+                        activeVisit.reportPdfUrl != null) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            launchUrl(
+                              Uri.parse(activeVisit.reportPdfUrl!),
+                              mode:
+                                  LaunchMode.externalApplication,
+                            );
+                          },
+                          icon: Icon(AppIcons.document),
+                          label: const Text('View Report'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _visitRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: widget.isDark
+                    ? AppTheme.darkTextSecondary
+                    : AppTheme.mediumGrey,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

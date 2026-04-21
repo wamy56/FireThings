@@ -29,3 +29,4 @@ export 'full_screen_image_viewer.dart';
 export 'asset_photo_gallery.dart';
 export 'selection_app_bar.dart';
 export 'selectable_avatar.dart';
+export 'prohibited_variations_alert.dart';

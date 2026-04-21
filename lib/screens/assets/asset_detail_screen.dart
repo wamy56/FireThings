@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 import '../../models/asset.dart';
 import '../../models/asset_type.dart';
 import '../../models/service_record.dart';
@@ -14,6 +13,7 @@ import '../../services/asset_type_service.dart';
 import '../../services/defect_service.dart';
 import '../../services/service_history_service.dart';
 import '../../services/analytics_service.dart';
+import '../../services/asset_test_service.dart';
 import '../../services/remote_config_service.dart';
 import '../../services/quote_service.dart';
 import '../../models/permission.dart';
@@ -102,22 +102,28 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     }
   }
 
-  Color _colorForStatus(String status) {
+  Color _colorForStatus(AssetComplianceStatus status) {
     switch (status) {
-      case Asset.statusPass: return const Color(0xFF4CAF50);
-      case Asset.statusFail: return const Color(0xFFD32F2F);
-      case Asset.statusDecommissioned: return Colors.grey;
-      default: return const Color(0xFF9E9E9E);
+      case AssetComplianceStatus.pass: return const Color(0xFF4CAF50);
+      case AssetComplianceStatus.fail: return const Color(0xFFD32F2F);
+      case AssetComplianceStatus.decommissioned: return Colors.grey;
+      case AssetComplianceStatus.untested: return const Color(0xFF9E9E9E);
     }
   }
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case Asset.statusPass: return 'Pass';
-      case Asset.statusFail: return 'Fail';
-      case Asset.statusDecommissioned: return 'Decommissioned';
-      default: return 'Untested';
+  String _statusLabel(AssetComplianceStatus status) {
+    return status.displayLabel;
+  }
+
+  bool _hasChecklistDrift(Asset asset, AssetType? type) {
+    if (asset.complianceStatus != AssetComplianceStatus.pass &&
+        asset.complianceStatus != AssetComplianceStatus.fail) {
+      return false;
     }
+    if (type == null) return false;
+    final tested = asset.lastChecklistVersionTested;
+    if (tested == null) return false;
+    return tested < type.checklistVersion;
   }
 
   Future<void> _navigateToEdit() async {
@@ -248,7 +254,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
           widget.basePath,
           widget.siteId,
           _asset!.copyWith(
-            complianceStatus: Asset.statusDecommissioned,
+            complianceStatus: AssetComplianceStatus.decommissioned,
             decommissionDate: DateTime.now(),
             decommissionReason: reason,
           ),
@@ -302,50 +308,40 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
   Future<void> _passAsset() async {
     if (_asset == null || _isTestSaving) return;
-    setState(() => _isTestSaving = true);
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final originalAsset = _asset!;
+    final now = DateTime.now();
+
+    setState(() {
+      _isTestSaving = true;
+      _asset = _asset!.copyWith(
+        complianceStatus: AssetComplianceStatus.pass,
+        lastServiceDate: now,
+      );
+    });
+    context.showSuccessToast('Asset passed');
+
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('Not signed in');
-      final now = DateTime.now();
-      final record = ServiceRecord(
-        id: const Uuid().v4(),
-        assetId: _asset!.id,
+      await AssetTestService.instance.markAssetPassed(
+        basePath: widget.basePath,
         siteId: widget.siteId,
+        asset: originalAsset,
+        assetType: _assetType,
         engineerId: user.uid,
-        engineerName: user.displayName ?? 'Unknown',
-        serviceDate: now,
-        overallResult: 'pass',
-        createdAt: now,
-      );
-      await ServiceHistoryService.instance
-          .createRecord(widget.basePath, widget.siteId, record);
-      await AssetService.instance.updateAsset(
-        widget.basePath,
-        widget.siteId,
-        _asset!.copyWith(
-          complianceStatus: Asset.statusPass,
-          lastServiceDate: now,
-          lastServiceBy: user.uid,
-          lastServiceByName: user.displayName ?? 'Unknown',
-          nextServiceDue: DateTime(now.year + 1, now.month, now.day),
-        ),
-      );
-      await DefectService.instance.rectifyAllForAsset(
-        widget.basePath,
-        widget.siteId,
-        _asset!.id,
-        rectifiedBy: user.uid,
-        rectifiedByName: user.displayName ?? 'Unknown',
+        engineerName: UserProfileService.instance.resolveEngineerName(),
       );
       AnalyticsService.instance.logAssetTested(
-        assetType: _asset!.assetTypeId,
+        assetType: originalAsset.assetTypeId,
         result: 'pass',
         siteId: widget.siteId,
       );
-      if (mounted) context.showSuccessToast('Asset passed');
-      _loadAsset();
     } catch (e) {
-      if (mounted) context.showErrorToast('Failed to save');
+      if (mounted) {
+        setState(() => _asset = originalAsset);
+        context.showErrorToast('Failed to save — test was not recorded');
+      }
     } finally {
       if (mounted) setState(() => _isTestSaving = false);
     }
@@ -416,7 +412,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                     value: 'scan_barcode',
                     child: Text('Scan Barcode'),
                   ),
-                if (asset.complianceStatus != Asset.statusDecommissioned)
+                if (asset.complianceStatus != AssetComplianceStatus.decommissioned)
                   const PopupMenuItem(
                     value: 'decommission',
                     child: Text('Decommission'),
@@ -492,12 +488,32 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                     ),
                   ),
                 ),
+                // Checklist drift warning
+                if (_hasChecklistDrift(asset, type)) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Checklist updated — re-test recommended',
+                      style: TextStyle(
+                        color: Color(0xFFF59E0B),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
 
           // Test buttons
-          if (asset.complianceStatus != Asset.statusDecommissioned) ...[
+          if (asset.complianceStatus != AssetComplianceStatus.decommissioned) ...[
             const SizedBox(height: 16),
             if (_isTestSaving)
               const Center(
@@ -644,7 +660,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
             ),
           ],
           // Decommission info
-          if (asset.complianceStatus == Asset.statusDecommissioned) ...[
+          if (asset.complianceStatus == AssetComplianceStatus.decommissioned) ...[
             const SizedBox(height: AppTheme.sectionGap),
             _SectionHeader('Decommissioned'),
             const SizedBox(height: 8),
@@ -1343,7 +1359,7 @@ class _ActiveDefectCard extends StatelessWidget {
                   defect.id,
                   rectifiedBy: user.uid,
                   rectifiedByName:
-                      user.displayName ?? 'Unknown',
+                      UserProfileService.instance.resolveEngineerName(),
                   rectifiedNote:
                       noteController.text.trim().isNotEmpty
                           ? noteController.text.trim()

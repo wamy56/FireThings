@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// Represents a defect found on an asset during inspection.
 /// Lives as a first-class entity in Firestore with its own lifecycle (open/rectified).
 class Defect {
@@ -26,6 +28,8 @@ class Defect {
   final String? rectifiedNote;
   final String? serviceRecordId; // links to the service record that created it
   final String? linkedQuoteId;
+  final String? bs5839ClauseReference;
+  final bool triggeredProhibitedRule;
 
   Defect({
     required this.id,
@@ -46,6 +50,8 @@ class Defect {
     this.rectifiedNote,
     this.serviceRecordId,
     this.linkedQuoteId,
+    this.bs5839ClauseReference,
+    this.triggeredProhibitedRule = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -68,6 +74,8 @@ class Defect {
       'rectifiedNote': rectifiedNote,
       'serviceRecordId': serviceRecordId,
       'linkedQuoteId': linkedQuoteId,
+      'bs5839ClauseReference': bs5839ClauseReference,
+      'triggeredProhibitedRule': triggeredProhibitedRule,
     };
   }
 
@@ -87,15 +95,16 @@ class Defect {
       action: json['action'] as String?,
       createdBy: json['createdBy'] as String,
       createdByName: json['createdByName'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: jsonDateRequired(json['createdAt']),
       rectifiedBy: json['rectifiedBy'] as String?,
       rectifiedByName: json['rectifiedByName'] as String?,
-      rectifiedAt: json['rectifiedAt'] != null
-          ? DateTime.tryParse(json['rectifiedAt'] as String)
-          : null,
+      rectifiedAt: jsonDateOptional(json['rectifiedAt']),
       rectifiedNote: json['rectifiedNote'] as String?,
       serviceRecordId: json['serviceRecordId'] as String?,
       linkedQuoteId: json['linkedQuoteId'] as String?,
+      bs5839ClauseReference: json['bs5839ClauseReference'] as String?,
+      triggeredProhibitedRule:
+          json['triggeredProhibitedRule'] as bool? ?? false,
     );
   }
 
@@ -118,6 +127,8 @@ class Defect {
     String? rectifiedNote,
     String? serviceRecordId,
     String? linkedQuoteId,
+    String? bs5839ClauseReference,
+    bool? triggeredProhibitedRule,
   }) {
     return Defect(
       id: id ?? this.id,
@@ -138,6 +149,10 @@ class Defect {
       rectifiedNote: rectifiedNote ?? this.rectifiedNote,
       serviceRecordId: serviceRecordId ?? this.serviceRecordId,
       linkedQuoteId: linkedQuoteId ?? this.linkedQuoteId,
+      bs5839ClauseReference:
+          bs5839ClauseReference ?? this.bs5839ClauseReference,
+      triggeredProhibitedRule:
+          triggeredProhibitedRule ?? this.triggeredProhibitedRule,
     );
   }
 

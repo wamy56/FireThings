@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// Represents a floor plan image for a site, onto which assets are pinned.
 class FloorPlan {
   final String id;
@@ -61,11 +63,9 @@ class FloorPlan {
       imageWidth: (json['imageWidth'] as num).toDouble(),
       imageHeight: (json['imageHeight'] as num).toDouble(),
       createdBy: json['createdBy'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
-      lastModifiedAt: json['lastModifiedAt'] != null
-          ? DateTime.tryParse(json['lastModifiedAt'] as String)
-          : null,
+      createdAt: jsonDateRequired(json['createdAt']),
+      updatedAt: jsonDateRequired(json['updatedAt']),
+      lastModifiedAt: jsonDateOptional(json['lastModifiedAt']),
       pinScale: (json['pinScale'] as num?)?.toDouble() ?? 1.0,
       fileExtension: json['fileExtension'] as String? ?? 'jpg',
       showLabels: json['showLabels'] as bool? ?? true,

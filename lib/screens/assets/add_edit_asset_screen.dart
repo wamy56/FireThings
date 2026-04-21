@@ -264,7 +264,7 @@ class _AddEditAssetScreenState extends State<AddEditAssetScreen> {
         expectedLifespanYears: _expectedLifespan,
         complianceStatus: _isEditing
             ? widget.asset!.complianceStatus
-            : Asset.statusUntested,
+            : AssetComplianceStatus.untested,
         createdBy: _isEditing ? widget.asset!.createdBy : user.uid,
         createdAt: _isEditing ? widget.asset!.createdAt : now,
         updatedAt: now,

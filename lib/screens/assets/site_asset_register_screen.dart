@@ -11,6 +11,7 @@ import '../../utils/theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/widgets.dart';
+import '../../services/inspection_visit_service.dart';
 import '../../services/remote_config_service.dart';
 import 'add_edit_asset_screen.dart';
 import 'asset_detail_screen.dart';
@@ -18,6 +19,9 @@ import 'barcode_scanner_screen.dart';
 import 'batch_test_screen.dart';
 import 'asset_type_config_screen.dart';
 import 'compliance_report_screen.dart';
+import '../bs5839/bs5839_report_screen.dart';
+import '../bs5839/bs5839_system_config_screen.dart';
+import '../bs5839/start_inspection_visit_screen.dart';
 import '../floor_plans/floor_plan_list_screen.dart';
 
 class SiteAssetRegisterScreen extends StatefulWidget {
@@ -43,8 +47,9 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
   String? _filterType;
-  String? _filterStatus;
+  AssetComplianceStatus? _filterStatus;
   String? _filterLifecycle; // 'approaching' or 'past'
+  bool _filterDrift = false;
   List<AssetType> _assetTypes = [];
   List<Asset> _latestAssets = [];
 
@@ -116,30 +121,33 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
     }
   }
 
-  Color _colorForStatus(String status) {
+  Color _colorForStatus(AssetComplianceStatus status) {
     switch (status) {
-      case Asset.statusPass:
+      case AssetComplianceStatus.pass:
         return const Color(0xFF4CAF50);
-      case Asset.statusFail:
+      case AssetComplianceStatus.fail:
         return const Color(0xFFD32F2F);
-      case Asset.statusDecommissioned:
+      case AssetComplianceStatus.decommissioned:
         return Colors.grey;
-      default:
+      case AssetComplianceStatus.untested:
         return const Color(0xFF9E9E9E);
     }
   }
 
-  String _statusLabel(String status) {
-    switch (status) {
-      case Asset.statusPass:
-        return 'Pass';
-      case Asset.statusFail:
-        return 'Fail';
-      case Asset.statusDecommissioned:
-        return 'Decommissioned';
-      default:
-        return 'Untested';
+  String _statusLabel(AssetComplianceStatus status) {
+    return status.displayLabel;
+  }
+
+  bool _hasChecklistDrift(Asset asset) {
+    if (asset.complianceStatus != AssetComplianceStatus.pass &&
+        asset.complianceStatus != AssetComplianceStatus.fail) {
+      return false;
     }
+    final type = _getAssetType(asset.assetTypeId);
+    if (type == null) return false;
+    final tested = asset.lastChecklistVersionTested;
+    if (tested == null) return false;
+    return tested < type.checklistVersion;
   }
 
   List<Asset> _filterAssets(List<Asset> assets) {
@@ -163,6 +171,10 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
     if (_filterStatus != null) {
       filtered =
           filtered.where((a) => a.complianceStatus == _filterStatus).toList();
+    }
+
+    if (_filterDrift) {
+      filtered = filtered.where((a) => _hasChecklistDrift(a)).toList();
     }
 
     if (_filterLifecycle != null) {
@@ -199,7 +211,7 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
 
   void _navigateToBatchTest() {
     final testableAssets = _latestAssets
-        .where((a) => a.complianceStatus != Asset.statusDecommissioned)
+        .where((a) => a.complianceStatus != AssetComplianceStatus.decommissioned)
         .toList();
 
     if (testableAssets.isEmpty) {
@@ -233,6 +245,147 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
         ),
       );
     }
+  }
+
+  void _showReportTypeSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Choose Report Type',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Icon(AppIcons.clipboard,
+                    color: Colors.orange),
+                title: const Text('Site Compliance Summary'),
+                subtitle: const Text('General asset compliance overview'),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                onTap: () {
+                  Navigator.pop(context);
+                  if (kIsWeb) {
+                    context.go('/sites/${widget.siteId}/assets/report');
+                  } else {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ComplianceReportScreen(
+                          basePath: widget.basePath,
+                          siteId: widget.siteId,
+                          siteName: widget.siteName,
+                          siteAddress: widget.siteAddress,
+                        ),
+                      ),
+                    );
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(AppIcons.document,
+                    color: AppTheme.primaryBlue),
+                title: const Text('BS 5839-1:2025 Inspection Report'),
+                subtitle: const Text(
+                    'Full BS 5839 report for a completed visit'),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _selectVisitForBs5839Report();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectVisitForBs5839Report() async {
+    final visits = await InspectionVisitService.instance
+        .getVisitsStream(widget.basePath, widget.siteId)
+        .first;
+    final completed = visits.where((v) => v.completedAt != null).toList();
+
+    if (!mounted) return;
+
+    if (completed.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content:
+                Text('No completed visits. Complete an inspection first.')),
+      );
+      return;
+    }
+
+    if (completed.length == 1) {
+      _openBs5839Report(completed.first.id);
+      return;
+    }
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Select Visit',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              ...completed.take(10).map(
+                    (v) => ListTile(
+                      title: Text(v.visitType.displayLabel),
+                      subtitle: Text(
+                        '${v.declaration.displayLabel} · ${v.engineerName}',
+                      ),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      onTap: () => Navigator.pop(context, v.id),
+                    ),
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (selected != null && mounted) {
+      _openBs5839Report(selected);
+    }
+  }
+
+  void _openBs5839Report(String visitId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Bs5839ReportScreen(
+          basePath: widget.basePath,
+          siteId: widget.siteId,
+          siteName: widget.siteName,
+          siteAddress: widget.siteAddress,
+          visitId: visitId,
+        ),
+      ),
+    );
   }
 
   @override
@@ -307,6 +460,17 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
                         _filterType != null
                             ? () => setState(() => _filterType = null)
                             : null,
+                  ),
+                  const SizedBox(width: 8),
+                  // Drift filter
+                  _FilterChip(
+                    label: 'Needs re-test',
+                    selected: _filterDrift,
+                    onTap: () =>
+                        setState(() => _filterDrift = !_filterDrift),
+                    onClear: _filterDrift
+                        ? () => setState(() => _filterDrift = false)
+                        : null,
                   ),
                   const SizedBox(width: 8),
                   // Lifecycle filter
@@ -446,7 +610,9 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
         _buildActionCard(
           'Report', AppIcons.document, Colors.orange,
           () {
-            if (kIsWeb) {
+            if (rc.bs5839ModeEnabled) {
+              _showReportTypeSheet();
+            } else if (kIsWeb) {
               context.go('/sites/${widget.siteId}/assets/report');
             } else {
               Navigator.of(context).push(
@@ -460,6 +626,42 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
                 ),
               );
             }
+          },
+          isDark,
+        ),
+      if (rc.bs5839ModeEnabled)
+        _buildActionCard(
+          'BS 5839', AppIcons.shield, Colors.deepPurple,
+          () {
+            if (kIsWeb) {
+              context.go('/sites/${widget.siteId}/assets/bs5839-config');
+            } else {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => Bs5839SystemConfigScreen(
+                    basePath: widget.basePath,
+                    siteId: widget.siteId,
+                    siteName: widget.siteName,
+                  ),
+                ),
+              );
+            }
+          },
+          isDark,
+        ),
+      if (rc.bs5839ModeEnabled && !kIsWeb)
+        _buildActionCard(
+          'Start Visit', AppIcons.clipboardTick, Colors.teal,
+          () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => StartInspectionVisitScreen(
+                  basePath: widget.basePath,
+                  siteId: widget.siteId,
+                  siteName: widget.siteName,
+                ),
+              ),
+            );
           },
           isDark,
         ),
@@ -536,15 +738,16 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
 
   Widget _buildComplianceSummary(List<Asset> assets, bool isDark) {
     final pass =
-        assets.where((a) => a.complianceStatus == Asset.statusPass).length;
+        assets.where((a) => a.complianceStatus == AssetComplianceStatus.pass).length;
     final fail =
-        assets.where((a) => a.complianceStatus == Asset.statusFail).length;
+        assets.where((a) => a.complianceStatus == AssetComplianceStatus.fail).length;
     final untested =
-        assets.where((a) => a.complianceStatus == Asset.statusUntested).length;
+        assets.where((a) => a.complianceStatus == AssetComplianceStatus.untested).length;
     final decom = assets
-        .where((a) => a.complianceStatus == Asset.statusDecommissioned)
+        .where((a) => a.complianceStatus == AssetComplianceStatus.decommissioned)
         .length;
     final active = assets.length - decom;
+    final drift = assets.where((a) => _hasChecklistDrift(a)).length;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -570,6 +773,11 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
           const SizedBox(width: 12),
           _SummaryDot(
               color: const Color(0xFF9E9E9E), count: untested, label: 'Untested'),
+          if (drift > 0) ...[
+            const SizedBox(width: 12),
+            _SummaryDot(
+                color: const Color(0xFFF59E0B), count: drift, label: 'Re-test'),
+          ],
         ],
       ),
     );
@@ -581,6 +789,7 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
         ? Color(int.parse(type.defaultColor.replaceFirst('#', '0xFF')))
         : Colors.grey;
     final statusColor = _colorForStatus(asset.complianceStatus);
+    final drift = _hasChecklistDrift(asset);
 
     return GestureDetector(
       onTap: () => _navigateToAssetDetail(asset),
@@ -636,6 +845,27 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
                 ],
               ),
             ),
+            // Checklist drift badge
+            if (drift)
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'Re-test',
+                    style: TextStyle(
+                      color: Color(0xFFF59E0B),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
             // Lifecycle warning
             if (asset.installDate != null &&
                 asset.expectedLifespanYears != null)
@@ -694,10 +924,10 @@ class _SiteAssetRegisterScreenState extends State<SiteAssetRegisterScreen> {
               },
             ),
             for (final status in [
-              Asset.statusPass,
-              Asset.statusFail,
-              Asset.statusUntested,
-              Asset.statusDecommissioned,
+              AssetComplianceStatus.pass,
+              AssetComplianceStatus.fail,
+              AssetComplianceStatus.untested,
+              AssetComplianceStatus.decommissioned,
             ])
               ListTile(
                 leading: CircleAvatar(

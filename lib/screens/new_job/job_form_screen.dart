@@ -454,7 +454,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
 
     // Filter to only active (non-decommissioned) assets
     final activeAssets = assets
-        .where((a) => a.complianceStatus != 'decommissioned')
+        .where((a) => a.complianceStatus != AssetComplianceStatus.decommissioned)
         .toList();
 
     if (activeAssets.isEmpty) {
@@ -1298,7 +1298,7 @@ class _JobFormScreenState extends State<JobFormScreen> {
           .first;
 
       final activeAssets = assets
-          .where((a) => a.complianceStatus != 'decommissioned')
+          .where((a) => a.complianceStatus != AssetComplianceStatus.decommissioned)
           .toList();
 
       if (activeAssets.isEmpty || !mounted) return;

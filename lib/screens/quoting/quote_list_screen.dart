@@ -442,6 +442,8 @@ class _QuoteListScreenState extends State<QuoteListScreen>
           _loadQuotes();
           context.showSuccessToast('Quote deleted');
         }
+      } on ConvertedQuoteDeletionException catch (e) {
+        if (mounted) context.showErrorToast(e.message);
       } catch (e) {
         if (mounted) context.showErrorToast('Error: $e');
       }

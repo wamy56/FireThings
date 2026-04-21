@@ -1,3 +1,4 @@
+import '../utils/json_helpers.dart';
 import 'permission.dart';
 
 /// Role of a company member
@@ -43,17 +44,21 @@ class CompanyMember {
       (r) => r.name == json['role'],
       orElse: () => CompanyRole.engineer,
     );
+    final defaults = AppPermission.defaultsForRole(role);
+    final stored = json['permissions'] != null
+        ? Map<String, bool>.from(json['permissions'] as Map)
+        : <String, bool>{};
+    final merged = {...defaults, ...stored};
+
     return CompanyMember(
       uid: json['uid'] as String,
       displayName: json['displayName'] as String,
       email: json['email'] as String,
       role: role,
       fcmToken: json['fcmToken'] as String?,
-      joinedAt: DateTime.parse(json['joinedAt'] as String),
+      joinedAt: jsonDateRequired(json['joinedAt']),
       isActive: json['isActive'] as bool? ?? true,
-      permissions: json['permissions'] != null
-          ? Map<String, bool>.from(json['permissions'] as Map)
-          : null,
+      permissions: merged,
     );
   }
 

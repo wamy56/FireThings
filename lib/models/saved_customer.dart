@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// Represents a saved customer for quick invoice creation
 class SavedCustomer {
   final String id;
@@ -41,10 +43,8 @@ class SavedCustomer {
       customerAddress: json['customerAddress'] as String,
       email: json['email'] as String?,
       notes: json['notes'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      lastModifiedAt: json['lastModifiedAt'] != null
-          ? DateTime.tryParse(json['lastModifiedAt'] as String)
-          : null,
+      createdAt: jsonDateRequired(json['createdAt']),
+      lastModifiedAt: jsonDateOptional(json['lastModifiedAt']),
     );
   }
 

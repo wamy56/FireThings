@@ -333,7 +333,9 @@ class _NotificationFeedScreenState extends State<NotificationFeedScreen> {
         final companyId = _companyId;
         if (companyId == null) return;
 
-        if (profile.hasPermission(AppPermission.dispatchViewAll)) {
+        final canViewFull = profile.hasPermission(AppPermission.dispatchViewAll) ||
+            profile.hasPermission(AppPermission.dispatchEdit);
+        if (canViewFull) {
           Navigator.push(
             context,
             adaptivePageRoute(

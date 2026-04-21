@@ -42,9 +42,17 @@ class ServiceHistoryService {
         .where('assetId', isEqualTo: assetId)
         .orderBy('serviceDate', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ServiceRecord.fromJson(doc.data()))
-            .toList());
+        .map((snapshot) {
+      final records = <ServiceRecord>[];
+      for (final doc in snapshot.docs) {
+        try {
+          records.add(ServiceRecord.fromJson(doc.data()));
+        } catch (e) {
+          debugPrint('Skipping malformed service record ${doc.id}: $e');
+        }
+      }
+      return records;
+    });
   }
 
   /// Stream all service records for a site, newest first.
@@ -53,9 +61,17 @@ class ServiceHistoryService {
     return _historyCol(basePath, siteId)
         .orderBy('serviceDate', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ServiceRecord.fromJson(doc.data()))
-            .toList());
+        .map((snapshot) {
+      final records = <ServiceRecord>[];
+      for (final doc in snapshot.docs) {
+        try {
+          records.add(ServiceRecord.fromJson(doc.data()));
+        } catch (e) {
+          debugPrint('Skipping malformed service record ${doc.id}: $e');
+        }
+      }
+      return records;
+    });
   }
 
   /// Get the most recent service record for an asset.

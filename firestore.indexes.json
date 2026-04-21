@@ -49,6 +49,65 @@
         { "fieldPath": "assetId", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "inspection_visits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "siteId", "order": "ASCENDING" },
+        { "fieldPath": "visitDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "inspection_visits",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "siteId", "order": "ASCENDING" },
+        { "fieldPath": "declaration", "order": "ASCENDING" },
+        { "fieldPath": "visitDate", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "variations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "siteId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "isProhibited", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cause_effect_tests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "visitId", "order": "ASCENDING" },
+        { "fieldPath": "testedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "cause_effect_tests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "siteId", "order": "ASCENDING" },
+        { "fieldPath": "testedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "logbook_entries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "siteId", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "logbook_entries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "siteId", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "occurredAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -28,8 +28,17 @@ class FloorPlanService {
     return _plansCol(basePath, siteId)
         .orderBy('sortOrder')
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => FloorPlan.fromJson(doc.data())).toList());
+        .map((snapshot) {
+      final plans = <FloorPlan>[];
+      for (final doc in snapshot.docs) {
+        try {
+          plans.add(FloorPlan.fromJson(doc.data()));
+        } catch (e) {
+          debugPrint('Skipping malformed floor plan ${doc.id}: $e');
+        }
+      }
+      return plans;
+    });
   }
 
   /// Get a single floor plan.
@@ -71,12 +80,43 @@ class FloorPlanService {
     }
   }
 
-  /// Delete a floor plan document and its image from Storage.
+  /// Count how many assets are pinned to a floor plan.
+  Future<int> getAffectedAssetCount(
+      String basePath, String siteId, String planId) async {
+    final snap = await _firestore
+        .collection('$basePath/sites/$siteId/assets')
+        .where('floorPlanId', isEqualTo: planId)
+        .get();
+    return snap.docs.length;
+  }
+
+  /// Delete a floor plan, clear pin positions on affected assets, then
+  /// delete the image from Storage.
   Future<void> deleteFloorPlan(
       String basePath, String siteId, String planId,
       {String extension = 'jpg'}) async {
     try {
-      await _plansCol(basePath, siteId).doc(planId).delete();
+      final affectedSnap = await _firestore
+          .collection('$basePath/sites/$siteId/assets')
+          .where('floorPlanId', isEqualTo: planId)
+          .get();
+
+      final batch = _firestore.batch();
+
+      for (final doc in affectedSnap.docs) {
+        batch.update(doc.reference, {
+          'floorPlanId': null,
+          'xPercent': null,
+          'yPercent': null,
+          'updatedAt': DateTime.now().toIso8601String(),
+          'lastModifiedAt': DateTime.now().toIso8601String(),
+        });
+      }
+
+      batch.delete(_plansCol(basePath, siteId).doc(planId));
+
+      await batch.commit();
+
       await deleteFloorPlanImage(basePath, siteId, planId, extension: extension);
     } catch (e) {
       debugPrint('Error deleting floor plan: $e');
@@ -95,19 +135,15 @@ class FloorPlanService {
     final path = '$basePath/sites/$siteId/floor_plans/$planId.$extension';
     debugPrint('[FloorPlanService] Uploading ${bytes.length} bytes to $path');
 
-    if (kIsWeb) {
-      return _uploadViaRestApi(path, bytes, contentType);
-    }
-
-    try {
+    return _retryUpload(() async {
+      if (kIsWeb) {
+        return _uploadViaRestApi(path, bytes, contentType);
+      }
       final ref = _storage.ref(path);
       await ref.putData(bytes, SettableMetadata(contentType: contentType));
       debugPrint('[FloorPlanService] putData complete, getting download URL...');
       return await ref.getDownloadURL();
-    } catch (e) {
-      debugPrint('[FloorPlanService] Upload error (${e.runtimeType}): $e');
-      rethrow;
-    }
+    });
   }
 
   /// Web-only: upload via Firebase Storage REST API to avoid platform channel
@@ -168,5 +204,26 @@ class FloorPlanService {
       // Image may not exist — ignore
       debugPrint('Floor plan image delete (may not exist): $e');
     }
+  }
+
+  Future<T> _retryUpload<T>(
+    Future<T> Function() operation, {
+    int maxAttempts = 3,
+  }) async {
+    Object? lastError;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (e) {
+        lastError = e;
+        if (e is TimeoutException || e is http.ClientException) {
+          if (attempt == maxAttempts) rethrow;
+          await Future.delayed(Duration(seconds: 1 << (attempt - 1)));
+          continue;
+        }
+        rethrow;
+      }
+    }
+    throw lastError!;
   }
 }

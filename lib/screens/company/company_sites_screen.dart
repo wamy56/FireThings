@@ -22,6 +22,10 @@ import '../../widgets/selection_app_bar.dart';
 import '../../widgets/selectable_avatar.dart';
 import '../../services/remote_config_service.dart';
 import '../assets/site_asset_register_screen.dart';
+import '../bs5839/bs5839_system_config_screen.dart';
+import '../bs5839/visit_history_screen.dart';
+import '../bs5839/variations_register_screen.dart';
+import '../bs5839/logbook_screen.dart';
 
 class CompanySitesScreen extends StatefulWidget {
   final String companyId;
@@ -286,6 +290,13 @@ class _CompanySitesScreenState extends State<CompanySitesScreen>
                           ),
                           const SizedBox(height: 6),
                         ],
+                        if (RemoteConfigService.instance.bs5839ModeEnabled) ...[
+                          CardActionButton(
+                            label: 'BS 5839',
+                            onPressed: () => _showBs5839Menu(site),
+                          ),
+                          const SizedBox(height: 6),
+                        ],
                         if (_canEdit)
                           CardActionButton(
                             label: 'Edit',
@@ -322,6 +333,117 @@ class _CompanySitesScreenState extends State<CompanySitesScreen>
             siteName: site.name,
             siteAddress: site.address,
             basePath: 'companies/${widget.companyId}',
+          ),
+        ),
+      );
+    }
+  }
+
+  void _showBs5839Menu(CompanySite site) {
+    final basePath = 'companies/${widget.companyId}';
+    final extra = {'siteName': site.name, 'siteAddress': site.address};
+
+    if (kIsWeb) {
+      showDialog(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          title: const Text('BS 5839-1:2025'),
+          children: [
+            SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/sites/${site.id}/assets/bs5839-config', extra: extra);
+              },
+              child: const Text('System Configuration'),
+            ),
+            SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/sites/${site.id}/assets/bs5839-visits', extra: extra);
+              },
+              child: const Text('Inspection Visits'),
+            ),
+            SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/sites/${site.id}/assets/bs5839-variations', extra: extra);
+              },
+              child: const Text('Variations Register'),
+            ),
+            SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                context.go('/sites/${site.id}/assets/bs5839-logbook', extra: extra);
+              },
+              child: const Text('Logbook'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        builder: (ctx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(AppIcons.setting),
+                title: const Text('System Configuration'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => Bs5839SystemConfigScreen(
+                      basePath: basePath,
+                      siteId: site.id,
+                      siteName: site.name,
+                    ),
+                  ));
+                },
+              ),
+              ListTile(
+                leading: Icon(AppIcons.clipboard),
+                title: const Text('Inspection Visits'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => VisitHistoryScreen(
+                      basePath: basePath,
+                      siteId: site.id,
+                      siteName: site.name,
+                    ),
+                  ));
+                },
+              ),
+              ListTile(
+                leading: Icon(AppIcons.warning),
+                title: const Text('Variations Register'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => VariationsRegisterScreen(
+                      basePath: basePath,
+                      siteId: site.id,
+                      siteName: site.name,
+                    ),
+                  ));
+                },
+              ),
+              ListTile(
+                leading: Icon(AppIcons.book),
+                title: const Text('Logbook'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => LogbookScreen(
+                      basePath: basePath,
+                      siteId: site.id,
+                      siteName: site.name,
+                    ),
+                  ));
+                },
+              ),
+            ],
           ),
         ),
       );

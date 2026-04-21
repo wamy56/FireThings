@@ -224,7 +224,12 @@ class _MemberPermissionsScreenState extends State<MemberPermissionsScreen> {
                             'Cannot remove your own team management',
                             style: TextStyle(fontSize: 11),
                           )
-                        : null,
+                        : perm.description != null
+                            ? Text(
+                                perm.description!,
+                                style: const TextStyle(fontSize: 11),
+                              )
+                            : null,
                     value: _selectedRole == CompanyRole.admin ? true : enabled,
                     onChanged: _selectedRole == CompanyRole.admin || isProtected
                         ? null
@@ -280,9 +285,13 @@ class _MemberPermissionsScreenState extends State<MemberPermissionsScreen> {
           widget.companyId,
           widget.member.uid,
           _selectedRole,
-          permissions: _permissions,
         );
-      } else {
+      }
+
+      final permsChanged = roleChanged
+          ? !_mapsEqual(_permissions, AppPermission.defaultsForRole(_selectedRole))
+          : !_mapsEqual(_permissions, widget.member.permissions);
+      if (permsChanged) {
         await CompanyService.instance.updateMemberPermissions(
           widget.companyId,
           widget.member.uid,
@@ -300,6 +309,14 @@ class _MemberPermissionsScreenState extends State<MemberPermissionsScreen> {
         context.showErrorToast('Failed to save permissions');
       }
     }
+  }
+
+  bool _mapsEqual(Map<String, bool> a, Map<String, bool> b) {
+    if (a.length != b.length) return false;
+    for (final key in a.keys) {
+      if (a[key] != b[key]) return false;
+    }
+    return true;
   }
 
   String _roleLabel(CompanyRole role) {

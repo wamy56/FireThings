@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../models/permission.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/remote_config_service.dart';
 import '../../services/web_notification_service.dart';
@@ -17,6 +18,12 @@ import '../assets/add_edit_asset_screen.dart';
 import '../assets/asset_detail_screen.dart';
 import '../assets/asset_type_config_screen.dart';
 import '../assets/compliance_report_screen.dart';
+import '../bs5839/bs5839_system_config_screen.dart';
+import '../bs5839/visit_history_screen.dart';
+import '../bs5839/visit_detail_screen.dart';
+import '../bs5839/variations_register_screen.dart';
+import '../bs5839/competency_screen.dart';
+import '../bs5839/logbook_screen.dart';
 import '../floor_plans/floor_plan_list_screen.dart';
 import '../floor_plans/upload_floor_plan_screen.dart';
 import '../floor_plans/interactive_floor_plan_screen.dart';
@@ -55,9 +62,10 @@ class GoRouterRefreshStream extends ChangeNotifier {
 GoRouter createWebRouter() {
   return GoRouter(
     initialLocation: '/jobs',
-    refreshListenable: GoRouterRefreshStream(
-      FirebaseAuth.instance.authStateChanges(),
-    ),
+    refreshListenable: Listenable.merge([
+      GoRouterRefreshStream(FirebaseAuth.instance.authStateChanges()),
+      UserProfileService.instance,
+    ]),
     redirect: (context, state) async {
       final user = FirebaseAuth.instance.currentUser;
       final isLoggedIn = user != null;
@@ -92,7 +100,7 @@ GoRouter createWebRouter() {
           );
         }
         if (!profile.hasCompany) return '/access-denied?reason=noCompany';
-        if (!profile.isDispatcherOrAdmin) return '/access-denied?reason=engineerOnly';
+        if (!profile.hasPermission(AppPermission.webPortalAccess)) return '/access-denied?reason=noWebAccess';
       }
 
       return null;
@@ -141,6 +149,16 @@ GoRouter createWebRouter() {
           GoRoute(
             path: '/team',
             builder: (context, state) => const TeamManagementScreen(),
+          ),
+          GoRoute(
+            path: '/team/competency',
+            redirect: (context, state) {
+              if (!RemoteConfigService.instance.bs5839CompetencyTrackingEnabled) {
+                return '/team';
+              }
+              return null;
+            },
+            builder: (context, state) => const CompetencyScreen(),
           ),
           GoRoute(
             path: '/sites',
@@ -211,6 +229,130 @@ GoRouter createWebRouter() {
                       siteId: siteId,
                       siteName: site?.name ?? 'Site',
                       siteAddress: site?.address ?? '',
+                    ),
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'bs5839-config',
+                redirect: (context, state) {
+                  if (!RemoteConfigService.instance.bs5839ModeEnabled) {
+                    return '/sites';
+                  }
+                  return null;
+                },
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null;
+                  return _SiteDataLoader(
+                    companyId: companyId,
+                    siteId: siteId,
+                    cachedName: extra?['siteName'] as String?,
+                    cachedAddress: extra?['siteAddress'] as String?,
+                    builder: (site) => Bs5839SystemConfigScreen(
+                      basePath: basePath,
+                      siteId: siteId,
+                      siteName: site?.name ?? 'Site',
+                    ),
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'bs5839-visits',
+                redirect: (context, state) {
+                  if (!RemoteConfigService.instance.bs5839ModeEnabled) {
+                    return '/sites';
+                  }
+                  return null;
+                },
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null;
+                  return _SiteDataLoader(
+                    companyId: companyId,
+                    siteId: siteId,
+                    cachedName: extra?['siteName'] as String?,
+                    builder: (site) => VisitHistoryScreen(
+                      basePath: basePath,
+                      siteId: siteId,
+                      siteName: site?.name ?? 'Site',
+                    ),
+                  );
+                },
+                routes: [
+                  GoRoute(
+                    path: ':visitId',
+                    builder: (context, state) {
+                      final companyId = UserProfileService.instance.companyId ?? '';
+                      final basePath = 'companies/$companyId';
+                      final siteId = state.pathParameters['siteId']!;
+                      final visitId = state.pathParameters['visitId']!;
+                      final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null;
+                      return _SiteDataLoader(
+                        companyId: companyId,
+                        siteId: siteId,
+                        cachedName: extra?['siteName'] as String?,
+                        builder: (site) => VisitDetailScreen(
+                          basePath: basePath,
+                          siteId: siteId,
+                          siteName: site?.name ?? 'Site',
+                          visitId: visitId,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+              GoRoute(
+                path: 'bs5839-variations',
+                redirect: (context, state) {
+                  if (!RemoteConfigService.instance.bs5839ModeEnabled) {
+                    return '/sites';
+                  }
+                  return null;
+                },
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null;
+                  return _SiteDataLoader(
+                    companyId: companyId,
+                    siteId: siteId,
+                    cachedName: extra?['siteName'] as String?,
+                    builder: (site) => VariationsRegisterScreen(
+                      basePath: basePath,
+                      siteId: siteId,
+                      siteName: site?.name ?? 'Site',
+                    ),
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'bs5839-logbook',
+                redirect: (context, state) {
+                  if (!RemoteConfigService.instance.bs5839ModeEnabled) {
+                    return '/sites';
+                  }
+                  return null;
+                },
+                builder: (context, state) {
+                  final companyId = UserProfileService.instance.companyId ?? '';
+                  final basePath = 'companies/$companyId';
+                  final siteId = state.pathParameters['siteId']!;
+                  final extra = state.extra is Map<String, dynamic> ? state.extra as Map<String, dynamic> : null;
+                  return _SiteDataLoader(
+                    companyId: companyId,
+                    siteId: siteId,
+                    cachedName: extra?['siteName'] as String?,
+                    builder: (site) => LogbookScreen(
+                      basePath: basePath,
+                      siteId: siteId,
+                      siteName: site?.name ?? 'Site',
                     ),
                   );
                 },

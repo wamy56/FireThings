@@ -1,7 +1,9 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'competency_service.dart';
 import 'database_helper.dart';
+import 'remote_config_service.dart';
 
 class NotificationService {
   static final NotificationService instance = NotificationService._init();
@@ -17,6 +19,7 @@ class NotificationService {
   static const _draftJobsheetId = 2;
   static const _overdueInvoiceId = 3;
   static const _dispatchNotificationId = 10;
+  static const _competencyNotificationId = 20;
 
   // SharedPreferences keys
   static const _lastNotifiedPrefix = 'lastNotifiedAt_';
@@ -172,6 +175,52 @@ class NotificationService {
             '${_lastNotifiedPrefix}overdue_invoices', now.toIso8601String());
       }
     }
+
+    // Competency reminders (qualification expiry + CPD hours)
+    try {
+      final rc = RemoteConfigService.instance;
+      if (rc.bs5839CompetencyTrackingEnabled) {
+        final companyId = prefs.getString('user_company_id');
+        final basePath = companyId != null
+            ? 'companies/$companyId'
+            : 'users/${user.uid}';
+
+        final competency = await CompetencyService.instance
+            .getCompetency(basePath, user.uid);
+        if (competency != null && _canNotify(prefs, 'competency', now)) {
+          final expired = CompetencyService.instance
+              .getExpiredQualifications(competency);
+          final expiring = CompetencyService.instance
+              .getExpiringQualifications(competency);
+          final minHours = rc.bs5839MinCpdHoursPerYear;
+
+          final messages = <String>[];
+          if (expired.isNotEmpty) {
+            messages.add(
+                '${expired.length} expired qualification${expired.length == 1 ? '' : 's'}');
+          }
+          if (expiring.isNotEmpty) {
+            messages.add(
+                '${expiring.length} expiring within 30 days');
+          }
+          if (competency.totalCpdHoursLast12Months < minHours) {
+            messages.add(
+                'CPD hours below minimum (${competency.totalCpdHoursLast12Months.toStringAsFixed(1)}/${minHours.toStringAsFixed(0)}h)');
+          }
+
+          if (messages.isNotEmpty) {
+            await _showNotification(
+              _competencyNotificationId,
+              'Competency reminder',
+              messages.join('; '),
+              'competency',
+            );
+            await prefs.setString(
+                '${_lastNotifiedPrefix}competency', now.toIso8601String());
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   /// Returns true if at least 24h have passed since the last notification of this type.

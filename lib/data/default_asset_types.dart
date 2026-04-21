@@ -23,6 +23,8 @@ class DefaultAssetTypes {
     disabledRefugeOutstation,
     fireTelephone,
     toiletAlarmSystem,
+    arcSignallingEquipment,
+    zonePlan,
     otherCustom,
   ];
 
@@ -44,6 +46,7 @@ class DefaultAssetTypes {
     defaultColor: '#1E3A5F',
     variants: ['Conventional', 'Addressable', 'Analogue Addressable', 'Wireless'],
     defaultLifespanYears: 15,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Logged faults',
@@ -67,6 +70,7 @@ class DefaultAssetTypes {
     defaultColor: '#7C3AED',
     variants: ['Input Module', 'Output Module', 'Combined I/O', 'Relay Board', 'Mini Input Module', 'Zone Monitor'],
     defaultLifespanYears: 15,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'No communication',
@@ -89,6 +93,7 @@ class DefaultAssetTypes {
     defaultColor: '#CA8A04',
     variants: ['24V DC', 'Auxiliary PSU', 'EN54-4 Certified', 'Battery Charger', 'UPS'],
     defaultLifespanYears: 10,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Battery low/failed',
@@ -111,6 +116,7 @@ class DefaultAssetTypes {
     defaultColor: '#3B82F6',
     variants: ['Optical', 'Ionisation', 'Multi-sensor', 'Beam', 'Aspirating'],
     defaultLifespanYears: 10,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Head dirty/contaminated',
@@ -133,6 +139,7 @@ class DefaultAssetTypes {
     defaultColor: '#EF4444',
     variants: ['Fixed Temperature', 'Rate of Rise', 'Combined'],
     defaultLifespanYears: 10,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'No response to test',
@@ -153,6 +160,7 @@ class DefaultAssetTypes {
     defaultColor: '#DC2626',
     variants: ['Conventional', 'Addressable', 'Resettable', 'Break Glass'],
     defaultLifespanYears: 15,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Damaged frangible element',
@@ -174,6 +182,7 @@ class DefaultAssetTypes {
     defaultColor: '#F97316',
     variants: ['Sounder', 'Beacon', 'Combined Sounder/Beacon', 'Voice Alarm Speaker'],
     defaultLifespanYears: 15,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Not functioning',
@@ -194,6 +203,7 @@ class DefaultAssetTypes {
     defaultColor: '#059669',
     variants: ['CO2', 'Dry Powder', 'AFFF Foam', 'Water', 'Wet Chemical'],
     defaultLifespanYears: 20,
+    defaultServiceIntervalMonths: 12,
     isBuiltIn: true,
     commonFaults: [
       'Low pressure',
@@ -217,6 +227,7 @@ class DefaultAssetTypes {
     defaultColor: '#FBBF24',
     variants: ['Maintained', 'Non-maintained', 'Sustained', 'Combined'],
     defaultLifespanYears: 10,
+    defaultServiceIntervalMonths: 12,
     isBuiltIn: true,
     commonFaults: [
       'Battery failure',
@@ -237,6 +248,7 @@ class DefaultAssetTypes {
     iconName: 'door',
     defaultColor: '#8B5CF6',
     variants: ['FD30', 'FD60', 'FD90', 'FD120'],
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Damaged intumescent seals',
@@ -260,6 +272,7 @@ class DefaultAssetTypes {
     defaultColor: '#06B6D4',
     variants: ['Natural (AOV)', 'Mechanical', 'Smoke Shaft'],
     defaultLifespanYears: 15,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Fails to open',
@@ -281,6 +294,7 @@ class DefaultAssetTypes {
     defaultColor: '#0EA5E9',
     variants: ['Pendant', 'Upright', 'Sidewall', 'Concealed'],
     defaultLifespanYears: 50,
+    defaultServiceIntervalMonths: 12,
     isBuiltIn: true,
     commonFaults: [
       'Corroded',
@@ -302,6 +316,7 @@ class DefaultAssetTypes {
     defaultColor: '#14B8A6',
     variants: ['Light Duty (kitchen)', 'Heavy Duty (industrial)'],
     defaultLifespanYears: 7,
+    defaultServiceIntervalMonths: 12,
     isBuiltIn: true,
     commonFaults: [
       'Damaged blanket',
@@ -322,6 +337,7 @@ class DefaultAssetTypes {
     defaultColor: '#0D9488',
     variants: ['Type A (simplex)', 'Type B (duplex)', 'Combined EVC/Fire Telephone'],
     defaultLifespanYears: 15,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Display fault',
@@ -344,6 +360,7 @@ class DefaultAssetTypes {
     defaultColor: '#0891B2',
     variants: ['Push-to-Talk', 'Hands-free', 'Combined Visual/Audio', 'Weatherproof'],
     defaultLifespanYears: 15,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'No communication with panel',
@@ -366,6 +383,7 @@ class DefaultAssetTypes {
     defaultColor: '#E11D48',
     variants: ['Type A Handset', 'Type B Handset', 'Jack Point', 'Combined Handset/Jack', 'Weatherproof'],
     defaultLifespanYears: 15,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Handset fault',
@@ -388,6 +406,7 @@ class DefaultAssetTypes {
     defaultColor: '#BE185D',
     variants: ['Full Kit', 'Pull Cord Only', 'Interface Unit', 'Overdoor Light', 'Reset Button'],
     defaultLifespanYears: 15,
+    defaultServiceIntervalMonths: 6,
     isBuiltIn: true,
     commonFaults: [
       'Pull cord broken/missing',
@@ -402,6 +421,56 @@ class DefaultAssetTypes {
   );
 
   // ─── Other / Custom Type ─────────────────────────────────────
+
+  // ─── ARC Signalling Equipment ─────────────────────────────
+
+  static final arcSignallingEquipment = AssetType(
+    id: 'arc_signalling_equipment',
+    name: 'ARC Signalling Equipment',
+    category: 'Communication',
+    iconName: 'wifi',
+    defaultColor: '#7C3AED',
+    variants: [
+      'Digital Communicator (Redcare)',
+      'DualCom IP',
+      'Pure IP',
+      'PSTN Legacy',
+    ],
+    defaultLifespanYears: 10,
+    defaultServiceIntervalMonths: 6,
+    isBuiltIn: true,
+    commonFaults: [
+      'Path A transmission failure',
+      'Path B transmission failure',
+      'Fault signal not transmitted',
+      'Reinstatement signal not verified',
+      'Connection label missing',
+      'Transmission time exceeds site commitment',
+    ],
+  );
+
+  // ─── Zone Plan ──────────────────────────────────────────
+
+  static final zonePlan = AssetType(
+    id: 'zone_plan',
+    name: 'Zone Plan',
+    category: 'Documentation',
+    iconName: 'map',
+    defaultColor: '#0891B2',
+    variants: ['Wall-mounted', 'Digital', 'Both'],
+    defaultServiceIntervalMonths: 12,
+    isBuiltIn: true,
+    commonFaults: [
+      'Zone plan not present',
+      'Does not match as-installed system',
+      'Not legible from approach to panel',
+      'Missing building orientation',
+      'Missing zone boundaries',
+      'Missing detector and call point locations',
+    ],
+  );
+
+  // ─── Other / Custom ─────────────────────────────────────
 
   static final otherCustom = AssetType(
     id: 'other',

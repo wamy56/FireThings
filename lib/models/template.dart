@@ -1,3 +1,4 @@
+import '../utils/json_helpers.dart';
 import 'template_field.dart';
 import 'pdf_section_layout_config.dart';
 
@@ -51,16 +52,12 @@ class JobTemplate {
           .toList(),
       isShared: json['isShared'] as bool? ?? false,
       creatorId: json['creatorId'] as String?,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : null,
+      createdAt: jsonDateOptional(json['createdAt']),
       sectionLayout: json['sectionLayout'] != null
           ? PdfSectionLayoutConfig.fromJson(
               json['sectionLayout'] as Map<String, dynamic>)
           : null,
-      lastModifiedAt: json['lastModifiedAt'] != null
-          ? DateTime.tryParse(json['lastModifiedAt'] as String)
-          : null,
+      lastModifiedAt: jsonDateOptional(json['lastModifiedAt']),
     );
   }
 

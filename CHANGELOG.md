@@ -4,6 +4,309 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-21 (Session 86)
+
+### Privacy Policy & Terms of Service — BS 5839 Updates
+
+Updated all privacy policy and terms of service files to cover BS 5839-1:2025 compliance data.
+
+#### Privacy Policy (3 locations updated)
+- Added BS 5839 compliance data category: responsible person details, digital signatures, professional qualifications/CPD, inspection records, evidence photographs
+- Added BS 5839 compliance purpose in "Why We Collect It"
+- Added immutable audit record retention note (visits, variations, C&E tests cannot be edited/deleted)
+- Added company sharing for BS 5839 data and competency records
+- Added Firebase Cloud Storage to third-party services
+- Fixed date discrepancy: in-app screen was showing "10 March 2026", now "21 April 2026" consistently across all 3 locations
+
+#### Terms of Service (2 locations updated)
+- Added BS 5839 inspection reporting to service description
+- Added Section 8.4 "BS 5839-1:2025 Compliance Inspection Reports" with 6 sub-clauses: no certification, engineer responsibility, standard attribution (no BSI endorsement), immutable records, competency tracking caveat, prohibited variation detection caveat
+- Added BS 5839 records to data ownership list
+- Updated summary key points to cover inspection reports
+- Set effective date to 21 April 2026
+
+#### Modified Files (5)
+- `privacy_policy.md` — root markdown privacy policy
+- `lib/screens/settings/privacy_policy_screen.dart` — in-app Dart privacy policy screen
+- `marketing-site/public/privacy.html` — marketing website privacy page
+- `TERMS_OF_SERVICE.md` — root markdown terms of service
+- `marketing-site/public/terms.html` — marketing website terms page
+
+---
+
+## 2026-04-21 (Session 85)
+
+### BS 5839-1:2025 Compliance — Phase 11 (Logbook & Polish)
+
+Structured logbook screens, compliance report polish, and data quality fixes.
+
+#### Logbook (Structured)
+- Created `lib/services/logbook_service.dart` — singleton Firestore CRUD service (getEntriesStream, getEntriesByTypeStream, getRecentEntriesStream, saveEntry, deleteEntry)
+- Created `lib/screens/bs5839/logbook_screen.dart` — list screen with LogbookEntryType filter chips, color-coded type badges, delete gated by companyEdit permission, FAB to add entry
+- Created `lib/screens/bs5839/add_logbook_entry_screen.dart` — form with type ChoiceChips, date/time picker, description (min 5 chars), zone/device ref, conditional cause field, action taken
+- Wired "Review Logbook" quick action on inspection visit dashboard (was no-op `() {}`)
+- Added web route `/sites/:siteId/assets/bs5839-logbook` gated by `bs5839LogbookStructuredEnabled`
+- Added logbook to BS 5839 menu on company sites screen (web SimpleDialog + mobile bottom sheet)
+
+#### Section 13: Compliance Report Polish
+- Added `bs5839LastDeclaration` (String?) and `bs5839ModeEnabled` (bool) to `ComplianceReportPdfData`
+- Updated `_buildCoverPage()` — blue "BS 5839: [declaration]" badge when config + completed visit exist; disclaimer text when mode enabled but no config
+- Added BS 5839 data loading block in `generateReport()` — loads system config, queries last completed visit, maps declaration to label
+
+#### Section 13.4: Data Quality Fixes
+- **Asset register table**: Location column now falls back to floor plan name when `locationDescription` is empty, then to em dash "—". All fallback dashes changed from hyphen to em dash
+- **Service history**: Collapse same-asset same-day records into single row with "(N attempts)" indicator. Shows latest attempt result per group
+- **Defect description**: Added min-length validation (5 chars) in defect bottom sheet — only when no common fault preset selected
+
+#### Modified/Created Files (8)
+- `lib/services/logbook_service.dart` (NEW) — Firestore logbook CRUD
+- `lib/screens/bs5839/logbook_screen.dart` (NEW) — logbook list with filters
+- `lib/screens/bs5839/add_logbook_entry_screen.dart` (NEW) — add logbook entry form
+- `lib/screens/bs5839/inspection_visit_dashboard_screen.dart` — wired Review Logbook action
+- `lib/services/compliance_report_service.dart` — BS 5839 badge/disclaimer on cover page, location fallback to floor plan name, service history collapse
+- `lib/services/pdf_generation_data.dart` — bs5839LastDeclaration + bs5839ModeEnabled fields on ComplianceReportPdfData
+- `lib/screens/web/web_router.dart` — bs5839-logbook route
+- `lib/screens/company/company_sites_screen.dart` — logbook in BS 5839 menu
+- `lib/widgets/defect_bottom_sheet.dart` — min 5-char defect description validation
+
+---
+
+## 2026-04-21 (Session 84)
+
+### BS 5839-1:2025 Compliance — Phase 10 (Dispatch & Web Integration)
+
+Jobsheet integration, dispatch system integration, and web portal integration for BS 5839 compliance.
+
+#### Section 17: Jobsheet Integration
+- Added `bs5839VisitJson` field to `JobsheetPdfData` for passing visit data into PDF isolate
+- Wired up BS 5839 visit loading in `PdfService.generateJobsheetPDF()` gather phase — loads visit by jobsheetId when site has linked visit
+- Added `_buildBs5839SummarySection()` to jobsheet PDF — shows visit type, declaration, report status; red callout for unsatisfactory declarations
+- Added `PdfSectionId.bs5839Summary` to layout config enum
+- Enhanced defect-to-quote flow: quote line items auto-include BS 5839 clause reference from defect
+- Added `defectClauseReference` and `defectTriggeredProhibitedRule` fields to Quote model
+- Quote PDF defect summary now shows clause reference and prohibited variation warning banner
+
+#### Section 18: Dispatch System Integration
+- **Create Job screen**: BS 5839 compliance summary card when selecting a BS 5839 site — shows system category badge, last declaration, next service due, prohibited variation count
+- **Engineer Job Detail**: New "BS 5839 Inspection" section with "Start Compliance Visit" button (creates linked InspectionVisit), visit status/type display, report link after completion
+- **Dispatch Dashboard**: "BS 5839 sites" filter chip, loads site config to identify BS 5839 sites
+- **Cloud Functions**: `onVisitDeclarationUnsatisfactory` (notifies dispatchers), `onProhibitedVariationDetected` (notifies dispatchers), `onServiceWindowApproaching` (daily 08:00 UTC check, 30-day warning)
+
+#### Section 19: Web Portal Integration
+- Added routes: `/sites/:siteId/assets/bs5839-visits`, `/sites/:siteId/assets/bs5839-visits/:visitId`, `/sites/:siteId/assets/bs5839-variations`, `/team/competency`
+- Added BS 5839 menu to company sites screen (web: SimpleDialog, mobile: bottom sheet) with config/visits/variations navigation
+- All routes gated by `bs5839ModeEnabled` / `bs5839CompetencyTrackingEnabled` remote config flags
+
+#### Modified Files (14)
+- `lib/services/pdf_service.dart` — BS 5839 visit loading + summary section rendering
+- `lib/services/pdf_generation_data.dart` — Added `bs5839VisitJson` to JobsheetPdfData
+- `lib/models/pdf_section_layout_config.dart` — Added `bs5839Summary` enum value
+- `lib/models/inspection_visit.dart` — Added `jobsheetId` and `dispatchedJobId` fields
+- `lib/models/quote.dart` — Added `defectClauseReference` and `defectTriggeredProhibitedRule` fields
+- `lib/services/quote_pdf_service.dart` — Prohibited variation banner in defect summary
+- `lib/screens/quoting/quote_screen.dart` — Auto-include clause reference in defect-to-quote line items
+- `lib/services/inspection_visit_service.dart` — Added `getVisitByJobsheetId()` method
+- `lib/services/bs5839_config_service.dart` — Added `getActiveVariations()` stream
+- `lib/services/database_helper.dart` — Added ALTER TABLE for quotes + defects BS 5839 columns
+- `lib/screens/dispatch/create_job_screen.dart` — BS 5839 compliance summary widget
+- `lib/screens/dispatch/engineer_job_detail_screen.dart` — BS 5839 inspection section with start/view visit
+- `lib/screens/dispatch/dispatch_dashboard_screen.dart` — BS 5839 filter chip + site ID loading
+- `lib/screens/company/company_sites_screen.dart` — BS 5839 navigation menu (config/visits/variations)
+- `lib/screens/web/web_router.dart` — BS 5839 routes (visits, visit detail, variations, team competency)
+- `lib/screens/template_builder/custom_template_builder_screen.dart` — Added bs5839Summary case
+- `functions/index.js` — 3 new Cloud Functions (unsatisfactory declaration, prohibited variation, service window)
+- `functions/shared.js` — BS 5839 permissions added to defaults
+
+---
+
+## 2026-04-21 (Session 83)
+
+### BS 5839-1:2025 Compliance — Phases 2-8
+
+Phase 2: Service, screen, and integration for BS 5839 system configuration per site.
+Phase 3: Core compliance validation service with all rules, calculations, MCP rotation tracking, and unit tests.
+Phase 4: Variations register — service, screens (list + add/edit), and reusable prohibited variations alert widget.
+Phase 5: Inspection visit workflow — service, start visit (pre-checks), dashboard (progress checklist + quick actions), complete visit (declaration + signatures), visit history + detail screens.
+Phase 6: Cause & effect testing — service, list screen, 3-step workflow screen (choose trigger → define effects → execute test), per-category template defaults.
+Phase 7: Competency tracking — service, 2-tab screen (qualifications + CPD records), summary card with status, workmanager notification reminders.
+Phase 8: BS 5839 report PDF — report service (data collection + isolate-safe PDF generation), report screen (generate/preview/share/print/upload), report type chooser, declaration templates with category substitution.
+
+#### New Files (22)
+- **`lib/services/bs5839_config_service.dart`** — Singleton service: config CRUD, zone plan upload/delete, prohibited variation detection + auto-creation
+- **`lib/screens/bs5839/bs5839_system_config_screen.dart`** — Full form screen: system category, responsible person, building characteristics, panel details, ARC connection, dates, zone plan upload with image preview. On save detects prohibited variations and auto-creates variation records.
+- **`lib/services/bs5839_compliance_service.dart`** — Core compliance validation: detectProhibitedVariations, validateSiteCompliance, calculateDeclaration (declaration algorithm per spec 7.4), calculateNextServiceWindow (5-7 month BS 5839 tolerance), getMcpRotationStatus (25% MCP rotation tracking), isCompetencyCurrent (CPD hours + qualification expiry check). Also defines ComplianceIssue, ComplianceIssueSeverity, McpRotationStatus, ProhibitedVariationFinding classes.
+- **`test/bs5839_prohibited_rules_test.dart`** — 24 unit tests covering all 4 prohibited variation rules: zone plan absent, heat detector in sleeping room, zone plan URL missing, ARC signalling absent. Tests pass/fail conditions, edge cases (decommissioned assets, boundary categories).
+- **`test/bs5839_compliance_service_test.dart`** — 13 unit tests: LifecycleService BS 5839 window (5-7 month calculation, year boundary, month-end clamping, leap year), isServiceOverdue, McpRotationStatus data class, ComplianceIssue data class.
+- **`lib/services/variation_service.dart`** — Singleton service: variation CRUD, stream queries (all/active/prohibited), status transitions (rectify/update), evidence photo upload/delete to Firebase Storage
+- **`lib/screens/bs5839/variations_register_screen.dart`** — Two-tab list (Active/History), variation cards with clause reference badge + status badge (green/red/grey), prohibited banner, FAB to add
+- **`lib/screens/bs5839/add_edit_variation_screen.dart`** — Form: clause reference with autocomplete from BS 5839 reference data, description, justification, agreed-by (name/role/date), status selector, evidence photo upload. Auto-detects prohibited rules on save with warning dialog.
+- **`lib/widgets/prohibited_variations_alert.dart`** — Reusable StreamBuilder widget: red banner with prohibited count and "View" action, self-hides when none exist
+- **`lib/services/inspection_visit_service.dart`** — Singleton service: visit CRUD, streams (all/single/last), completeVisit (updates site lastVisitId + nextServiceDueDate), addServiceRecordId, addMcpTestedId
+- **`lib/screens/bs5839/start_inspection_visit_screen.dart`** — Visit type selector (5 types), pre-visit checks (config status, last visit, MCP rotation, variations count, competency). Creates InspectionVisit with notDeclared, navigates to dashboard. "Configure Now" button if config missing.
+- **`lib/screens/bs5839/inspection_visit_dashboard_screen.dart`** — Real-time StreamBuilder on visit. Visit summary card (type/date/engineer/stats). Quick actions row (Test Assets, Add Variation, Review Logbook). Progress checklist with toggleable items (logbook, zone plan, cyber security, ARC, earth fault). ProhibitedVariationsAlert banner. "Complete & Sign" button.
+- **`lib/screens/bs5839/complete_visit_screen.dart`** — Declaration card (auto-calculated via compliance service with reasoning). Variations review (prohibited/permissible counts). Visit summary rollup. Engineer signature pad. Responsible person options (sign now / email later / declined). Generates next service window on complete.
+- **`lib/screens/bs5839/visit_history_screen.dart`** — Streamed list of all visits for a site. Cards show visit type, declaration badge, date, engineer, test count. Tap opens detail.
+- **`lib/screens/bs5839/visit_detail_screen.dart`** — Read-only view: declaration header, visit info, test summary, compliance checks, rendered signatures (base64→image), next service due. In-progress visits show "Continue Visit" button.
+- **`lib/services/cause_effect_service.dart`** — Singleton service: cause & effect test CRUD, visit-scoped and site-scoped streams, ID generation
+- **`lib/screens/bs5839/cause_effect_test_list_screen.dart`** — StreamBuilder list of cause & effect tests for a visit. Cards show trigger reference, pass/fail badge, effect counts, date/engineer. FAB for new test.
+- **`lib/screens/bs5839/cause_effect_test_screen.dart`** — 3-step workflow: (1) choose trigger device from asset register or select template, (2) define expected effects with EffectType dropdown, expected behaviour, target description, (3) execute test with pass/fail toggle per effect, actual behaviour, ARC transmission time prompt. Pre-fills effects from per-category template defaults or selected template. Saves CauseEffectTest linked to visit.
+- **`lib/services/competency_service.dart`** — Singleton service: CRUD for qualifications and CPD records, auto-recalculates totalCpdHoursLast12Months on every mutation, ensureCompetencyExists for lazy init, getExpiringQualifications/getExpiredQualifications helpers. Handles both solo (users/{uid}) and company (companies/{id}/members/{uid}) paths.
+- **`lib/screens/bs5839/competency_screen.dart`** — Two-tab screen (Qualifications/CPD Records). Summary card with competency status (up to date/attention/action required), CPD hours vs minimum, expiring/expired qualification counts. Qualification cards with expiry colour coding (green/orange/red). CPD cards with hours badge. Add/edit/delete dialogs for both. Gated by `bs5839CompetencyTrackingEnabled` remote config.
+- **`lib/services/bs5839_report_service.dart`** — Singleton service: data collection (config, visit, assets, C&E tests, variations, logbook, competency, defects, floor plans, photos), isolate-safe PDF generation using existing pdf_widgets (MultiPage, buildModernHeader, buildSectionCard, buildFieldGrid, buildModernTable, buildSignatureSection). Sections: cover + declaration banner, system config, responsible person, engineer competency, inspection scope, asset results table, C&E test tables, battery readings, variations register (permissible + prohibited), defects, logbook summary, declaration paragraph with {category} substitution, signatures. Upload to Firebase Storage, update visit record.
+- **`lib/screens/bs5839/bs5839_report_screen.dart`** — Report screen: site info card with declaration badge, report contents preview, generate with progress, preview/share/print actions, upload to cloud. Follows same pattern as existing ComplianceReportScreen.
+
+#### Modified Files (12)
+- **`lib/screens/assets/site_asset_register_screen.dart`** — Added BS 5839 action card (gated by `bs5839ModeEnabled` remote config flag)
+- **`lib/screens/web/web_router.dart`** — Added `/sites/:siteId/assets/bs5839-config` web route with `_SiteDataLoader`
+- **`lib/utils/icon_map.dart`** — Added `wifi` and `documentUpload` icons
+- **`lib/services/bs5839_config_service.dart`** — Fixed `List<Asset>?` type annotation
+- **`lib/widgets/widgets.dart`** — Added `prohibited_variations_alert.dart` export
+- **`lib/services/lifecycle_service.dart`** — Added `calculateBs5839ServiceWindow()` (5-7 month) and `isBs5839ServiceOverdue()` methods
+- **`lib/screens/assets/site_asset_register_screen.dart`** — Added "Start Visit" action card (gated by `bs5839ModeEnabled`, mobile only)
+- **`lib/data/cause_effect_templates.dart`** — Added `mcpDefaultEffects` map: per-category (L1–L5, P1, P2, M) default EffectType lists for MCP triggers, imported `bs5839_system_config.dart`
+- **`lib/utils/icon_map.dart`** — Added `medal` icon (medal_star)
+- **`lib/screens/settings/settings_screen.dart`** — Added "Competency Record" tile in Account section, gated by `bs5839CompetencyTrackingEnabled`
+- **`lib/services/notification_service.dart`** — Added competency reminder check to `checkAndNotify()`: expired qualifications, expiring within 30 days, CPD hours below minimum. Uses 24h throttle. Gated by `bs5839CompetencyTrackingEnabled`.
+- **`lib/services/pdf_generation_data.dart`** — Added `Bs5839ReportPdfData` class with all fields for isolate-safe BS 5839 report generation
+- **`lib/data/declaration_templates.dart`** — Updated templates with `{category}` placeholder per spec (substituted at render time)
+- **`lib/screens/assets/site_asset_register_screen.dart`** — Report action now shows bottom sheet chooser when BS 5839 mode enabled: "Site Compliance Summary" (existing) or "BS 5839-1:2025 Inspection Report" (new, with visit selector)
+
+---
+
+## 2026-04-21 (Session 82)
+
+### BS 5839-1:2025 Compliance — Phase 1 Foundation
+
+Data layer for the BS 5839-1:2025 compliance reporting feature. All new models, static data, permissions, remote config flags, SQLite migration, Firestore rules/indexes, and storage rules. No services or screens yet (Phases 2+).
+
+#### New Files (11)
+- **`lib/models/bs5839_system_config.dart`** — Bs5839SystemCategory enum (L1–L5, P1/P2, M), ArcTransmissionMethod enum, Bs5839SystemConfig class (site-level config)
+- **`lib/models/inspection_visit.dart`** — InspectionVisitType enum, InspectionDeclaration enum, BatteryLoadTestReading, InspectionVisit class (wraps one visit)
+- **`lib/models/bs5839_variation.dart`** — VariationStatus enum, Bs5839Variation class (variations register entry)
+- **`lib/models/cause_effect_test.dart`** — EffectType enum (16 values), ExpectedEffect class, CauseEffectTest class
+- **`lib/models/engineer_competency.dart`** — QualificationType enum (15 values), Qualification, CpdRecord, EngineerCompetency classes
+- **`lib/models/logbook_entry.dart`** — LogbookEntryType enum, LogbookEntry class
+- **`lib/models/prohibited_variation_rule.dart`** — ProhibitedVariationRule class (function-based rule checks)
+- **`lib/data/prohibited_variation_rules.dart`** — 4 Clause 6.6 rules (zone plan, heat detector sleeping room, ARC signalling)
+- **`lib/data/declaration_templates.dart`** — Template strings for 4 declaration outcomes
+- **`lib/data/cause_effect_templates.dart`** — 11 pre-built cause-and-effect test templates
+- **`lib/data/bs5839_2025_reference.dart`** — 22 clause references for the 2025 edition reference guide
+
+#### Modified Files (13)
+- **`lib/models/service_record.dart`** — Added 8 fields: visitId, clauseReference, sounderDbReadingAt1m, sounderDbReadingAtFurthestPoint, mcpTestedThisVisit, batteryVoltageResting, batteryVoltageUnderLoad, cyberSecurityNotes
+- **`lib/models/asset.dart`** — Added 3 fields: bs5839ClauseReference, isInSleepingRoom, hasRemoteAccess
+- **`lib/models/saved_site.dart`** — Added 3 fields: isBs5839Site, lastVisitId, nextServiceDueDate
+- **`lib/models/company_site.dart`** — Added 3 fields: isBs5839Site, lastVisitId, nextServiceDueDate
+- **`lib/models/defect.dart`** — Added 2 fields: bs5839ClauseReference, triggeredProhibitedRule
+- **`lib/models/permission.dart`** — Added 5 BS 5839 permissions (bs5839ConfigEdit, bs5839ApproveVariations, bs5839IssueReports, bs5839RecordCpd, bs5839ViewTeamCompetency) with role defaults
+- **`lib/services/remote_config_service.dart`** — Added 10 bs5839_* flags + getters
+- **`lib/services/database_helper.dart`** — v18→v19 migration: 6 new tables, 18 ALTER TABLE columns
+- **`firestore.rules`** — 6 new collection rules (bs5839_config, inspection_visits, variations, cause_effect_tests, logbook_entries, competency)
+- **`firestore.indexes.json`** — 7 new composite indexes
+- **`storage.rules`** — 5 new storage paths (zone plans, BS 5839 evidence, reports)
+- **`lib/data/default_asset_types.dart`** — 2 new asset types: ARC Signalling Equipment, Zone Plan
+- **`lib/models/models.dart`** — Barrel file exports for 7 new models
+
+---
+
+## 2026-04-21 (Session 81)
+
+### Checklist Drift UI
+
+Visual indicators for assets tested against an outdated checklist version (Section 11 UI from BUG_FIXES_AND_HARDENING_SPEC).
+
+#### Modified Files (5)
+- **`lib/models/asset.dart`** — Added `lastChecklistVersionTested` (int?) field to Asset model (constructor, toJson, fromJson, copyWith)
+- **`lib/services/asset_test_service.dart`** — Stamps `lastChecklistVersionTested` on the asset document during both pass and fail
+- **`lib/screens/assets/site_asset_register_screen.dart`** — Amber "Re-test" badge on asset cards with checklist drift; "Needs re-test" filter chip; drift count in compliance summary bar; `_hasChecklistDrift()` helper
+- **`lib/screens/assets/asset_detail_screen.dart`** — Amber "Checklist updated — re-test recommended" banner below status badge when drift detected
+- **`lib/services/compliance_report_service.dart`** — `checklistDriftCount` getter on `_ReportContext`; amber warning banner on cover page: "X assets tested against an outdated checklist version"
+
+---
+
+## 2026-04-21 (Session 80)
+
+### Bug Fixes & Hardening — Phases 2-4
+
+Implemented remaining phases of BUG_FIXES_AND_HARDENING_SPEC.md: race condition prevention, compliance status enum, optimistic UI, upload retry, checklist drift detection, and orphaned storage cleanup.
+
+#### New Files (1)
+- **`functions/storage_janitor.js`** — Scheduled Cloud Function (daily) that finds and deletes orphaned Storage files older than 7 days with no Firestore reference
+
+#### Modified Files (18)
+- **`lib/services/asset_service.dart`** — Atomic reference allocation via counter documents (Firestore transaction); photo upload race fix (transactional count check + rollback on limit exceeded); upload retry with exponential backoff (3 attempts for timeout/network errors)
+- **`lib/services/quote_service.dart`** — Quote deletion now clears `linkedQuoteId` on linked defect; blocks deletion of converted quotes (`ConvertedQuoteDeletionException`); bulk delete skips converted quotes
+- **`lib/services/floor_plan_service.dart`** — Upload retry with exponential backoff
+- **`lib/services/asset_test_service.dart`** — Stamps `checklistVersionTested` on service records; uses `AssetComplianceStatus` enum
+- **`lib/models/asset.dart`** — Added `AssetComplianceStatus` enum (pass/fail/untested/decommissioned) with `fromString`, `displayLabel`; changed `complianceStatus` field from `String` to enum; deprecated old string constants
+- **`lib/models/asset_type.dart`** — Added `checklistVersion` field (int, default 1)
+- **`lib/models/service_record.dart`** — Added `checklistVersionTested` field (int?)
+- **13 screen/service files** — Migrated all `Asset.statusPass/Fail/Untested/Decommissioned` string comparisons to `AssetComplianceStatus` enum
+- **`lib/screens/assets/asset_detail_screen.dart`** — Optimistic UI for test-pass: immediate local state update, background Firestore sync, rollback on failure
+- **`lib/screens/quoting/quote_list_screen.dart`** — Catches `ConvertedQuoteDeletionException` with user-friendly toast
+- **`functions/index.js`** — Re-exports `storageJanitor`
+
+---
+
+## 2026-04-21 (Session 79)
+
+### Permissions Hardening — Full Implementation (16 Steps)
+
+Implemented all 27 items from PERMISSIONS_HARDENING_SPEC.md: privilege escalation prevention, Firestore rules lockdown, granular permission enforcement, Cloud Function migration for sensitive operations, real-time permission sync, and reactive UI wiring.
+
+#### New Files (6)
+- **`functions/shared.js`** — Shared Firebase init module with `defaultPermissionsForRole()` mirroring all 40 permission keys
+- **`functions/company_join.js`** — Server-side invite code validation, expiry check, batch member+profile creation
+- **`functions/company_create.js`** — Company creation with unique invite code (collision check), 90-day expiry, admin member setup
+- **`functions/company_preview.js`** — Minimal company name lookup by invite code
+- **`functions/update_member_role.js`** — Admin-only role changes with last-admin demotion protection
+- **`functions/update_member_permissions.js`** — Admin-only permission updates with caller/target validation
+
+#### Modified Files (14)
+- **`pubspec.yaml`** — Added `cloud_functions: ^6.0.6`
+- **`lib/models/user_profile.dart`** — Sentinel-based nullable copyWith so `companyId`/`companyRole` can be set to null
+- **`lib/models/permission.dart`** — Added 10 new permissions (invoicing, jobsheets, assetsTest, defects), optional `description` field, updated `defaultsForRole` for all roles, engineer `customersCreate` default changed to true
+- **`lib/models/company_member.dart`** — Permission map migration: merges role defaults under stored permissions so new permissions get role-appropriate defaults
+- **`lib/models/company.dart`** — Added `inviteCodeExpiresAt` (DateTime?) field with toJson/fromJson/copyWith
+- **`lib/services/company_service.dart`** — Migrated createCompany/joinCompany/updateMemberRole/updateMemberPermissions to Cloud Functions; rewrote removeMember/leaveCompany with soft-delete + last-admin guards; added getAdminCount, LastAdminException, SelfRemovalException; regenerateInviteCode now sets 90-day expiry
+- **`lib/services/user_profile_service.dart`** — Extended ChangeNotifier; added real-time Firestore listener on member doc for live permission/role changes; inactive member recovery; cache clearing on profile load
+- **`firestore.rules`** — Complete security rewrite: company reads restricted to members, creates via Cloud Functions only, role/permission changes blocked in rules, dispatched job engineer self-update scoped, per-permission gates on assets/defects/jobsheets/invoices/compliance
+- **`lib/main.dart`** — Dispatch routing uses any-dispatch-permission check; added UserProfileService listener for reactive rebuilds and badge stream resubscription
+- **`lib/screens/dispatch/dispatch_dashboard_screen.dart`** — Stream scoped by dispatchViewAll; FAB gated on dispatchCreate
+- **`lib/screens/settings/settings_screen.dart`** — Team tile shown for all company members; subtitle varies by teamManage permission; reactive listener
+- **`lib/screens/company/company_settings_screen.dart`** — All section visibility gated by specific permissions (sitesEdit, pdfBranding, companyEdit, companyDelete, inviteCodeRegenerate); invite code expiry display with countdown; reactive listener
+- **`lib/screens/company/member_permissions_screen.dart`** — Permission descriptions in SwitchListTile subtitles; separated role/permission Cloud Function calls
+- **`lib/screens/company/team_management_screen.dart`** — LastAdminException/SelfRemovalException catch blocks with user-friendly toasts
+- **`lib/screens/web/web_router.dart`** — webPortalAccess permission gate; refreshListenable includes UserProfileService for reactive re-evaluation
+- **`lib/screens/notifications/notification_feed_screen.dart`** — Dispatch routing broadened to dispatchViewAll || dispatchEdit
+- **`functions/index.js`** — Re-exports all 5 new callable functions via shared init
+
+---
+
+## 2026-04-21 (Session 78)
+
+### Bug Fixes & Hardening — Phase 1 (Data Integrity)
+
+Implemented Phase 1 of the bug fixes and hardening spec, targeting the 6 highest-severity data integrity issues across asset register, service history, floor plans, and defect workflows.
+
+#### New Files (3)
+- **`lib/utils/json_helpers.dart`** — Safe date deserialization helpers (`jsonDateOptional`, `jsonDateRequired`, `jsonStringOptional`) handling Firestore Timestamps, ISO strings, DateTime, and null
+- **`lib/services/lifecycle_service.dart`** — Centralised service interval calculations (`calculateNextServiceDue`, `calculateServiceWindow`, `isServiceOverdue`) with safe month arithmetic (handles Feb 29, month-end clamping)
+- **`lib/services/asset_test_service.dart`** — Atomic test save service (`markAssetPassed`, `markAssetFailed`) using Firestore WriteBatch — service record, asset update, and defect rectification all commit or fail together
+
+#### Modified Files (27)
+- **17 model files** (`asset.dart`, `service_record.dart`, `defect.dart`, `floor_plan.dart`, `company_member.dart`, `company_customer.dart`, `company.dart`, `jobsheet.dart`, `company_site.dart`, `saved_site.dart`, `saved_customer.dart`, `template.dart`, `invoice.dart`, `dispatched_job.dart`, `quote.dart`, `pdf_form_template.dart`, `dip_switch_models.dart`) — Replaced 30+ unsafe `DateTime.parse(json['x'] as String)` with json_helpers; fixes intermittent crashes when Firestore returns native Timestamp objects
+- **`lib/models/asset_type.dart`** — Added `defaultServiceIntervalMonths` (int?) field
+- **`lib/data/default_asset_types.dart`** — Set correct BS 5839 intervals for all 18 types (6mo for fire alarm components/doors, 12mo for extinguishers/lighting/blankets)
+- **`lib/services/user_profile_service.dart`** — Added `resolveEngineerName()` with fallback chain (CompanyMember → Auth → email → throw) and `ProfileNotLoadedException`
+- **`lib/services/floor_plan_service.dart`** — `deleteFloorPlan()` now batch-clears `floorPlanId`/`xPercent`/`yPercent` on affected assets; added `getAffectedAssetCount()`
+- **5 service stream files** (`asset_service.dart`, `floor_plan_service.dart`, `service_history_service.dart`, `defect_service.dart`, `dispatch_service.dart`) — Added per-doc try/catch in stream .map() so one malformed doc doesn't crash the whole list
+- **4 screen/widget files** (`asset_detail_screen.dart`, `batch_test_screen.dart`, `interactive_floor_plan_screen.dart`, `defect_bottom_sheet.dart`) — Refactored to use AssetTestService (atomic writes), LifecycleService (correct intervals), and resolveEngineerName (no more "Unknown" in audit trail)
+- **`lib/screens/floor_plans/floor_plan_list_screen.dart`** — Delete confirmation now shows affected asset count
+- **`lib/services/compliance_report_service.dart`** — Uses resolveEngineerName() instead of displayName fallback
+
+---
+
 ## 2026-04-20 (Session 77)
 
 ### Quote Fixes, Dispatch Status Fix & Multi-Select Bulk Delete

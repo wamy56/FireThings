@@ -88,9 +88,11 @@ class _DetectorSpacingCalculatorScreenState
   final _lengthController = TextEditingController();
   final _widthController = TextEditingController();
   final _heightController = TextEditingController();
+  final _beamSpacingController = TextEditingController();
 
   DetectorType _detectorType = DetectorType.pointSmoke;
   RoomType _roomType = RoomType.openArea;
+  bool _hasCloselySpacedBeams = false;
 
   _CalcResult? _result;
   String? _ceilingExceededMessage;
@@ -101,7 +103,33 @@ class _DetectorSpacingCalculatorScreenState
     _lengthController.dispose();
     _widthController.dispose();
     _heightController.dispose();
+    _beamSpacingController.dispose();
     super.dispose();
+  }
+
+  // ─── Presets ────────────────────────────────────────────────────────────
+
+  void _applyStairwayLobbyPreset() {
+    setState(() {
+      _lengthController.text = '3.0';
+      _widthController.text = '2.5';
+      _heightController.text = '2.7';
+      _detectorType = DetectorType.pointSmoke;
+      _roomType = RoomType.openArea;
+      _hasCloselySpacedBeams = false;
+      _beamSpacingController.clear();
+      _result = null;
+      _ceilingExceededMessage = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Stairway lobby preset applied \u2014 L1/L2 systems require '
+          'automatic detection in stairway lobbies (BS 5839-1:2025)',
+        ),
+        duration: Duration(seconds: 4),
+      ),
+    );
   }
 
   // ─── Calculation Logic ──────────────────────────────────────────────────
@@ -118,7 +146,7 @@ class _DetectorSpacingCalculatorScreenState
     // Auto-switch room type based on width
     if (width <= 2.0 && _roomType == RoomType.openArea) {
       _roomType = RoomType.corridor;
-      notes.add('Room type automatically switched to Corridor (width ≤ 2m).');
+      notes.add('Room type automatically switched to Corridor (width \u2264 2m).');
     } else if (width > 2.0 && _roomType == RoomType.corridor) {
       _roomType = RoomType.openArea;
       notes.add('Room type automatically switched to Open Area (width > 2m).');
@@ -146,6 +174,18 @@ class _DetectorSpacingCalculatorScreenState
       return;
     }
 
+    // Closely spaced beams note
+    if (_hasCloselySpacedBeams) {
+      final beamSpacing = double.tryParse(_beamSpacingController.text);
+      if (beamSpacing != null && beamSpacing < 1.0) {
+        notes.add(
+          'Closely spaced beams (${beamSpacing.toStringAsFixed(2)}m c/c) \u2014 '
+          'mount detectors on the underside of beams, not between them '
+          '(BS 5839-1:2025 cl. 14.8).',
+        );
+      }
+    }
+
     int cols;
     int rows;
     double spacingX;
@@ -154,10 +194,8 @@ class _DetectorSpacingCalculatorScreenState
     double wallOffY;
 
     if (_roomType == RoomType.corridor) {
-      // Corridor: single row centred in width
       final corridorSpacing = spec.corridorSpacing;
 
-      // Even distribution: wall offset = L/(2*cols), spacing = L/cols
       cols = max(1, (length / corridorSpacing).ceil());
       rows = 1;
       wallOffX = length / (2 * cols);
@@ -165,16 +203,12 @@ class _DetectorSpacingCalculatorScreenState
       wallOffY = width / 2;
       spacingY = 0;
     } else {
-      // Open area — minimum-detector search
       final R = spec.radius;
 
-      // Very small rooms: 1 detector centered
       if (length < 1.0 || width < 1.0) {
         cols = 1;
         rows = 1;
       } else {
-        // Search for minimum cols × rows where worst-case corner distance ≤ R
-        // Worst-case: √((L/(2*cols))² + (W/(2*rows))²) ≤ R
         int bestTotal = 999999;
         int bestCols = 1;
         int bestRows = 1;
@@ -182,16 +216,15 @@ class _DetectorSpacingCalculatorScreenState
         final maxCols = length.ceil();
         for (int c = 1; c <= maxCols; c++) {
           final halfCellX = length / (2 * c);
-          if (halfCellX > R) continue; // can't cover even in X
-          if (halfCellX < 0.5) break; // BS 5839-1 min wall offset
+          if (halfCellX > R) continue;
+          if (halfCellX < 0.5) break;
 
           final remainingR = sqrt(R * R - halfCellX * halfCellX);
-          if (remainingR <= 0) continue; // No remaining radius for Y coverage
+          if (remainingR <= 0) continue;
           var minRows = max(1, (width / (2 * remainingR)).ceil());
 
-          // Enforce min 0.5m wall offset in Y
           if (width / (2 * minRows) < 0.5) {
-            minRows = max(minRows, (width / 1.0).ceil()); // w/(2*rows)>=0.5 → rows<=w
+            minRows = max(minRows, (width / 1.0).ceil());
           }
 
           final total = c * minRows;
@@ -205,7 +238,6 @@ class _DetectorSpacingCalculatorScreenState
         cols = bestCols;
         rows = bestRows;
 
-        // "Show both" — check if fewer detectors would work within 5% tolerance
         _checkAlternative(length, width, R, cols, rows, notes);
       }
 
@@ -215,8 +247,8 @@ class _DetectorSpacingCalculatorScreenState
       spacingY = rows > 1 ? width / rows : 0;
 
       notes.add(
-        'Wall offset: ${wallOffX.toStringAsFixed(2)}m (L) × ${wallOffY.toStringAsFixed(2)}m (W), '
-        'calculated automatically per BS 5839-1 (minimum 0.5m).',
+        'Wall offset: ${wallOffX.toStringAsFixed(2)}m (L) \u00d7 ${wallOffY.toStringAsFixed(2)}m (W), '
+        'calculated automatically per BS 5839-1:2025 (minimum 0.5m).',
       );
     }
 
@@ -251,7 +283,6 @@ class _DetectorSpacingCalculatorScreenState
     });
   }
 
-  /// Check if one fewer column or row would cover with ≤5% overshoot
   void _checkAlternative(
     double length,
     double width,
@@ -260,7 +291,6 @@ class _DetectorSpacingCalculatorScreenState
     int rows,
     List<String> notes,
   ) {
-    // Try cols-1
     if (cols > 1) {
       final altCols = cols - 1;
       final halfX = length / (2 * altCols);
@@ -271,11 +301,10 @@ class _DetectorSpacingCalculatorScreenState
         final altTotal = altCols * rows;
         notes.add(
           'Could use $altTotal detectors (corners ${overshoot.toStringAsFixed(2)}m '
-          'outside coverage — engineer\'s discretion).',
+          'outside coverage \u2014 engineer\'s discretion).',
         );
       }
     }
-    // Try rows-1
     if (rows > 1) {
       final altRows = rows - 1;
       final halfX = length / (2 * cols);
@@ -286,7 +315,7 @@ class _DetectorSpacingCalculatorScreenState
         final altTotal = cols * altRows;
         notes.add(
           'Could use $altTotal detectors (corners ${overshoot.toStringAsFixed(2)}m '
-          'outside coverage — engineer\'s discretion).',
+          'outside coverage \u2014 engineer\'s discretion).',
         );
       }
     }
@@ -297,8 +326,10 @@ class _DetectorSpacingCalculatorScreenState
       _lengthController.clear();
       _widthController.clear();
       _heightController.clear();
+      _beamSpacingController.clear();
       _detectorType = DetectorType.pointSmoke;
       _roomType = RoomType.openArea;
+      _hasCloselySpacedBeams = false;
       _result = null;
       _ceilingExceededMessage = null;
     });
@@ -330,6 +361,8 @@ class _DetectorSpacingCalculatorScreenState
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _buildInfoCard(),
+              const SizedBox(height: 12),
+              _buildPresetButtons(),
               const SizedBox(height: 20),
               _buildInputSection(),
               _buildSuggestionBanner(),
@@ -386,7 +419,7 @@ class _DetectorSpacingCalculatorScreenState
             ),
             const SizedBox(height: 12),
             Text(
-              'Calculate the number of detectors needed and their layout based on room dimensions per BS 5839-1.',
+              'Calculate the number of detectors needed and their layout based on room dimensions per BS 5839-1:2025.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -395,7 +428,24 @@ class _DetectorSpacingCalculatorScreenState
     );
   }
 
+  Widget _buildPresetButtons() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Wrap(
+      spacing: 8,
+      children: [
+        ActionChip(
+          avatar: Icon(AppIcons.building, size: 16),
+          label: const Text('Stairway Lobby (L1/L2)'),
+          onPressed: _applyStairwayLobbyPreset,
+          backgroundColor: isDark ? Colors.white.withValues(alpha: 0.08) : null,
+        ),
+      ],
+    );
+  }
+
   Widget _buildInputSection() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Card(
       elevation: 2,
       child: Padding(
@@ -412,7 +462,6 @@ class _DetectorSpacingCalculatorScreenState
             ),
             const SizedBox(height: 16),
 
-            // Length
             TextFormField(
               controller: _lengthController,
               decoration: InputDecoration(
@@ -435,7 +484,6 @@ class _DetectorSpacingCalculatorScreenState
             ),
             const SizedBox(height: 16),
 
-            // Width
             TextFormField(
               controller: _widthController,
               decoration: InputDecoration(
@@ -458,7 +506,6 @@ class _DetectorSpacingCalculatorScreenState
             ),
             const SizedBox(height: 16),
 
-            // Ceiling Height
             TextFormField(
               controller: _heightController,
               decoration: InputDecoration(
@@ -480,6 +527,67 @@ class _DetectorSpacingCalculatorScreenState
               },
             ),
             const SizedBox(height: 20),
+
+            // Beam spacing
+            CheckboxListTile(
+              value: _hasCloselySpacedBeams,
+              onChanged: (v) =>
+                  setState(() => _hasCloselySpacedBeams = v ?? false),
+              title: const Text(
+                'Closely spaced ceiling beams',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+            ),
+            if (_hasCloselySpacedBeams) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 40, bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? Colors.blue.shade900.withValues(alpha: 0.3)
+                        : Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Beams less than 1 metre apart centre-to-centre are treated '
+                    'as closely spaced. Use the lower of slab-to-slab or '
+                    'beam-to-beam spacing for detector calculations '
+                    '(BS 5839-1:2025 cl. 14.8).',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDark
+                          ? Colors.blue.shade200
+                          : Colors.blue.shade800,
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: 40, right: 0, bottom: 12),
+                child: TextFormField(
+                  controller: _beamSpacingController,
+                  decoration: InputDecoration(
+                    labelText: 'Beam spacing c/c (m)',
+                    prefixIcon: Icon(AppIcons.ruler),
+                    border: const OutlineInputBorder(),
+                    suffixText: 'm',
+                    isDense: true,
+                  ),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.done,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 4),
 
             // Detector Type
             Text(
@@ -797,7 +905,6 @@ class _DetectorSpacingCalculatorScreenState
                   final maxWidth = constraints.maxWidth - 32;
                   const maxHeight = 280.0;
 
-                  // Room area fits inside margins
                   final roomMaxW = maxWidth - marginLeft;
                   final roomMaxH = maxHeight - marginBottom;
                   final aspect = length / width;
@@ -890,7 +997,7 @@ class _DetectorSpacingCalculatorScreenState
       context: context,
       child: Builder(
         builder: (context) => AlertDialog(
-          title: const Text('BS 5839-1 Spacing Rules'),
+          title: const Text('BS 5839-1:2025 Spacing Rules'),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -921,6 +1028,27 @@ class _DetectorSpacingCalculatorScreenState
                 const SizedBox(height: 8),
                 const Text('\u2022 Point Smoke: 10.5m'),
                 const Text('\u2022 Point Heat: 7.5m'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Closely Spaced Beams (2025)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '\u2022 Beams <1m centre-to-centre are "closely spaced"\n'
+                  '\u2022 Mount detectors on underside of beams, not between\n'
+                  '\u2022 Use lower of slab-to-slab or beam-to-beam for spacing',
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Stairway Lobby (2025)',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '\u2022 L1/L2 systems now require detection in stairway lobbies\n'
+                  '\u2022 Use the preset button for typical lobby dimensions',
+                ),
                 const SizedBox(height: 12),
                 const Text(
                   'Key Principles',
@@ -988,7 +1116,6 @@ class _DetectorGridPainter extends CustomPainter {
     final roomH = size.height - marginBottom;
     final roomOrigin = Offset(marginLeft, 0);
 
-    // Room outline
     final roomPaint = Paint()
       ..color = isDark ? Colors.white24 : Colors.grey.shade300
       ..style = PaintingStyle.stroke
@@ -997,38 +1124,31 @@ class _DetectorGridPainter extends CustomPainter {
     final roomRect = Rect.fromLTWH(roomOrigin.dx, roomOrigin.dy, roomW, roomH);
     canvas.drawRect(roomRect, roomPaint);
 
-    // Room fill
     final fillPaint = Paint()
       ..color = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.grey.shade50
       ..style = PaintingStyle.fill;
     canvas.drawRect(roomRect, fillPaint);
 
-    // Pixel offsets from actual wall offsets
     final pxOffX = (wallOffsetX / roomLength) * roomW;
     final pxOffY = (wallOffsetY / roomWidth) * roomH;
 
-    // Wall offset zone (for open area)
     if (!isCorridor) {
       final offsetPaint = Paint()
         ..color = isDark ? Colors.orange.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.08)
         ..style = PaintingStyle.fill;
 
-      // Top strip
       canvas.drawRect(
         Rect.fromLTWH(roomOrigin.dx, roomOrigin.dy, roomW, pxOffY),
         offsetPaint,
       );
-      // Bottom strip
       canvas.drawRect(
         Rect.fromLTWH(roomOrigin.dx, roomOrigin.dy + roomH - pxOffY, roomW, pxOffY),
         offsetPaint,
       );
-      // Left strip
       canvas.drawRect(
         Rect.fromLTWH(roomOrigin.dx, roomOrigin.dy + pxOffY, pxOffX, roomH - 2 * pxOffY),
         offsetPaint,
       );
-      // Right strip
       canvas.drawRect(
         Rect.fromLTWH(
           roomOrigin.dx + roomW - pxOffX,
@@ -1040,21 +1160,17 @@ class _DetectorGridPainter extends CustomPainter {
       );
     }
 
-    // Detector dots
     final dotPaint = Paint()
       ..color = Colors.indigo
       ..style = PaintingStyle.fill;
 
     final dotRadius = min(8.0, min(roomW, roomH) / 12);
 
-    final List<Offset> detectorPositions = [];
-
     if (isCorridor) {
       final y = roomOrigin.dy + roomH / 2;
       for (int c = 0; c < columns; c++) {
         final x = roomOrigin.dx + pxOffX + (columns > 1 ? c * (gridSpacingX / roomLength) * roomW : (roomW / 2 - pxOffX));
         final cx = x.clamp(roomOrigin.dx + dotRadius, roomOrigin.dx + roomW - dotRadius);
-        detectorPositions.add(Offset(cx, y));
         canvas.drawCircle(Offset(cx, y), dotRadius, dotPaint);
       }
     } else {
@@ -1066,7 +1182,6 @@ class _DetectorGridPainter extends CustomPainter {
           final y = rows > 1
               ? roomOrigin.dy + pxOffY + r * (gridSpacingY / roomWidth) * roomH
               : roomOrigin.dy + roomH / 2;
-          detectorPositions.add(Offset(x, y));
           canvas.drawCircle(Offset(x, y), dotRadius, dotPaint);
         }
       }
@@ -1080,11 +1195,9 @@ class _DetectorGridPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     const tickLen = 4.0;
-    const dimGap = 6.0; // gap between room edge and dim line
+    const dimGap = 6.0;
 
-    // ── Bottom annotations (X-axis) ──
     if (!isCorridor) {
-      // Wall-to-detector X
       final firstDetX = roomOrigin.dx + pxOffX;
       final dimY = roomOrigin.dy + roomH + dimGap + 8;
 
@@ -1094,7 +1207,6 @@ class _DetectorGridPainter extends CustomPainter {
         '${wallOffsetX.toStringAsFixed(2)}m',
       );
 
-      // Detector-to-detector X
       if (columns > 1) {
         final secondDetX = roomOrigin.dx + pxOffX + (gridSpacingX / roomLength) * roomW;
         final dimY2 = dimY + 18;
@@ -1105,7 +1217,6 @@ class _DetectorGridPainter extends CustomPainter {
         );
       }
     } else {
-      // Corridor: wall-to-detector X
       final firstDetX = roomOrigin.dx + pxOffX;
       final dimY = roomOrigin.dy + roomH + dimGap + 8;
 
@@ -1126,7 +1237,6 @@ class _DetectorGridPainter extends CustomPainter {
       }
     }
 
-    // ── Left annotations (Y-axis, open area only) ──
     if (!isCorridor) {
       final firstDetY = roomOrigin.dy + pxOffY;
       final dimX = roomOrigin.dx - dimGap - 8;
@@ -1153,14 +1263,10 @@ class _DetectorGridPainter extends CustomPainter {
     Canvas canvas, Paint linePaint, Color textColor,
     double x1, double x2, double y, double tickLen, String label,
   ) {
-    // Horizontal line
     canvas.drawLine(Offset(x1, y), Offset(x2, y), linePaint);
-    // Left tick
     canvas.drawLine(Offset(x1, y - tickLen), Offset(x1, y + tickLen), linePaint);
-    // Right tick
     canvas.drawLine(Offset(x2, y - tickLen), Offset(x2, y + tickLen), linePaint);
 
-    // Label
     final tp = TextPainter(
       text: TextSpan(
         text: label,
@@ -1176,14 +1282,10 @@ class _DetectorGridPainter extends CustomPainter {
     Canvas canvas, Paint linePaint, Color textColor,
     double y1, double y2, double x, double tickLen, String label,
   ) {
-    // Vertical line
     canvas.drawLine(Offset(x, y1), Offset(x, y2), linePaint);
-    // Top tick
     canvas.drawLine(Offset(x - tickLen, y1), Offset(x + tickLen, y1), linePaint);
-    // Bottom tick
     canvas.drawLine(Offset(x - tickLen, y2), Offset(x + tickLen, y2), linePaint);
 
-    // Label (rotated)
     final tp = TextPainter(
       text: TextSpan(
         text: label,

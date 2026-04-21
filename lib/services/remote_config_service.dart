@@ -18,7 +18,7 @@ class RemoteConfigService {
     'pdf_forms_enabled': true,
     'cloud_sync_enabled': true,
     'custom_templates_enabled': true,
-    'standards_data_version': '08/03/2026',
+    'standards_data_version': '2026-04-21',
     'dispatch_enabled': false,
     'dispatch_max_members': 25,
     'dispatch_notifications_enabled': true,
@@ -27,6 +27,16 @@ class RemoteConfigService {
     'lifecycle_tracking_enabled': false,
     'compliance_report_enabled': false,
     'quoting_enabled': false,
+    'bs5839_mode_enabled': false,
+    'bs5839_visits_enabled': false,
+    'bs5839_variations_register_enabled': false,
+    'bs5839_cause_effect_enabled': false,
+    'bs5839_competency_tracking_enabled': false,
+    'bs5839_report_enabled': false,
+    'bs5839_logbook_structured_enabled': false,
+    'bs5839_min_cpd_hours_per_year': 5.0,
+    'bs5839_service_window_warning_days': 30,
+    'bs5839_reference_data_version': '2025-04-30',
   };
 
   Future<void> initialize() async {
@@ -106,4 +116,34 @@ class RemoteConfigService {
       _remoteConfig.getBool('compliance_report_enabled');
 
   bool get quotingEnabled => _remoteConfig.getBool('quoting_enabled');
+
+  bool get bs5839ModeEnabled =>
+      _remoteConfig.getBool('bs5839_mode_enabled');
+
+  bool get bs5839VisitsEnabled =>
+      _remoteConfig.getBool('bs5839_visits_enabled');
+
+  bool get bs5839VariationsRegisterEnabled =>
+      _remoteConfig.getBool('bs5839_variations_register_enabled');
+
+  bool get bs5839CauseEffectEnabled =>
+      _remoteConfig.getBool('bs5839_cause_effect_enabled');
+
+  bool get bs5839CompetencyTrackingEnabled =>
+      _remoteConfig.getBool('bs5839_competency_tracking_enabled');
+
+  bool get bs5839ReportEnabled =>
+      _remoteConfig.getBool('bs5839_report_enabled');
+
+  bool get bs5839LogbookStructuredEnabled =>
+      _remoteConfig.getBool('bs5839_logbook_structured_enabled');
+
+  double get bs5839MinCpdHoursPerYear =>
+      _remoteConfig.getDouble('bs5839_min_cpd_hours_per_year');
+
+  int get bs5839ServiceWindowWarningDays =>
+      _remoteConfig.getInt('bs5839_service_window_warning_days');
+
+  String get bs5839ReferenceDataVersion =>
+      _remoteConfig.getString('bs5839_reference_data_version');
 }

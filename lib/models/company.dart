@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// Represents a company in the dispatch system
 class Company {
   final String id;
@@ -9,6 +11,7 @@ class Company {
   final DateTime createdAt;
   final String? logoUrl;
   final String? inviteCode;
+  final DateTime? inviteCodeExpiresAt;
 
   Company({
     required this.id,
@@ -20,6 +23,7 @@ class Company {
     required this.createdAt,
     this.logoUrl,
     this.inviteCode,
+    this.inviteCodeExpiresAt,
   });
 
   Map<String, dynamic> toJson() {
@@ -33,6 +37,7 @@ class Company {
       'createdAt': createdAt.toIso8601String(),
       'logoUrl': logoUrl,
       'inviteCode': inviteCode,
+      'inviteCodeExpiresAt': inviteCodeExpiresAt?.toIso8601String(),
     };
   }
 
@@ -44,9 +49,10 @@ class Company {
       phone: json['phone'] as String?,
       email: json['email'] as String?,
       createdBy: json['createdBy'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: jsonDateRequired(json['createdAt']),
       logoUrl: json['logoUrl'] as String?,
       inviteCode: json['inviteCode'] as String?,
+      inviteCodeExpiresAt: jsonDateOptional(json['inviteCodeExpiresAt']),
     );
   }
 
@@ -60,6 +66,7 @@ class Company {
     DateTime? createdAt,
     String? logoUrl,
     String? inviteCode,
+    DateTime? inviteCodeExpiresAt,
   }) {
     return Company(
       id: id ?? this.id,
@@ -71,6 +78,7 @@ class Company {
       createdAt: createdAt ?? this.createdAt,
       logoUrl: logoUrl ?? this.logoUrl,
       inviteCode: inviteCode ?? this.inviteCode,
+      inviteCodeExpiresAt: inviteCodeExpiresAt ?? this.inviteCodeExpiresAt,
     );
   }
 

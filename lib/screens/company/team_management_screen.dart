@@ -290,6 +290,8 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
             '${member.displayName} is now a ${_roleLabel(newRole)}',
           );
         }
+      } on LastAdminException catch (e) {
+        if (mounted) context.showErrorToast(e.message);
       } catch (e) {
         if (mounted) context.showErrorToast('Failed to change role');
       }
@@ -322,6 +324,10 @@ class _TeamManagementScreenState extends State<TeamManagementScreen> {
         if (mounted) {
           context.showSuccessToast('${member.displayName} removed');
         }
+      } on SelfRemovalException catch (e) {
+        if (mounted) context.showErrorToast(e.message);
+      } on LastAdminException catch (e) {
+        if (mounted) context.showErrorToast(e.message);
       } catch (e) {
         if (mounted) context.showErrorToast('Failed to remove member');
       }

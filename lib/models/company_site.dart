@@ -1,3 +1,5 @@
+import '../utils/json_helpers.dart';
+
 /// Represents a shared company site for dispatch job creation
 class CompanySite {
   final String id;
@@ -9,6 +11,9 @@ class CompanySite {
   final String createdBy;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final bool isBs5839Site;
+  final String? lastVisitId;
+  final DateTime? nextServiceDueDate;
 
   CompanySite({
     required this.id,
@@ -20,6 +25,9 @@ class CompanySite {
     required this.createdBy,
     required this.createdAt,
     this.updatedAt,
+    this.isBs5839Site = false,
+    this.lastVisitId,
+    this.nextServiceDueDate,
   });
 
   Map<String, dynamic> toJson() {
@@ -33,6 +41,9 @@ class CompanySite {
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'isBs5839Site': isBs5839Site,
+      'lastVisitId': lastVisitId,
+      'nextServiceDueDate': nextServiceDueDate?.toIso8601String(),
     };
   }
 
@@ -45,10 +56,11 @@ class CompanySite {
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       createdBy: json['createdBy'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.tryParse(json['updatedAt'] as String)
-          : null,
+      createdAt: jsonDateRequired(json['createdAt']),
+      updatedAt: jsonDateOptional(json['updatedAt']),
+      isBs5839Site: json['isBs5839Site'] as bool? ?? false,
+      lastVisitId: json['lastVisitId'] as String?,
+      nextServiceDueDate: jsonDateOptional(json['nextServiceDueDate']),
     );
   }
 
@@ -62,6 +74,9 @@ class CompanySite {
     String? createdBy,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isBs5839Site,
+    String? lastVisitId,
+    DateTime? nextServiceDueDate,
   }) {
     return CompanySite(
       id: id ?? this.id,
@@ -73,6 +88,9 @@ class CompanySite {
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isBs5839Site: isBs5839Site ?? this.isBs5839Site,
+      lastVisitId: lastVisitId ?? this.lastVisitId,
+      nextServiceDueDate: nextServiceDueDate ?? this.nextServiceDueDate,
     );
   }
 

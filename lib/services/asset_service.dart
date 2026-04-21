@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -29,9 +30,17 @@ class AssetService {
     return _assetsCol(basePath, siteId)
         .orderBy('reference')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Asset.fromJson(doc.data()))
-            .toList());
+        .map((snapshot) {
+      final assets = <Asset>[];
+      for (final doc in snapshot.docs) {
+        try {
+          assets.add(Asset.fromJson(doc.data()));
+        } catch (e) {
+          debugPrint('Skipping malformed asset ${doc.id}: $e');
+        }
+      }
+      return assets;
+    });
   }
 
   /// Get a single asset.
@@ -47,15 +56,46 @@ class AssetService {
     }
   }
 
-  /// Create a new asset.
+  /// Create a new asset. If the reference matches the auto-suggested pattern
+  /// (e.g. "SD-003"), allocates atomically via a counter document to prevent
+  /// duplicate references from concurrent creates.
   Future<void> createAsset(
       String basePath, String siteId, Asset asset) async {
     try {
-      await _assetsCol(basePath, siteId).doc(asset.id).set(asset.toJson());
+      final ref = asset.reference;
+      if (ref != null && _isAutoReference(ref)) {
+        final parts = ref.split('-');
+        final prefix = parts.sublist(0, parts.length - 1).join('-');
+        final number = await _allocateNumber(basePath, siteId, prefix);
+        final newRef = '$prefix-${number.toString().padLeft(3, '0')}';
+        final updated = asset.copyWith(reference: newRef);
+        await _assetsCol(basePath, siteId).doc(updated.id).set(updated.toJson());
+      } else {
+        await _assetsCol(basePath, siteId).doc(asset.id).set(asset.toJson());
+      }
     } catch (e) {
       debugPrint('Error creating asset: $e');
       rethrow;
     }
+  }
+
+  bool _isAutoReference(String reference) {
+    final parts = reference.split('-');
+    if (parts.length < 2) return false;
+    return int.tryParse(parts.last) != null;
+  }
+
+  Future<int> _allocateNumber(
+      String basePath, String siteId, String prefix) async {
+    final counterRef = _firestore.doc(
+        '$basePath/sites/$siteId/asset_counters/$prefix');
+    return await _firestore.runTransaction((txn) async {
+      final snap = await txn.get(counterRef);
+      final current = (snap.data()?['nextNumber'] as int?) ?? 0;
+      final next = current + 1;
+      txn.set(counterRef, {'nextNumber': next}, SetOptions(merge: true));
+      return next;
+    });
   }
 
   /// Update an existing asset.
@@ -114,10 +154,18 @@ class AssetService {
   }
 
   /// Get the next suggested reference for an asset type at a site.
-  /// E.g. if site has SD-001, SD-002, returns "SD-003".
+  /// Reads from the counter document if it exists, otherwise scans assets.
   Future<String> suggestNextReference(
       String basePath, String siteId, String prefix) async {
     try {
+      final counterSnap = await _firestore
+          .doc('$basePath/sites/$siteId/asset_counters/$prefix')
+          .get();
+      if (counterSnap.exists) {
+        final next = ((counterSnap.data()?['nextNumber'] as int?) ?? 0) + 1;
+        return '$prefix-${next.toString().padLeft(3, '0')}';
+      }
+
       final snapshot = await _assetsCol(basePath, siteId)
           .where('reference', isGreaterThanOrEqualTo: '$prefix-')
           .where('reference', isLessThanOrEqualTo: '$prefix-\uf8ff')
@@ -151,37 +199,50 @@ class AssetService {
     required Uint8List bytes,
   }) async {
     try {
-      // Check current photo count
-      final asset = await getAsset(basePath, siteId, assetId);
-      if (asset == null) {
-        debugPrint('Asset not found');
-        return null;
-      }
-      if (asset.photoUrls.length >= maxPhotos) {
-        debugPrint('Max photos ($maxPhotos) reached');
-        return null;
-      }
-
-      // Upload to Storage (compression already done by caller)
+      // Upload to Storage first (outside transaction)
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final path = '$basePath/sites/$siteId/assets/$assetId/photos/$timestamp.jpg';
-      final url = kIsWeb
-          ? await _uploadViaRestApi(path, bytes)
-          : await _uploadViaSdk(path, bytes);
+      final url = await _retryUpload(
+        () => kIsWeb
+            ? _uploadViaRestApi(path, bytes)
+            : _uploadViaSdk(path, bytes),
+      );
 
-      // Update asset's photoUrls
-      final updatedUrls = [...asset.photoUrls, url];
-      await _assetsCol(basePath, siteId).doc(assetId).update({
-        'photoUrls': updatedUrls,
-        'updatedAt': DateTime.now().toIso8601String(),
-        'lastModifiedAt': DateTime.now().toIso8601String(),
-      });
-
-      return url;
+      // Atomically check count and append URL
+      try {
+        await _firestore.runTransaction((txn) async {
+          final ref = _assetsCol(basePath, siteId).doc(assetId);
+          final snap = await txn.get(ref);
+          if (!snap.exists) throw _PhotoUploadAborted();
+          final current =
+              (snap.data()?['photoUrls'] as List<dynamic>?)?.length ?? 0;
+          if (current >= maxPhotos) throw _PhotoLimitExceeded();
+          txn.update(ref, {
+            'photoUrls': FieldValue.arrayUnion([url]),
+            'updatedAt': DateTime.now().toIso8601String(),
+            'lastModifiedAt': DateTime.now().toIso8601String(),
+          });
+        });
+        return url;
+      } on _PhotoLimitExceeded {
+        debugPrint('Max photos ($maxPhotos) reached');
+        _tryDeleteStorageUrl(url);
+        return null;
+      } on _PhotoUploadAborted {
+        debugPrint('Asset not found during photo upload');
+        _tryDeleteStorageUrl(url);
+        return null;
+      }
     } catch (e) {
       debugPrint('Error uploading asset photo: $e');
       return null;
     }
+  }
+
+  void _tryDeleteStorageUrl(String url) {
+    try {
+      _storage.refFromURL(url).delete();
+    } catch (_) {}
   }
 
   /// Delete a photo from an asset. Removes from Storage and updates photoUrls.
@@ -277,3 +338,28 @@ class AssetService {
     return 'https://firebasestorage.googleapis.com/v0/b/$bucket/o/$encodedPath?alt=media&token=$token';
   }
 }
+
+Future<T> _retryUpload<T>(
+  Future<T> Function() operation, {
+  int maxAttempts = 3,
+}) async {
+  Object? lastError;
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (e) {
+      lastError = e;
+      if (e is TimeoutException || e is http.ClientException) {
+        if (attempt == maxAttempts) rethrow;
+        await Future.delayed(Duration(seconds: 1 << (attempt - 1)));
+        continue;
+      }
+      rethrow;
+    }
+  }
+  throw lastError!;
+}
+
+class _PhotoLimitExceeded implements Exception {}
+
+class _PhotoUploadAborted implements Exception {}

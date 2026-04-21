@@ -199,4 +199,7 @@ class AppIcons {
   static const IconData image = IconsaxPlusLinear.image;
   static const IconData award = IconsaxPlusLinear.award;
   static const IconData undo = IconsaxPlusLinear.refresh_left_square;
+  static const IconData wifi = IconsaxPlusLinear.wifi;
+  static const IconData documentUpload = IconsaxPlusLinear.document_upload;
+  static const IconData medal = IconsaxPlusLinear.medal_star;
 }

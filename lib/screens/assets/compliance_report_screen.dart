@@ -55,10 +55,10 @@ class _ComplianceReportScreenState extends State<ComplianceReportScreen> {
           .getAssetsStream(widget.basePath, widget.siteId)
           .first;
       final active = assets
-          .where((a) => a.complianceStatus != Asset.statusDecommissioned)
+          .where((a) => a.complianceStatus != AssetComplianceStatus.decommissioned)
           .toList();
       final passCount =
-          active.where((a) => a.complianceStatus == Asset.statusPass).length;
+          active.where((a) => a.complianceStatus == AssetComplianceStatus.pass).length;
       final passRate = active.isEmpty ? 0.0 : passCount / active.length;
 
       AnalyticsService.instance.logComplianceReportGenerated(

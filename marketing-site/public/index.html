@@ -3,514 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="FireThings — fire alarm management software for engineers. Digital jobsheets, dispatch, invoicing, compliance, and field tools in one app.">
-    <title>FireThings — Fire Alarm Management Software</title>
+    <meta name="description" content="FireThings — fire alarm management software for engineers. Coming soon.">
+    <title>FireThings — Coming Soon</title>
     <link rel="icon" type="image/png" href="favicon.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
-    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ft-primary: #1A1A2E;
+            --ft-accent: #FFB020;
+            --ft-fg1: #1F2937;
+            --ft-fg2: #6B7280;
+            --ft-bg: #FAFAF7;
+            --ft-border: #E8E5DE;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--ft-bg);
+            color: var(--ft-fg1);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glow-accent {
+            position: absolute;
+            top: -160px;
+            right: -160px;
+            width: 480px;
+            height: 480px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255, 176, 32, 0.1), transparent 70%);
+            pointer-events: none;
+        }
+
+        .glow-primary {
+            position: absolute;
+            bottom: -200px;
+            left: -200px;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(26, 26, 46, 0.06), transparent 70%);
+            pointer-events: none;
+        }
+
+        .content {
+            position: relative;
+            text-align: center;
+            max-width: 520px;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 40px;
+        }
+
+        .logo-emoji { font-size: 32px; }
+
+        .logo-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--ft-primary);
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: rgba(255, 176, 32, 0.1);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--ft-accent);
+            letter-spacing: 0.3px;
+            margin-bottom: 24px;
+        }
+
+        .badge-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--ft-accent);
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 48px;
+            line-height: 1.08;
+            letter-spacing: -1px;
+            font-weight: 800;
+            color: var(--ft-primary);
+            margin-bottom: 16px;
+        }
+
+        h1 span { color: var(--ft-accent); }
+
+        .subtitle {
+            font-size: 17px;
+            line-height: 1.6;
+            color: var(--ft-fg2);
+            margin-bottom: 36px;
+        }
+
+        .actions {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn-portal {
+            display: inline-block;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 10px;
+            background: var(--ft-accent);
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.15s;
+            box-shadow: 0 8px 24px rgba(255, 176, 32, 0.3);
+        }
+
+        .btn-portal:hover {
+            background: #E69D1C;
+            transform: translateY(-1px);
+        }
+
+        .link-notify {
+            font-size: 13px;
+            color: var(--ft-fg2);
+        }
+
+        .link-notify a {
+            color: var(--ft-primary);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .link-notify a:hover { text-decoration: underline; }
+
+        .footer {
+            position: absolute;
+            bottom: 32px;
+            font-size: 12px;
+            color: var(--ft-fg2);
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 34px; }
+            .subtitle { font-size: 15px; }
+        }
+    </style>
 </head>
 <body>
+    <div class="glow-accent"></div>
+    <div class="glow-primary"></div>
 
-<!-- ════════════════════════════════════════════════════════════════════════
-     Nav
-     ════════════════════════════════════════════════════════════════════ -->
-<nav class="mk-nav">
-  <div class="mk-nav__inner">
-    <a href="/" class="mk-nav__logo">
-      <span style="font-size:22px;">🔥</span>
-      <span class="mk-nav__logo-text">FireThings</span>
-    </a>
-    <div class="mk-nav__links">
-      <a href="#features">Features</a>
-      <a href="#pricing">Pricing</a>
-      <a href="#compliance">Compliance</a>
-      <a href="#about">About</a>
-    </div>
-    <div class="mk-nav__actions">
-      <a href="https://app.firethings.co.uk" class="mk-nav__signin">Sign in</a>
-      <a href="#cta" class="btn-accent">Book a demo</a>
-    </div>
-  </div>
-</nav>
+    <div class="content">
+        <div class="logo">
+            <span class="logo-emoji">🔥</span>
+            <span class="logo-text">FireThings</span>
+        </div>
 
-<!-- ════════════════════════════════════════════════════════════════════════
-     Hero
-     ════════════════════════════════════════════════════════════════════ -->
-<section class="mk-hero">
-  <div class="mk-hero__glow-accent"></div>
-  <div class="mk-hero__glow-primary"></div>
+        <div class="badge">
+            <span class="badge-dot"></span>
+            Coming Soon
+        </div>
 
-  <div class="mk-hero__grid">
-    <!-- Left column: copy -->
-    <div class="mk-hero__copy">
-      <div class="mk-hero__badge">
-        <span class="mk-hero__badge-dot"></span>
-        Built for BS 5839
-      </div>
-      <h1 class="mk-hero__title">Fire safety jobs<br>that <span>run themselves</span></h1>
-      <p class="mk-hero__subtitle">
-        From dispatch to signed-off jobsheet in one platform.
-        Less paperwork, faster invoicing, full compliance — all from your phone.
-      </p>
-      <div class="mk-hero__cta">
-        <button class="btn-hero-primary">Start free trial</button>
-        <button class="btn-hero-secondary">Book a demo</button>
-      </div>
-      <div class="mk-hero__proof">
-        <span>✓ No credit card required</span>
-        <span>✓ 14-day free trial</span>
-        <span>✓ Cancel anytime</span>
-      </div>
+        <h1>Fire safety jobs that <span>run themselves</span></h1>
+
+        <p class="subtitle">
+            We're building the all-in-one platform for fire alarm engineers — dispatch, jobsheets,
+            compliance, and invoicing. Launching soon.
+        </p>
+
+        <div class="actions">
+            <a href="https://app.firethings.co.uk" class="btn-portal">Open Dispatch Portal</a>
+            <p class="link-notify">Already have an account? <a href="https://app.firethings.co.uk">Sign in here</a></p>
+        </div>
     </div>
 
-    <!-- Right column: dashboard mock -->
-    <div class="mk-hero__mock">
-      <div class="mk-hero__dashboard">
-        <div class="mk-hero__dash-header">
-          <div class="mk-hero__dash-eyebrow">Dispatch Board</div>
-          <div class="mk-hero__dash-title">Today's Schedule</div>
-        </div>
-        <div class="mk-hero__dash-rows">
-          <div class="mk-hero__dash-row mk-hero__dash-row--active">
-            <span class="mk-hero__dash-time">09:00</span>
-            <div class="mk-hero__dash-info">
-              <div class="mk-hero__dash-site">Westfield Tower</div>
-              <div class="mk-hero__dash-type">Annual Inspection</div>
-            </div>
-            <div class="mk-hero__dash-avatar">JS</div>
-            <span class="mk-hero__dash-tag" style="background:#E8F5E9;color:#4CAF50;">In Progress</span>
-          </div>
-          <div class="mk-hero__dash-row">
-            <span class="mk-hero__dash-time">11:30</span>
-            <div class="mk-hero__dash-info">
-              <div class="mk-hero__dash-site">Harrow Depot</div>
-              <div class="mk-hero__dash-type">Panel Commissioning</div>
-            </div>
-            <div class="mk-hero__dash-avatar">MR</div>
-            <span class="mk-hero__dash-tag" style="background:rgba(255,176,32,0.12);color:#E69D1C;">Scheduled</span>
-          </div>
-          <div class="mk-hero__dash-row">
-            <span class="mk-hero__dash-time">14:00</span>
-            <div class="mk-hero__dash-info">
-              <div class="mk-hero__dash-site">Canary Wharf L3</div>
-              <div class="mk-hero__dash-type">Quarterly Test</div>
-            </div>
-            <div class="mk-hero__dash-avatar">AL</div>
-            <span class="mk-hero__dash-tag" style="background:rgba(255,176,32,0.12);color:#E69D1C;">Scheduled</span>
-          </div>
-          <div class="mk-hero__dash-row">
-            <span class="mk-hero__dash-time">16:30</span>
-            <div class="mk-hero__dash-info">
-              <div class="mk-hero__dash-site">Bristol Royal</div>
-              <div class="mk-hero__dash-type">Fault Finding</div>
-            </div>
-            <div class="mk-hero__dash-avatar">JS</div>
-            <span class="mk-hero__dash-tag" style="background:#FEE2E2;color:#DC2626;">Urgent</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Floating signed-off card -->
-      <div class="mk-hero__floating">
-        <div class="mk-hero__floating-status">
-          <span class="mk-hero__floating-dot"></span>
-          <span class="mk-hero__floating-label">SIGNED OFF</span>
-        </div>
-        <div class="mk-hero__floating-site">Harrow Depot</div>
-        <div class="mk-hero__floating-cert">BS 5839-1 — Annual</div>
-        <svg width="80" height="28" viewBox="0 0 80 28" fill="none" style="opacity:0.5;">
-          <path d="M2 20 C10 8, 18 24, 26 14 S42 4, 50 16 S62 26, 78 8" stroke="#1A1A2E" stroke-width="2" fill="none" stroke-linecap="round"/>
-        </svg>
-      </div>
-    </div>
-  </div>
-
-  <!-- Logo strip -->
-  <div class="mk-hero__logos">
-    <div class="mk-hero__logos-label">Trusted by fire safety companies across the UK</div>
-    <div class="mk-hero__logos-row">
-      <span>Stratton Fire</span>
-      <span>BlazeSafe</span>
-      <span>Meridian FP</span>
-      <span>AlphaFire</span>
-      <span>CrestAlarm</span>
-      <span>VanguardFS</span>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════════════
-     Features
-     ════════════════════════════════════════════════════════════════════ -->
-<section id="features" class="mk-features">
-  <div class="mk-features__inner">
-    <div class="mk-features__header">
-      <div class="section-eyebrow">Platform</div>
-      <h2 class="section-title">Everything your team needs</h2>
-      <p class="section-subtitle">One app for dispatch, jobsheets, invoicing, compliance, and field tools. No more juggling spreadsheets, paper forms, and WhatsApp groups.</p>
-    </div>
-    <div class="mk-features__grid">
-      <div class="mk-feature-card">
-        <div class="mk-feature-card__icon" style="background:rgba(255,176,32,0.12);">📋</div>
-        <h3 class="mk-feature-card__title">Dispatch Board</h3>
-        <p class="mk-feature-card__body">Drag-and-drop scheduling, real-time engineer tracking, and instant push notifications. See your whole week at a glance.</p>
-      </div>
-      <div class="mk-feature-card">
-        <div class="mk-feature-card__icon" style="background:rgba(76,175,80,0.12);">📄</div>
-        <h3 class="mk-feature-card__title">Digital Jobsheets</h3>
-        <p class="mk-feature-card__body">BS 5839-1:2025 aligned templates with digital signatures, photo attachments, and one-tap PDF export.</p>
-      </div>
-      <div class="mk-feature-card">
-        <div class="mk-feature-card__icon" style="background:rgba(220,38,38,0.12);">🧾</div>
-        <h3 class="mk-feature-card__title">Quotes &amp; Invoices</h3>
-        <p class="mk-feature-card__body">Generate quotes from defects, convert to jobs on approval, and invoice with your company branding — all in one flow.</p>
-      </div>
-      <div class="mk-feature-card">
-        <div class="mk-feature-card__icon" style="background:rgba(26,26,46,0.12);">🏢</div>
-        <h3 class="mk-feature-card__title">Sites &amp; Assets</h3>
-        <p class="mk-feature-card__body">Full asset register with service history, floor plans, barcode scanning, and automatic quarterly rotation tracking.</p>
-      </div>
-      <div class="mk-feature-card">
-        <div class="mk-feature-card__icon" style="background:rgba(255,176,32,0.12);">🛡️</div>
-        <h3 class="mk-feature-card__title">Compliance Library</h3>
-        <p class="mk-feature-card__body">BS 5839-1, detector spacing calculations, DIP switch references, and standards data — all offline-ready on your device.</p>
-      </div>
-      <div class="mk-feature-card">
-        <div class="mk-feature-card__icon" style="background:rgba(76,175,80,0.12);">🔧</div>
-        <h3 class="mk-feature-card__title">Engineer Tools</h3>
-        <p class="mk-feature-card__body">Decibel meter, battery load test calculator, timestamp camera, and cable voltage drop — purpose-built for the job.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════════════
-     Split — Compliance
-     ════════════════════════════════════════════════════════════════════ -->
-<section id="compliance" class="mk-split">
-  <div class="mk-split__inner">
-    <div class="mk-split__copy">
-      <h2 class="mk-split__title">Compliance without the paper chase</h2>
-      <p class="mk-split__body">
-        Every jobsheet, inspection, and test result feeds into a living compliance record.
-        No more chasing paper certificates or digging through filing cabinets before an audit.
-      </p>
-      <div class="mk-split__checks">
-        <div class="mk-split__check">
-          <span class="mk-split__check-icon">✓</span>
-          BS 5839-1:2025 aligned templates
-        </div>
-        <div class="mk-split__check">
-          <span class="mk-split__check-icon">✓</span>
-          Automatic PDF generation &amp; storage
-        </div>
-        <div class="mk-split__check">
-          <span class="mk-split__check-icon">✓</span>
-          Full audit trail per asset
-        </div>
-        <div class="mk-split__check">
-          <span class="mk-split__check-icon">✓</span>
-          Defect tracking with quote integration
-        </div>
-      </div>
-    </div>
-
-    <!-- Certificate mock -->
-    <div class="mk-cert">
-      <div class="mk-cert__header">
-        <div>
-          <div class="mk-cert__type">Annual Inspection Certificate</div>
-          <div class="mk-cert__standard">BS 5839-1:2017</div>
-        </div>
-        <span class="mk-cert__badge">✓ Verified</span>
-      </div>
-      <div class="mk-cert__fields">
-        <div>
-          <div class="mk-cert__field-label">Site</div>
-          <div class="mk-cert__field-value">Harrow Depot</div>
-        </div>
-        <div>
-          <div class="mk-cert__field-label">System Type</div>
-          <div class="mk-cert__field-value">L2 — Category</div>
-        </div>
-        <div>
-          <div class="mk-cert__field-label">Date</div>
-          <div class="mk-cert__field-value">14 March 2026</div>
-        </div>
-        <div>
-          <div class="mk-cert__field-label">Engineer</div>
-          <div class="mk-cert__field-value">James Sullivan</div>
-        </div>
-      </div>
-      <div class="mk-cert__progress">
-        <div class="mk-cert__progress-bar"></div>
-      </div>
-      <div class="mk-cert__progress-label">28 / 28 checks completed</div>
-      <div class="mk-cert__footer">
-        <svg width="100" height="36" viewBox="0 0 100 36" fill="none">
-          <path d="M4 28 C12 10, 22 30, 32 18 S48 6, 58 20 S72 32, 82 12 L96 10" stroke="#1A1A2E" stroke-width="2" fill="none" stroke-linecap="round"/>
-        </svg>
-        <div class="mk-cert__signed-meta">
-          Signed digitally<br>14 Mar 2026, 15:42
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════════════
-     Metrics
-     ════════════════════════════════════════════════════════════════════ -->
-<section id="about" class="mk-metrics">
-  <div class="mk-metrics__glow"></div>
-  <div class="mk-metrics__inner">
-    <div class="mk-metrics__header">
-      <div class="section-eyebrow">By the Numbers</div>
-      <h2 class="section-title">Trusted by fire safety professionals</h2>
-    </div>
-    <div class="mk-metrics__grid">
-      <div class="mk-metric">
-        <div class="mk-metric__number">42%</div>
-        <div class="mk-metric__label">Less time on paperwork<br>compared to paper-based systems</div>
-      </div>
-      <div class="mk-metric">
-        <div class="mk-metric__number">3.1h</div>
-        <div class="mk-metric__label">Saved per engineer per day<br>on admin and travel planning</div>
-      </div>
-      <div class="mk-metric">
-        <div class="mk-metric__number">£18k</div>
-        <div class="mk-metric__label">Average annual savings<br>for a 5-engineer team</div>
-      </div>
-      <div class="mk-metric">
-        <div class="mk-metric__number">99.2%</div>
-        <div class="mk-metric__label">Compliance audit pass rate<br>across all customer sites</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════════════
-     Testimonial
-     ════════════════════════════════════════════════════════════════════ -->
-<section class="mk-testimonial">
-  <div class="mk-testimonial__inner">
-    <p class="mk-testimonial__quote">
-      "We went from losing certificates in vans to having every inspection audit-ready in the cloud. The dispatch board alone saved us two admin hours a day."
-    </p>
-    <div class="mk-testimonial__author">
-      <div class="mk-testimonial__avatar">MS</div>
-      <div>
-        <div class="mk-testimonial__name">Mark Sinclair</div>
-        <div class="mk-testimonial__role">Operations Director, Stratton Fire Protection</div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════════════
-     Pricing
-     ════════════════════════════════════════════════════════════════════ -->
-<section id="pricing" class="mk-pricing">
-  <div class="mk-pricing__inner">
-    <div class="mk-pricing__header">
-      <div class="section-eyebrow">Pricing</div>
-      <h2 class="section-title">Start free, scale when ready</h2>
-      <p class="section-subtitle">All plans include a 14-day free trial. No credit card required to get started.</p>
-    </div>
-    <div class="mk-pricing__grid">
-
-      <!-- Starter -->
-      <div class="mk-plan">
-        <div class="mk-plan__name">Starter</div>
-        <div class="mk-plan__price-row">
-          <span class="mk-plan__price">£29</span>
-          <span class="mk-plan__per">/month</span>
-        </div>
-        <p class="mk-plan__pitch">Perfect for solo engineers and small teams getting started.</p>
-        <button class="mk-plan__cta mk-plan__cta--primary">Start free trial</button>
-        <div class="mk-plan__features">
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>1 engineer seat</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>Unlimited jobsheets</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>PDF export &amp; email</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>Invoice generation</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>All field tools</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Growth (featured) -->
-      <div class="mk-plan mk-plan--featured">
-        <div class="mk-plan__popular">Most Popular</div>
-        <div class="mk-plan__name">Growth</div>
-        <div class="mk-plan__price-row">
-          <span class="mk-plan__price">£49</span>
-          <span class="mk-plan__per">/month</span>
-        </div>
-        <p class="mk-plan__pitch">For growing teams that need dispatch, compliance, and collaboration.</p>
-        <button class="mk-plan__cta mk-plan__cta--accent">Start free trial</button>
-        <div class="mk-plan__features">
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-accent);">✓</span>
-            <span>Up to 10 engineers</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-accent);">✓</span>
-            <span>Dispatch board &amp; scheduling</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-accent);">✓</span>
-            <span>Asset register &amp; floor plans</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-accent);">✓</span>
-            <span>Compliance reports</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-accent);">✓</span>
-            <span>Quoting &amp; defect tracking</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-accent);">✓</span>
-            <span>Company branding</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-accent);">✓</span>
-            <span>Priority support</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Enterprise -->
-      <div class="mk-plan">
-        <div class="mk-plan__name">Enterprise</div>
-        <div class="mk-plan__price-row">
-          <span class="mk-plan__price">Let's talk</span>
-        </div>
-        <p class="mk-plan__pitch">For large operations needing custom integrations and dedicated support.</p>
-        <button class="mk-plan__cta mk-plan__cta--primary">Contact sales</button>
-        <div class="mk-plan__features">
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>Unlimited engineers</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>Everything in Growth</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>Custom integrations</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>SSO &amp; advanced permissions</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>Dedicated account manager</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>SLA guarantee</span>
-          </div>
-          <div class="mk-plan__feature">
-            <span class="mk-plan__feature-check" style="color:var(--ft-success);">✓</span>
-            <span>On-site onboarding</span>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════════════
-     Final CTA
-     ════════════════════════════════════════════════════════════════════ -->
-<section id="cta" class="mk-cta">
-  <div class="mk-cta__card">
-    <div class="mk-cta__glow"></div>
-    <div class="mk-cta__content">
-      <h2 class="mk-cta__title">Ready to ditch the clipboards?</h2>
-      <p class="mk-cta__body">Join hundreds of fire safety professionals who've switched to FireThings. Start your free trial today — no credit card, no commitment.</p>
-      <div class="mk-cta__buttons">
-        <button class="btn-cta-primary">Start free trial</button>
-        <button class="btn-cta-secondary">Book a demo</button>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- ════════════════════════════════════════════════════════════════════════
-     Footer
-     ════════════════════════════════════════════════════════════════════ -->
-<footer class="mk-footer">
-  <div class="mk-footer__inner">
-    <div class="mk-footer__grid">
-      <div class="mk-footer__brand">
-        <div class="mk-nav__logo" style="margin-bottom:4px;">
-          <span style="font-size:22px;">🔥</span>
-          <span class="mk-nav__logo-text" style="color:#fff;">FireThings</span>
-        </div>
-        <p class="mk-footer__brand-text">Fire alarm management software built by engineers, for engineers. Jobsheets, dispatch, compliance, and invoicing — all in one app.</p>
-      </div>
-      <div>
-        <div class="mk-footer__col-title">Product</div>
-        <div class="mk-footer__col-links">
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#compliance">Compliance</a>
-          <a href="https://app.firethings.co.uk">Web Portal</a>
-        </div>
-      </div>
-      <div>
-        <div class="mk-footer__col-title">Company</div>
-        <div class="mk-footer__col-links">
-          <a href="#about">About</a>
-          <a href="#">Careers</a>
-          <a href="#">Blog</a>
-          <a href="#">Contact</a>
-        </div>
-      </div>
-      <div>
-        <div class="mk-footer__col-title">Resources</div>
-        <div class="mk-footer__col-links">
-          <a href="#">Help Centre</a>
-          <a href="#">API Docs</a>
-          <a href="#">BS 5839 Guide</a>
-          <a href="#">Status</a>
-        </div>
-      </div>
-      <div>
-        <div class="mk-footer__col-title">Legal</div>
-        <div class="mk-footer__col-links">
-          <a href="/privacy.html">Privacy Policy</a>
-          <a href="/terms.html">Terms of Service</a>
-          <a href="#">Cookie Policy</a>
-          <a href="#">GDPR</a>
-        </div>
-      </div>
-    </div>
-    <div class="mk-footer__bottom">
-      <span>&copy; 2026 FireThings Ltd. All rights reserved.</span>
-      <span>Made in the UK 🇬🇧</span>
-    </div>
-  </div>
-</footer>
-
+    <div class="footer">&copy; 2026 FireThings Ltd.</div>
 </body>
 </html>

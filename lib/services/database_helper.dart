@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 18,
+      version: 19,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -103,6 +103,173 @@ class DatabaseHelper {
     }
     if (oldVersion < 18) {
       await db.execute('ALTER TABLE invoices ADD COLUMN linkedJobsheetId TEXT');
+    }
+    if (oldVersion < 19) {
+      // BS 5839-1:2025 foundation tables
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS bs5839_system_config (
+          id TEXT PRIMARY KEY,
+          siteId TEXT NOT NULL,
+          category TEXT NOT NULL,
+          categoryJustification TEXT,
+          responsiblePersonName TEXT NOT NULL,
+          responsiblePersonRole TEXT,
+          responsiblePersonEmail TEXT,
+          responsiblePersonPhone TEXT,
+          originalCommissionDate TEXT,
+          lastModificationDate TEXT,
+          arcConnected INTEGER NOT NULL DEFAULT 0,
+          arcTransmissionMethod TEXT NOT NULL DEFAULT 'none',
+          arcProvider TEXT,
+          arcAccountRef TEXT,
+          arcMaxTransmissionTimeSeconds INTEGER,
+          zonePlanUrl TEXT,
+          zonePlanLastReviewedAt TEXT,
+          hasSleepingAccommodation INTEGER NOT NULL DEFAULT 0,
+          numberOfZones INTEGER NOT NULL DEFAULT 1,
+          cyberSecurityRequired INTEGER NOT NULL DEFAULT 0,
+          panelMake TEXT,
+          panelModel TEXT,
+          panelSerialNumber TEXT,
+          standardVersion TEXT NOT NULL DEFAULT 'BS 5839-1:2025',
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL,
+          createdBy TEXT NOT NULL,
+          updatedBy TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS inspection_visits (
+          id TEXT PRIMARY KEY,
+          siteId TEXT NOT NULL,
+          engineerId TEXT NOT NULL,
+          engineerName TEXT NOT NULL,
+          visitType TEXT NOT NULL,
+          visitDate TEXT NOT NULL,
+          completedAt TEXT,
+          mcpIdsTestedThisVisit TEXT,
+          allDetectorsTestedThisVisit INTEGER NOT NULL DEFAULT 0,
+          serviceRecordIds TEXT,
+          logbookReviewed INTEGER NOT NULL DEFAULT 0,
+          logbookReviewNotes TEXT,
+          zonePlanVerified INTEGER NOT NULL DEFAULT 0,
+          zonePlanVariationNotes TEXT,
+          causeAndEffectMatrixProvided INTEGER NOT NULL DEFAULT 0,
+          cyberSecurityChecksCompleted INTEGER NOT NULL DEFAULT 0,
+          batteryTestReadings TEXT,
+          arcSignallingTested INTEGER NOT NULL DEFAULT 0,
+          arcTransmissionTimeMeasuredSeconds INTEGER,
+          earthFaultTestPassed INTEGER NOT NULL DEFAULT 0,
+          earthFaultReadingKOhms REAL,
+          declaration TEXT NOT NULL DEFAULT 'notDeclared',
+          declarationNotes TEXT,
+          nextServiceDueDate TEXT,
+          engineerSignatureBase64 TEXT,
+          responsiblePersonSignatureBase64 TEXT,
+          responsiblePersonSignedName TEXT,
+          responsiblePersonSignedAt TEXT,
+          reportPdfUrl TEXT,
+          reportGeneratedAt TEXT,
+          jobsheetId TEXT,
+          dispatchedJobId TEXT,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS bs5839_variations (
+          id TEXT PRIMARY KEY,
+          siteId TEXT NOT NULL,
+          clauseReference TEXT NOT NULL,
+          description TEXT NOT NULL,
+          justification TEXT NOT NULL,
+          isProhibited INTEGER NOT NULL DEFAULT 0,
+          prohibitedRuleId TEXT,
+          status TEXT NOT NULL DEFAULT 'active',
+          agreedByName TEXT,
+          agreedByRole TEXT,
+          dateAgreed TEXT,
+          loggedByEngineerId TEXT,
+          loggedByEngineerName TEXT,
+          loggedAt TEXT NOT NULL,
+          rectifiedAt TEXT,
+          rectifiedByVisitId TEXT,
+          evidencePhotoUrls TEXT
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS cause_effect_tests (
+          id TEXT PRIMARY KEY,
+          siteId TEXT NOT NULL,
+          visitId TEXT NOT NULL,
+          triggerAssetId TEXT NOT NULL,
+          triggerAssetReference TEXT NOT NULL,
+          triggerDescription TEXT NOT NULL,
+          expectedEffects TEXT,
+          testedAt TEXT NOT NULL,
+          testedByEngineerId TEXT NOT NULL,
+          testedByEngineerName TEXT NOT NULL,
+          overallPassed INTEGER NOT NULL DEFAULT 0,
+          notes TEXT,
+          evidencePhotoUrls TEXT
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS logbook_entries (
+          id TEXT PRIMARY KEY,
+          siteId TEXT NOT NULL,
+          type TEXT NOT NULL,
+          occurredAt TEXT NOT NULL,
+          description TEXT NOT NULL,
+          zoneOrDeviceReference TEXT,
+          cause TEXT,
+          actionTaken TEXT,
+          loggedByName TEXT,
+          loggedByRole TEXT,
+          visitId TEXT,
+          createdAt TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS engineer_competency (
+          id TEXT PRIMARY KEY,
+          engineerId TEXT NOT NULL,
+          engineerName TEXT NOT NULL,
+          qualifications TEXT,
+          cpdRecords TEXT,
+          totalCpdHoursLast12Months REAL NOT NULL DEFAULT 0,
+          lastReviewedAt TEXT,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT NOT NULL
+        )
+      ''');
+
+      // Extend existing tables
+      await db.execute('ALTER TABLE asset_service_history ADD COLUMN checklistVersionTested INTEGER');
+      await db.execute('ALTER TABLE asset_service_history ADD COLUMN visitId TEXT');
+      await db.execute('ALTER TABLE asset_service_history ADD COLUMN clauseReference TEXT');
+      await db.execute('ALTER TABLE asset_service_history ADD COLUMN sounderDbReadingAt1m REAL');
+      await db.execute('ALTER TABLE asset_service_history ADD COLUMN sounderDbReadingAtFurthestPoint REAL');
+      await db.execute('ALTER TABLE asset_service_history ADD COLUMN mcpTestedThisVisit INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE asset_service_history ADD COLUMN batteryVoltageResting REAL');
+      await db.execute('ALTER TABLE asset_service_history ADD COLUMN batteryVoltageUnderLoad REAL');
+      await db.execute('ALTER TABLE asset_service_history ADD COLUMN cyberSecurityNotes TEXT');
+
+      await db.execute('ALTER TABLE assets ADD COLUMN lastChecklistVersionTested INTEGER');
+      await db.execute('ALTER TABLE assets ADD COLUMN photoUrls TEXT');
+      await db.execute('ALTER TABLE assets ADD COLUMN bs5839ClauseReference TEXT');
+      await db.execute('ALTER TABLE assets ADD COLUMN isInSleepingRoom INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE assets ADD COLUMN hasRemoteAccess INTEGER DEFAULT 0');
+
+      await db.execute('ALTER TABLE saved_sites ADD COLUMN isBs5839Site INTEGER DEFAULT 0');
+      await db.execute('ALTER TABLE saved_sites ADD COLUMN lastVisitId TEXT');
+      await db.execute('ALTER TABLE saved_sites ADD COLUMN nextServiceDueDate TEXT');
+
+      await db.execute('ALTER TABLE quotes ADD COLUMN defectClauseReference TEXT');
+      await db.execute('ALTER TABLE quotes ADD COLUMN defectTriggeredProhibitedRule INTEGER DEFAULT 0');
+
+      await db.execute('ALTER TABLE defects ADD COLUMN bs5839ClauseReference TEXT');
+      await db.execute('ALTER TABLE defects ADD COLUMN triggeredProhibitedRule INTEGER DEFAULT 0');
     }
   }
 
