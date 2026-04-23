@@ -6,7 +6,7 @@ import '../../services/firestore_sync_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/invoice_pdf_service.dart';
 import '../../services/payment_settings_service.dart';
-import '../../utils/theme.dart';
+import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
@@ -43,14 +43,14 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
     super.initState();
     _slideController = AnimationController(
       vsync: this,
-      duration: AppTheme.normalAnimation,
+      duration: FtMotion.slow,
     );
     _slideAnimation = Tween<Offset>(
       begin: const Offset(1, 0),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideController,
-      curve: AppTheme.defaultCurve,
+      curve: FtMotion.standardCurve,
     ));
     if (widget.animateIn) {
       _slideController.forward();
@@ -72,14 +72,16 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currencyFmt = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(symbol: '£', decimalDigits: 2);
 
     return SlideTransition(
       position: _slideAnimation,
-      child: Material(
-        elevation: 8,
-        color: isDark ? AppTheme.darkSurface : Colors.white,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: FtColors.bg,
+          boxShadow: FtShadows.lg,
+          border: Border(left: BorderSide(color: FtColors.border, width: 1.5)),
+        ),
         child: StreamBuilder<Invoice?>(
           stream: FirestoreSyncService.instance.getInvoiceStream(UserProfileService.instance.companyId!, widget.invoiceId),
           builder: (context, snapshot) {
@@ -93,11 +95,15 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(AppIcons.warning, size: 32, color: AppTheme.mediumGrey),
+                    Icon(AppIcons.warning, size: 32, color: FtColors.hint),
                     const SizedBox(height: 8),
-                    const Text('Invoice not found'),
+                    Text('Invoice not found', style: FtText.bodySoft),
                     const SizedBox(height: 16),
-                    TextButton(onPressed: _closePanel, child: const Text('Close')),
+                    TextButton(
+                      onPressed: _closePanel,
+                      style: TextButton.styleFrom(foregroundColor: FtColors.fg2),
+                      child: Text('Close', style: FtText.button),
+                    ),
                   ],
                 ),
               );
@@ -105,41 +111,41 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
 
             return Column(
               children: [
-                _buildPanelHeader(invoice, isDark),
+                _buildPanelHeader(invoice),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.all(20),
+                    padding: FtSpacing.cardBody,
                     children: [
-                      _buildStatusSection(invoice, isDark),
+                      _buildStatusSection(invoice),
                       const SizedBox(height: 16),
                       _buildSection('Invoice Details', [
-                        _detailRow('Invoice #', invoice.invoiceNumber, isDark),
-                        _detailRow('Date', DateFormat('dd MMM yyyy').format(invoice.date), isDark),
-                        _detailRow('Due Date', DateFormat('dd MMM yyyy').format(invoice.dueDate), isDark),
+                        _detailRow('Invoice #', invoice.invoiceNumber),
+                        _detailRow('Date', DateFormat('dd MMM yyyy').format(invoice.date)),
+                        _detailRow('Due Date', DateFormat('dd MMM yyyy').format(invoice.dueDate)),
                         if (invoice.includeVat)
-                          _detailRow('VAT', 'Included (20%)', isDark),
-                      ], isDark),
+                          _detailRow('VAT', 'Included (20%)'),
+                      ]),
                       const SizedBox(height: 16),
                       _buildSection('Customer', [
-                        _detailRow('Name', invoice.customerName, isDark),
-                        _detailRow('Address', invoice.customerAddress, isDark),
+                        _detailRow('Name', invoice.customerName),
+                        _detailRow('Address', invoice.customerAddress),
                         if (invoice.customerEmail != null)
-                          _detailRow('Email', invoice.customerEmail!, isDark),
-                      ], isDark),
+                          _detailRow('Email', invoice.customerEmail!),
+                      ]),
                       const SizedBox(height: 16),
-                      _buildItemsTable(invoice, isDark, currencyFmt),
+                      _buildItemsTable(invoice, currencyFmt),
                       const SizedBox(height: 16),
                       _buildSection('Engineer', [
-                        _detailRow('Name', invoice.engineerName, isDark),
-                      ], isDark),
+                        _detailRow('Name', invoice.engineerName),
+                      ]),
                       if (invoice.notes != null && invoice.notes!.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _buildSection('Notes', [
-                          Text(invoice.notes!, style: const TextStyle(fontSize: 13)),
-                        ], isDark),
+                          Text(invoice.notes!, style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
+                        ]),
                       ],
                       const SizedBox(height: 24),
-                      _buildActionButtons(invoice, isDark),
+                      _buildActionButtons(invoice),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -152,15 +158,13 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
     );
   }
 
-  Widget _buildPanelHeader(Invoice invoice, bool isDark) {
+  Widget _buildPanelHeader(Invoice invoice) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceElevated : Colors.grey.shade50,
+      padding: FtSpacing.cardHeader,
+      decoration: const BoxDecoration(
+        color: FtColors.bgAlt,
         border: Border(
-          bottom: BorderSide(
-            color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-          ),
+          bottom: BorderSide(color: FtColors.border, width: 1),
         ),
       ),
       child: Row(
@@ -171,15 +175,12 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
               children: [
                 Text(
                   invoice.invoiceNumber,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  style: FtText.cardTitle,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   invoice.customerName,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                  ),
+                  style: FtText.helper,
                 ),
               ],
             ),
@@ -188,7 +189,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
           const SizedBox(width: 8),
           IconButton(
             onPressed: _closePanel,
-            icon: const Icon(Icons.close),
+            icon: Icon(AppIcons.close, color: FtColors.fg2),
             tooltip: 'Close',
           ),
         ],
@@ -196,7 +197,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
     );
   }
 
-  Widget _buildStatusSection(Invoice invoice, bool isDark) {
+  Widget _buildStatusSection(Invoice invoice) {
     final statuses = [InvoiceStatus.draft, InvoiceStatus.sent, InvoiceStatus.paid];
     final currentIndex = statuses.indexOf(invoice.status);
 
@@ -208,7 +209,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
           final isCurrent = i == currentIndex;
           final color = isActive
               ? invoiceStatusColor(statuses[i])
-              : (isDark ? AppTheme.darkDivider : Colors.grey.shade300);
+              : FtColors.border;
 
           return Expanded(
             child: Column(
@@ -233,7 +234,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
                           height: 2,
                           color: i < currentIndex
                               ? invoiceStatusColor(statuses[i + 1])
-                              : (isDark ? AppTheme.darkDivider : Colors.grey.shade300),
+                              : FtColors.border,
                         ),
                       ),
                   ],
@@ -241,12 +242,10 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
                 const SizedBox(height: 4),
                 Text(
                   invoiceStatusLabel(statuses[i]),
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
-                    color: isActive
-                        ? (isDark ? Colors.white : AppTheme.darkGrey)
-                        : (isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey),
+                  style: FtText.inter(
+                    size: 9,
+                    weight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                    color: isActive ? FtColors.fg1 : FtColors.hint,
                   ),
                 ),
               ],
@@ -257,7 +256,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
     );
   }
 
-  Widget _buildItemsTable(Invoice invoice, bool isDark, NumberFormat currencyFmt) {
+  Widget _buildItemsTable(Invoice invoice, NumberFormat currencyFmt) {
     return _buildSection('Items', [
       Table(
         columnWidths: const {
@@ -268,37 +267,35 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
         },
         children: [
           TableRow(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               border: Border(
-                bottom: BorderSide(
-                  color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-                ),
+                bottom: BorderSide(color: FtColors.border),
               ),
             ),
             children: [
-              _tableHeader('Description', isDark),
-              _tableHeader('Qty', isDark),
-              _tableHeader('Price', isDark),
-              _tableHeader('Total', isDark),
+              _tableHeader('Description'),
+              _tableHeader('Qty'),
+              _tableHeader('Price'),
+              _tableHeader('Total'),
             ],
           ),
           ...invoice.items.map((item) => TableRow(
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(item.description, style: const TextStyle(fontSize: 13)),
+                child: Text(item.description, style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text('${item.quantity}', style: const TextStyle(fontSize: 13)),
+                child: Text('${item.quantity}', style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(currencyFmt.format(item.unitPrice), style: const TextStyle(fontSize: 13)),
+                child: Text(currencyFmt.format(item.unitPrice), style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(currencyFmt.format(item.total), style: const TextStyle(fontSize: 13)),
+                child: Text(currencyFmt.format(item.total), style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
               ),
             ],
           )),
@@ -311,52 +308,49 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _totalRow('Subtotal', currencyFmt.format(invoice.subtotal), isDark),
+              _totalRow('Subtotal', currencyFmt.format(invoice.subtotal)),
               if (invoice.includeVat) ...[
                 const SizedBox(height: 4),
-                _totalRow('VAT (20%)', currencyFmt.format(invoice.tax), isDark),
+                _totalRow('VAT (20%)', currencyFmt.format(invoice.tax)),
               ],
               const SizedBox(height: 4),
               Text(
                 'Total: ${currencyFmt.format(invoice.total)}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                style: FtText.inter(size: 16, weight: FontWeight.w700, color: FtColors.fg1),
               ),
             ],
           ),
         ],
       ),
-    ], isDark);
+    ]);
   }
 
-  Widget _tableHeader(String text, bool isDark) {
+  Widget _tableHeader(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-        ),
-      ),
+      child: Text(text.toUpperCase(), style: FtText.label),
     );
   }
 
-  Widget _totalRow(String label, String value, bool isDark) {
+  Widget _totalRow(String label, String value) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: TextStyle(
-          fontSize: 13,
-          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-        )),
+        Text(label, style: FtText.helper),
         const SizedBox(width: 16),
-        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        Text(value, style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
       ],
     );
   }
 
-  Widget _buildActionButtons(Invoice invoice, bool isDark) {
+  Widget _buildActionButtons(Invoice invoice) {
+    final btnStyle = OutlinedButton.styleFrom(
+      foregroundColor: FtColors.fg1,
+      side: const BorderSide(color: FtColors.border, width: 1.5),
+      shape: RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
+      textStyle: FtText.button,
+    );
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -365,38 +359,50 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
           onPressed: () => _downloadPdf(invoice),
           icon: Icon(AppIcons.download, size: 16),
           label: const Text('Download PDF'),
+          style: btnStyle,
         ),
         if (invoice.customerEmail != null && invoice.customerEmail!.isNotEmpty)
           OutlinedButton.icon(
             onPressed: () => _emailInvoice(invoice),
             icon: Icon(AppIcons.sms, size: 16),
             label: const Text('Email'),
+            style: btnStyle,
           ),
         if (invoice.status == InvoiceStatus.draft)
           OutlinedButton.icon(
             onPressed: () => _updateStatus(invoice, InvoiceStatus.sent),
             icon: Icon(AppIcons.send, size: 16),
             label: const Text('Mark Sent'),
-            style: OutlinedButton.styleFrom(foregroundColor: Colors.blue),
+            style: btnStyle.copyWith(
+              foregroundColor: const WidgetStatePropertyAll(FtColors.info),
+              side: WidgetStatePropertyAll(BorderSide(color: FtColors.info.withValues(alpha: 0.3), width: 1.5)),
+            ),
           ),
         if (invoice.status == InvoiceStatus.sent)
           OutlinedButton.icon(
             onPressed: () => _updateStatus(invoice, InvoiceStatus.paid),
             icon: Icon(AppIcons.tickCircle, size: 16),
             label: const Text('Mark Paid'),
-            style: OutlinedButton.styleFrom(foregroundColor: AppTheme.successGreen),
+            style: btnStyle.copyWith(
+              foregroundColor: const WidgetStatePropertyAll(FtColors.success),
+              side: WidgetStatePropertyAll(BorderSide(color: FtColors.success.withValues(alpha: 0.3), width: 1.5)),
+            ),
           ),
         if (invoice.status == InvoiceStatus.draft)
           OutlinedButton.icon(
             onPressed: () => widget.onEdit(invoice),
             icon: Icon(AppIcons.edit, size: 16),
             label: const Text('Edit'),
+            style: btnStyle,
           ),
         OutlinedButton.icon(
           onPressed: () => _deleteInvoice(invoice),
           icon: Icon(AppIcons.trash, size: 16),
           label: const Text('Delete'),
-          style: OutlinedButton.styleFrom(foregroundColor: AppTheme.errorRed),
+          style: btnStyle.copyWith(
+            foregroundColor: const WidgetStatePropertyAll(FtColors.danger),
+            side: WidgetStatePropertyAll(BorderSide(color: FtColors.danger.withValues(alpha: 0.3), width: 1.5)),
+          ),
         ),
       ],
     );
@@ -423,7 +429,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
     );
     final body = Uri.encodeComponent(
       'Hi,\n\nPlease find attached invoice ${invoice.invoiceNumber}.\n\n'
-      'Amount: \u00A3${invoice.total.toStringAsFixed(2)}\n'
+      'Amount: £${invoice.total.toStringAsFixed(2)}\n'
       'Due Date: ${DateFormat('dd/MM/yyyy').format(invoice.dueDate)}\n\n'
       'Kind regards',
     );
@@ -463,7 +469,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
+            style: ElevatedButton.styleFrom(backgroundColor: FtColors.danger),
             child: const Text('Delete'),
           ),
         ],
@@ -476,27 +482,14 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
     }
   }
 
-  Widget _buildSection(String title, List<Widget> children, bool isDark) {
+  Widget _buildSection(String title, List<Widget> children) {
     return Container(
-      padding: const EdgeInsets.all(AppTheme.cardPadding),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceElevated : AppTheme.surfaceWhite,
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        border: Border.all(
-          color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-        ),
-      ),
+      padding: FtSpacing.cardBody,
+      decoration: FtDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-            ),
-          ),
+          Text(title.toUpperCase(), style: FtText.label),
           const SizedBox(height: 8),
           ...children,
         ],
@@ -504,7 +497,7 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
     );
   }
 
-  Widget _detailRow(String label, String value, bool isDark) {
+  Widget _detailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -512,16 +505,10 @@ class _WebInvoiceDetailPanelState extends State<WebInvoiceDetailPanel>
         children: [
           SizedBox(
             width: 130,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-              ),
-            ),
+            child: Text(label, style: FtText.helper),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 13)),
+            child: Text(value, style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
           ),
         ],
       ),

@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FireThings — Job #2841</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ft-primary:       #1A1A2E;
+    --ft-primary-dark:  #12121F;
+    --ft-primary-soft:  #2A2A4E;
+    --ft-accent:        #FFB020;
+    --ft-accent-hover:  #E69D1C;
+    --ft-accent-soft:   #FFF6E5;
+    --ft-brand-red:     #DC2626;
+    --ft-success:       #4CAF50;
+    --ft-success-soft:  #E8F5E9;
+    --ft-warning:       #F59E0B;
+    --ft-warning-soft:  #FEF3C7;
+    --ft-danger:        #DC2626;
+    --ft-danger-soft:   #FEE2E2;
+    --ft-info:          #2563EB;
+    --ft-info-soft:     #DBEAFE;
+    --ft-fg1:           #1F2937;
+    --ft-fg2:           #6B7280;
+    --ft-hint:          #9CA3AF;
+    --ft-bg:            #FFFFFF;
+    --ft-bg-alt:        #FAFAF7;
+    --ft-bg-sunken:     #F3F4F1;
+    --ft-border:        #E8E5DE;
+    --ft-border-strong: #D4D1C7;
+    --ft-font:          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --ft-font-display:  'Outfit', sans-serif;
+    --ft-font-mono:     'JetBrains Mono', ui-monospace, monospace;
+    --radius:    10px;
+    --radius-lg: 16px;
+    --shadow-sm: 0 1px 2px rgba(26,26,46,0.04), 0 1px 3px rgba(26,26,46,0.06);
+    --shadow-md: 0 4px 12px rgba(26,26,46,0.06), 0 2px 4px rgba(26,26,46,0.04);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--ft-font);
+    color: var(--ft-fg1);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    background: var(--ft-bg-alt);
+    font-size: 14px;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; font-size: inherit; }
+  a { color: inherit; text-decoration: none; }
+  ul { list-style: none; }
+
+  /* Shell */
+  .shell {
+    display: grid;
+    grid-template-columns: 236px 1fr;
+    grid-template-rows: 64px 1fr;
+    min-height: 100vh;
+  }
+
+  /* Topbar (same as dashboard) */
+  .topbar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px 0 20px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--ft-border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 10px; width: 216px; flex-shrink: 0; }
+  .topbar-brand-mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--ft-primary) 0%, var(--ft-primary-soft) 100%);
+    display: grid; place-items: center;
+    color: var(--ft-accent);
+    font-family: var(--ft-font-display);
+    font-weight: 800; font-size: 17px; letter-spacing: -0.3px;
+    box-shadow: 0 2px 8px rgba(26,26,46,0.12);
+  }
+  .topbar-brand-wordmark { font-size: 19px; font-weight: 800; letter-spacing: -0.3px; color: var(--ft-primary); }
+
+  .topbar-search {
+    flex: 1; max-width: 480px; margin: 0 32px;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--ft-bg-alt);
+    border: 1.5px solid transparent;
+    border-radius: var(--radius);
+    padding: 9px 14px;
+    transition: all 0.15s;
+  }
+  .topbar-search:focus-within {
+    background: #fff; border-color: var(--ft-accent);
+    box-shadow: 0 0 0 4px rgba(255,176,32,0.12);
+  }
+  .topbar-search input {
+    flex: 1; border: none; background: transparent; outline: none;
+    font-size: 14px; font-weight: 500;
+  }
+  .topbar-search input::placeholder { color: var(--ft-hint); font-weight: 400; }
+  .topbar-search-icon { color: var(--ft-hint); width: 16px; height: 16px; }
+  .kbd {
+    display: inline-flex; align-items: center;
+    padding: 3px 7px; background: #fff;
+    border: 1px solid var(--ft-border); border-radius: 5px;
+    font-family: var(--ft-font-mono); font-size: 11px;
+    color: var(--ft-fg2); font-weight: 500; line-height: 1;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    border-radius: var(--radius);
+    color: var(--ft-fg2);
+    transition: all 0.15s;
+    position: relative;
+  }
+  .icon-btn:hover { background: var(--ft-bg-alt); color: var(--ft-primary); }
+  .icon-btn .dot {
+    position: absolute; top: 8px; right: 8px;
+    width: 8px; height: 8px;
+    background: var(--ft-accent); border-radius: 50%;
+    border: 2px solid #fff;
+  }
+  .user-chip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 5px 12px 5px 5px;
+    border-radius: var(--radius); transition: background 0.15s;
+  }
+  .user-chip:hover { background: var(--ft-bg-alt); }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, #DC2626 0%, #FFB020 100%);
+    display: grid; place-items: center;
+    color: white; font-weight: 700; font-size: 11px;
+  }
+  .user-name { font-size: 14px; font-weight: 600; color: var(--ft-fg1); }
+
+  /* Sidebar */
+  .sidebar {
+    background: #fff; border-right: 1px solid var(--ft-border);
+    padding: 24px 0;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-section { padding: 0 16px; margin-bottom: 28px; }
+  .sidebar-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+    text-transform: uppercase; color: var(--ft-hint);
+    padding: 0 14px; margin-bottom: 10px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 14px; border-radius: 10px;
+    color: var(--ft-fg2); font-size: 14px; font-weight: 500;
+    transition: all 0.15s;
+    cursor: pointer; position: relative; user-select: none;
+    margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--ft-bg-alt); color: var(--ft-primary); }
+  .nav-item.active {
+    background: var(--ft-primary); color: #fff; font-weight: 600;
+    box-shadow: 0 4px 12px rgba(26,26,46,0.18);
+  }
+  .nav-item.active .nav-item-icon { color: var(--ft-accent); }
+  .nav-item-icon { width: 18px; height: 18px; flex-shrink: 0; color: var(--ft-hint); }
+  .nav-item:hover .nav-item-icon { color: var(--ft-fg2); }
+  .nav-item-badge {
+    margin-left: auto; font-size: 11px; font-weight: 700;
+    color: var(--ft-hint);
+    font-variant-numeric: tabular-nums;
+    padding: 2px 7px; border-radius: 10px; background: var(--ft-bg-alt);
+  }
+  .nav-item-badge.attention { color: #fff; background: var(--ft-brand-red); }
+
+  /* Main */
+  .main {
+    overflow-y: auto;
+    padding: 0 0 48px;
+  }
+
+  /* ── Sub-header (breadcrumb + actions) ── */
+  .sub-header {
+    background: #fff;
+    border-bottom: 1px solid var(--ft-border);
+    padding: 14px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    position: sticky;
+    top: 64px;
+    z-index: 9;
+  }
+  .breadcrumb {
+    font-size: 13px;
+    color: var(--ft-fg2);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+  }
+  .breadcrumb a:hover { color: var(--ft-primary); }
+  .breadcrumb-sep { color: var(--ft-hint); }
+  .breadcrumb-current { color: var(--ft-fg1); font-weight: 600; }
+  .breadcrumb-ref {
+    font-family: var(--ft-font-mono); font-size: 12px;
+    color: var(--ft-fg2); font-weight: 500;
+  }
+
+  .sub-header-actions { display: flex; gap: 8px; align-items: center; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 13px; font-weight: 600;
+    transition: background 0.15s, transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    border: 1.5px solid transparent;
+    white-space: nowrap; font-family: inherit;
+  }
+  .btn-primary {
+    background: var(--ft-accent); color: #fff;
+    box-shadow: 0 8px 24px rgba(255, 176, 32, 0.35);
+  }
+  .btn-primary:hover {
+    background: var(--ft-accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(255, 176, 32, 0.4);
+  }
+  .btn-secondary {
+    background: #fff;
+    border-color: var(--ft-border);
+    color: var(--ft-primary);
+  }
+  .btn-secondary:hover { border-color: var(--ft-primary); transform: translateY(-1px); }
+  .btn-danger {
+    background: #fff;
+    border-color: var(--ft-border);
+    color: var(--ft-danger);
+  }
+  .btn-danger:hover { border-color: var(--ft-danger); background: var(--ft-danger-soft); }
+  .btn-ghost { color: var(--ft-fg2); padding: 6px 10px; font-size: 13px; }
+  .btn-ghost:hover { background: var(--ft-bg-alt); color: var(--ft-primary); }
+
+  /* ── Page body: document + rail ── */
+  .page-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 28px;
+    padding: 28px 40px 0;
+    max-width: 1320px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* Page header */
+  .page-header {
+    margin-bottom: 28px;
+    position: relative;
+  }
+  .page-glow {
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 260px; height: 260px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,176,32,0.08), transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+  }
+  .page-status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .priority-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.4px; text-transform: uppercase;
+  }
+  .priority-badge-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .priority-emergency { background: var(--ft-danger-soft); color: var(--ft-danger); }
+  .priority-emergency .priority-badge-dot { background: var(--ft-danger); }
+  .priority-urgent { background: var(--ft-warning-soft); color: #B45309; }
+  .priority-urgent .priority-badge-dot { background: var(--ft-warning); }
+  .priority-normal { background: var(--ft-bg-alt); color: var(--ft-fg2); }
+  .priority-normal .priority-badge-dot { background: var(--ft-hint); }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 11px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.1px;
+  }
+  .status-pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+  .status-onsite { background: var(--ft-accent-soft); color: #A16207; }
+  .status-onsite::before { background: var(--ft-accent); }
+
+  .sla-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--ft-danger-soft);
+    color: var(--ft-danger);
+    font-family: var(--ft-font-mono);
+    font-size: 12px; font-weight: 600;
+  }
+
+  .page-title {
+    font-family: var(--ft-font-display);
+    font-weight: 800;
+    font-size: 34px;
+    line-height: 1.1;
+    letter-spacing: -0.8px;
+    color: var(--ft-primary);
+    margin-bottom: 10px;
+  }
+  .page-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    font-size: 14px;
+    color: var(--ft-fg2);
+    font-weight: 500;
+  }
+  .page-meta-item { display: inline-flex; align-items: center; gap: 6px; }
+  .page-meta-icon { width: 15px; height: 15px; color: var(--ft-hint); }
+
+  /* Sections */
+  .section {
+    background: #fff;
+    border: 1px solid var(--ft-border);
+    border-radius: 16px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--ft-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .section-title-wrap { display: flex; align-items: baseline; gap: 12px; }
+  .section-title {
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.2px;
+    color: var(--ft-fg1);
+  }
+  .section-meta {
+    font-size: 12px;
+    color: var(--ft-fg2);
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+  .section-body { padding: 22px 24px; }
+  .section-body.dense { padding: 0; }
+
+  /* Description */
+  .description {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ft-fg1);
+  }
+
+  /* Key-value grid */
+  .kv-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    column-gap: 32px;
+    row-gap: 18px;
+  }
+  .kv {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .kv-label {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    color: var(--ft-fg2);
+  }
+  .kv-value {
+    font-size: 14px; font-weight: 600;
+    color: var(--ft-fg1);
+  }
+  .kv-value a { color: var(--ft-info); }
+  .kv-value a:hover { text-decoration: underline; }
+  .kv-value.mono { font-family: var(--ft-font-mono); font-weight: 500; font-size: 13px; }
+
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding: 4px 0;
+  }
+  .timeline-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 14px 24px;
+    position: relative;
+    border-bottom: 1px solid var(--ft-border);
+  }
+  .timeline-row:last-child { border-bottom: none; }
+  .timeline-row::before {
+    content: '';
+    position: absolute;
+    left: 41px;
+    top: 40px;
+    bottom: -14px;
+    width: 2px;
+    background: var(--ft-border);
+  }
+  .timeline-row:last-child::before { display: none; }
+  .timeline-dot {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    z-index: 1;
+    background: #fff;
+    border: 2px solid var(--ft-border);
+    color: var(--ft-fg2);
+  }
+  .timeline-dot.info { background: var(--ft-info-soft); border-color: var(--ft-info-soft); color: var(--ft-info); }
+  .timeline-dot.success { background: var(--ft-success-soft); border-color: var(--ft-success-soft); color: var(--ft-success); }
+  .timeline-dot.accent { background: var(--ft-accent-soft); border-color: var(--ft-accent-soft); color: #A16207; }
+  .timeline-dot.warning { background: var(--ft-warning-soft); border-color: var(--ft-warning-soft); color: #B45309; }
+  .timeline-dot.danger { background: var(--ft-danger-soft); border-color: var(--ft-danger-soft); color: var(--ft-danger); }
+  .timeline-dot.current {
+    background: var(--ft-accent);
+    border-color: var(--ft-accent);
+    color: #fff;
+    box-shadow: 0 0 0 4px rgba(255,176,32,0.25);
+  }
+  .timeline-body { flex: 1; min-width: 0; padding-top: 2px; }
+  .timeline-title {
+    font-size: 14px; font-weight: 600;
+    color: var(--ft-fg1);
+    margin-bottom: 3px;
+  }
+  .timeline-meta {
+    font-size: 12px;
+    color: var(--ft-fg2);
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .timeline-dot-sep {
+    width: 3px; height: 3px; border-radius: 50%;
+    background: var(--ft-hint);
+  }
+  .timeline-note {
+    margin-top: 8px;
+    padding: 10px 12px;
+    background: var(--ft-bg-alt);
+    border-radius: 8px;
+    font-size: 13px;
+    color: var(--ft-fg1);
+    line-height: 1.5;
+    border-left: 3px solid var(--ft-accent);
+  }
+
+  /* Defect list */
+  .defect-row {
+    display: flex;
+    gap: 14px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--ft-border);
+    align-items: center;
+    transition: background 0.12s;
+    cursor: pointer;
+  }
+  .defect-row:last-child { border-bottom: none; }
+  .defect-row:hover { background: var(--ft-bg-alt); }
+  .defect-icon {
+    width: 38px; height: 38px; border-radius: 8px;
+    display: grid; place-items: center;
+    flex-shrink: 0;
+    background: var(--ft-danger-soft);
+    color: var(--ft-danger);
+  }
+  .defect-icon.minor { background: var(--ft-warning-soft); color: #B45309; }
+  .defect-icon.rectified { background: var(--ft-success-soft); color: var(--ft-success); }
+  .defect-body { flex: 1; min-width: 0; }
+  .defect-title { font-size: 14px; font-weight: 600; color: var(--ft-fg1); margin-bottom: 3px; }
+  .defect-meta { font-size: 12px; color: var(--ft-fg2); font-weight: 500; }
+  .defect-meta .ref { font-family: var(--ft-font-mono); color: var(--ft-fg1); }
+  .defect-badge {
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  .defect-badge.major { background: var(--ft-danger-soft); color: var(--ft-danger); }
+  .defect-badge.minor { background: var(--ft-warning-soft); color: #B45309; }
+  .defect-badge.rectified { background: var(--ft-success-soft); color: var(--ft-success); }
+
+  /* Attachments */
+  .attachment-row {
+    display: flex; gap: 14px; align-items: center;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--ft-border);
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+  .attachment-row:last-child { border-bottom: none; }
+  .attachment-row:hover { background: var(--ft-bg-alt); }
+  .attachment-icon {
+    width: 38px; height: 46px; border-radius: 5px;
+    background: linear-gradient(135deg, var(--ft-primary) 0%, var(--ft-primary-soft) 100%);
+    display: grid; place-items: center;
+    color: var(--ft-accent);
+    font-family: var(--ft-font-mono);
+    font-size: 9px; font-weight: 700;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(26,26,46,0.15);
+  }
+  .attachment-body { flex: 1; min-width: 0; }
+  .attachment-title { font-size: 14px; font-weight: 600; color: var(--ft-fg1); margin-bottom: 3px; }
+  .attachment-meta { font-size: 12px; color: var(--ft-fg2); font-weight: 500; }
+  .attachment-actions { display: flex; gap: 4px; }
+
+  /* Previous visits */
+  .visit-row {
+    display: flex; gap: 14px; padding: 14px 24px;
+    border-bottom: 1px solid var(--ft-border);
+    align-items: center;
+  }
+  .visit-row:last-child { border-bottom: none; }
+  .visit-row:hover { background: var(--ft-bg-alt); }
+  .visit-date {
+    font-family: var(--ft-font-mono);
+    font-size: 12px; font-weight: 600;
+    color: var(--ft-fg2);
+    width: 64px;
+    flex-shrink: 0;
+    text-align: center;
+    padding: 8px 6px;
+    background: var(--ft-bg-alt);
+    border-radius: 8px;
+    line-height: 1.3;
+  }
+  .visit-date-month {
+    display: block;
+    font-size: 10px;
+    color: var(--ft-hint);
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+  .visit-date-day {
+    display: block;
+    font-size: 18px;
+    color: var(--ft-fg1);
+    font-weight: 700;
+    line-height: 1;
+    margin-top: 1px;
+  }
+  .visit-body { flex: 1; min-width: 0; }
+  .visit-title { font-size: 14px; font-weight: 600; color: var(--ft-fg1); margin-bottom: 3px; }
+  .visit-meta { font-size: 12px; color: var(--ft-fg2); font-weight: 500; }
+  .visit-result {
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.2px;
+    background: var(--ft-success-soft); color: var(--ft-success);
+  }
+  .visit-result.fail { background: var(--ft-danger-soft); color: var(--ft-danger); }
+
+  /* ═══ Right rail ═══ */
+  .rail {
+    display: flex; flex-direction: column; gap: 20px;
+    position: sticky; top: 140px;
+    align-self: flex-start;
+    max-height: calc(100vh - 160px);
+    overflow-y: auto;
+    padding-bottom: 20px;
+  }
+  .rail::-webkit-scrollbar { width: 6px; }
+
+  .rail-card {
+    background: #fff;
+    border: 1px solid var(--ft-border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .rail-card-header {
+    padding: 14px 18px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .rail-card-title {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.4px; text-transform: uppercase;
+    color: var(--ft-fg2);
+  }
+  .rail-card-body { padding: 0 18px 16px; }
+
+  /* Summary rail */
+  .summary-card {
+    background: var(--ft-primary);
+    border-color: var(--ft-primary);
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .summary-card::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 220px; height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,176,32,0.2), transparent 70%);
+    pointer-events: none;
+  }
+  .summary-card .rail-card-header {
+    padding: 16px 20px 10px;
+    position: relative;
+  }
+  .summary-card .rail-card-title {
+    color: rgba(255,255,255,0.6);
+  }
+  .summary-card .rail-card-body { padding: 0 20px 20px; position: relative; }
+
+  .summary-item {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .summary-item:last-child { border-bottom: none; }
+  .summary-label {
+    font-size: 12px; font-weight: 500;
+    color: rgba(255,255,255,0.65);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .summary-value {
+    font-size: 13px; font-weight: 600;
+    color: #fff;
+    text-align: right;
+  }
+  .summary-value.accent { color: var(--ft-accent); }
+  .summary-value.danger { color: #FCA5A5; }
+  .summary-value.mono { font-family: var(--ft-font-mono); font-size: 13px; font-weight: 500; }
+
+  /* Engineer card inside summary */
+  .engineer-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 10px;
+    margin-top: 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .engineer-chip:hover { background: rgba(255,255,255,0.1); }
+  .engineer-chip-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #DC2626;
+    display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: 11px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .engineer-chip-avatar .presence {
+    position: absolute;
+    bottom: -1px; right: -1px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--ft-warning);
+    border: 2px solid var(--ft-primary);
+  }
+  .engineer-chip-body { flex: 1; min-width: 0; }
+  .engineer-chip-name { font-size: 13px; font-weight: 600; color: #fff; }
+  .engineer-chip-status { font-size: 11px; color: rgba(255,255,255,0.6); font-weight: 500; margin-top: 1px; }
+  .engineer-chip-load {
+    font-family: var(--ft-font-mono);
+    font-size: 11px; font-weight: 600;
+    color: rgba(255,255,255,0.5);
+  }
+
+  /* Quick action buttons */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .qa-btn {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%;
+    padding: 11px 14px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    color: rgba(255,255,255,0.9);
+    font-size: 13px; font-weight: 500;
+    transition: all 0.15s;
+  }
+  .qa-btn:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.15);
+    transform: translateY(-1px);
+  }
+  .qa-btn-icon { width: 16px; height: 16px; color: var(--ft-accent); flex-shrink: 0; }
+  .qa-btn.accent {
+    background: var(--ft-accent);
+    color: #fff;
+    border-color: var(--ft-accent);
+    font-weight: 600;
+    box-shadow: 0 8px 20px rgba(255,176,32,0.3);
+  }
+  .qa-btn.accent:hover { background: var(--ft-accent-hover); }
+  .qa-btn.accent .qa-btn-icon { color: #fff; }
+
+  /* Site compliance card */
+  .compliance-header {
+    padding: 16px 18px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .compliance-stat {
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .compliance-value {
+    font-family: var(--ft-font-display);
+    font-weight: 800; font-size: 28px;
+    line-height: 1;
+    letter-spacing: -0.8px;
+    color: var(--ft-primary);
+  }
+  .compliance-suffix {
+    font-size: 13px; font-weight: 600;
+    color: var(--ft-hint);
+  }
+  .compliance-bar {
+    margin: 0 18px 14px;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--ft-bg-sunken);
+    overflow: hidden;
+  }
+  .compliance-bar-fill {
+    height: 100%;
+    width: 94%;
+    background: linear-gradient(90deg, #4CAF50 0%, #8BC34A 100%);
+    border-radius: 3px;
+  }
+  .compliance-breakdown {
+    padding: 0 18px 16px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .compliance-breakdown-item {
+    text-align: center;
+    padding: 10px 8px;
+    background: var(--ft-bg-alt);
+    border-radius: 8px;
+  }
+  .compliance-breakdown-value {
+    font-size: 16px; font-weight: 700;
+    color: var(--ft-fg1);
+    font-variant-numeric: tabular-nums;
+  }
+  .compliance-breakdown-value.pass { color: var(--ft-success); }
+  .compliance-breakdown-value.fail { color: var(--ft-danger); }
+  .compliance-breakdown-value.untested { color: var(--ft-warning); }
+  .compliance-breakdown-label {
+    font-size: 11px; font-weight: 600;
+    color: var(--ft-fg2);
+    margin-top: 2px;
+    letter-spacing: 0.2px;
+  }
+
+  /* Site access */
+  .access-item {
+    padding: 10px 0;
+    border-bottom: 1px dashed var(--ft-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+  }
+  .access-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .access-item:first-child { padding-top: 0; }
+  .access-label {
+    font-size: 12px; font-weight: 500;
+    color: var(--ft-fg2);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .access-label-icon { width: 14px; height: 14px; color: var(--ft-hint); }
+  .access-value {
+    font-size: 12px; font-weight: 600;
+    color: var(--ft-fg1);
+    text-align: right;
+    font-family: var(--ft-font-mono);
+  }
+  .access-value.hidden { color: var(--ft-hint); font-style: italic; }
+  .access-reveal {
+    font-size: 11px; font-weight: 600;
+    color: var(--ft-info);
+    cursor: pointer;
+  }
+  .access-reveal:hover { text-decoration: underline; }
+
+  /* Hazard banner inside access card */
+  .hazard-banner {
+    background: var(--ft-warning-soft);
+    border: 1px solid #FDE68A;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin: 0 0 14px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .hazard-banner-icon {
+    color: #B45309;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .hazard-banner-body {
+    font-size: 12px;
+    color: #B45309;
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--ft-border-strong); border-radius: 10px; border: 2px solid var(--ft-bg-alt); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ft-hint); }
+
+  /* Responsive */
+  @media (max-width: 1200px) {
+    .page-body { grid-template-columns: 1fr; }
+    .rail { position: static; max-height: none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-brand-mark">F</div>
+      <span class="topbar-brand-wordmark">FireThings</span>
+    </div>
+    <div class="topbar-search">
+      <svg class="topbar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="text" placeholder="Search jobs, sites, engineers, quotes…" />
+      <span class="kbd">⌘K</span>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" title="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="dot"></span>
+      </button>
+      <button class="user-chip">
+        <div class="avatar">CS</div>
+        <span class="user-name">Chris Scott</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--ft-hint)"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-section">
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item active">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+        <span>Jobs</span>
+        <span class="nav-item-badge" style="color: #1A1A2E; background: var(--ft-accent);">47</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Schedule</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <span>Quotes</span>
+        <span class="nav-item-badge">12</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+        <span>Invoices</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Workspace</div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+        <span>Sites</span>
+        <span class="nav-item-badge">128</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Customers</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <span>Team</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Compliance</div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Inspections</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>Variations</span>
+        <span class="nav-item-badge attention">3</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>Reports</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Sub-header: breadcrumb + actions -->
+    <div class="sub-header">
+      <div class="breadcrumb">
+        <a href="#">Jobs</a>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current">Fire alarm reset — sounder panel</span>
+        <span class="breadcrumb-sep">·</span>
+        <span class="breadcrumb-ref">#2841</span>
+      </div>
+      <div class="sub-header-actions">
+        <button class="btn btn-ghost">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
+        <button class="btn btn-secondary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
+        <button class="btn btn-danger">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- Page body: document + rail -->
+    <div class="page-body">
+      <!-- ───────── Document column ───────── -->
+      <div>
+        <!-- Page header -->
+        <div class="page-header">
+          <div class="page-glow"></div>
+          <div class="page-status-row">
+            <span class="priority-badge priority-emergency">
+              <span class="priority-badge-dot"></span>Emergency
+            </span>
+            <span class="status-pill status-onsite">On site</span>
+            <span class="sla-chip">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              SLA breach · −14m
+            </span>
+          </div>
+          <h1 class="page-title">Fire alarm reset — sounder panel</h1>
+          <div class="page-meta">
+            <span class="page-meta-item">
+              <svg class="page-meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <a href="#" style="color: var(--ft-info); text-decoration: underline;">Berkeley Square Offices</a>
+            </span>
+            <span class="page-meta-item">
+              <svg class="page-meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+              De-Group Contracting
+            </span>
+            <span class="page-meta-item">
+              <svg class="page-meta-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Created 2h 14m ago
+            </span>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h2 class="section-title">Description</h2>
+            </div>
+          </div>
+          <div class="section-body">
+            <p class="description">
+              Customer reported sounder panel in reception activating intermittently throughout the morning. Building evacuated twice between 08:15 and 09:40. No fire detected on investigation. Requires reset, investigation of potential false alarm source, and confirmation that the L2 system is fully operational before customer resumes occupation. Site has aged Apollo XP95 system — likely contamination in detector heads near kitchen.
+            </p>
+          </div>
+        </div>
+
+        <!-- Key info -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h2 class="section-title">Job details</h2>
+            </div>
+          </div>
+          <div class="section-body">
+            <div class="kv-grid">
+              <div class="kv">
+                <span class="kv-label">Reference</span>
+                <span class="kv-value mono">FT-J-002841</span>
+              </div>
+              <div class="kv">
+                <span class="kv-label">Job type</span>
+                <span class="kv-value">Emergency callout</span>
+              </div>
+              <div class="kv">
+                <span class="kv-label">Scheduled</span>
+                <span class="kv-value">Today, 10:30 — arrived 10:44</span>
+              </div>
+              <div class="kv">
+                <span class="kv-label">Estimated duration</span>
+                <span class="kv-value">1.5 hours</span>
+              </div>
+              <div class="kv">
+                <span class="kv-label">Contact on site</span>
+                <span class="kv-value"><a href="tel:+447700900123">David Hughes · 07700 900123</a></span>
+              </div>
+              <div class="kv">
+                <span class="kv-label">Covered by contract</span>
+                <span class="kv-value" style="color: var(--ft-success)">Yes · Premium 4hr SLA</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h2 class="section-title">Progress</h2>
+              <span class="section-meta">6 events · last updated 14m ago</span>
+            </div>
+          </div>
+          <div class="section-body dense">
+            <div class="timeline">
+
+              <div class="timeline-row">
+                <div class="timeline-dot current">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/></svg>
+                </div>
+                <div class="timeline-body">
+                  <div class="timeline-title">Dan Miller on site</div>
+                  <div class="timeline-meta">
+                    <span>Today · 10:44</span>
+                    <span class="timeline-dot-sep"></span>
+                    <span>Berkeley Sq · W1J 8DU</span>
+                  </div>
+                  <div class="timeline-note">
+                    Arrived. Two false alarms confirmed in reception zone. Inspecting detector heads for contamination. Will need battery replacement on loop 2.
+                  </div>
+                </div>
+              </div>
+
+              <div class="timeline-row">
+                <div class="timeline-dot warning">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                </div>
+                <div class="timeline-body">
+                  <div class="timeline-title">SLA breach recorded</div>
+                  <div class="timeline-meta">
+                    <span>Today · 10:30</span>
+                    <span class="timeline-dot-sep"></span>
+                    <span>Emergency response target exceeded by 14 minutes</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="timeline-row">
+                <div class="timeline-dot accent">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/></svg>
+                </div>
+                <div class="timeline-body">
+                  <div class="timeline-title">En route</div>
+                  <div class="timeline-meta">
+                    <span>Today · 10:09</span>
+                    <span class="timeline-dot-sep"></span>
+                    <span>Dan Miller · ETA 15 min</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="timeline-row">
+                <div class="timeline-dot info">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>
+                </div>
+                <div class="timeline-body">
+                  <div class="timeline-title">Job accepted by Dan Miller</div>
+                  <div class="timeline-meta">
+                    <span>Today · 09:58</span>
+                    <span class="timeline-dot-sep"></span>
+                    <span>From dispatch notification</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="timeline-row">
+                <div class="timeline-dot">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </div>
+                <div class="timeline-body">
+                  <div class="timeline-title">Assigned to Dan Miller</div>
+                  <div class="timeline-meta">
+                    <span>Today · 09:52</span>
+                    <span class="timeline-dot-sep"></span>
+                    <span>Chris Scott</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="timeline-row">
+                <div class="timeline-dot">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </div>
+                <div class="timeline-body">
+                  <div class="timeline-title">Job created from customer phone call</div>
+                  <div class="timeline-meta">
+                    <span>Today · 09:44</span>
+                    <span class="timeline-dot-sep"></span>
+                    <span>Chris Scott</span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Defects -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h2 class="section-title">Active defects at this site</h2>
+              <span class="section-meta">3 open · 1 rectified today</span>
+            </div>
+            <button class="btn btn-ghost">Full register →</button>
+          </div>
+          <div class="section-body dense">
+            <div class="defect-row">
+              <div class="defect-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              </div>
+              <div class="defect-body">
+                <div class="defect-title">Smoke detector contamination — reception zone</div>
+                <div class="defect-meta">
+                  <span class="ref">SD-004</span> · Logged 12 days ago by Sarah Patel
+                </div>
+              </div>
+              <span class="defect-badge major">Major</span>
+            </div>
+            <div class="defect-row">
+              <div class="defect-icon minor">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div class="defect-body">
+                <div class="defect-title">Battery nearing end-of-life — loop 2</div>
+                <div class="defect-meta">
+                  <span class="ref">BAT-L2-001</span> · Logged 4 days ago by Dan Miller
+                </div>
+              </div>
+              <span class="defect-badge minor">Minor</span>
+            </div>
+            <div class="defect-row">
+              <div class="defect-icon minor">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              </div>
+              <div class="defect-body">
+                <div class="defect-title">MCP cover cracked — stair core 2</div>
+                <div class="defect-meta">
+                  <span class="ref">MCP-SC2-003</span> · Logged today by Dan Miller
+                </div>
+              </div>
+              <span class="defect-badge minor">Minor</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attachments -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h2 class="section-title">Paperwork</h2>
+              <span class="section-meta">2 documents</span>
+            </div>
+          </div>
+          <div class="section-body dense">
+            <div class="attachment-row">
+              <div class="attachment-icon">PDF</div>
+              <div class="attachment-body">
+                <div class="attachment-title">Previous inspection report · Berkeley Sq</div>
+                <div class="attachment-meta">BS 5839-1 · 14 pages · Issued 4 months ago</div>
+              </div>
+              <div class="attachment-actions">
+                <button class="btn btn-ghost">Open</button>
+              </div>
+            </div>
+            <div class="attachment-row">
+              <div class="attachment-icon" style="background: linear-gradient(135deg, var(--ft-accent) 0%, var(--ft-accent-hover) 100%); color: var(--ft-primary)">QTE</div>
+              <div class="attachment-body">
+                <div class="attachment-title">Quote #Q-1204 · Detector replacement programme</div>
+                <div class="attachment-meta">£1,840 · Awaiting customer approval · Sent 6 days ago</div>
+              </div>
+              <div class="attachment-actions">
+                <button class="btn btn-ghost">Open</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Previous visits -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-title-wrap">
+              <h2 class="section-title">Recent visits to this site</h2>
+              <span class="section-meta">Last 6 months · 4 visits</span>
+            </div>
+            <button class="btn btn-ghost">All visits →</button>
+          </div>
+          <div class="section-body dense">
+            <div class="visit-row">
+              <div class="visit-date">
+                <span class="visit-date-month">Dec</span>
+                <span class="visit-date-day">18</span>
+              </div>
+              <div class="visit-body">
+                <div class="visit-title">Quarterly service · L2 system</div>
+                <div class="visit-meta">Sarah Patel · 2h 40m · 1 defect raised</div>
+              </div>
+              <span class="visit-result">Pass</span>
+            </div>
+            <div class="visit-row">
+              <div class="visit-date">
+                <span class="visit-date-month">Sep</span>
+                <span class="visit-date-day">12</span>
+              </div>
+              <div class="visit-body">
+                <div class="visit-title">Battery replacement · main panel</div>
+                <div class="visit-meta">Dan Miller · 1h 15m · Part fitted from van stock</div>
+              </div>
+              <span class="visit-result">Pass</span>
+            </div>
+            <div class="visit-row">
+              <div class="visit-date">
+                <span class="visit-date-month">Jun</span>
+                <span class="visit-date-day">24</span>
+              </div>
+              <div class="visit-body">
+                <div class="visit-title">Annual inspection · L2 system</div>
+                <div class="visit-meta">Sarah Patel · 3h 20m · 2 defects raised, 1 rectified on visit</div>
+              </div>
+              <span class="visit-result fail">Fail</span>
+            </div>
+            <div class="visit-row">
+              <div class="visit-date">
+                <span class="visit-date-month">Apr</span>
+                <span class="visit-date-day">02</span>
+              </div>
+              <div class="visit-body">
+                <div class="visit-title">Emergency callout · sounder fault</div>
+                <div class="visit-meta">Ravi Kaur · 1h 10m · Similar to today</div>
+              </div>
+              <span class="visit-result">Pass</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ───────── Right rail ───────── -->
+      <aside class="rail">
+        <!-- Summary card (dark) -->
+        <div class="rail-card summary-card">
+          <div class="rail-card-header">
+            <span class="rail-card-title">Live summary</span>
+          </div>
+          <div class="rail-card-body">
+
+            <div class="summary-item">
+              <span class="summary-label">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                SLA
+              </span>
+              <span class="summary-value danger mono">−0:14</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Priority</span>
+              <span class="summary-value" style="color: #FCA5A5">Emergency</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Status</span>
+              <span class="summary-value accent">● On site</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Scheduled</span>
+              <span class="summary-value">Today · 10:30</span>
+            </div>
+            <div class="summary-item">
+              <span class="summary-label">Duration</span>
+              <span class="summary-value">1.5h est.</span>
+            </div>
+
+            <!-- Engineer chip -->
+            <div class="engineer-chip">
+              <div class="engineer-chip-avatar">DM
+                <span class="presence"></span>
+              </div>
+              <div class="engineer-chip-body">
+                <div class="engineer-chip-name">Dan Miller</div>
+                <div class="engineer-chip-status">On site · Berkeley Sq</div>
+              </div>
+              <span class="engineer-chip-load">3 jobs</span>
+            </div>
+
+            <!-- Quick actions -->
+            <div class="quick-actions">
+              <button class="qa-btn accent">
+                <svg class="qa-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                Call engineer
+              </button>
+              <button class="qa-btn">
+                <svg class="qa-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Message engineer
+              </button>
+              <button class="qa-btn">
+                <svg class="qa-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+                Reassign
+              </button>
+              <button class="qa-btn">
+                <svg class="qa-btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                Reschedule
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Site compliance -->
+        <div class="rail-card">
+          <div class="compliance-header">
+            <div>
+              <span class="rail-card-title">Site compliance</span>
+              <div class="compliance-stat" style="margin-top: 4px;">
+                <span class="compliance-value">94<span class="compliance-suffix">%</span></span>
+              </div>
+            </div>
+          </div>
+          <div class="compliance-bar">
+            <div class="compliance-bar-fill"></div>
+          </div>
+          <div class="compliance-breakdown">
+            <div class="compliance-breakdown-item">
+              <div class="compliance-breakdown-value pass">82</div>
+              <div class="compliance-breakdown-label">Pass</div>
+            </div>
+            <div class="compliance-breakdown-item">
+              <div class="compliance-breakdown-value fail">3</div>
+              <div class="compliance-breakdown-label">Fail</div>
+            </div>
+            <div class="compliance-breakdown-item">
+              <div class="compliance-breakdown-value untested">2</div>
+              <div class="compliance-breakdown-label">Due</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Site access info -->
+        <div class="rail-card">
+          <div class="rail-card-header">
+            <span class="rail-card-title">Site access</span>
+          </div>
+          <div class="rail-card-body">
+            <div class="hazard-banner">
+              <svg class="hazard-banner-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <div class="hazard-banner-body">
+                Asbestos register in plant room — reference before drilling
+              </div>
+            </div>
+            <div class="access-item">
+              <span class="access-label">
+                <svg class="access-label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Alarm code
+              </span>
+              <span class="access-value hidden">•••• <span class="access-reveal">Reveal</span></span>
+            </div>
+            <div class="access-item">
+              <span class="access-label">
+                <svg class="access-label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/></svg>
+                Key safe
+              </span>
+              <span class="access-value">Side door · ••••</span>
+            </div>
+            <div class="access-item">
+              <span class="access-label">
+                <svg class="access-label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                Parking
+              </span>
+              <span class="access-value" style="font-family: var(--ft-font); text-align: right; font-size: 11px;">Loading bay, rear</span>
+            </div>
+            <div class="access-item">
+              <span class="access-label">
+                <svg class="access-label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Site hours
+              </span>
+              <span class="access-value" style="font-family: var(--ft-font); font-size: 12px;">07:00–20:00</span>
+            </div>
+            <div class="access-item">
+              <span class="access-label">
+                <svg class="access-label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                OOH contact
+              </span>
+              <span class="access-value">David · 07700 ••••••</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Customer info -->
+        <div class="rail-card">
+          <div class="rail-card-header">
+            <span class="rail-card-title">Customer</span>
+            <button class="btn btn-ghost" style="padding: 2px 6px; font-size: 12px;">View →</button>
+          </div>
+          <div class="rail-card-body">
+            <div style="font-size: 15px; font-weight: 700; color: var(--ft-fg1); margin-bottom: 2px;">
+              De-Group Contracting Ltd
+            </div>
+            <div style="font-size: 13px; color: var(--ft-fg2); margin-bottom: 12px;">
+              Premium 4hr SLA · 12 sites
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px;">
+              <a href="tel:+442071234567" style="color: var(--ft-info); display: inline-flex; align-items: center; gap: 6px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                020 7123 4567
+              </a>
+              <a href="mailto:ops@de-group.co.uk" style="color: var(--ft-info); display: inline-flex; align-items: center; gap: 6px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                ops@de-group.co.uk
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </aside>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

@@ -22,6 +22,8 @@ import 'bs5839_config_service.dart';
 import 'inspection_visit_service.dart';
 import 'remote_config_service.dart';
 import 'pdf_footer_builder.dart';
+import 'pdf_branding_service.dart';
+import 'pdf_widgets/pdf_cover_builder.dart' show buildBrandedCoverPage;
 
 // ── Colour constants for the isolate ──
 const _white = PdfColors.white;
@@ -50,6 +52,7 @@ class _ReportContext {
   final List<Asset> untested;
   final PdfColor primaryColor;
   final PdfColor primaryLight;
+  final PdfColor accentColor;
 
   _ReportContext({
     required this.data,
@@ -64,6 +67,7 @@ class _ReportContext {
     required this.untested,
     required this.primaryColor,
     required this.primaryLight,
+    required this.accentColor,
   });
 
   AssetType? getType(String typeId) {
@@ -115,6 +119,9 @@ _ReportContext _buildReportContext(ComplianceReportPdfData data) {
     untested: active.where((a) => a.complianceStatus == AssetComplianceStatus.untested).toList(),
     primaryColor: colourScheme.primaryColor,
     primaryLight: colourScheme.primaryLight,
+    accentColor: data.secondaryColourValue != null
+        ? PdfColor.fromInt(data.secondaryColourValue!)
+        : colourScheme.secondaryColor,
   );
 }
 
@@ -243,6 +250,93 @@ pw.Page _buildCoverPage(ComplianceReportPdfData data, _ReportContext ctx) {
       ],
     ),
   );
+}
+
+List<pw.Widget> _buildCoverAdditionalContent(
+  ComplianceReportPdfData data,
+  _ReportContext ctx,
+) {
+  return [
+    pw.SizedBox(height: 32),
+    pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+      children: [
+        _statBox('Total', '${ctx.assets.length}', ctx.primaryColor),
+        _statBox('Pass', '${ctx.pass.length}', _passGreen),
+        _statBox('Fail', '${ctx.fail.length}', _failRed),
+        _statBox('Untested', '${ctx.untested.length}', _untestedAmber),
+      ],
+    ),
+    if (ctx.checklistDriftCount > 0) ...[
+      pw.SizedBox(height: 24),
+      pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: pw.BoxDecoration(
+          color: const PdfColor.fromInt(0xFFFFF3CD),
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+          border: pw.Border.all(
+              color: const PdfColor.fromInt(0xFFF59E0B), width: 0.5),
+        ),
+        child: pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.center,
+          mainAxisSize: pw.MainAxisSize.min,
+          children: [
+            pw.Text(
+              '${ctx.checklistDriftCount} asset${ctx.checklistDriftCount == 1 ? '' : 's'} tested against an outdated checklist version',
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: const PdfColor.fromInt(0xFF92400E),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+    if (data.bs5839LastDeclaration != null) ...[
+      pw.SizedBox(height: 24),
+      pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: pw.BoxDecoration(
+          color: ctx.primaryColor,
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+        ),
+        child: pw.Text(
+          'BS 5839: ${data.bs5839LastDeclaration}',
+          style: pw.TextStyle(
+            fontSize: 11,
+            fontWeight: pw.FontWeight.bold,
+            color: const PdfColor.fromInt(0xFFFFFFFF),
+          ),
+        ),
+      ),
+      pw.SizedBox(height: 6),
+      pw.Text(
+        'For full BS 5839 reporting, generate a BS 5839 Inspection Report instead.',
+        style: const pw.TextStyle(
+          fontSize: 9,
+          color: PdfColors.grey600,
+        ),
+      ),
+    ],
+    if (data.bs5839ModeEnabled && data.bs5839LastDeclaration == null) ...[
+      pw.SizedBox(height: 24),
+      pw.Text(
+        'This is a general site compliance summary. It is not a BS 5839-1:2025 inspection report. '
+        'To produce a BS 5839 report, configure the system category from the site detail screen.',
+        style: const pw.TextStyle(
+          fontSize: 9,
+          color: PdfColors.grey600,
+        ),
+        textAlign: pw.TextAlign.center,
+      ),
+    ],
+  ];
+}
+
+int _hexToColorValue(String hex) {
+  final clean = hex.replaceFirst('#', '');
+  return 0xFF000000 | int.parse(clean, radix: 16);
 }
 
 // ── Section 2: Compliance Summary ──
@@ -830,7 +924,33 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
   );
 
   // Section 1: Cover Page
-  pdf.addPage(_buildCoverPage(data, ctx));
+  if (data.brandingJson != null) {
+    final branding = PdfBranding.fromJson(data.brandingJson!);
+    final coverText = branding.coverTextFor(BrandingDocType.report);
+    pdf.addPage(buildBrandedCoverPage(
+      style: branding.coverStyle,
+      primaryColor: ctx.primaryColor,
+      accentColor: ctx.accentColor,
+      eyebrow: coverText?.eyebrow ?? 'SITE COMPLIANCE',
+      title: coverText?.title ?? 'Compliance\nReport',
+      subtitle: coverText?.subtitle ??
+          '${data.siteName} · ${data.reportDate}',
+      logoBytes: data.logoBytes,
+      logoMaxHeight: branding.logoMaxHeight,
+      companyName: data.companyName,
+      metaItems: [
+        (label: 'SITE', value: data.siteName),
+        (label: 'ADDRESS', value: data.siteAddress),
+        (label: 'DATE', value: data.reportDate),
+        (label: 'ENGINEER', value: data.engineerName),
+        if (data.companyName.isNotEmpty)
+          (label: 'COMPANY', value: data.companyName),
+      ],
+      additionalContent: _buildCoverAdditionalContent(data, ctx),
+    ));
+  } else {
+    pdf.addPage(_buildCoverPage(data, ctx));
+  }
 
   // Sections 2-7: Multi-page content
   final widgets = <pw.Widget>[];
@@ -879,7 +999,33 @@ Future<Uint8List> _buildComplianceReportWeb(
 
   // Section 1: Cover Page
   onProgress?.call('Building cover page...');
-  pdf.addPage(_buildCoverPage(data, ctx));
+  if (data.brandingJson != null) {
+    final branding = PdfBranding.fromJson(data.brandingJson!);
+    final coverText = branding.coverTextFor(BrandingDocType.report);
+    pdf.addPage(buildBrandedCoverPage(
+      style: branding.coverStyle,
+      primaryColor: ctx.primaryColor,
+      accentColor: ctx.accentColor,
+      eyebrow: coverText?.eyebrow ?? 'SITE COMPLIANCE',
+      title: coverText?.title ?? 'Compliance\nReport',
+      subtitle: coverText?.subtitle ??
+          '${data.siteName} · ${data.reportDate}',
+      logoBytes: data.logoBytes,
+      logoMaxHeight: branding.logoMaxHeight,
+      companyName: data.companyName,
+      metaItems: [
+        (label: 'SITE', value: data.siteName),
+        (label: 'ADDRESS', value: data.siteAddress),
+        (label: 'DATE', value: data.reportDate),
+        (label: 'ENGINEER', value: data.engineerName),
+        if (data.companyName.isNotEmpty)
+          (label: 'COMPANY', value: data.companyName),
+      ],
+      additionalContent: _buildCoverAdditionalContent(data, ctx),
+    ));
+  } else {
+    pdf.addPage(_buildCoverPage(data, ctx));
+  }
   await Future.delayed(Duration.zero);
 
   // Build sections 2-7 with yields between each
@@ -1094,11 +1240,40 @@ class ComplianceReportService {
     // Branding
     final settings = await JobsheetSettingsService.getSettings();
     final useCompanyBranding = basePath.startsWith('companies/');
-    final logoBytes =
+
+    // Resolve PdfBranding from Firestore (if company user and report type applies)
+    PdfBranding? branding;
+    Uint8List? brandingLogoBytes;
+    if (useCompanyBranding) {
+      final companyId = UserProfileService.instance.companyId;
+      if (companyId != null) {
+        try {
+          final b = await PdfBrandingService.instance.getBranding(companyId);
+          if (b.appliesToDocType(BrandingDocType.report)) {
+            branding = b;
+            if (b.logoUrl != null) {
+              try {
+                final response = await http.get(Uri.parse(b.logoUrl!));
+                if (response.statusCode == 200) {
+                  brandingLogoBytes = response.bodyBytes;
+                }
+              } catch (e) {
+                debugPrint('Failed to download branding logo: $e');
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Failed to load PdfBranding: $e');
+        }
+      }
+    }
+
+    // Existing config resolution (fallback when branding is null)
+    final logoBytes = brandingLogoBytes ??
         await CompanyPdfConfigService.instance.getEffectiveLogoBytes(
-      useCompanyBranding: useCompanyBranding,
-      type: PdfDocumentType.jobsheet,
-    );
+          useCompanyBranding: useCompanyBranding,
+          type: PdfDocumentType.jobsheet,
+        );
     final companyPdf = CompanyPdfConfigService.instance;
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(
       PdfDocumentType.jobsheet,
@@ -1112,6 +1287,26 @@ class ComplianceReportService {
       PdfDocumentType.jobsheet,
       useCompanyBranding: useCompanyBranding,
     );
+
+    // Override colour + footer when branding applies
+    final effectiveColourValue = branding != null
+        ? _hexToColorValue(branding.primaryColour)
+        : colourScheme.primaryColorValue;
+    final effectiveSecondaryValue = branding != null
+        ? _hexToColorValue(branding.accentColour)
+        : colourScheme.secondaryColorValue;
+    final effectiveFooterConfig = branding != null
+        ? PdfFooterConfig(
+            leftLines: [
+              if (branding.footerText.isNotEmpty)
+                HeaderTextLine(
+                    key: 'brandingText',
+                    value: branding.footerText,
+                    fontSize: 8),
+            ],
+            centreLines: const [],
+          )
+        : footerConfig;
 
     // User info
     final engineerName = UserProfileService.instance.resolveEngineerName();
@@ -1278,8 +1473,9 @@ class ComplianceReportService {
       reportDate: DateFormat('dd/MM/yyyy').format(DateTime.now()),
       logoBytes: logoBytes,
       headerConfigJson: headerConfig.toJson(),
-      footerConfigJson: footerConfig.toJson(),
-      colourSchemeValue: colourScheme.primaryColorValue,
+      footerConfigJson: effectiveFooterConfig.toJson(),
+      colourSchemeValue: effectiveColourValue,
+      secondaryColourValue: effectiveSecondaryValue,
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
       assetsJson: assets.map((a) => a.toJson()).toList(),
@@ -1293,6 +1489,7 @@ class ComplianceReportService {
       lastReportDateStr: lastReportDate?.toIso8601String(),
       bs5839LastDeclaration: bs5839LastDeclaration,
       bs5839ModeEnabled: bs5839Enabled,
+      brandingJson: branding?.toJson(),
     );
 
     // Store last report date for rectified-count tracking

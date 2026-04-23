@@ -12,14 +12,18 @@ pw.Widget buildModernHeader({
   required String documentType,
   required String documentRef,
   Map<String, String> fallbackValues = const {},
+  bool showCompanyName = true,
+  bool showDocNumber = true,
 }) {
   switch (config.headerStyle) {
     case HeaderStyle.classic:
       return _buildClassicStyleHeader(
-          config, colors, logoBytes, documentType, documentRef, fallbackValues);
+          config, colors, logoBytes, documentType, documentRef, fallbackValues,
+          showCompanyName: showCompanyName, showDocNumber: showDocNumber);
     case HeaderStyle.minimal:
       return _buildMinimalStyleHeader(
-          config, colors, logoBytes, documentType, documentRef, fallbackValues);
+          config, colors, logoBytes, documentType, documentRef, fallbackValues,
+          showCompanyName: showCompanyName, showDocNumber: showDocNumber);
   }
 }
 
@@ -30,14 +34,38 @@ pw.Widget _buildClassicStyleHeader(
   Uint8List? logoBytes,
   String documentType,
   String documentRef,
-  Map<String, String> fallbackValues,
-) {
+  Map<String, String> fallbackValues, {
+  bool showCompanyName = true,
+  bool showDocNumber = true,
+}) {
+  final badgeChildren = <pw.Widget>[
+    pw.Text(
+      documentType.toUpperCase(),
+      style: pw.TextStyle(
+        fontSize: 14,
+        fontWeight: pw.FontWeight.bold,
+        color: pdfWhite,
+        letterSpacing: 1,
+      ),
+    ),
+  ];
+
+  if (showDocNumber) {
+    badgeChildren.add(pw.SizedBox(height: 6));
+    badgeChildren.add(
+      pw.Text(
+        'REF: $documentRef',
+        style: pw.TextStyle(fontSize: 9, color: pdfWhite),
+      ),
+    );
+  }
+
   final contentRow = pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
       pw.Expanded(
         flex: 5,
-        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues),
+        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues, showCompanyName: showCompanyName),
       ),
       pw.SizedBox(width: 12),
       pw.Container(
@@ -48,25 +76,7 @@ pw.Widget _buildClassicStyleHeader(
         ),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.center,
-          children: [
-            pw.Text(
-              documentType.toUpperCase(),
-              style: pw.TextStyle(
-                fontSize: 14,
-                fontWeight: pw.FontWeight.bold,
-                color: pdfWhite,
-                letterSpacing: 1,
-              ),
-            ),
-            pw.SizedBox(height: 6),
-            pw.Text(
-              'REF: $documentRef',
-              style: pw.TextStyle(
-                fontSize: 9,
-                color: pdfWhite,
-              ),
-            ),
-          ],
+          children: badgeChildren,
         ),
       ),
     ],
@@ -91,36 +101,42 @@ pw.Widget _buildMinimalStyleHeader(
   Uint8List? logoBytes,
   String documentType,
   String documentRef,
-  Map<String, String> fallbackValues,
-) {
+  Map<String, String> fallbackValues, {
+  bool showCompanyName = true,
+  bool showDocNumber = true,
+}) {
+  final rightChildren = <pw.Widget>[
+    pw.Text(
+      documentType.toUpperCase(),
+      style: pw.TextStyle(
+        fontSize: 24,
+        fontWeight: pw.FontWeight.bold,
+        color: colors.primaryColor,
+        letterSpacing: 2,
+      ),
+    ),
+  ];
+
+  if (showDocNumber) {
+    rightChildren.add(pw.SizedBox(height: 4));
+    rightChildren.add(
+      pw.Text(
+        'REF: $documentRef',
+        style: pw.TextStyle(fontSize: 10, color: colors.textSecondary),
+      ),
+    );
+  }
+
   final contentRow = pw.Row(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     children: [
       pw.Expanded(
         flex: 3,
-        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues),
+        child: _buildLogoAndInfo(config, colors, logoBytes, fallbackValues, showCompanyName: showCompanyName),
       ),
       pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.end,
-        children: [
-          pw.Text(
-            documentType.toUpperCase(),
-            style: pw.TextStyle(
-              fontSize: 24,
-              fontWeight: pw.FontWeight.bold,
-              color: colors.primaryColor,
-              letterSpacing: 2,
-            ),
-          ),
-          pw.SizedBox(height: 4),
-          pw.Text(
-            'REF: $documentRef',
-            style: pw.TextStyle(
-              fontSize: 10,
-              color: colors.textSecondary,
-            ),
-          ),
-        ],
+        children: rightChildren,
       ),
     ],
   );
@@ -137,8 +153,9 @@ pw.Widget _buildLogoAndInfo(
   PdfHeaderConfig config,
   PdfColourScheme colors,
   Uint8List? logoBytes,
-  Map<String, String> fallbackValues,
-) {
+  Map<String, String> fallbackValues, {
+  bool showCompanyName = true,
+}) {
   final children = <pw.Widget>[];
 
   if (config.logoZone == LogoZone.left && logoBytes != null) {
@@ -155,6 +172,8 @@ pw.Widget _buildLogoAndInfo(
 
   final textWidgets = <pw.Widget>[];
   for (final line in config.leftLines) {
+    if (line.key == 'companyName' && !showCompanyName) continue;
+
     final value =
         line.value.isNotEmpty ? line.value : fallbackValues[line.key] ?? '';
     if (value.isEmpty) continue;

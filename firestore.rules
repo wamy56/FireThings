@@ -189,6 +189,12 @@ service cloud.firestore {
         allow write: if hasPermission(companyId, 'pdf_branding');
       }
 
+      // Company branding config
+      match /branding/{docId} {
+        allow read: if isCompanyMember(companyId);
+        allow write: if hasPermission(companyId, 'pdf_branding');
+      }
+
       // Engineer competency (per member)
       match /members/{memberId}/competency/{docId} {
         allow read: if isCompanyMember(companyId);

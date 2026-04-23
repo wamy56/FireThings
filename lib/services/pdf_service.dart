@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
 import 'jobsheet_settings_service.dart';
+import 'pdf_branding_service.dart';
 import 'pdf_footer_builder.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
@@ -22,17 +24,33 @@ import 'pdf_widgets/pdf_modern_table.dart';
 import 'pdf_widgets/pdf_signature_box.dart';
 import 'pdf_widgets/pdf_style_helpers.dart';
 
+int _hexToColorValue(String hex) {
+  final clean = hex.replaceFirst('#', '');
+  return 0xFF000000 | int.parse(clean, radix: 16);
+}
+
 /// Top-level function for compute() — builds the jobsheet PDF in a background isolate.
 Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
   final jobsheet = Jobsheet.fromJson(data.jobsheetJson);
   final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
   final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
 
+  final branding = data.brandingJson != null
+      ? PdfBranding.fromJson(data.brandingJson!)
+      : null;
+
   // Reconstruct colour scheme with optional secondary
   final colourScheme = PdfColourScheme(
     primaryColorValue: data.colourSchemeValue,
     secondaryColorValue: data.secondaryColourValue,
   );
+
+  final effectiveFooterConfig = branding != null && branding.footerText.isNotEmpty
+      ? PdfFooterConfig(
+          leftLines: [HeaderTextLine(key: 'brandingText', value: branding.footerText, fontSize: 8)],
+          centreLines: const [],
+        )
+      : footerConfig;
 
   // Reconstruct section style and typography configs
   final sectionStyle = data.sectionStyleJson != null
@@ -68,12 +86,19 @@ Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
       header: (context) => _buildHeader(
-        jobsheet, context, settings, data.logoBytes, headerConfig, colourScheme),
+        jobsheet, context, settings, data.logoBytes, headerConfig, colourScheme,
+        showCompanyName: branding?.headerShowCompanyName ?? true,
+        showDocNumber: branding?.headerShowDocNumber ?? true),
       footer: (context) => PdfFooterBuilder.buildFooter(
-        config: footerConfig,
+        config: effectiveFooterConfig,
         pageNumber: context.pageNumber,
         pagesCount: context.pagesCount,
         primaryColor: colourScheme.primaryColor,
+        brandingFooterStyle: branding?.footerStyle,
+        accentColor: branding != null
+            ? PdfColor.fromInt(_hexToColorValue(branding.accentColour))
+            : null,
+        showPageNumbers: branding?.footerShowPageNumbers ?? true,
       ),
       build: (context) => _buildDynamicSections(
         jobsheet, colourScheme, sectionStyle, typography, data),
@@ -104,13 +129,18 @@ const PdfColor _darkGray = PdfColor.fromInt(0xFF424242);
 
 // ── Builder helpers (top-level so they work inside the isolate) ──
 
-pw.Widget _buildHeader(Jobsheet jobsheet, pw.Context context, _JobsheetSettings settings, Uint8List? logoBytes, PdfHeaderConfig headerConfig, PdfColourScheme colors) {
+pw.Widget _buildHeader(Jobsheet jobsheet, pw.Context context, _JobsheetSettings settings, Uint8List? logoBytes, PdfHeaderConfig headerConfig, PdfColourScheme colors, {
+  bool showCompanyName = true,
+  bool showDocNumber = true,
+}) {
   return buildModernHeader(
     config: headerConfig,
     colors: colors,
     logoBytes: logoBytes,
     documentType: jobsheet.templateType,
     documentRef: jobsheet.jobNumber,
+    showCompanyName: showCompanyName,
+    showDocNumber: showDocNumber,
     fallbackValues: {
       'companyName': settings.companyName.isNotEmpty ? settings.companyName : jobsheet.engineerName,
       'tagline': settings.tagline,
@@ -1036,11 +1066,37 @@ class PDFService {
 
     final settings = await JobsheetSettingsService.getSettings();
     final useCompanyBranding = jobsheet.useCompanyBranding;
-    final logoBytes = await CompanyPdfConfigService.instance.getEffectiveLogoBytes(
+
+    PdfBranding? branding;
+    Uint8List? brandingLogoBytes;
+
+    if (useCompanyBranding) {
+      final companyId = UserProfileService.instance.companyId;
+      if (companyId != null) {
+        try {
+          final b = await PdfBrandingService.instance.getBranding(companyId);
+          if (b.appliesToDocType(BrandingDocType.jobsheet)) {
+            branding = b;
+            if (b.logoUrl != null) {
+              try {
+                final response = await http.get(Uri.parse(b.logoUrl!));
+                if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
+              } catch (e) {
+                debugPrint('Failed to download branding logo: $e');
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Failed to load PdfBranding: $e');
+        }
+      }
+    }
+
+    final companyPdf = CompanyPdfConfigService.instance;
+    final logoBytes = brandingLogoBytes ?? await companyPdf.getEffectiveLogoBytes(
       useCompanyBranding: useCompanyBranding,
       type: PdfDocumentType.jobsheet,
     );
-    final companyPdf = CompanyPdfConfigService.instance;
     final headerConfig = await companyPdf.getEffectiveHeaderConfig(
       PdfDocumentType.jobsheet,
       useCompanyBranding: useCompanyBranding,
@@ -1124,13 +1180,21 @@ class PDFService {
       }
     }
 
+    final effectiveColourValue = branding != null
+        ? _hexToColorValue(branding.primaryColour)
+        : colourScheme.primaryColorValue;
+    final effectiveSecondaryValue = branding != null
+        ? _hexToColorValue(branding.accentColour)
+        : colourScheme.secondaryColorValue;
+
     final data = JobsheetPdfData(
       jobsheetJson: jobsheet.toJson(),
       logoBytes: logoBytes,
       headerConfigJson: headerConfig.toJson(),
       footerConfigJson: footerConfig.toJson(),
-      colourSchemeValue: colourScheme.primaryColorValue,
-      secondaryColourValue: colourScheme.secondaryColorValue,
+      colourSchemeValue: effectiveColourValue,
+      secondaryColourValue: effectiveSecondaryValue,
+      brandingJson: branding?.toJson(),
       sectionStyleJson: sectionStyle.toJson(),
       typographyJson: typography.toJson(),
       settingsCompanyName: settings.companyName,

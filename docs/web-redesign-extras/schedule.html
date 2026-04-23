@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FireThings — Schedule</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --ft-primary:       #1A1A2E;
+    --ft-primary-dark:  #12121F;
+    --ft-primary-soft:  #2A2A4E;
+    --ft-accent:        #FFB020;
+    --ft-accent-hover:  #E69D1C;
+    --ft-accent-soft:   #FFF6E5;
+    --ft-brand-red:     #DC2626;
+    --ft-success:       #4CAF50;
+    --ft-success-soft:  #E8F5E9;
+    --ft-warning:       #F59E0B;
+    --ft-warning-soft:  #FEF3C7;
+    --ft-danger:        #DC2626;
+    --ft-danger-soft:   #FEE2E2;
+    --ft-info:          #2563EB;
+    --ft-info-soft:     #DBEAFE;
+    --ft-fg1:           #1F2937;
+    --ft-fg2:           #6B7280;
+    --ft-hint:          #9CA3AF;
+    --ft-bg:            #FFFFFF;
+    --ft-bg-alt:        #FAFAF7;
+    --ft-bg-sunken:     #F3F4F1;
+    --ft-bg-hover:      #ECEBE3;
+    --ft-border:        #E8E5DE;
+    --ft-border-strong: #D4D1C7;
+    --ft-font:          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --ft-font-display:  'Outfit', sans-serif;
+    --ft-font-mono:     'JetBrains Mono', ui-monospace, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--ft-font);
+    color: var(--ft-fg1);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    background: var(--ft-bg-alt);
+    font-size: 14px;
+    overflow: hidden;
+  }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; font-size: inherit; }
+  a { color: inherit; text-decoration: none; }
+
+  .shell {
+    display: grid;
+    grid-template-columns: 236px 1fr;
+    grid-template-rows: 64px 1fr;
+    height: 100vh;
+  }
+
+  /* Topbar */
+  .topbar {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px 0 20px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--ft-border);
+  }
+  .topbar-brand { display: flex; align-items: center; gap: 10px; width: 216px; }
+  .topbar-brand-mark {
+    width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--ft-primary) 0%, var(--ft-primary-soft) 100%);
+    display: grid; place-items: center;
+    color: var(--ft-accent);
+    font-family: var(--ft-font-display);
+    font-weight: 800; font-size: 17px;
+  }
+  .topbar-brand-wordmark { font-size: 19px; font-weight: 800; letter-spacing: -0.3px; color: var(--ft-primary); }
+  .topbar-search {
+    flex: 1; max-width: 480px; margin: 0 32px;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--ft-bg-alt);
+    border: 1.5px solid transparent;
+    border-radius: 10px;
+    padding: 9px 14px;
+  }
+  .topbar-search input { flex: 1; border: none; background: transparent; outline: none; font-size: 14px; font-weight: 500; }
+  .topbar-search input::placeholder { color: var(--ft-hint); }
+  .topbar-search-icon { color: var(--ft-hint); width: 16px; height: 16px; }
+  .kbd {
+    padding: 3px 7px; background: #fff;
+    border: 1px solid var(--ft-border); border-radius: 5px;
+    font-family: var(--ft-font-mono); font-size: 11px;
+    color: var(--ft-fg2); font-weight: 500;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 8px; }
+  .icon-btn {
+    width: 36px; height: 36px;
+    display: grid; place-items: center;
+    border-radius: 10px;
+    color: var(--ft-fg2);
+    transition: all 0.15s;
+    position: relative;
+  }
+  .icon-btn:hover { background: var(--ft-bg-alt); color: var(--ft-primary); }
+  .icon-btn .dot {
+    position: absolute; top: 8px; right: 8px;
+    width: 8px; height: 8px; background: var(--ft-accent);
+    border-radius: 50%; border: 2px solid #fff;
+  }
+  .user-chip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 5px 12px 5px 5px;
+    border-radius: 10px;
+  }
+  .user-chip:hover { background: var(--ft-bg-alt); }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, #DC2626 0%, #FFB020 100%);
+    display: grid; place-items: center;
+    color: white; font-weight: 700; font-size: 11px;
+  }
+  .user-name { font-size: 14px; font-weight: 600; }
+
+  /* Sidebar */
+  .sidebar {
+    background: #fff;
+    border-right: 1px solid var(--ft-border);
+    padding: 24px 0;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  .sidebar-section { padding: 0 16px; margin-bottom: 28px; }
+  .sidebar-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
+    text-transform: uppercase; color: var(--ft-hint);
+    padding: 0 14px; margin-bottom: 10px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 14px; border-radius: 10px;
+    color: var(--ft-fg2); font-size: 14px; font-weight: 500;
+    transition: all 0.15s; cursor: pointer; margin-bottom: 2px;
+  }
+  .nav-item:hover { background: var(--ft-bg-alt); color: var(--ft-primary); }
+  .nav-item.active {
+    background: var(--ft-primary); color: #fff; font-weight: 600;
+    box-shadow: 0 4px 12px rgba(26,26,46,0.18);
+  }
+  .nav-item.active .nav-item-icon { color: var(--ft-accent); }
+  .nav-item-icon { width: 18px; height: 18px; flex-shrink: 0; color: var(--ft-hint); }
+  .nav-item-badge {
+    margin-left: auto; font-size: 11px; font-weight: 700;
+    color: var(--ft-hint);
+    padding: 2px 7px; border-radius: 10px; background: var(--ft-bg-alt);
+  }
+  .nav-item-badge.attention { color: #fff; background: var(--ft-brand-red); }
+
+  /* ─── Main schedule layout ─── */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Sub-header */
+  .sub-header {
+    background: #fff;
+    border-bottom: 1px solid var(--ft-border);
+    padding: 16px 32px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+  }
+  .sub-header-left { display: flex; flex-direction: column; gap: 2px; }
+  .sub-title {
+    font-family: var(--ft-font-display);
+    font-size: 24px; font-weight: 800; letter-spacing: -0.6px;
+    color: var(--ft-primary);
+  }
+  .sub-meta { font-size: 13px; color: var(--ft-fg2); font-weight: 500; }
+
+  .nav-controls { display: flex; align-items: center; gap: 8px; justify-content: center; }
+  .nav-arrow {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    border: 1.5px solid var(--ft-border);
+    background: #fff;
+    display: grid; place-items: center;
+    color: var(--ft-fg2);
+    transition: all 0.15s;
+  }
+  .nav-arrow:hover { border-color: var(--ft-primary); color: var(--ft-primary); }
+  .today-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1.5px solid var(--ft-border);
+    background: #fff;
+    font-size: 13px; font-weight: 600;
+    color: var(--ft-fg1);
+    transition: all 0.15s;
+  }
+  .today-btn:hover { border-color: var(--ft-primary); }
+
+  .sub-header-right { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+
+  /* View switcher (segmented) */
+  .view-switcher {
+    display: flex;
+    background: var(--ft-bg-alt);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .view-switch {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px; font-weight: 600;
+    color: var(--ft-fg2);
+    transition: all 0.15s;
+  }
+  .view-switch:hover { color: var(--ft-fg1); }
+  .view-switch.active {
+    background: #fff;
+    color: var(--ft-primary);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 13px; font-weight: 600;
+    transition: all 0.15s;
+    border: 1.5px solid transparent;
+  }
+  .btn-primary {
+    background: var(--ft-accent); color: #fff;
+    box-shadow: 0 8px 24px rgba(255,176,32,0.35);
+  }
+  .btn-primary:hover {
+    background: var(--ft-accent-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(255,176,32,0.4);
+  }
+  .btn-secondary {
+    background: #fff;
+    border-color: var(--ft-border);
+    color: var(--ft-primary);
+  }
+  .btn-secondary:hover { border-color: var(--ft-primary); }
+
+  /* Filters strip */
+  .filters {
+    background: #fff;
+    border-bottom: 1px solid var(--ft-border);
+    padding: 12px 32px;
+    display: flex; align-items: center; gap: 16px;
+    flex-shrink: 0;
+  }
+  .filter-label {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.4px; text-transform: uppercase;
+    color: var(--ft-hint);
+  }
+  .filter-chips { display: flex; gap: 6px; }
+  .filter-chip {
+    padding: 5px 11px;
+    border-radius: 20px;
+    background: var(--ft-bg-alt);
+    font-size: 12px; font-weight: 600;
+    color: var(--ft-fg2);
+    transition: all 0.15s;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+  }
+  .filter-chip:hover { background: var(--ft-bg-sunken); color: var(--ft-fg1); }
+  .filter-chip.active {
+    background: var(--ft-primary); color: #fff;
+    border-color: var(--ft-primary);
+  }
+  .filter-chip-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  .filter-spacer { flex: 1; }
+
+  .filter-stats {
+    display: flex; gap: 20px;
+    font-size: 12px;
+  }
+  .filter-stat-item { display: flex; align-items: center; gap: 6px; }
+  .filter-stat-label { color: var(--ft-fg2); font-weight: 500; }
+  .filter-stat-value {
+    font-family: var(--ft-font-mono);
+    font-weight: 600;
+    color: var(--ft-fg1);
+  }
+  .filter-stat-value.warning { color: var(--ft-warning); }
+  .filter-stat-value.danger { color: var(--ft-danger); }
+
+  /* ═══ Calendar grid ═══ */
+  .calendar {
+    flex: 1;
+    overflow: auto;
+    background: #fff;
+    position: relative;
+  }
+
+  /* Day header row (sticky top) */
+  .day-headers {
+    display: grid;
+    grid-template-columns: 180px repeat(7, minmax(140px, 1fr));
+    background: #fff;
+    border-bottom: 2px solid var(--ft-border);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .day-headers-corner {
+    background: var(--ft-bg-alt);
+    border-right: 1px solid var(--ft-border);
+    padding: 14px 16px;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.4px; text-transform: uppercase;
+    color: var(--ft-hint);
+    display: flex; align-items: center;
+  }
+  .day-header {
+    padding: 14px 12px;
+    border-right: 1px solid var(--ft-border);
+    display: flex; flex-direction: column; gap: 2px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .day-header:hover { background: var(--ft-bg-alt); }
+  .day-header:last-child { border-right: none; }
+  .day-header.today {
+    background: linear-gradient(180deg, var(--ft-accent-soft) 0%, transparent 100%);
+  }
+  .day-header-label {
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.4px; text-transform: uppercase;
+    color: var(--ft-fg2);
+  }
+  .day-header-date {
+    display: flex; align-items: baseline; gap: 6px;
+  }
+  .day-header-day {
+    font-family: var(--ft-font-display);
+    font-size: 22px; font-weight: 800;
+    line-height: 1;
+    color: var(--ft-primary);
+    letter-spacing: -0.5px;
+  }
+  .day-header.today .day-header-day { color: var(--ft-accent-hover); }
+  .day-header-month {
+    font-size: 12px; font-weight: 600;
+    color: var(--ft-fg2);
+  }
+  .day-header-stat {
+    margin-top: 4px;
+    font-size: 11px; font-weight: 600;
+    color: var(--ft-fg2);
+  }
+  .day-header-stat.busy { color: var(--ft-warning); }
+  .day-header-stat.full { color: var(--ft-danger); }
+
+  /* Engineer rows */
+  .engineer-row {
+    display: grid;
+    grid-template-columns: 180px repeat(7, minmax(140px, 1fr));
+    border-bottom: 1px solid var(--ft-border);
+    min-height: 100px;
+  }
+
+  .engineer-cell {
+    background: var(--ft-bg-alt);
+    border-right: 1px solid var(--ft-border);
+    padding: 14px 14px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    position: sticky;
+    left: 0;
+    z-index: 2;
+  }
+  .engineer-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: 12px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .engineer-presence {
+    position: absolute;
+    bottom: -1px; right: -1px;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    border: 2px solid var(--ft-bg-alt);
+  }
+  .engineer-presence.online { background: var(--ft-success); }
+  .engineer-presence.onsite { background: var(--ft-warning); }
+  .engineer-presence.offline { background: var(--ft-hint); }
+  .engineer-info { flex: 1; min-width: 0; }
+  .engineer-name {
+    font-size: 13px; font-weight: 600;
+    color: var(--ft-fg1);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .engineer-load {
+    font-size: 11px;
+    color: var(--ft-fg2);
+    font-weight: 500;
+    margin-top: 2px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .engineer-load-bar {
+    flex: 1;
+    height: 3px;
+    background: var(--ft-bg-sunken);
+    border-radius: 2px;
+    overflow: hidden;
+    max-width: 60px;
+  }
+  .engineer-load-fill {
+    height: 100%;
+    background: var(--ft-success);
+    border-radius: 2px;
+  }
+  .engineer-load-fill.busy { background: var(--ft-warning); }
+  .engineer-load-fill.full { background: var(--ft-danger); }
+
+  .day-cell {
+    border-right: 1px solid var(--ft-border);
+    padding: 8px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-height: 100px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .day-cell:hover { background: var(--ft-bg-alt); }
+  .day-cell:last-child { border-right: none; }
+  .day-cell.today {
+    background: linear-gradient(180deg, rgba(255,176,32,0.04) 0%, transparent 100%);
+  }
+  .day-cell.dragover {
+    background: var(--ft-accent-soft) !important;
+    box-shadow: inset 0 0 0 2px var(--ft-accent);
+  }
+
+  /* Job blocks */
+  .job-block {
+    padding: 7px 9px;
+    border-radius: 7px;
+    font-size: 12px;
+    cursor: grab;
+    transition: all 0.15s;
+    border-left: 3px solid;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    position: relative;
+    user-select: none;
+  }
+  .job-block:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+    z-index: 3;
+  }
+  .job-block:active { cursor: grabbing; }
+  .job-block.dragging { opacity: 0.4; }
+
+  .job-block-time {
+    font-family: var(--ft-font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--ft-fg2);
+    margin-bottom: 2px;
+  }
+  .job-block-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ft-fg1);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    margin-bottom: 3px;
+  }
+  .job-block-site {
+    font-size: 11px;
+    color: var(--ft-fg2);
+    font-weight: 500;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .job-block.priority-emergency {
+    border-left-color: var(--ft-danger);
+    background: linear-gradient(135deg, var(--ft-danger-soft) 0%, #fff 100%);
+  }
+  .job-block.priority-urgent { border-left-color: var(--ft-warning); }
+  .job-block.priority-normal { border-left-color: var(--ft-info); }
+  .job-block.priority-low { border-left-color: var(--ft-hint); }
+
+  .job-block.completed {
+    border-left-color: var(--ft-success);
+    background: var(--ft-success-soft);
+    opacity: 0.7;
+  }
+  .job-block.completed .job-block-title { text-decoration: line-through; }
+
+  .job-block.in-progress {
+    border-left-color: var(--ft-accent);
+    background: linear-gradient(135deg, var(--ft-accent-soft) 0%, #fff 100%);
+    box-shadow: 0 0 0 1px var(--ft-accent), 0 4px 8px rgba(255,176,32,0.15);
+  }
+  .job-block.in-progress::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ft-accent);
+    box-shadow: 0 0 0 3px rgba(255,176,32,0.25);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .day-cell-add {
+    margin-top: auto;
+    padding: 4px;
+    border: 1.5px dashed var(--ft-border);
+    border-radius: 6px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--ft-hint);
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .day-cell:hover .day-cell-add { opacity: 1; }
+
+  /* Unassigned row (special) */
+  .engineer-row.unassigned-row { background: var(--ft-warning-soft); }
+  .engineer-row.unassigned-row .engineer-cell { background: var(--ft-warning-soft); }
+  .engineer-row.unassigned-row .day-cell { background: transparent; }
+  .engineer-row.unassigned-row .day-cell:hover { background: rgba(245,158,11,0.05); }
+  .engineer-row.unassigned-row .engineer-avatar {
+    background: transparent !important;
+    border: 2px dashed #B45309;
+    color: #B45309;
+  }
+  .engineer-row.unassigned-row .engineer-name { color: #B45309; }
+  .engineer-row.unassigned-row .engineer-load { color: #B45309; opacity: 0.8; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--ft-border-strong); border-radius: 10px; border: 2px solid var(--ft-bg-alt); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ft-hint); }
+
+  /* Tooltip preview on hover (optional polish) */
+  .job-tooltip {
+    position: fixed;
+    background: var(--ft-primary);
+    color: #fff;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.2);
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    max-width: 280px;
+  }
+  .job-tooltip.visible { opacity: 1; }
+  .job-tooltip-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+    font-size: 13px;
+  }
+  .job-tooltip-row {
+    font-size: 11px;
+    color: rgba(255,255,255,0.75);
+    margin-top: 3px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .job-tooltip-row strong { color: #fff; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-brand-mark">F</div>
+      <span class="topbar-brand-wordmark">FireThings</span>
+    </div>
+    <div class="topbar-search">
+      <svg class="topbar-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="text" placeholder="Search jobs, sites, engineers, quotes…" />
+      <span class="kbd">⌘K</span>
+    </div>
+    <div class="topbar-right">
+      <button class="icon-btn" title="Notifications">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="dot"></span>
+      </button>
+      <button class="user-chip">
+        <div class="avatar">CS</div>
+        <span class="user-name">Chris Scott</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-section">
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
+        <span>Jobs</span>
+        <span class="nav-item-badge">47</span>
+      </div>
+      <div class="nav-item active">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Schedule</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>Quotes</span>
+        <span class="nav-item-badge">12</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+        <span>Invoices</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Workspace</div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/></svg>
+        <span>Sites</span>
+        <span class="nav-item-badge">128</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <span>Customers</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+        <span>Team</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Compliance</div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Inspections</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>
+        <span>Variations</span>
+        <span class="nav-item-badge attention">3</span>
+      </div>
+      <div class="nav-item">
+        <svg class="nav-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <span>Reports</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Sub-header -->
+    <div class="sub-header">
+      <div class="sub-header-left">
+        <div class="sub-title">21 — 27 April</div>
+        <div class="sub-meta">Week 17 · 38 jobs scheduled · 4 unassigned</div>
+      </div>
+      <div class="nav-controls">
+        <button class="nav-arrow" title="Previous week">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <button class="today-btn">Today</button>
+        <button class="nav-arrow" title="Next week">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+      <div class="sub-header-right">
+        <div class="view-switcher">
+          <button class="view-switch">Day</button>
+          <button class="view-switch active">Week</button>
+          <button class="view-switch">Month</button>
+        </div>
+        <button class="btn btn-secondary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print
+        </button>
+        <button class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New job
+        </button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <span class="filter-label">View</span>
+      <div class="filter-chips">
+        <span class="filter-chip active">All engineers</span>
+        <span class="filter-chip">Available only</span>
+        <span class="filter-chip">By region</span>
+      </div>
+      <span class="filter-label" style="margin-left: 16px;">Show</span>
+      <div class="filter-chips">
+        <span class="filter-chip active"><span class="filter-chip-dot" style="background: var(--ft-danger);"></span>Emergency</span>
+        <span class="filter-chip active"><span class="filter-chip-dot" style="background: var(--ft-warning);"></span>Urgent</span>
+        <span class="filter-chip active"><span class="filter-chip-dot" style="background: var(--ft-info);"></span>Normal</span>
+        <span class="filter-chip"><span class="filter-chip-dot" style="background: var(--ft-success);"></span>Completed</span>
+      </div>
+      <div class="filter-spacer"></div>
+      <div class="filter-stats">
+        <div class="filter-stat-item">
+          <span class="filter-stat-label">Booked:</span>
+          <span class="filter-stat-value">38</span>
+        </div>
+        <div class="filter-stat-item">
+          <span class="filter-stat-label">Unassigned:</span>
+          <span class="filter-stat-value warning">4</span>
+        </div>
+        <div class="filter-stat-item">
+          <span class="filter-stat-label">Capacity:</span>
+          <span class="filter-stat-value">84%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calendar -->
+    <div class="calendar">
+      <!-- Day headers -->
+      <div class="day-headers">
+        <div class="day-headers-corner">Engineer</div>
+        <div class="day-header today">
+          <span class="day-header-label">Today</span>
+          <div class="day-header-date">
+            <span class="day-header-day">21</span>
+            <span class="day-header-month">Apr · Tue</span>
+          </div>
+          <div class="day-header-stat full">8 jobs · full</div>
+        </div>
+        <div class="day-header">
+          <span class="day-header-label">Wed</span>
+          <div class="day-header-date">
+            <span class="day-header-day">22</span>
+            <span class="day-header-month">Apr</span>
+          </div>
+          <div class="day-header-stat busy">7 jobs</div>
+        </div>
+        <div class="day-header">
+          <span class="day-header-label">Thu</span>
+          <div class="day-header-date">
+            <span class="day-header-day">23</span>
+            <span class="day-header-month">Apr</span>
+          </div>
+          <div class="day-header-stat">5 jobs</div>
+        </div>
+        <div class="day-header">
+          <span class="day-header-label">Fri</span>
+          <div class="day-header-date">
+            <span class="day-header-day">24</span>
+            <span class="day-header-month">Apr</span>
+          </div>
+          <div class="day-header-stat busy">7 jobs</div>
+        </div>
+        <div class="day-header">
+          <span class="day-header-label">Sat</span>
+          <div class="day-header-date">
+            <span class="day-header-day">25</span>
+            <span class="day-header-month">Apr</span>
+          </div>
+          <div class="day-header-stat">2 jobs</div>
+        </div>
+        <div class="day-header">
+          <span class="day-header-label">Sun</span>
+          <div class="day-header-date">
+            <span class="day-header-day">26</span>
+            <span class="day-header-month">Apr</span>
+          </div>
+          <div class="day-header-stat" style="color: var(--ft-hint);">0 jobs</div>
+        </div>
+        <div class="day-header">
+          <span class="day-header-label">Mon</span>
+          <div class="day-header-date">
+            <span class="day-header-day">27</span>
+            <span class="day-header-month">Apr</span>
+          </div>
+          <div class="day-header-stat busy">9 jobs</div>
+        </div>
+      </div>
+
+      <!-- Engineer rows -->
+      <!-- Dan Miller -->
+      <div class="engineer-row">
+        <div class="engineer-cell">
+          <div class="engineer-avatar" style="background: #DC2626;">DM
+            <span class="engineer-presence onsite"></span>
+          </div>
+          <div class="engineer-info">
+            <div class="engineer-name">Dan Miller</div>
+            <div class="engineer-load">
+              <div class="engineer-load-bar"><div class="engineer-load-fill busy" style="width: 75%"></div></div>
+              <span>9 jobs</span>
+            </div>
+          </div>
+        </div>
+        <!-- Tue (today) -->
+        <div class="day-cell today">
+          <div class="job-block in-progress priority-emergency" draggable="true" data-job="2841">
+            <div class="job-block-time">10:30 · 1.5h</div>
+            <div class="job-block-title">Fire alarm reset — sounder panel</div>
+            <div class="job-block-site">Berkeley Sq</div>
+          </div>
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">14:00 · 2h</div>
+            <div class="job-block-title">Battery test · main panel</div>
+            <div class="job-block-site">De-Group HQ</div>
+          </div>
+        </div>
+        <!-- Wed -->
+        <div class="day-cell">
+          <div class="job-block priority-urgent" draggable="true">
+            <div class="job-block-time">09:00 · 3h</div>
+            <div class="job-block-title">Quarterly inspection · L2</div>
+            <div class="job-block-site">Mayfair Corp</div>
+          </div>
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">13:30 · 1h</div>
+            <div class="job-block-title">Detector swap × 2</div>
+            <div class="job-block-site">TCR Site B</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <!-- Thu -->
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">11:00 · 2h</div>
+            <div class="job-block-title">Annual cert · L3 system</div>
+            <div class="job-block-site">Hampstead Mews</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <!-- Fri -->
+        <div class="day-cell">
+          <div class="job-block priority-urgent" draggable="true">
+            <div class="job-block-time">08:00 · 4h</div>
+            <div class="job-block-title">Commissioning · 2nd floor extension</div>
+            <div class="job-block-site">Bishopsgate Tower</div>
+          </div>
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">14:00 · 1h</div>
+            <div class="job-block-title">MCP rotation</div>
+            <div class="job-block-site">Diamond Cutting</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <!-- Sat -->
+        <div class="day-cell">
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <!-- Sun -->
+        <div class="day-cell">
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <!-- Mon -->
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">09:30 · 2h</div>
+            <div class="job-block-title">Quarterly · L2 system</div>
+            <div class="job-block-site">Camden Works</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+      </div>
+
+      <!-- Sarah Patel -->
+      <div class="engineer-row">
+        <div class="engineer-cell">
+          <div class="engineer-avatar" style="background: #2563EB;">SP
+            <span class="engineer-presence onsite"></span>
+          </div>
+          <div class="engineer-info">
+            <div class="engineer-name">Sarah Patel</div>
+            <div class="engineer-load">
+              <div class="engineer-load-bar"><div class="engineer-load-fill busy" style="width: 80%"></div></div>
+              <span>10 jobs</span>
+            </div>
+          </div>
+        </div>
+        <div class="day-cell today">
+          <div class="job-block in-progress priority-urgent" draggable="true">
+            <div class="job-block-time">08:30 · 2h</div>
+            <div class="job-block-title">Annual inspection · L2 system</div>
+            <div class="job-block-site">One Services St</div>
+          </div>
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">11:30 · 1.5h</div>
+            <div class="job-block-title">Battery replacement</div>
+            <div class="job-block-site">Hatton Garden</div>
+          </div>
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">15:00 · 1h</div>
+            <div class="job-block-title">Detector clean</div>
+            <div class="job-block-site">Soho Studios</div>
+          </div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">10:00 · 2h</div>
+            <div class="job-block-title">Quarterly · MCP rotation</div>
+            <div class="job-block-site">TCR Site A</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">09:00 · 3h</div>
+            <div class="job-block-title">Annual · L1 system</div>
+            <div class="job-block-site">Kings Cross HQ</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-urgent" draggable="true">
+            <div class="job-block-time">11:00 · 2h</div>
+            <div class="job-block-title">Sounder fault investigation</div>
+            <div class="job-block-site">Westbourne Apartments</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">10:00 · 1.5h</div>
+            <div class="job-block-title">Weekend service</div>
+            <div class="job-block-site">Notting Hill Office</div>
+          </div>
+        </div>
+        <div class="day-cell">
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-emergency" draggable="true">
+            <div class="job-block-time">08:00 · 2h</div>
+            <div class="job-block-title">Emergency callout · panel reset</div>
+            <div class="job-block-site">Holborn Mews</div>
+          </div>
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">13:00 · 2h</div>
+            <div class="job-block-title">Quarterly check</div>
+            <div class="job-block-site">Bloomsbury Court</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+      </div>
+
+      <!-- Ravi Kaur -->
+      <div class="engineer-row">
+        <div class="engineer-cell">
+          <div class="engineer-avatar" style="background: #7C3AED;">RK
+            <span class="engineer-presence online"></span>
+          </div>
+          <div class="engineer-info">
+            <div class="engineer-name">Ravi Kaur</div>
+            <div class="engineer-load">
+              <div class="engineer-load-bar"><div class="engineer-load-fill" style="width: 40%"></div></div>
+              <span>5 jobs</span>
+            </div>
+          </div>
+        </div>
+        <div class="day-cell today">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">10:00 · 45m</div>
+            <div class="job-block-title">Quarterly test · MCP rotation</div>
+            <div class="job-block-site">TCR Site A</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">14:00 · 2h</div>
+            <div class="job-block-title">L2 inspection</div>
+            <div class="job-block-site">Borough Market Office</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">10:00 · 1.5h</div>
+            <div class="job-block-title">Detector replacement</div>
+            <div class="job-block-site">Aldgate Tower</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-low" draggable="true">
+            <div class="job-block-time">11:00 · 1h</div>
+            <div class="job-block-title">Routine service</div>
+            <div class="job-block-site">Wimbledon Practice</div>
+          </div>
+        </div>
+        <div class="day-cell">
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">09:00 · 2h</div>
+            <div class="job-block-title">Annual cert</div>
+            <div class="job-block-site">Stratford Workshop</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+      </div>
+
+      <!-- Jamie Taylor -->
+      <div class="engineer-row">
+        <div class="engineer-cell">
+          <div class="engineer-avatar" style="background: #059669;">JT
+            <span class="engineer-presence online"></span>
+          </div>
+          <div class="engineer-info">
+            <div class="engineer-name">Jamie Taylor</div>
+            <div class="engineer-load">
+              <div class="engineer-load-bar"><div class="engineer-load-fill busy" style="width: 70%"></div></div>
+              <span>8 jobs</span>
+            </div>
+          </div>
+        </div>
+        <div class="day-cell today">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">14:00 · 3h</div>
+            <div class="job-block-title">Commissioning walkthrough</div>
+            <div class="job-block-site">Mayfair Corp · L3-4</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-urgent" draggable="true">
+            <div class="job-block-time">08:30 · 4h</div>
+            <div class="job-block-title">Commissioning · day 2 of 3</div>
+            <div class="job-block-site">Mayfair Corp · L3-4</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-urgent" draggable="true">
+            <div class="job-block-time">09:00 · 3h</div>
+            <div class="job-block-title">Commissioning · day 3 of 3</div>
+            <div class="job-block-site">Mayfair Corp · L3-4</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">11:00 · 2h</div>
+            <div class="job-block-title">Quarterly · L2</div>
+            <div class="job-block-site">Marylebone Office</div>
+          </div>
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">10:00 · 2h</div>
+            <div class="job-block-title">Annual inspection</div>
+            <div class="job-block-site">Knightsbridge Place</div>
+          </div>
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">14:30 · 1.5h</div>
+            <div class="job-block-title">Detector replacement × 4</div>
+            <div class="job-block-site">Belgravia Centre</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Alex Pratt (offline) -->
+      <div class="engineer-row">
+        <div class="engineer-cell">
+          <div class="engineer-avatar" style="background: var(--ft-bg-sunken); color: var(--ft-fg2);">AP
+            <span class="engineer-presence offline"></span>
+          </div>
+          <div class="engineer-info">
+            <div class="engineer-name" style="color: var(--ft-hint);">Alex Pratt</div>
+            <div class="engineer-load" style="color: var(--ft-hint);">
+              <span>Offline · holiday until 28 Apr</span>
+            </div>
+          </div>
+        </div>
+        <div class="day-cell today" style="background: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(154,154,159,0.06) 8px, rgba(154,154,159,0.06) 16px);"></div>
+        <div class="day-cell" style="background: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(154,154,159,0.06) 8px, rgba(154,154,159,0.06) 16px);"></div>
+        <div class="day-cell" style="background: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(154,154,159,0.06) 8px, rgba(154,154,159,0.06) 16px);"></div>
+        <div class="day-cell" style="background: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(154,154,159,0.06) 8px, rgba(154,154,159,0.06) 16px);"></div>
+        <div class="day-cell" style="background: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(154,154,159,0.06) 8px, rgba(154,154,159,0.06) 16px);"></div>
+        <div class="day-cell" style="background: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(154,154,159,0.06) 8px, rgba(154,154,159,0.06) 16px);"></div>
+        <div class="day-cell">
+          <div class="day-cell-add">+ Drop or add job</div>
+        </div>
+      </div>
+
+      <!-- Unassigned bucket -->
+      <div class="engineer-row unassigned-row">
+        <div class="engineer-cell">
+          <div class="engineer-avatar">!</div>
+          <div class="engineer-info">
+            <div class="engineer-name">Unassigned</div>
+            <div class="engineer-load">4 jobs need assigning</div>
+          </div>
+        </div>
+        <div class="day-cell today">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">11:15 · 1h</div>
+            <div class="job-block-title">Detector replacement × 4</div>
+            <div class="job-block-site">Diamond Cutting Mezz</div>
+          </div>
+          <div class="job-block priority-urgent" draggable="true">
+            <div class="job-block-time">16:30 · 1.5h</div>
+            <div class="job-block-title">Battery replacement · main panel</div>
+            <div class="job-block-site">De-Group HQ B2</div>
+          </div>
+        </div>
+        <div class="day-cell">
+          <div class="job-block priority-normal" draggable="true">
+            <div class="job-block-time">10:00 · 2h</div>
+            <div class="job-block-title">Quarterly · L2 system</div>
+            <div class="job-block-site">Pimlico Mews</div>
+          </div>
+        </div>
+        <div class="day-cell"></div>
+        <div class="day-cell">
+          <div class="job-block priority-low" draggable="true">
+            <div class="job-block-time">14:00 · 1h</div>
+            <div class="job-block-title">Routine service</div>
+            <div class="job-block-site">Earl's Court Office</div>
+          </div>
+        </div>
+        <div class="day-cell"></div>
+        <div class="day-cell"></div>
+        <div class="day-cell"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Tooltip (positioned by JS, hidden by default) -->
+<div class="job-tooltip" id="tooltip"></div>
+
+<script>
+  // View switcher
+  document.querySelectorAll('.view-switch').forEach(sw => {
+    sw.addEventListener('click', () => {
+      document.querySelectorAll('.view-switch').forEach(s => s.classList.remove('active'));
+      sw.classList.add('active');
+    });
+  });
+
+  // Filter chips
+  document.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      chip.classList.toggle('active');
+    });
+  });
+
+  // Drag and drop (basic visual demo)
+  let draggedEl = null;
+  document.querySelectorAll('.job-block').forEach(block => {
+    block.addEventListener('dragstart', (e) => {
+      draggedEl = block;
+      block.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    block.addEventListener('dragend', () => {
+      block.classList.remove('dragging');
+      document.querySelectorAll('.day-cell.dragover').forEach(c => c.classList.remove('dragover'));
+      draggedEl = null;
+    });
+  });
+  document.querySelectorAll('.day-cell').forEach(cell => {
+    cell.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      cell.classList.add('dragover');
+    });
+    cell.addEventListener('dragleave', () => {
+      cell.classList.remove('dragover');
+    });
+    cell.addEventListener('drop', (e) => {
+      e.preventDefault();
+      cell.classList.remove('dragover');
+      if (draggedEl && cell !== draggedEl.parentElement) {
+        const addBtn = cell.querySelector('.day-cell-add');
+        if (addBtn) cell.insertBefore(draggedEl, addBtn);
+        else cell.appendChild(draggedEl);
+      }
+    });
+  });
+
+  // Sidebar nav
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

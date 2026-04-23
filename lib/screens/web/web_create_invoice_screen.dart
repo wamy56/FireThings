@@ -9,7 +9,7 @@ import '../../models/company_customer.dart';
 import '../../services/firestore_sync_service.dart';
 import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
-import '../../utils/theme.dart';
+import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
@@ -180,8 +180,6 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
@@ -191,9 +189,10 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
       child: Focus(
         autofocus: true,
         child: Scaffold(
+          backgroundColor: FtColors.bgAlt,
           body: Column(
             children: [
-              _buildFormHeader(isDark),
+              _buildFormHeader(),
               Expanded(
                 child: Form(
                   key: _formKey,
@@ -207,9 +206,9 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(child: _buildLeftColumn(isDark)),
+                                Expanded(child: _buildLeftColumn()),
                                 const SizedBox(width: 32),
-                                Expanded(child: _buildRightColumn(isDark)),
+                                Expanded(child: _buildRightColumn()),
                               ],
                             ),
                             const SizedBox(height: 16),
@@ -221,12 +220,11 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
                                     child: OutlinedButton(
                                       onPressed: () => Navigator.of(context).pop(),
                                       style: OutlinedButton.styleFrom(
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
+                                        foregroundColor: FtColors.fg1,
+                                        side: const BorderSide(color: FtColors.border, width: 1.5),
+                                        shape: RoundedRectangleBorder(borderRadius: FtRadii.lgAll),
                                       ),
-                                      child: const Text('Cancel',
-                                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                                      child: Text('Cancel', style: FtText.button.copyWith(fontSize: 16)),
                                     ),
                                   ),
                                 ),
@@ -237,20 +235,19 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
                                     child: ElevatedButton(
                                       onPressed: _isLoading ? null : _saveInvoice,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.primaryBlue,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
+                                        backgroundColor: FtColors.accent,
+                                        foregroundColor: FtColors.primary,
+                                        shape: RoundedRectangleBorder(borderRadius: FtRadii.lgAll),
                                       ),
                                       child: _isLoading
                                           ? const SizedBox(
-                                              width: 20, height: 20,
-                                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2, color: FtColors.primary),
                                             )
                                           : Text(
                                               _isEdit ? 'Update Invoice' : 'Create Invoice',
-                                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                              style: FtText.button.copyWith(fontSize: 16),
                                             ),
                                     ),
                                   ),
@@ -272,50 +269,53 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
     );
   }
 
-  Widget _buildFormHeader(bool isDark) {
+  Widget _buildFormHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         border: Border(
-          bottom: BorderSide(
-            color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-          ),
+          bottom: BorderSide(color: FtColors.border, width: 1),
         ),
       ),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
-            icon: Icon(AppIcons.arrowLeft),
+            icon: Icon(AppIcons.arrowLeft, color: FtColors.fg2),
             tooltip: 'Back',
           ),
           const SizedBox(width: 8),
           Text(
             _isEdit ? 'Edit Invoice' : 'Create New Invoice',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            style: FtText.sectionTitle,
           ),
           if (_invoiceNumber.isNotEmpty) ...[
             const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: AppTheme.primaryBlue.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: FtColors.accentSoft,
+                borderRadius: FtRadii.xlAll,
               ),
               child: Text(
                 _invoiceNumber,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primaryBlue),
+                style: FtText.mono(size: 13, weight: FontWeight.w600, color: FtColors.accent),
               ),
             ),
           ],
           const Spacer(),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(foregroundColor: FtColors.fg2),
             child: const Text('Cancel'),
           ),
           const SizedBox(width: 8),
           ElevatedButton(
             onPressed: _isLoading ? null : _saveInvoice,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: FtColors.accent,
+              foregroundColor: FtColors.primary,
+            ),
             child: Text(_isEdit ? 'Update Invoice' : 'Create Invoice'),
           ),
         ],
@@ -323,13 +323,12 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
     );
   }
 
-  Widget _buildLeftColumn(bool isDark) {
+  Widget _buildLeftColumn() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionCard(
           title: 'Customer',
-          isDark: isDark,
           children: [
             _buildCustomerAutocomplete(),
             const SizedBox(height: 16),
@@ -353,16 +352,19 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
         const SizedBox(height: 20),
         _sectionCard(
           title: 'Invoice Details',
-          isDark: isDark,
           children: [
             InkWell(
               onTap: () => _pickDate(isDate: true),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: FtRadii.mdAll,
               child: InputDecorator(
                 decoration: InputDecoration(
                   labelText: 'Invoice Date',
                   prefixIcon: Icon(AppIcons.calendar),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(borderRadius: FtRadii.mdAll),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: const BorderSide(color: FtColors.border),
+                  ),
                 ),
                 child: Text(DateFormat('dd/MM/yyyy').format(_date)),
               ),
@@ -370,12 +372,16 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
             const SizedBox(height: 16),
             InkWell(
               onTap: () => _pickDate(isDate: false),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: FtRadii.mdAll,
               child: InputDecorator(
                 decoration: InputDecoration(
                   labelText: 'Due Date',
                   prefixIcon: Icon(AppIcons.calendar),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(borderRadius: FtRadii.mdAll),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: const BorderSide(color: FtColors.border),
+                  ),
                 ),
                 child: Text(DateFormat('dd/MM/yyyy').format(_dueDate)),
               ),
@@ -399,8 +405,8 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
     );
   }
 
-  Widget _buildRightColumn(bool isDark) {
-    final currencyFmt = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+  Widget _buildRightColumn() {
+    final currencyFmt = NumberFormat.currency(symbol: '£', decimalDigits: 2);
     double subtotal = 0;
     for (final item in _items) {
       final qty = double.tryParse(item.qtyController.text) ?? 0;
@@ -415,7 +421,6 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
       children: [
         _sectionCard(
           title: 'Line Items',
-          isDark: isDark,
           children: [
             ..._items.asMap().entries.map((entry) {
               final index = entry.key;
@@ -425,25 +430,18 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    border: Border.all(
-                      color: isDark ? AppTheme.darkDivider : Colors.grey.shade300,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: FtColors.border, width: 1.5),
+                    borderRadius: FtRadii.mdAll,
                   ),
                   child: Column(
                     children: [
                       Row(
                         children: [
-                          Text('Item ${index + 1}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                              )),
+                          Text('Item ${index + 1}', style: FtText.label),
                           const Spacer(),
                           if (_items.length > 1)
                             IconButton(
-                              icon: Icon(AppIcons.trash, size: 16, color: AppTheme.errorRed),
+                              icon: Icon(AppIcons.trash, size: 16, color: FtColors.danger),
                               onPressed: () => setState(() {
                                 item.dispose();
                                 _items.removeAt(index);
@@ -475,7 +473,7 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
                           Expanded(
                             child: CustomTextField(
                               controller: item.priceController,
-                              label: 'Unit Price (\u00A3)',
+                              label: 'Unit Price (£)',
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
                               onChanged: (_) => setState(() {}),
                             ),
@@ -493,6 +491,11 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
                 onPressed: () => setState(() => _items.add(_LineItem())),
                 icon: Icon(AppIcons.add, size: 16),
                 label: const Text('Add Item'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: FtColors.fg1,
+                  side: const BorderSide(color: FtColors.border, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
+                ),
               ),
             ),
           ],
@@ -500,20 +503,19 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
         const SizedBox(height: 20),
         _sectionCard(
           title: 'Totals',
-          isDark: isDark,
           children: [
-            _totalDisplayRow('Subtotal', currencyFmt.format(subtotal), isDark),
+            _totalDisplayRow('Subtotal', currencyFmt.format(subtotal)),
             if (_includeVat) ...[
               const SizedBox(height: 4),
-              _totalDisplayRow('VAT (20%)', currencyFmt.format(vat), isDark),
+              _totalDisplayRow('VAT (20%)', currencyFmt.format(vat)),
             ],
             const Divider(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Total', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                Text('Total', style: FtText.inter(size: 16, weight: FontWeight.w700, color: FtColors.fg1)),
                 Text(currencyFmt.format(total),
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    style: FtText.inter(size: 16, weight: FontWeight.w700, color: FtColors.fg1)),
               ],
             ),
           ],
@@ -521,7 +523,6 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
         const SizedBox(height: 20),
         _sectionCard(
           title: 'Notes',
-          isDark: isDark,
           children: [
             CustomTextField(
               controller: _notesController,
@@ -535,15 +536,12 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
     );
   }
 
-  Widget _totalDisplayRow(String label, String value, bool isDark) {
+  Widget _totalDisplayRow(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(
-          fontSize: 14,
-          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-        )),
-        Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+        Text(label, style: FtText.bodySoft),
+        Text(value, style: FtText.inter(size: 14, weight: FontWeight.w500, color: FtColors.fg1)),
       ],
     );
   }
@@ -581,25 +579,32 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
       optionsViewBuilder: (context, onSelected, options) {
         return Align(
           alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(8),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200, maxWidth: 400),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (context, index) {
-                  final customer = options.elementAt(index);
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(AppIcons.user, size: 18),
-                    title: Text(customer.name),
-                    subtitle: customer.phone != null ? Text(customer.phone!) : null,
-                    onTap: () => onSelected(customer),
-                  );
-                },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: FtRadii.mdAll,
+              boxShadow: FtShadows.md,
+            ),
+            child: Material(
+              elevation: 0,
+              color: FtColors.bg,
+              borderRadius: FtRadii.mdAll,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200, maxWidth: 400),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final customer = options.elementAt(index);
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(AppIcons.user, size: 18),
+                      title: Text(customer.name),
+                      subtitle: customer.phone != null ? Text(customer.phone!) : null,
+                      onTap: () => onSelected(customer),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -610,30 +615,16 @@ class _WebCreateInvoiceScreenState extends State<WebCreateInvoiceScreen> {
 
   Widget _sectionCard({
     required String title,
-    required bool isDark,
     required List<Widget> children,
   }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDark ? AppTheme.darkDivider : Colors.grey.shade300,
-        ),
-      ),
+    return Container(
+      decoration: FtDecorations.card(),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: FtSpacing.cardBody,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
-              ),
-            ),
+            Text(title, style: FtText.cardTitle),
             const SizedBox(height: 16),
             ...children,
           ],

@@ -11,7 +11,7 @@ import '../../services/dispatch_service.dart';
 import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../services/analytics_service.dart';
-import '../../utils/theme.dart';
+import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
@@ -247,7 +247,6 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
             _assignedToUid = null;
             _assignedToName = null;
             _priority = JobPriority.normal;
-            // Keep site + contact pre-filled for batch creation
           });
         } else {
           context.showSuccessToast(_isEdit ? 'Job updated' : 'Job created');
@@ -269,8 +268,6 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.enter, control: true): () {
@@ -280,154 +277,151 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
       child: Focus(
         autofocus: true,
         child: Scaffold(
-      body: Column(
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-            decoration: BoxDecoration(
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: Icon(AppIcons.arrowLeft),
-                  tooltip: 'Back',
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _isEdit ? 'Edit Job' : 'Create New Job',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _saveJob,
-                  child: Text(_isEdit ? 'Update Job' : 'Create Job'),
-                ),
-              ],
-            ),
-          ),
-
-          // Form body — two columns
-          Expanded(
-            child: Form(
-              key: _formKey,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 900),
-                    child: Column(
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+          backgroundColor: FtColors.bgAlt,
+          body: Column(
+            children: [
+              _buildFormHeader(),
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 900),
+                        child: Column(
                           children: [
-                            // Left column
-                            Expanded(child: _buildLeftColumn(isDark)),
-                            const SizedBox(width: 32),
-                            // Right column
-                            Expanded(child: _buildRightColumn(isDark)),
-                          ],
-                        ),
-                        if (!_isEdit) ...[
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Checkbox(
-                                value: _createAnother,
-                                onChanged: (v) => setState(() => _createAnother = v ?? false),
-                              ),
-                              GestureDetector(
-                                onTap: () => setState(() => _createAnother = !_createAnother),
-                                child: const Text('Create another job after saving (keeps site & contact)'),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(child: _buildLeftColumn()),
+                                const SizedBox(width: 32),
+                                Expanded(child: _buildRightColumn()),
+                              ],
+                            ),
+                            if (!_isEdit) ...[
+                              const SizedBox(height: 16),
+                              Row(
+                                children: [
+                                  Checkbox(
+                                    value: _createAnother,
+                                    activeColor: FtColors.primary,
+                                    onChanged: (v) => setState(() => _createAnother = v ?? false),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () => setState(() => _createAnother = !_createAnother),
+                                    child: Text(
+                                      'Create another job after saving (keeps site & contact)',
+                                      style: FtText.body,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 48,
-                                child: OutlinedButton(
-                                  onPressed: () => Navigator.of(context).pop(),
-                                  style: OutlinedButton.styleFrom(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 48,
+                                    child: OutlinedButton(
+                                      onPressed: () => Navigator.of(context).pop(),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: FtColors.fg1,
+                                        side: const BorderSide(color: FtColors.border, width: 1.5),
+                                        shape: RoundedRectangleBorder(borderRadius: FtRadii.lgAll),
+                                      ),
+                                      child: Text('Cancel', style: FtText.button.copyWith(fontSize: 16)),
                                     ),
                                   ),
-                                  child: const Text(
-                                    'Cancel',
-                                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                                  ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: SizedBox(
-                                height: 48,
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _saveJob,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppTheme.primaryBlue,
-                                    foregroundColor: Colors.white,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 48,
+                                    child: ElevatedButton(
+                                      onPressed: _isLoading ? null : _saveJob,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: FtColors.accent,
+                                        foregroundColor: FtColors.primary,
+                                        shape: RoundedRectangleBorder(borderRadius: FtRadii.lgAll),
+                                      ),
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(strokeWidth: 2, color: FtColors.primary),
+                                            )
+                                          : Text(
+                                              _isEdit ? 'Update Job' : 'Create Job',
+                                              style: FtText.button.copyWith(fontSize: 16),
+                                            ),
                                     ),
                                   ),
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          width: 20, height: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                        )
-                                      : Text(
-                                          _isEdit ? 'Update Job' : 'Create Job',
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
                                 ),
-                              ),
+                              ],
                             ),
+                            const SizedBox(height: 24),
                           ],
                         ),
-                        const SizedBox(height: 24),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    ),
+        ),
       ),
     );
   }
 
-  Widget _buildLeftColumn(bool isDark) {
+  Widget _buildFormHeader() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: FtColors.border, width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: Icon(AppIcons.arrowLeft, color: FtColors.fg2),
+            tooltip: 'Back',
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _isEdit ? 'Edit Job' : 'Create New Job',
+            style: FtText.sectionTitle,
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: TextButton.styleFrom(foregroundColor: FtColors.fg2),
+            child: const Text('Cancel'),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: _isLoading ? null : _saveJob,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: FtColors.accent,
+              foregroundColor: FtColors.primary,
+            ),
+            child: Text(_isEdit ? 'Update Job' : 'Create Job'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeftColumn() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionCard(
           title: 'Job Details',
-          isDark: isDark,
           children: [
             CustomTextField(
               controller: _titleController,
@@ -461,10 +455,8 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
           ],
         ),
         const SizedBox(height: 20),
-
         _sectionCard(
           title: 'Priority',
-          isDark: isDark,
           children: [
             SizedBox(
               width: double.infinity,
@@ -482,10 +474,8 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
           ],
         ),
         const SizedBox(height: 20),
-
         _sectionCard(
           title: 'System Info',
-          isDark: isDark,
           children: [
             CustomTextField(
               controller: _systemCategoryController,
@@ -517,16 +507,22 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
           ],
         ),
         const SizedBox(height: 20),
-
         _sectionCard(
           title: 'Assign To',
-          isDark: isDark,
           children: [
             DropdownButtonFormField<String?>(
               initialValue: _assignedToUid,
               decoration: InputDecoration(
                 prefixIcon: Icon(AppIcons.user),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(borderRadius: FtRadii.mdAll),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: FtRadii.mdAll,
+                  borderSide: const BorderSide(color: FtColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: FtRadii.mdAll,
+                  borderSide: const BorderSide(color: FtColors.primary, width: 1.5),
+                ),
               ),
               hint: const Text('Unassigned'),
               items: [
@@ -550,13 +546,12 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
     );
   }
 
-  Widget _buildRightColumn(bool isDark) {
+  Widget _buildRightColumn() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _sectionCard(
           title: 'Site',
-          isDark: isDark,
           children: [
             _buildSiteAutocomplete(),
             const SizedBox(height: 16),
@@ -593,10 +588,8 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
           ],
         ),
         const SizedBox(height: 20),
-
         _sectionCard(
           title: 'Contact',
-          isDark: isDark,
           children: [
             _buildCustomerAutocomplete(),
             const SizedBox(height: 16),
@@ -616,27 +609,29 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
           ],
         ),
         const SizedBox(height: 20),
-
         _sectionCard(
           title: 'Scheduling',
-          isDark: isDark,
           children: [
             InkWell(
               onTap: _pickDate,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: FtRadii.mdAll,
               child: InputDecorator(
                 decoration: InputDecoration(
                   labelText: 'Scheduled Date',
                   prefixIcon: Icon(AppIcons.calendar),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(borderRadius: FtRadii.mdAll),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: const BorderSide(color: FtColors.border),
+                  ),
                 ),
                 child: Text(
                   _scheduledDate != null
                       ? '${_scheduledDate!.day}/${_scheduledDate!.month}/${_scheduledDate!.year}'
                       : 'Select date',
-                  style: TextStyle(
-                    color: _scheduledDate != null ? null : AppTheme.mediumGrey,
-                  ),
+                  style: _scheduledDate != null
+                      ? null
+                      : FtText.inter(size: 14, color: FtColors.hint),
                 ),
               ),
             ),
@@ -684,7 +679,6 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
         }
         controller.addListener(() {
           _siteNameController.text = controller.text;
-          // Clear site ID if user manually edits away from autocomplete match
           if (_selectedSiteId != null) {
             final matchesSite = _companySites.any((s) => s.name == controller.text);
             if (!matchesSite) {
@@ -706,25 +700,32 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
       optionsViewBuilder: (context, onSelected, options) {
         return Align(
           alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(8),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200, maxWidth: 400),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (context, index) {
-                  final site = options.elementAt(index);
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(AppIcons.building, size: 18),
-                    title: Text(site.name),
-                    subtitle: Text(site.address, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    onTap: () => onSelected(site),
-                  );
-                },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: FtRadii.mdAll,
+              boxShadow: FtShadows.md,
+            ),
+            child: Material(
+              elevation: 0,
+              color: FtColors.bg,
+              borderRadius: FtRadii.mdAll,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200, maxWidth: 400),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final site = options.elementAt(index);
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(AppIcons.building, size: 18),
+                      title: Text(site.name),
+                      subtitle: Text(site.address, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      onTap: () => onSelected(site),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -765,25 +766,32 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
       optionsViewBuilder: (context, onSelected, options) {
         return Align(
           alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4,
-            borderRadius: BorderRadius.circular(8),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200, maxWidth: 400),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (context, index) {
-                  final customer = options.elementAt(index);
-                  return ListTile(
-                    dense: true,
-                    leading: Icon(AppIcons.user, size: 18),
-                    title: Text(customer.name),
-                    subtitle: customer.phone != null ? Text(customer.phone!) : null,
-                    onTap: () => onSelected(customer),
-                  );
-                },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: FtRadii.mdAll,
+              boxShadow: FtShadows.md,
+            ),
+            child: Material(
+              elevation: 0,
+              color: FtColors.bg,
+              borderRadius: FtRadii.mdAll,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 200, maxWidth: 400),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  shrinkWrap: true,
+                  itemCount: options.length,
+                  itemBuilder: (context, index) {
+                    final customer = options.elementAt(index);
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(AppIcons.user, size: 18),
+                      title: Text(customer.name),
+                      subtitle: customer.phone != null ? Text(customer.phone!) : null,
+                      onTap: () => onSelected(customer),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -792,36 +800,18 @@ class _WebCreateJobScreenState extends State<WebCreateJobScreen> {
     );
   }
 
-  Widget _sectionHeader(String title, bool isDark) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: isDark ? AppTheme.darkTextPrimary : AppTheme.textPrimary,
-      ),
-    );
-  }
-
   Widget _sectionCard({
     required String title,
-    required bool isDark,
     required List<Widget> children,
   }) {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isDark ? AppTheme.darkDivider : Colors.grey.shade300,
-        ),
-      ),
+    return Container(
+      decoration: FtDecorations.card(),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: FtSpacing.cardBody,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionHeader(title, isDark),
+            Text(title, style: FtText.cardTitle),
             const SizedBox(height: 16),
             ...children,
           ],

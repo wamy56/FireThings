@@ -8,19 +8,22 @@ import '../../models/jobsheet.dart';
 import '../../services/dispatch_service.dart';
 import '../../services/company_service.dart';
 import '../../services/pdf_service.dart' show PDFService;
-import '../../utils/theme.dart';
+import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/site_map_preview.dart';
 import '../../services/analytics_service.dart';
-import '../../utils/print_stub.dart' if (dart.library.html) '../../utils/print_web.dart';
-import '../../utils/download_stub.dart' if (dart.library.html) '../../utils/download_web.dart';
+import '../../utils/print_stub.dart'
+    if (dart.library.html) '../../utils/print_web.dart';
+import '../../utils/download_stub.dart'
+    if (dart.library.html) '../../utils/download_web.dart';
 import 'cancel_job_dialog.dart';
 import '../../models/asset.dart';
 import '../../services/asset_service.dart';
 import '../../services/remote_config_service.dart';
 import 'package:go_router/go_router.dart';
+import 'dashboard/job_helpers.dart';
 
 class WebJobDetailPanel extends StatefulWidget {
   final String companyId;
@@ -52,14 +55,14 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
     super.initState();
     _slideController = AnimationController(
       vsync: this,
-      duration: AppTheme.normalAnimation,
+      duration: FtMotion.slow,
     );
     _slideAnimation = Tween<Offset>(
       begin: const Offset(1, 0),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideController,
-      curve: AppTheme.defaultCurve,
+      curve: FtMotion.standardCurve,
     ));
     if (widget.animateIn) {
       _slideController.forward();
@@ -91,15 +94,18 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return SlideTransition(
       position: _slideAnimation,
-      child: Material(
-        elevation: 8,
-        color: isDark ? AppTheme.darkSurface : Colors.white,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: FtColors.bg,
+          boxShadow: FtShadows.lg,
+          border: Border(
+              left: BorderSide(color: FtColors.border, width: 1.5)),
+        ),
         child: StreamBuilder<DispatchedJob?>(
-          stream: DispatchService.instance.getJobStream(widget.companyId, widget.jobId),
+          stream: DispatchService.instance
+              .getJobStream(widget.companyId, widget.jobId),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: AdaptiveLoadingIndicator());
@@ -111,11 +117,16 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(AppIcons.warning, size: 32, color: AppTheme.mediumGrey),
+                    Icon(AppIcons.warning, size: 32, color: FtColors.hint),
                     const SizedBox(height: 8),
-                    const Text('Job not found'),
+                    Text('Job not found', style: FtText.bodySoft),
                     const SizedBox(height: 16),
-                    TextButton(onPressed: _closePanel, child: const Text('Close')),
+                    TextButton(
+                      onPressed: _closePanel,
+                      style: TextButton.styleFrom(
+                          foregroundColor: FtColors.fg2),
+                      child: Text('Close', style: FtText.button),
+                    ),
                   ],
                 ),
               );
@@ -123,28 +134,35 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
 
             return Column(
               children: [
-                _buildPanelHeader(job, isDark),
+                _buildPanelHeader(job),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.all(20),
+                    padding: FtSpacing.cardBody,
                     children: [
-                      _buildStatusTimeline(job, isDark),
+                      _buildStatusTimeline(job),
                       const SizedBox(height: 20),
                       _buildSection('Job Details', [
-                        _detailRow('Title', job.title, isDark),
-                        if (job.jobType != null) _detailRow('Type', job.jobType!, isDark),
-                        if (job.jobNumber != null) _detailRow('Job #', job.jobNumber!, isDark),
-                        if (job.description != null) _detailRow('Description', job.description!, isDark),
-                        _detailRow('Priority', _priorityLabel(job.priority), isDark),
-                      ], isDark),
+                        _detailRow('Title', job.title),
+                        if (job.jobType != null)
+                          _detailRow('Type', job.jobType!),
+                        if (job.jobNumber != null)
+                          _detailRow('Job #', job.jobNumber!),
+                        if (job.description != null)
+                          _detailRow('Description', job.description!),
+                        _detailRow(
+                            'Priority', _priorityLabel(job.priority)),
+                      ]),
                       const SizedBox(height: 16),
                       _buildSection('Site', [
-                        _detailRow('Name', job.siteName, isDark),
-                        _detailRow('Address', job.siteAddress, isDark),
-                        if (job.parkingNotes != null) _detailRow('Parking', job.parkingNotes!, isDark),
-                        if (job.accessNotes != null) _detailRow('Access', job.accessNotes!, isDark),
-                        if (job.siteNotes != null) _detailRow('Notes', job.siteNotes!, isDark),
-                      ], isDark),
+                        _detailRow('Name', job.siteName),
+                        _detailRow('Address', job.siteAddress),
+                        if (job.parkingNotes != null)
+                          _detailRow('Parking', job.parkingNotes!),
+                        if (job.accessNotes != null)
+                          _detailRow('Access', job.accessNotes!),
+                        if (job.siteNotes != null)
+                          _detailRow('Notes', job.siteNotes!),
+                      ]),
                       const SizedBox(height: 12),
                       SiteMapPreview(
                         address: job.siteAddress,
@@ -157,61 +175,85 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: () => _openDirections(job.siteAddress),
+                          onPressed: () =>
+                              _openDirections(job.siteAddress),
                           icon: Icon(AppIcons.map, size: 18),
-                          label: const Text('Get Directions'),
+                          label: Text('Get Directions',
+                              style: FtText.button),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: FtColors.fg1,
+                            side: const BorderSide(
+                                color: FtColors.border, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: FtRadii.mdAll),
+                          ),
                         ),
                       ),
                       if (job.companySiteId != null &&
-                          RemoteConfigService.instance.assetRegisterEnabled) ...[
+                          RemoteConfigService
+                              .instance.assetRegisterEnabled) ...[
                         const SizedBox(height: 16),
-                        _buildSiteAssetsSection(job, isDark),
+                        _buildSiteAssetsSection(job),
                       ],
                       const SizedBox(height: 16),
-                      if (job.contactName != null || job.contactPhone != null || job.contactEmail != null)
-                        ...[
-                          _buildSection('Contact', [
-                            if (job.contactName != null) _detailRow('Name', job.contactName!, isDark),
-                            if (job.contactPhone != null) _detailRow('Phone', job.contactPhone!, isDark),
-                            if (job.contactEmail != null) _detailRow('Email', job.contactEmail!, isDark),
-                          ], isDark),
-                          const SizedBox(height: 16),
-                        ],
+                      if (job.contactName != null ||
+                          job.contactPhone != null ||
+                          job.contactEmail != null) ...[
+                        _buildSection('Contact', [
+                          if (job.contactName != null)
+                            _detailRow('Name', job.contactName!),
+                          if (job.contactPhone != null)
+                            _detailRow('Phone', job.contactPhone!),
+                          if (job.contactEmail != null)
+                            _detailRow('Email', job.contactEmail!),
+                        ]),
+                        const SizedBox(height: 16),
+                      ],
                       _buildSection('Scheduling', [
                         _detailRow(
                           'Date',
                           job.scheduledDate != null
-                              ? DateFormat('EEEE, dd MMMM yyyy').format(job.scheduledDate!)
+                              ? DateFormat('EEEE, dd MMMM yyyy')
+                                  .format(job.scheduledDate!)
                               : 'Not set',
-                          isDark,
                         ),
-                        if (job.scheduledTime != null) _detailRow('Time', job.scheduledTime!, isDark),
-                        if (job.estimatedDuration != null) _detailRow('Duration', job.estimatedDuration!, isDark),
-                      ], isDark),
+                        if (job.scheduledTime != null)
+                          _detailRow('Time', job.scheduledTime!),
+                        if (job.estimatedDuration != null)
+                          _detailRow(
+                              'Duration', job.estimatedDuration!),
+                      ]),
                       const SizedBox(height: 16),
                       _buildSection('Assignment', [
                         _detailRow(
                           'Engineer',
                           job.assignedToName ?? 'Unassigned',
-                          isDark,
                         ),
-                        _detailRow('Created by', job.createdByName, isDark),
-                      ], isDark),
-                      if (job.systemCategory != null || job.panelMake != null) ...[
+                        _detailRow('Created by', job.createdByName),
+                      ]),
+                      if (job.systemCategory != null ||
+                          job.panelMake != null) ...[
                         const SizedBox(height: 16),
                         _buildSection('System Info', [
-                          if (job.systemCategory != null) _detailRow('Category', job.systemCategory!, isDark),
-                          if (job.panelMake != null) _detailRow('Panel', job.panelMake!, isDark),
-                          if (job.panelLocation != null) _detailRow('Panel Location', job.panelLocation!, isDark),
-                          if (job.numberOfZones != null) _detailRow('Zones', '${job.numberOfZones}', isDark),
-                        ], isDark),
+                          if (job.systemCategory != null)
+                            _detailRow(
+                                'Category', job.systemCategory!),
+                          if (job.panelMake != null)
+                            _detailRow('Panel', job.panelMake!),
+                          if (job.panelLocation != null)
+                            _detailRow('Panel Location',
+                                job.panelLocation!),
+                          if (job.numberOfZones != null)
+                            _detailRow(
+                                'Zones', '${job.numberOfZones}'),
+                        ]),
                       ],
                       if (job.linkedJobsheetId != null) ...[
                         const SizedBox(height: 16),
-                        _buildLinkedJobsheetSection(job, isDark),
+                        _buildLinkedJobsheetSection(job),
                       ],
                       const SizedBox(height: 24),
-                      _buildActionButtons(job, isDark),
+                      _buildActionButtons(job),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -224,29 +266,43 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
     );
   }
 
-  Widget _buildPanelHeader(DispatchedJob job, bool isDark) {
+  Widget _buildPanelHeader(DispatchedJob job) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceElevated : Colors.grey.shade50,
-        border: Border(
-          bottom: BorderSide(
-            color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-          ),
-        ),
+      padding: FtSpacing.cardHeader,
+      decoration: const BoxDecoration(
+        color: FtColors.bgAlt,
+        border:
+            Border(bottom: BorderSide(color: FtColors.border, width: 1)),
       ),
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              job.title,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(job.title,
+                    style: FtText.cardTitle,
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    jobStatusBadge(job.status),
+                    const SizedBox(width: 8),
+                    if (job.priority != JobPriority.normal)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: jobPriorityBadge(job.priority),
+                      ),
+                    if (job.jobNumber != null)
+                      Text(job.jobNumber!, style: FtText.monoSmall),
+                  ],
+                ),
+              ],
             ),
           ),
           IconButton(
             onPressed: _closePanel,
-            icon: const Icon(Icons.close),
+            icon: Icon(AppIcons.close, color: FtColors.fg2),
             tooltip: 'Close',
           ),
         ],
@@ -254,7 +310,7 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
     );
   }
 
-  Widget _buildStatusTimeline(DispatchedJob job, bool isDark) {
+  Widget _buildStatusTimeline(DispatchedJob job) {
     final statuses = [
       DispatchedJobStatus.created,
       DispatchedJobStatus.assigned,
@@ -274,10 +330,10 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
           final isActive = !isDeclined && i <= currentIndex;
           final isCurrent = !isDeclined && i == currentIndex;
           final color = isDeclined && i == 0
-              ? Colors.red
+              ? FtColors.danger
               : isActive
-                  ? _statusColor(statuses[i])
-                  : (isDark ? AppTheme.darkDivider : Colors.grey.shade300);
+                  ? jobStatusColor(statuses[i])
+                  : FtColors.border;
 
           return Expanded(
             child: Column(
@@ -294,8 +350,10 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                       height: isCurrent ? 14 : 10,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isActive ? color : Colors.transparent,
-                        border: Border.all(color: color, width: 2),
+                        color:
+                            isActive ? color : Colors.transparent,
+                        border:
+                            Border.all(color: color, width: 2),
                       ),
                     ),
                     if (i < statuses.length - 1)
@@ -303,8 +361,8 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                         child: Container(
                           height: 2,
                           color: !isDeclined && i < currentIndex
-                              ? _statusColor(statuses[i + 1])
-                              : (isDark ? AppTheme.darkDivider : Colors.grey.shade300),
+                              ? jobStatusColor(statuses[i + 1])
+                              : FtColors.border,
                         ),
                       ),
                   ],
@@ -312,12 +370,13 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                 const SizedBox(height: 4),
                 Text(
                   _shortStatusLabel(statuses[i]),
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
-                    color: isActive
-                        ? (isDark ? Colors.white : AppTheme.darkGrey)
-                        : (isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey),
+                  style: FtText.inter(
+                    size: 9,
+                    weight: isCurrent
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                    color:
+                        isActive ? FtColors.fg1 : FtColors.hint,
                   ),
                 ),
               ],
@@ -328,31 +387,48 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
     );
   }
 
-  Widget _buildSiteAssetsSection(DispatchedJob job, bool isDark) {
+  Widget _buildSiteAssetsSection(DispatchedJob job) {
     final basePath = 'companies/${job.companyId}';
     final siteId = job.companySiteId!;
 
     return FutureBuilder<List<Asset>>(
-      future: AssetService.instance.getAssetsStream(basePath, siteId).first,
+      future:
+          AssetService.instance.getAssetsStream(basePath, siteId).first,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
-            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            child:
+                Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
         }
 
         final assets = snapshot.data ?? [];
         if (assets.isEmpty) return const SizedBox.shrink();
 
-        final active = assets.where((a) => a.complianceStatus != AssetComplianceStatus.decommissioned).toList();
-        final pass = active.where((a) => a.complianceStatus == AssetComplianceStatus.pass).length;
-        final fail = active.where((a) => a.complianceStatus == AssetComplianceStatus.fail).length;
-        final untested = active.where((a) => a.complianceStatus == AssetComplianceStatus.untested).length;
+        final active = assets
+            .where((a) =>
+                a.complianceStatus !=
+                AssetComplianceStatus.decommissioned)
+            .toList();
+        final pass = active
+            .where((a) =>
+                a.complianceStatus == AssetComplianceStatus.pass)
+            .length;
+        final fail = active
+            .where((a) =>
+                a.complianceStatus == AssetComplianceStatus.fail)
+            .length;
+        final untested = active
+            .where((a) =>
+                a.complianceStatus == AssetComplianceStatus.untested)
+            .length;
 
         final now = DateTime.now();
         final lifecycleWarnings = active.where((a) {
-          if (a.installDate == null || a.expectedLifespanYears == null) return false;
+          if (a.installDate == null || a.expectedLifespanYears == null) {
+            return false;
+          }
           final age = now.difference(a.installDate!).inDays / 365.25;
           return (a.expectedLifespanYears! - age) < 1;
         }).length;
@@ -360,7 +436,7 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
         return _buildSection('Site Assets', [
           Text.rich(
             TextSpan(
-              style: const TextStyle(fontSize: 14),
+              style: FtText.body,
               children: [
                 TextSpan(
                   text: '${active.length} assets: ',
@@ -368,20 +444,26 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                 ),
                 TextSpan(
                   text: '$pass pass',
-                  style: TextStyle(color: AppTheme.successGreen, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      color: FtColors.success,
+                      fontWeight: FontWeight.w600),
                 ),
                 if (fail > 0) ...[
                   const TextSpan(text: ', '),
                   TextSpan(
                     text: '$fail fail',
-                    style: TextStyle(color: AppTheme.errorRed, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: FtColors.danger,
+                        fontWeight: FontWeight.w600),
                   ),
                 ],
                 if (untested > 0) ...[
                   const TextSpan(text: ', '),
                   TextSpan(
                     text: '$untested untested',
-                    style: TextStyle(color: AppTheme.accentOrange, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: FtColors.warning,
+                        fontWeight: FontWeight.w600),
                   ),
                 ],
               ],
@@ -391,11 +473,15 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(AppIcons.danger, size: 14, color: AppTheme.accentOrange),
+                Icon(AppIcons.danger,
+                    size: 14, color: FtColors.warning),
                 const SizedBox(width: 4),
                 Text(
                   '$lifecycleWarnings asset${lifecycleWarnings == 1 ? '' : 's'} approaching end of life',
-                  style: TextStyle(fontSize: 13, color: AppTheme.accentOrange, fontWeight: FontWeight.w500),
+                  style: FtText.inter(
+                      size: 13,
+                      weight: FontWeight.w500,
+                      color: FtColors.warning),
                 ),
               ],
             ),
@@ -411,35 +497,30 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                 });
               },
               icon: Icon(AppIcons.clipboard, size: 18),
-              label: const Text('View Asset Register'),
+              label:
+                  Text('View Asset Register', style: FtText.button),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: FtColors.fg1,
+                side: const BorderSide(
+                    color: FtColors.border, width: 1.5),
+                shape: RoundedRectangleBorder(
+                    borderRadius: FtRadii.mdAll),
+              ),
             ),
           ),
-        ], isDark);
+        ]);
       },
     );
   }
 
-  Widget _buildSection(String title, List<Widget> children, bool isDark) {
+  Widget _buildSection(String title, List<Widget> children) {
     return Container(
-      padding: const EdgeInsets.all(AppTheme.cardPadding),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceElevated : AppTheme.surfaceWhite,
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        border: Border.all(
-          color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-        ),
-      ),
+      padding: FtSpacing.cardBody,
+      decoration: FtDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-            ),
-          ),
+          Text(title.toUpperCase(), style: FtText.label),
           const SizedBox(height: 8),
           ...children,
         ],
@@ -447,7 +528,7 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
     );
   }
 
-  Widget _detailRow(String label, String value, bool isDark) {
+  Widget _detailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -455,56 +536,82 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
         children: [
           SizedBox(
             width: 130,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-              ),
-            ),
+            child: Text(label, style: FtText.helper),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 13)),
+            child: Text(value,
+                style: FtText.inter(
+                    size: 13,
+                    weight: FontWeight.w500,
+                    color: FtColors.fg1)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtons(DispatchedJob job, bool isDark) {
+  Widget _buildActionButtons(DispatchedJob job) {
+    final btnStyle = OutlinedButton.styleFrom(
+      foregroundColor: FtColors.fg1,
+      side: const BorderSide(color: FtColors.border, width: 1.5),
+      shape: RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
+      textStyle: FtText.button,
+    );
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
-        if (job.status != DispatchedJobStatus.completed && job.status != DispatchedJobStatus.declined)
+        if (job.status != DispatchedJobStatus.completed &&
+            job.status != DispatchedJobStatus.declined)
           OutlinedButton.icon(
             onPressed: () => widget.onEdit(job),
             icon: Icon(AppIcons.edit, size: 16),
             label: const Text('Edit'),
+            style: btnStyle,
           ),
         OutlinedButton.icon(
           onPressed: () => _duplicateJob(job),
           icon: Icon(AppIcons.copy, size: 16),
           label: const Text('Duplicate'),
+          style: btnStyle,
         ),
         if (job.status != DispatchedJobStatus.completed)
           OutlinedButton.icon(
             onPressed: () => _showReassignDialog(job),
             icon: Icon(AppIcons.userAdd, size: 16),
             label: const Text('Reassign'),
+            style: btnStyle,
           ),
-        if (job.status != DispatchedJobStatus.completed && job.status != DispatchedJobStatus.declined)
+        if (job.status != DispatchedJobStatus.completed &&
+            job.status != DispatchedJobStatus.declined)
           OutlinedButton.icon(
             onPressed: () => _cancelJob(job),
             icon: Icon(AppIcons.close, size: 16),
             label: const Text('Cancel'),
-            style: OutlinedButton.styleFrom(foregroundColor: Colors.orange),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: FtColors.warning,
+              side: BorderSide(
+                  color: FtColors.warning.withValues(alpha: 0.3),
+                  width: 1.5),
+              shape: RoundedRectangleBorder(
+                  borderRadius: FtRadii.mdAll),
+              textStyle: FtText.button,
+            ),
           ),
         OutlinedButton.icon(
           onPressed: () => _deleteJob(job),
           icon: Icon(AppIcons.trash, size: 16),
           label: const Text('Delete'),
-          style: OutlinedButton.styleFrom(foregroundColor: AppTheme.errorRed),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: FtColors.danger,
+            side: BorderSide(
+                color: FtColors.danger.withValues(alpha: 0.3),
+                width: 1.5),
+            shape: RoundedRectangleBorder(
+                borderRadius: FtRadii.mdAll),
+            textStyle: FtText.button,
+          ),
         ),
         OutlinedButton.icon(
           onPressed: () {
@@ -513,6 +620,7 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
           },
           icon: Icon(AppIcons.printer, size: 16),
           label: const Text('Print'),
+          style: btnStyle,
         ),
       ],
     );
@@ -558,7 +666,8 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
 
   Future<void> _showReassignDialog(DispatchedJob job) async {
     final companyId = widget.companyId;
-    final members = await CompanyService.instance.getCompanyMembers(companyId);
+    final members =
+        await CompanyService.instance.getCompanyMembers(companyId);
 
     if (!mounted) return;
 
@@ -574,17 +683,20 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
               content: DropdownButtonFormField<String?>(
                 decoration: InputDecoration(
                   labelText: 'Engineer',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(
+                      borderRadius: FtRadii.mdAll),
                 ),
                 items: [
-                  const DropdownMenuItem(value: null, child: Text('Unassigned')),
+                  const DropdownMenuItem(
+                      value: null, child: Text('Unassigned')),
                   ...members.map((m) => DropdownMenuItem(
-                    value: m.uid,
-                    child: Text(m.displayName),
-                  )),
+                        value: m.uid,
+                        child: Text(m.displayName),
+                      )),
                 ],
                 onChanged: (v) {
-                  final member = members.where((m) => m.uid == v).firstOrNull;
+                  final member =
+                      members.where((m) => m.uid == v).firstOrNull;
                   setDialogState(() {
                     selectedUid = v;
                     selectedName = member?.displayName;
@@ -640,12 +752,16 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Job?'),
-        content: Text('This will permanently delete "${job.title}". This cannot be undone.'),
+        content: Text(
+            'This will permanently delete "${job.title}". This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: FtColors.danger),
             child: const Text('Delete'),
           ),
         ],
@@ -653,44 +769,43 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
     );
 
     if (confirmed == true) {
-      await DispatchService.instance.deleteJob(widget.companyId, job.id);
+      await DispatchService.instance
+          .deleteJob(widget.companyId, job.id);
       _closePanel();
-    }
-  }
-
-  Color _statusColor(DispatchedJobStatus status) {
-    switch (status) {
-      case DispatchedJobStatus.created: return Colors.orange;
-      case DispatchedJobStatus.assigned: return Colors.blue;
-      case DispatchedJobStatus.accepted: return Colors.teal;
-      case DispatchedJobStatus.enRoute: return Colors.indigo;
-      case DispatchedJobStatus.onSite: return Colors.purple;
-      case DispatchedJobStatus.completed: return AppTheme.successGreen;
-      case DispatchedJobStatus.declined: return Colors.red;
     }
   }
 
   String _shortStatusLabel(DispatchedJobStatus status) {
     switch (status) {
-      case DispatchedJobStatus.created: return 'New';
-      case DispatchedJobStatus.assigned: return 'Assigned';
-      case DispatchedJobStatus.accepted: return 'Accepted';
-      case DispatchedJobStatus.enRoute: return 'En Route';
-      case DispatchedJobStatus.onSite: return 'On Site';
-      case DispatchedJobStatus.completed: return 'Done';
-      case DispatchedJobStatus.declined: return 'Declined';
+      case DispatchedJobStatus.created:
+        return 'New';
+      case DispatchedJobStatus.assigned:
+        return 'Assigned';
+      case DispatchedJobStatus.accepted:
+        return 'Accepted';
+      case DispatchedJobStatus.enRoute:
+        return 'En Route';
+      case DispatchedJobStatus.onSite:
+        return 'On Site';
+      case DispatchedJobStatus.completed:
+        return 'Done';
+      case DispatchedJobStatus.declined:
+        return 'Declined';
     }
   }
 
   String _priorityLabel(JobPriority priority) {
     switch (priority) {
-      case JobPriority.normal: return 'Normal';
-      case JobPriority.urgent: return 'Urgent';
-      case JobPriority.emergency: return 'Emergency';
+      case JobPriority.normal:
+        return 'Normal';
+      case JobPriority.urgent:
+        return 'Urgent';
+      case JobPriority.emergency:
+        return 'Emergency';
     }
   }
 
-  Widget _buildLinkedJobsheetSection(DispatchedJob job, bool isDark) {
+  Widget _buildLinkedJobsheetSection(DispatchedJob job) {
     return FutureBuilder<DocumentSnapshot>(
       future: FirebaseFirestore.instance
           .collection('companies')
@@ -701,19 +816,20 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
-            padding: const EdgeInsets.all(16),
+            padding: FtSpacing.cardBody,
             decoration: BoxDecoration(
-              color: isDark ? AppTheme.darkSurfaceElevated : Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-              ),
+              color: FtColors.bgAlt,
+              borderRadius: FtRadii.mdAll,
+              border: Border.all(color: FtColors.border, width: 1.5),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                SizedBox(width: 16, height: 16, child: AdaptiveLoadingIndicator()),
-                SizedBox(width: 12),
-                Text('Loading jobsheet...', style: TextStyle(fontSize: 13)),
+                const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: AdaptiveLoadingIndicator()),
+                const SizedBox(width: 12),
+                Text('Loading jobsheet...', style: FtText.helper),
               ],
             ),
           );
@@ -721,20 +837,24 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return Container(
-            padding: const EdgeInsets.all(16),
+            padding: FtSpacing.cardBody,
             decoration: BoxDecoration(
-              color: AppTheme.successGreen.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppTheme.successGreen.withValues(alpha: 0.3)),
+              color: FtColors.successSoft,
+              borderRadius: FtRadii.mdAll,
+              border: Border.all(
+                  color: FtColors.success.withValues(alpha: 0.3),
+                  width: 1.5),
             ),
             child: Row(
               children: [
-                Icon(AppIcons.document, color: AppTheme.successGreen, size: 18),
+                Icon(AppIcons.document,
+                    color: FtColors.success, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Jobsheet completed and linked (data not yet synced)',
-                    style: TextStyle(fontSize: 13, color: AppTheme.successGreen),
+                    style:
+                        FtText.helper.copyWith(color: FtColors.success),
                   ),
                 ),
               ],
@@ -745,54 +865,51 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
         final data = snapshot.data!.data() as Map<String, dynamic>;
         final jobsheet = Jobsheet.fromJson(data);
 
-        return _buildJobsheetCard(jobsheet, job, isDark);
+        return _buildJobsheetCard(jobsheet, job);
       },
     );
   }
 
-  Widget _buildJobsheetCard(Jobsheet jobsheet, DispatchedJob job, bool isDark) {
+  Widget _buildJobsheetCard(Jobsheet jobsheet, DispatchedJob job) {
     return StatefulBuilder(
       builder: (context, setCardState) {
         return Container(
           decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkSurfaceElevated : Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(8),
+            color: FtColors.bgAlt,
+            borderRadius: FtRadii.lgAll,
             border: Border.all(
-              color: AppTheme.successGreen.withValues(alpha: 0.4),
-            ),
+                color: FtColors.success.withValues(alpha: 0.4),
+                width: 1.5),
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppTheme.successGreen.withValues(alpha: 0.08),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                padding: FtSpacing.cardHeader,
+                decoration: const BoxDecoration(
+                  color: FtColors.successSoft,
                 ),
                 child: Row(
                   children: [
-                    Icon(AppIcons.document, color: AppTheme.successGreen, size: 18),
+                    Icon(AppIcons.document,
+                        color: FtColors.success, size: 18),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
                         children: [
                           Text(
                             'Completed Jobsheet',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.successGreen,
-                            ),
+                            style: FtText.inter(
+                                size: 13,
+                                weight: FontWeight.w600,
+                                color: FtColors.success),
                           ),
                           Text(
                             '${jobsheet.engineerName} — ${DateFormat('dd MMM yyyy').format(jobsheet.date)}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                            ),
+                            style: FtText.helper,
                           ),
                         ],
                       ),
@@ -800,119 +917,107 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                   ],
                 ),
               ),
-
-              // Jobsheet details
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: FtSpacing.cardBody,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _detailRow('Customer', jobsheet.customerName, isDark),
-                    _detailRow('Site', jobsheet.siteAddress, isDark),
-                    _detailRow('Job #', jobsheet.jobNumber, isDark),
-                    _detailRow('Category', jobsheet.systemCategory, isDark),
-                    _detailRow('Template', jobsheet.templateType, isDark),
-
-                    // Form data
+                    _detailRow('Customer', jobsheet.customerName),
+                    _detailRow('Site', jobsheet.siteAddress),
+                    _detailRow('Job #', jobsheet.jobNumber),
+                    _detailRow('Category', jobsheet.systemCategory),
+                    _detailRow('Template', jobsheet.templateType),
                     if (jobsheet.formData.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        'FORM DATA',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                      Text('FORM DATA', style: FtText.label),
                       const SizedBox(height: 6),
                       ...jobsheet.formData.entries.map((entry) {
-                        final label = jobsheet.fieldLabels[entry.key] ?? entry.key;
-                        final value = entry.value?.toString() ?? '';
-                        if (value.isEmpty) return const SizedBox.shrink();
-                        // Handle checkbox/boolean values
+                        final label =
+                            jobsheet.fieldLabels[entry.key] ??
+                                entry.key;
+                        final value =
+                            entry.value?.toString() ?? '';
+                        if (value.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
                         final displayValue = value == 'true'
                             ? 'Yes'
                             : value == 'false'
                                 ? 'No'
                                 : value;
-                        return _detailRow(label, displayValue, isDark);
+                        return _detailRow(label, displayValue);
                       }),
                     ],
-
-                    // Notes
                     if (jobsheet.notes.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        'NOTES',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                      Text('NOTES', style: FtText.label),
                       const SizedBox(height: 4),
-                      Text(jobsheet.notes, style: const TextStyle(fontSize: 13)),
+                      Text(jobsheet.notes,
+                          style: FtText.inter(
+                              size: 13,
+                              weight: FontWeight.w500,
+                              color: FtColors.fg1)),
                     ],
-
-                    // Defects
                     if (jobsheet.defects.isNotEmpty) ...[
                       const SizedBox(height: 8),
-                      Text(
-                        'DEFECTS',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.errorRed,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                      Text('DEFECTS',
+                          style: FtText.label
+                              .copyWith(color: FtColors.danger)),
                       const SizedBox(height: 4),
                       ...jobsheet.defects.map((d) => Padding(
-                        padding: const EdgeInsets.only(bottom: 2),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('• ', style: TextStyle(color: AppTheme.errorRed, fontSize: 13)),
-                            Expanded(child: Text(d, style: const TextStyle(fontSize: 13))),
-                          ],
-                        ),
-                      )),
+                            padding:
+                                const EdgeInsets.only(bottom: 2),
+                            child: Row(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text('• ',
+                                    style: FtText.inter(
+                                        size: 13,
+                                        color: FtColors.danger)),
+                                Expanded(
+                                    child: Text(d,
+                                        style: FtText.inter(
+                                            size: 13,
+                                            weight:
+                                                FontWeight.w500,
+                                            color:
+                                                FtColors.fg1))),
+                              ],
+                            ),
+                          )),
                     ],
-
-                    // Signatures
-                    if (jobsheet.engineerSignature != null || jobsheet.customerSignature != null) ...[
+                    if (jobsheet.engineerSignature != null ||
+                        jobsheet.customerSignature != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        'SIGNATURES',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
+                      Text('SIGNATURES', style: FtText.label),
                       const SizedBox(height: 8),
                       Row(
                         children: [
                           if (jobsheet.engineerSignature != null)
                             Expanded(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
-                                  Text('Engineer', style: TextStyle(fontSize: 11, color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey)),
+                                  Text('Engineer',
+                                      style: FtText.label),
                                   const SizedBox(height: 4),
                                   Container(
                                     height: 60,
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor),
+                                      color: FtColors.bg,
+                                      borderRadius:
+                                          FtRadii.smAll,
+                                      border: Border.all(
+                                          color:
+                                              FtColors.border,
+                                          width: 1.5),
                                     ),
                                     child: Center(
                                       child: Image.memory(
-                                        base64Decode(jobsheet.engineerSignature!),
+                                        base64Decode(jobsheet
+                                            .engineerSignature!),
                                         fit: BoxFit.contain,
                                       ),
                                     ),
@@ -920,28 +1025,38 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                                 ],
                               ),
                             ),
-                          if (jobsheet.engineerSignature != null && jobsheet.customerSignature != null)
+                          if (jobsheet.engineerSignature !=
+                                  null &&
+                              jobsheet.customerSignature !=
+                                  null)
                             const SizedBox(width: 12),
                           if (jobsheet.customerSignature != null)
                             Expanded(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    jobsheet.customerSignatureName ?? 'Customer',
-                                    style: TextStyle(fontSize: 11, color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey),
+                                    jobsheet.customerSignatureName ??
+                                        'Customer',
+                                    style: FtText.label,
                                   ),
                                   const SizedBox(height: 4),
                                   Container(
                                     height: 60,
                                     decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(4),
-                                      border: Border.all(color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor),
+                                      color: FtColors.bg,
+                                      borderRadius:
+                                          FtRadii.smAll,
+                                      border: Border.all(
+                                          color:
+                                              FtColors.border,
+                                          width: 1.5),
                                     ),
                                     child: Center(
                                       child: Image.memory(
-                                        base64Decode(jobsheet.customerSignature!),
+                                        base64Decode(jobsheet
+                                            .customerSignature!),
                                         fit: BoxFit.contain,
                                       ),
                                     ),
@@ -952,8 +1067,6 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                         ],
                       ),
                     ],
-
-                    // Action buttons
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -961,8 +1074,8 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                           child: _JobsheetActionButton(
                             icon: AppIcons.download,
                             label: 'Download PDF',
-                            onPressed: () => _downloadJobsheetPdf(jobsheet),
-                            isDark: isDark,
+                            onPressed: () =>
+                                _downloadJobsheetPdf(jobsheet),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -970,8 +1083,8 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
                           child: _JobsheetActionButton(
                             icon: AppIcons.send,
                             label: 'Email to Client',
-                            onPressed: () => _emailJobsheet(jobsheet, job),
-                            isDark: isDark,
+                            onPressed: () =>
+                                _emailJobsheet(jobsheet, job),
                           ),
                         ),
                       ],
@@ -989,20 +1102,27 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
   Future<void> _downloadJobsheetPdf(Jobsheet jobsheet) async {
     try {
       showPremiumToast(context: context, message: 'Generating PDF...');
-      final pdfBytes = await PDFService.generateJobsheetPDF(jobsheet);
-      final filename = 'Jobsheet_${jobsheet.jobNumber}_${DateFormat('yyyyMMdd').format(jobsheet.date)}.pdf';
+      final pdfBytes =
+          await PDFService.generateJobsheetPDF(jobsheet);
+      final filename =
+          'Jobsheet_${jobsheet.jobNumber}_${DateFormat('yyyyMMdd').format(jobsheet.date)}.pdf';
       downloadFile(pdfBytes, filename);
     } catch (e) {
       if (mounted) {
-        showPremiumToast(context: context, message: 'Failed to generate PDF', variant: ToastVariant.error);
+        showPremiumToast(
+            context: context,
+            message: 'Failed to generate PDF',
+            variant: ToastVariant.error);
       }
     }
   }
 
-  Future<void> _emailJobsheet(Jobsheet jobsheet, DispatchedJob job) async {
+  Future<void> _emailJobsheet(
+      Jobsheet jobsheet, DispatchedJob job) async {
     final prefilledEmail = job.contactEmail ?? '';
 
-    final emailController = TextEditingController(text: prefilledEmail);
+    final emailController =
+        TextEditingController(text: prefilledEmail);
 
     final shouldSend = await showDialog<bool>(
       context: context,
@@ -1014,14 +1134,15 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
           children: [
             Text(
               'This will open your email client with a pre-filled message. Download the PDF first and attach it to the email.',
-              style: TextStyle(fontSize: 13, color: AppTheme.mediumGrey),
+              style: FtText.helper,
             ),
             const SizedBox(height: 16),
             TextField(
               controller: emailController,
               decoration: InputDecoration(
                 labelText: 'Recipient Email',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                border: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll),
                 prefixIcon: Icon(AppIcons.send, size: 18),
               ),
               keyboardType: TextInputType.emailAddress,
@@ -1064,7 +1185,8 @@ class _WebJobDetailPanelState extends State<WebJobDetailPanel>
         'Please see the attached PDF.\n\n'
         'Kind regards',
       );
-      final mailto = Uri.parse('mailto:$email?subject=$subject&body=$body');
+      final mailto =
+          Uri.parse('mailto:$email?subject=$subject&body=$body');
       if (await canLaunchUrl(mailto)) {
         await launchUrl(mailto);
       }
@@ -1078,13 +1200,11 @@ class _JobsheetActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onPressed;
-  final bool isDark;
 
   const _JobsheetActionButton({
     required this.icon,
     required this.label,
     required this.onPressed,
-    required this.isDark,
   });
 
   @override
@@ -1092,12 +1212,14 @@ class _JobsheetActionButton extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: onPressed,
       icon: Icon(icon, size: 16),
-      label: Text(label, style: const TextStyle(fontSize: 12)),
+      label: Text(label, style: FtText.button.copyWith(fontSize: 12)),
       style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        side: BorderSide(
-          color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-        ),
+        foregroundColor: FtColors.fg1,
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        side: const BorderSide(color: FtColors.border, width: 1.5),
+        shape:
+            RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
       ),
     );
   }

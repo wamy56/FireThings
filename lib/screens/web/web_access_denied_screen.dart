@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../utils/theme.dart';
+import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 
 enum WebAccessDeniedReason { noCompany, engineerOnly }
@@ -25,56 +25,54 @@ class WebAccessDeniedScreen extends StatelessWidget {
         : AppIcons.global;
 
     return Scaffold(
-      backgroundColor: AppTheme.primaryBlue,
+      backgroundColor: FtColors.primary,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
-          child: Card(
-            elevation: 8,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+          child: Container(
+            decoration: BoxDecoration(
+              color: FtColors.bg,
+              borderRadius: FtRadii.lgAll,
+              boxShadow: FtShadows.lg,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: AppTheme.accentOrange.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(icon, color: AppTheme.accentOrange, size: 32),
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: FtColors.accentSoft,
+                    borderRadius: FtRadii.lgAll,
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    message,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.mediumGrey,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => FirebaseAuth.instance.signOut(),
-                      icon: Icon(AppIcons.logout),
-                      label: const Text('Sign Out'),
+                  child: Icon(icon, color: FtColors.accent, size: 32),
+                ),
+                const SizedBox(height: 20),
+                Text(title, style: FtText.cardTitle),
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: FtText.bodySoft.copyWith(height: 1.5),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => FirebaseAuth.instance.signOut(),
+                    icon: Icon(AppIcons.logout),
+                    label: const Text('Sign Out'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: FtColors.fg1,
+                      side: BorderSide(color: FtColors.border, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
+                      textStyle: FtText.button,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

@@ -1,27 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:table_calendar/table_calendar.dart';
-import '../../models/dispatched_job.dart';
+import 'package:intl/intl.dart';
 import '../../models/company_member.dart';
-import '../../services/dispatch_service.dart';
+import '../../models/dispatched_job.dart';
 import '../../services/company_service.dart';
+import '../../services/dispatch_service.dart';
 import '../../services/user_profile_service.dart';
-import '../../utils/adaptive_widgets.dart';
-import '../../utils/responsive.dart';
-import '../../utils/theme.dart';
-import '../../services/analytics_service.dart';
-import '../../services/geocoding_service.dart';
-import '../../widgets/job_map.dart';
-import 'web_job_detail_panel.dart';
+import '../../theme/web_theme.dart';
+import '../../utils/icon_map.dart';
+import '../../widgets/premium_toast.dart';
 import 'package:go_router/go_router.dart';
-import 'schedule/schedule_helpers.dart';
-import 'schedule/schedule_header.dart';
-import 'schedule/week_view.dart';
-import 'schedule/month_view.dart';
-import 'schedule/day_view.dart';
-import 'schedule/route_builder.dart';
-import 'schedule/route_controls.dart';
-import 'schedule/unscheduled_strip.dart';
+import 'web_job_detail_panel.dart';
+import 'widgets/schedule/schedule_day_grid.dart';
+import 'widgets/schedule/schedule_week_grid.dart';
 
 class WebScheduleScreen extends StatefulWidget {
   const WebScheduleScreen({super.key});
@@ -33,59 +24,64 @@ class WebScheduleScreen extends StatefulWidget {
 class _WebScheduleScreenState extends State<WebScheduleScreen>
     with SingleTickerProviderStateMixin {
   late DateTime _weekStart;
+  late DateTime _selectedDay;
+  int _activeViewIndex = 1;
+
+  List<CompanyMember> _members = [];
+  List<DispatchedJob> _jobs = [];
+  bool _loading = true;
+
+  StreamSubscription<List<DispatchedJob>>? _jobsSub;
+  StreamSubscription<List<CompanyMember>>? _membersSub;
+
   String? _selectedJobId;
   bool _panelVisible = false;
   bool _panelAnimateIn = true;
-  List<CompanyMember> _members = [];
-  bool _colorByEngineer = true;
-  ScheduleViewMode _viewMode = ScheduleViewMode.week;
-  late DateTime _focusedDay;
-  late DateTime _selectedDay;
-
-  /// For narrower screens: toggle between calendar and map tabs.
-  bool _showMapTab = false;
-
-  /// Route view state: selected engineer for route overlay.
-  String? _routeEngineerId;
-
-  /// Cache of geocoded coordinates keyed by job id.
-  final Map<String, LatLng> _geocodedLocations = {};
-
-  /// Job IDs currently being geocoded (to avoid duplicate requests).
-  final Set<String> _geocodingInProgress = {};
-
-  Stream<List<DispatchedJob>>? _jobsStream;
-
   late final AnimationController _overlayController;
   late final Animation<double> _overlayOpacity;
 
-  String? get _companyId => UserProfileService.instance.companyId;
+  final Set<JobPriority> _activePriorities = {
+    JobPriority.emergency,
+    JobPriority.urgent,
+    JobPriority.normal,
+  };
+  bool _showCompleted = false;
+  String _engineerFilter = 'all';
+
+  static const _palette = [
+    Color(0xFFDC2626),
+    Color(0xFF2563EB),
+    Color(0xFF7C3AED),
+    Color(0xFF059669),
+    Color(0xFFD97706),
+    Color(0xFFDB2777),
+    Color(0xFF0891B2),
+    Color(0xFF4F46E5),
+  ];
 
   @override
   void initState() {
     super.initState();
     _overlayController = AnimationController(
       vsync: this,
-      duration: AppTheme.normalAnimation,
+      duration: FtMotion.slow,
     );
     _overlayOpacity = CurvedAnimation(
       parent: _overlayController,
-      curve: AppTheme.defaultCurve,
+      curve: FtMotion.standardCurve,
     );
     final now = DateTime.now();
-    _weekStart = _startOfWeek(now);
-    _focusedDay = now;
-    _selectedDay = now;
-    _loadMembers();
-    _initJobsStream();
-    AnalyticsService.instance.logWebScheduleViewed();
+    _selectedDay = DateTime(now.year, now.month, now.day);
+    _weekStart = _selectedDay.subtract(Duration(days: now.weekday - 1));
+    _loadData();
   }
 
-  void _initJobsStream() {
-    final companyId = _companyId;
-    if (companyId != null) {
-      _jobsStream = DispatchService.instance.getJobsStream(companyId);
-    }
+  @override
+  void dispose() {
+    _overlayController.dispose();
+    _jobsSub?.cancel();
+    _membersSub?.cancel();
+    super.dispose();
   }
 
   void _selectJob(String jobId) {
@@ -108,512 +104,820 @@ class _WebScheduleScreenState extends State<WebScheduleScreen>
     }
   }
 
-  @override
-  void dispose() {
-    _overlayController.dispose();
-    super.dispose();
-  }
-
-  DateTime _startOfWeek(DateTime date) {
-    final d = DateTime(date.year, date.month, date.day);
-    return d.subtract(Duration(days: d.weekday - 1));
-  }
-
-  Future<void> _loadMembers() async {
-    final companyId = _companyId;
+  void _handleJobDrop(DispatchedJob job, DateTime newDate, String? engineerId, String? engineerName) async {
+    final companyId = UserProfileService.instance.companyId;
     if (companyId == null) return;
-    try {
-      final members =
-          await CompanyService.instance.getCompanyMembers(companyId);
-      if (mounted) setState(() => _members = members);
-    } catch (_) {}
+
+    final isSameDate = job.scheduledDate != null &&
+        job.scheduledDate!.year == newDate.year &&
+        job.scheduledDate!.month == newDate.month &&
+        job.scheduledDate!.day == newDate.day;
+    final isSameEngineer = job.assignedTo == engineerId;
+
+    if (isSameDate && isSameEngineer) return;
+
+    if (!isSameEngineer && job.status == DispatchedJobStatus.onSite) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: FtRadii.lgAll),
+          title: Text(
+            'Reassign active job?',
+            style: FtText.inter(size: 16, weight: FontWeight.w700, color: FtColors.fg1),
+          ),
+          content: Text(
+            '${job.assignedToName ?? 'The engineer'} is currently on site for this job. Reassigning will change their active assignment.',
+            style: FtText.inter(size: 14, weight: FontWeight.w500, color: FtColors.fg2),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text('Cancel', style: FtText.inter(size: 14, weight: FontWeight.w600, color: FtColors.fg2)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text('Reassign', style: FtText.inter(size: 14, weight: FontWeight.w600, color: FtColors.warning)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    if (job.status == DispatchedJobStatus.completed && mounted) {
+      context.showWarningToast('Moved a completed job');
+    }
+
+    final snapshot = List<DispatchedJob>.from(_jobs);
+
+    if (isSameEngineer) {
+      setState(() {
+        final idx = _jobs.indexWhere((j) => j.id == job.id);
+        if (idx != -1) _jobs[idx] = _jobs[idx].copyWith(scheduledDate: newDate);
+      });
+      try {
+        await DispatchService.instance.updateScheduledDate(
+          companyId: companyId, jobId: job.id, newDate: newDate,
+        );
+      } catch (e) {
+        if (mounted) {
+          setState(() => _jobs = snapshot);
+          context.showErrorToast('Failed to reschedule job');
+        }
+      }
+    } else if (engineerId == null) {
+      setState(() => _jobs.removeWhere((j) => j.id == job.id));
+      try {
+        await DispatchService.instance.unassignJob(companyId: companyId, jobId: job.id);
+        if (!isSameDate) {
+          await DispatchService.instance.updateScheduledDate(
+            companyId: companyId, jobId: job.id, newDate: newDate,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _jobs = snapshot);
+          context.showErrorToast('Failed to unassign job');
+        }
+      }
+    } else {
+      setState(() {
+        final idx = _jobs.indexWhere((j) => j.id == job.id);
+        if (idx != -1) {
+          _jobs[idx] = _jobs[idx].copyWith(
+            scheduledDate: newDate,
+            assignedTo: engineerId,
+            assignedToName: engineerName,
+            status: DispatchedJobStatus.assigned,
+          );
+        }
+      });
+      try {
+        await DispatchService.instance.rescheduleAndReassign(
+          companyId: companyId,
+          jobId: job.id,
+          newDate: newDate,
+          newAssignedTo: engineerId,
+          newAssignedToName: engineerName!,
+        );
+      } catch (e) {
+        if (mounted) {
+          setState(() => _jobs = snapshot);
+          context.showErrorToast('Failed to reassign job');
+        }
+      }
+    }
   }
 
-  void _previousWeek() =>
-      setState(() => _weekStart = _weekStart.subtract(const Duration(days: 7)));
-  void _nextWeek() =>
-      setState(() => _weekStart = _weekStart.add(const Duration(days: 7)));
-  void _previousMonth() => setState(
-      () => _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1));
-  void _nextMonth() => setState(
-      () => _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1));
+  void _loadData() {
+    final companyId = UserProfileService.instance.companyId;
+    if (companyId == null) return;
+
+    _membersSub?.cancel();
+    _membersSub = CompanyService.instance
+        .getCompanyMembersStream(companyId)
+        .listen((members) {
+      setState(() => _members = members);
+    });
+
+    _subscribeToJobs(companyId);
+  }
+
+  void _subscribeToJobs(String companyId) {
+    _jobsSub?.cancel();
+    late final DateTime from;
+    late final DateTime to;
+
+    if (_activeViewIndex == 0) {
+      from = DateTime(_selectedDay.year, _selectedDay.month, _selectedDay.day);
+      to = from.add(const Duration(hours: 23, minutes: 59, seconds: 59));
+    } else {
+      from = _weekStart;
+      to = _weekStart.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+    }
+
+    _jobsSub = DispatchService.instance
+        .watchJobsForDateRange(companyId: companyId, from: from, to: to)
+        .listen((jobs) {
+      setState(() {
+        _jobs = jobs;
+        _loading = false;
+      });
+    });
+  }
+
+  void _goToPrevious() {
+    setState(() {
+      if (_activeViewIndex == 0) {
+        _selectedDay = _selectedDay.subtract(const Duration(days: 1));
+      } else {
+        _weekStart = _weekStart.subtract(const Duration(days: 7));
+      }
+      _loading = true;
+    });
+    _subscribeToJobs(UserProfileService.instance.companyId!);
+  }
+
+  void _goToNext() {
+    setState(() {
+      if (_activeViewIndex == 0) {
+        _selectedDay = _selectedDay.add(const Duration(days: 1));
+      } else {
+        _weekStart = _weekStart.add(const Duration(days: 7));
+      }
+      _loading = true;
+    });
+    _subscribeToJobs(UserProfileService.instance.companyId!);
+  }
 
   void _goToToday() {
     final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (_activeViewIndex == 0) {
+      if (today == _selectedDay) return;
+      setState(() { _selectedDay = today; _loading = true; });
+    } else {
+      final monday = today.subtract(Duration(days: now.weekday - 1));
+      if (monday == _weekStart) return;
+      setState(() { _weekStart = monday; _loading = true; });
+    }
+    _subscribeToJobs(UserProfileService.instance.companyId!);
+  }
+
+  void _onViewChanged(int newIndex) {
+    if (newIndex == _activeViewIndex) return;
+    final oldIndex = _activeViewIndex;
     setState(() {
-      _weekStart = _startOfWeek(now);
-      _focusedDay = now;
-      _selectedDay = now;
+      _activeViewIndex = newIndex;
+      if (newIndex == 0 && oldIndex == 1) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final weekEnd = _weekStart.add(const Duration(days: 6));
+        _selectedDay = (!today.isBefore(_weekStart) && !today.isAfter(weekEnd))
+            ? today
+            : _weekStart;
+      } else if (newIndex == 1 && oldIndex == 0) {
+        _weekStart = _selectedDay.subtract(Duration(days: _selectedDay.weekday - 1));
+      }
+      _loading = true;
     });
+    _subscribeToJobs(UserProfileService.instance.companyId!);
   }
 
-  void _onDatePicked(DateTime selected) {
-    setState(() {
-      _selectedDay = selected;
-      _focusedDay = selected;
-      _weekStart = _startOfWeek(selected);
-    });
+  List<DispatchedJob> get _filteredJobs {
+    return _jobs.where((job) {
+      if (!_activePriorities.contains(job.priority)) return false;
+      if (!_showCompleted && job.status == DispatchedJobStatus.completed) return false;
+      return true;
+    }).toList();
   }
 
-  Color _jobColorFn(DispatchedJob job) =>
-      jobColor(job, _colorByEngineer, _members);
+  List<CompanyMember> get _filteredMembers {
+    if (_engineerFilter == 'available') {
+      return _members.where((m) => m.isActive).toList();
+    }
+    return _members;
+  }
 
-  /// Handle a job being dropped on a new date (week view drag-and-drop).
-  Future<void> _handleJobDrop(DispatchedJob job, DateTime newDate) async {
-    final companyId = _companyId;
-    if (companyId == null) return;
-
-    // Store old values for undo
-    final oldDate = job.scheduledDate;
-    final oldTime = job.scheduledTime;
-
-    try {
-      await DispatchService.instance.rescheduleJob(
-        companyId: companyId,
-        jobId: job.id,
-        newDate: newDate,
+  List<ScheduleEngineer> get _engineers {
+    final members = _filteredMembers;
+    return members.map((m) {
+      final engineerJobs = _filteredJobs.where((j) => j.assignedTo == m.uid).toList();
+      final hasOnSiteJob = engineerJobs.any((j) =>
+          j.status == DispatchedJobStatus.onSite ||
+          j.status == DispatchedJobStatus.enRoute);
+      return ScheduleEngineer(
+        id: m.uid,
+        name: m.displayName,
+        initials: _initials(m.displayName),
+        color: _palette[members.indexOf(m) % _palette.length],
+        presence: !m.isActive ? 'offline' : hasOnSiteJob ? 'onsite' : 'online',
+        isActive: m.isActive,
+        weekJobCount: engineerJobs.length,
+        offlineLabel: !m.isActive ? 'Offline' : null,
       );
-
-      if (!mounted) return;
-
-      final dateFmt = '${newDate.day}/${newDate.month}/${newDate.year}';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Job rescheduled to $dateFmt'),
-          duration: const Duration(seconds: 5),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () async {
-              try {
-                await DispatchService.instance.rescheduleJob(
-                  companyId: companyId,
-                  jobId: job.id,
-                  newDate: oldDate,
-                  newTime: oldTime ?? '',
-                );
-              } catch (_) {}
-            },
-          ),
-        ),
-      );
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to reschedule job')),
-        );
-      }
-    }
+    }).toList();
   }
 
-  Map<int, List<DispatchedJob>> _groupJobsByWeekDay(
-      List<DispatchedJob> allJobs) {
-    final weekEnd = _weekStart.add(const Duration(days: 7));
-    final Map<int, List<DispatchedJob>> jobsByDay = {
-      for (var i = 0; i < 7; i++) i: []
-    };
-    for (final job in allJobs) {
-      if (job.scheduledDate == null) continue;
-      final d = job.scheduledDate!;
-      if (d.isBefore(_weekStart) || !d.isBefore(weekEnd)) continue;
-      jobsByDay[d.weekday - 1]!.add(job);
+  Map<String?, List<DispatchedJob>> get _jobsByEngineer {
+    final map = <String?, List<DispatchedJob>>{};
+    for (final job in _filteredJobs) {
+      map.putIfAbsent(job.assignedTo, () => []).add(job);
     }
-    return jobsByDay;
+    return map;
   }
 
-  /// Get jobs visible in the current view for the map.
-  List<DispatchedJob> _getMapJobs(List<DispatchedJob> allJobs) {
-    switch (_viewMode) {
-      case ScheduleViewMode.week:
-        final weekEnd = _weekStart.add(const Duration(days: 7));
-        return allJobs.where((j) {
-          if (j.scheduledDate == null) return false;
-          return !j.scheduledDate!.isBefore(_weekStart) &&
-              j.scheduledDate!.isBefore(weekEnd);
-        }).toList();
-      case ScheduleViewMode.month:
-      case ScheduleViewMode.day:
-        return allJobs
-            .where((j) =>
-                j.scheduledDate != null &&
-                isSameDay(j.scheduledDate!, _selectedDay))
-            .toList();
-    }
+  ScheduleEngineer? get _unassignedRow {
+    final unassignedJobs = _filteredJobs.where((j) => j.assignedTo == null).toList();
+    if (unassignedJobs.isEmpty) return null;
+    return ScheduleEngineer(
+      id: '_unassigned',
+      name: 'Unassigned',
+      initials: '!',
+      color: Colors.transparent,
+      weekJobCount: unassignedJobs.length,
+    );
   }
 
-  /// Build map pins from a list of jobs, using geocoded fallback for jobs
-  /// without stored coordinates.
-  ({List<JobMapPin> pins, int missingCount}) _buildMapPins(
-      List<DispatchedJob> jobs) {
-    final pins = <JobMapPin>[];
-    int missing = 0;
-    final toGeocode = <DispatchedJob>[];
-
-    for (final job in jobs) {
-      LatLng? location;
-
-      if (job.latitude != null && job.longitude != null) {
-        location = LatLng(job.latitude!, job.longitude!);
-      } else if (_geocodedLocations.containsKey(job.id)) {
-        location = _geocodedLocations[job.id]!;
-      } else if (job.siteAddress.trim().isNotEmpty) {
-        toGeocode.add(job);
-      }
-
-      if (location != null) {
-        pins.add(JobMapPin(
-          jobId: job.id,
-          location: location,
-          color: _jobColorFn(job),
-          title: job.title,
-          engineerName: job.assignedToName,
-          scheduledTime: job.scheduledTime,
-          statusLabel: jobStatusLabel(job.status),
-        ));
-      } else {
-        missing++;
-      }
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
     }
-
-    // Fire off geocoding for jobs that need it (non-blocking).
-    if (toGeocode.isNotEmpty) {
-      _geocodeJobs(toGeocode);
-    }
-
-    return (pins: pins, missingCount: missing);
+    return parts.first.substring(0, parts.first.length.clamp(0, 2)).toUpperCase();
   }
 
-  /// Geocode a batch of jobs and update state when done.
-  Future<void> _geocodeJobs(List<DispatchedJob> jobs) async {
-    bool anyResolved = false;
-    for (final job in jobs) {
-      if (_geocodingInProgress.contains(job.id)) continue;
-      _geocodingInProgress.add(job.id);
-
-      final result =
-          await GeocodingService.instance.geocode(job.siteAddress);
-      _geocodingInProgress.remove(job.id);
-
-      if (result != null) {
-        _geocodedLocations[job.id] = LatLng(result.lat, result.lng);
-        anyResolved = true;
-      }
-    }
-    if (anyResolved && mounted) {
-      setState(() {});
-    }
+  int _isoWeekNumber(DateTime date) {
+    final dayOfYear = date.difference(DateTime(date.year, 1, 1)).inDays;
+    return ((dayOfYear - date.weekday + 10) / 7).floor();
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final companyId = _companyId;
-    final screenSize = context.screenSize;
-    final isLargeScreen = screenSize == ScreenSize.large;
+    final weekEnd = _weekStart.add(const Duration(days: 6));
+    final filtered = _filteredJobs;
+    final scheduled = filtered.where((j) => j.assignedTo != null).length;
+    final unassigned = filtered.where((j) => j.assignedTo == null).length;
+    final weekNum = _isoWeekNumber(_weekStart);
+    final activeEngineers = _members.where((m) => m.isActive).length;
+    final capacityPct = activeEngineers > 0
+        ? (filtered.length / (activeEngineers * 12) * 100).round()
+        : 0;
 
-    if (companyId == null) {
-      return const Center(child: Text('No company found'));
-    }
+    final companyId = UserProfileService.instance.companyId;
+    final isDay = _activeViewIndex == 0;
+    final title = isDay
+        ? DateFormat('EEEE d MMMM').format(_selectedDay)
+        : '${DateFormat('d').format(_weekStart)} — ${DateFormat('d MMMM').format(weekEnd)}';
+    final subtitle = isDay
+        ? '$scheduled jobs scheduled · $unassigned unassigned'
+        : 'Week $weekNum · $scheduled jobs scheduled · $unassigned unassigned';
 
-    return StreamBuilder<List<DispatchedJob>>(
-      stream: _jobsStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: AdaptiveLoadingIndicator());
-        }
-
-        final allJobs = snapshot.data ?? [];
-        final unscheduled =
-            allJobs.where((j) => j.scheduledDate == null).toList();
-        final mapJobs = _getMapJobs(allJobs);
-        final mapData = _buildMapPins(mapJobs);
-
-        return Stack(
+    return Stack(
+      children: [
+        Column(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+            _SubHeader(
+              title: title,
+              subtitle: subtitle,
+              prevTooltip: isDay ? 'Previous day' : 'Previous week',
+              nextTooltip: isDay ? 'Next day' : 'Next week',
+              activeViewIndex: _activeViewIndex,
+              onViewChanged: _onViewChanged,
+              onPrevious: _goToPrevious,
+              onNext: _goToNext,
+              onToday: _goToToday,
+            ),
+            _FilterStrip(
+              activePriorities: _activePriorities,
+              showCompleted: _showCompleted,
+              engineerFilter: _engineerFilter,
+              onTogglePriority: (p) => setState(() {
+                _activePriorities.contains(p)
+                    ? _activePriorities.remove(p)
+                    : _activePriorities.add(p);
+              }),
+              onToggleCompleted: () => setState(() => _showCompleted = !_showCompleted),
+              onEngineerFilterChanged: (f) => setState(() => _engineerFilter = f),
+              bookedCount: scheduled,
+              unassignedCount: unassigned,
+              capacityPercent: capacityPct,
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator(color: FtColors.accent))
+                  : _members.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No team members found',
+                            style: FtText.inter(size: 14, weight: FontWeight.w500, color: FtColors.hint),
+                          ),
+                        )
+                      : Stack(
+                          children: [
+                            if (_activeViewIndex == 0)
+                              ScheduleDayGrid(
+                                engineers: _engineers,
+                                unassignedRow: _unassignedRow,
+                                jobsByEngineer: _jobsByEngineer,
+                                selectedDay: _selectedDay,
+                                onJobTap: (job) => _selectJob(job.id),
+                                onJobDrop: _handleJobDrop,
+                              )
+                            else
+                              ScheduleWeekGrid(
+                                engineers: _engineers,
+                                unassignedRow: _unassignedRow,
+                                jobsByEngineer: _jobsByEngineer,
+                                weekStart: _weekStart,
+                                onJobTap: (job) => _selectJob(job.id),
+                                onJobDrop: _handleJobDrop,
+                              ),
+                            if (filtered.isEmpty && _members.isNotEmpty)
+                              _EmptyStateOverlay(viewLabel: isDay ? 'day' : 'week'),
+                          ],
+                        ),
+            ),
+          ],
+        ),
+        if (_panelVisible)
+          Positioned.fill(
+            child: FadeTransition(
+              opacity: _overlayOpacity,
+              child: GestureDetector(
+                onTap: _dismissPanel,
+                child: Container(color: FtColors.primary.withValues(alpha: 0.08)),
+              ),
+            ),
+          ),
+        if (_panelVisible && _selectedJobId != null && companyId != null)
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: MediaQuery.of(context).size.width * 0.42,
+            child: WebJobDetailPanel(
+              key: ValueKey(_selectedJobId),
+              companyId: companyId,
+              jobId: _selectedJobId!,
+              onClose: _dismissPanel,
+              animateIn: _panelAnimateIn,
+              onEdit: (job) => context.push('/jobs/create', extra: job),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SubHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final String prevTooltip;
+  final String nextTooltip;
+  final int activeViewIndex;
+  final ValueChanged<int> onViewChanged;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onToday;
+
+  const _SubHeader({
+    required this.title,
+    required this.subtitle,
+    required this.prevTooltip,
+    required this.nextTooltip,
+    required this.activeViewIndex,
+    required this.onViewChanged,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onToday,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      decoration: const BoxDecoration(
+        color: FtColors.bg,
+        border: Border(bottom: BorderSide(color: FtColors.border, width: 1)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeaderWithMapToggle(isDark, isLargeScreen),
-                Expanded(
-                  child: isLargeScreen
-                      ? _buildSplitLayout(allJobs, mapData, isDark)
-                      : _showMapTab
-                          ? _buildMapWithRouteControls(allJobs, mapData, isDark)
-                          : _buildCalendarView(allJobs, isDark),
+                Text(
+                  title,
+                  style: FtText.outfit(
+                    size: 24, weight: FontWeight.w800,
+                    letterSpacing: -0.6, color: FtColors.primary,
+                  ),
                 ),
-                UnscheduledStrip(
-                  jobs: unscheduled,
-                  isDark: isDark,
-                  selectedJobId: _selectedJobId,
-                  jobColorFn: _jobColorFn,
-                  onJobTap: _selectJob,
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg2),
                 ),
               ],
             ),
-            if (_panelVisible)
-              Positioned.fill(
-                child: FadeTransition(
-                  opacity: _overlayOpacity,
-                  child: GestureDetector(
-                    onTap: _dismissPanel,
-                    child: Container(color: Colors.black.withValues(alpha: 0.05)),
+          ),
+
+          _NavArrow(icon: AppIcons.arrowLeft, tooltip: prevTooltip, onTap: onPrevious),
+          const SizedBox(width: 8),
+          _NavButton(label: 'Today', onTap: onToday),
+          const SizedBox(width: 8),
+          _NavArrow(icon: AppIcons.arrowRight, tooltip: nextTooltip, onTap: onNext),
+
+          const SizedBox(width: 16),
+
+          _ViewSwitcher(
+            labels: const ['Day', 'Week', 'Month'],
+            activeIndex: activeViewIndex,
+            onChanged: onViewChanged,
+          ),
+
+          const SizedBox(width: 8),
+          _SecondaryButton(icon: AppIcons.printer, label: 'Print'),
+          const SizedBox(width: 8),
+          _PrimaryButton(icon: AppIcons.addCircle, label: 'New job'),
+        ],
+      ),
+    );
+  }
+}
+
+class _NavArrow extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+  const _NavArrow({required this.icon, required this.tooltip, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: FtColors.bg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: FtColors.border, width: 1.5),
+            ),
+            child: Icon(icon, size: 16, color: FtColors.fg2),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NavButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _NavButton({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: FtColors.bg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: FtColors.border, width: 1.5),
+          ),
+          child: Text(
+            label,
+            style: FtText.inter(size: 13, weight: FontWeight.w600, color: FtColors.fg1),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ViewSwitcher extends StatelessWidget {
+  final List<String> labels;
+  final int activeIndex;
+  final ValueChanged<int> onChanged;
+
+  const _ViewSwitcher({
+    required this.labels,
+    required this.activeIndex,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: FtColors.bgAlt,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < labels.length; i++)
+            GestureDetector(
+              onTap: () => onChanged(i),
+              child: AnimatedContainer(
+                duration: FtMotion.fast,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: i == activeIndex ? FtColors.bg : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: i == activeIndex
+                      ? const [BoxShadow(color: Color(0x0D000000), offset: Offset(0, 1), blurRadius: 2)]
+                      : null,
+                ),
+                child: Text(
+                  labels[i],
+                  style: FtText.inter(
+                    size: 13, weight: FontWeight.w600,
+                    color: i == activeIndex ? FtColors.primary : FtColors.fg2,
                   ),
                 ),
               ),
-            if (_panelVisible && _selectedJobId != null)
-              Positioned(
-                top: 0,
-                bottom: 0,
-                right: 0,
-                width: MediaQuery.of(context).size.width * 0.42,
-                child: WebJobDetailPanel(
-                  key: ValueKey(_selectedJobId),
-                  companyId: companyId,
-                  jobId: _selectedJobId!,
-                  onClose: _dismissPanel,
-                  animateIn: _panelAnimateIn,
-                  onEdit: (job) {
-                    context.push('/jobs/create', extra: job);
-                  },
-                ),
-              ),
-          ],
-        );
-      },
+            ),
+        ],
+      ),
     );
   }
+}
 
-  Widget _buildHeaderWithMapToggle(bool isDark, bool isLargeScreen) {
-    return ScheduleHeader(
-      viewMode: _viewMode,
-      onViewModeChanged: (v) => setState(() => _viewMode = v),
-      colorByEngineer: _colorByEngineer,
-      onColorModeChanged: (v) => setState(() => _colorByEngineer = v),
-      weekStart: _weekStart,
-      focusedDay: _focusedDay,
-      selectedDay: _selectedDay,
-      isDark: isDark,
-      onPreviousWeek: _previousWeek,
-      onNextWeek: _nextWeek,
-      onPreviousMonth: _previousMonth,
-      onNextMonth: _nextMonth,
-      onGoToToday: _goToToday,
-      onDatePicked: _onDatePicked,
-      showMapToggle: !isLargeScreen,
-      showMapTab: _showMapTab,
-      onMapToggle: (v) => setState(() => _showMapTab = v),
+class _SecondaryButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _SecondaryButton({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+      decoration: BoxDecoration(
+        color: FtColors.bg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: FtColors.border, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: FtColors.primary),
+          const SizedBox(width: 7),
+          Text(label, style: FtText.inter(size: 13, weight: FontWeight.w600, color: FtColors.primary)),
+        ],
+      ),
     );
   }
+}
 
-  /// Large screens: calendar on left, map on right.
-  /// Build map pins with route modifications when an engineer is selected.
-  ({List<JobMapPin> pins, List<LatLng>? routePoints, int missingCount})
-      _buildMapDataWithRoute(
-    List<DispatchedJob> allJobs,
-    ({List<JobMapPin> pins, int missingCount}) baseData,
-  ) {
-    if (_routeEngineerId == null) {
-      return (
-        pins: baseData.pins,
-        routePoints: null,
-        missingCount: baseData.missingCount,
-      );
-    }
+class _PrimaryButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _PrimaryButton({required this.icon, required this.label});
 
-    // Find engineer name
-    final engineer = _members.where((m) => m.uid == _routeEngineerId).firstOrNull;
-    if (engineer == null) {
-      return (
-        pins: baseData.pins,
-        routePoints: null,
-        missingCount: baseData.missingCount,
-      );
-    }
-
-    final route = buildEngineerRoute(
-      engineerId: _routeEngineerId!,
-      engineerName: engineer.displayName,
-      date: _selectedDay,
-      allJobs: allJobs,
-    );
-
-    if (route == null || route.orderedJobs.isEmpty) {
-      return (
-        pins: baseData.pins,
-        routePoints: null,
-        missingCount: baseData.missingCount,
-      );
-    }
-
-    // Rebuild pins: number route jobs, fade others
-    final routeJobIds = route.orderedJobs.map((j) => j.id).toSet();
-    final pins = <JobMapPin>[];
-    int seq = 1;
-    for (final pin in baseData.pins) {
-      if (routeJobIds.contains(pin.jobId)) {
-        pins.add(JobMapPin(
-          jobId: pin.jobId,
-          location: pin.location,
-          color: pin.color,
-          title: pin.title,
-          engineerName: pin.engineerName,
-          scheduledTime: pin.scheduledTime,
-          statusLabel: pin.statusLabel,
-          sequenceNumber: seq++,
-        ));
-      } else {
-        // Fade non-route pins
-        pins.add(JobMapPin(
-          jobId: pin.jobId,
-          location: pin.location,
-          color: Colors.grey,
-          title: pin.title,
-          engineerName: pin.engineerName,
-          scheduledTime: pin.scheduledTime,
-          statusLabel: pin.statusLabel,
-        ));
-      }
-    }
-
-    return (
-      pins: pins,
-      routePoints: route.allPoints,
-      missingCount: baseData.missingCount,
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+      decoration: BoxDecoration(
+        color: FtColors.accent,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: FtShadows.amber,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 7),
+          Text(label, style: FtText.inter(size: 13, weight: FontWeight.w600, color: Colors.white)),
+        ],
+      ),
     );
   }
+}
 
-  Widget _buildSplitLayout(
-    List<DispatchedJob> allJobs,
-    ({List<JobMapPin> pins, int missingCount}) mapData,
-    bool isDark,
-  ) {
-    final routeData = _buildMapDataWithRoute(allJobs, mapData);
+class _FilterStrip extends StatelessWidget {
+  final Set<JobPriority> activePriorities;
+  final bool showCompleted;
+  final String engineerFilter;
+  final ValueChanged<JobPriority> onTogglePriority;
+  final VoidCallback onToggleCompleted;
+  final ValueChanged<String> onEngineerFilterChanged;
+  final int bookedCount;
+  final int unassignedCount;
+  final int capacityPercent;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          flex: 3,
-          child: _buildCalendarView(allJobs, isDark),
-        ),
-        VerticalDivider(
-          width: 1,
-          color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-        ),
-        Expanded(
-          flex: 2,
-          child: Stack(
+  const _FilterStrip({
+    required this.activePriorities,
+    required this.showCompleted,
+    required this.engineerFilter,
+    required this.onTogglePriority,
+    required this.onToggleCompleted,
+    required this.onEngineerFilterChanged,
+    required this.bookedCount,
+    required this.unassignedCount,
+    required this.capacityPercent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+      decoration: const BoxDecoration(
+        color: FtColors.bg,
+        border: Border(bottom: BorderSide(color: FtColors.border, width: 1)),
+      ),
+      child: Row(
+        children: [
+          Text('VIEW', style: FtText.inter(size: 11, weight: FontWeight.w700, letterSpacing: 0.4, color: FtColors.hint)),
+          const SizedBox(width: 12),
+          _FilterChip(
+            label: 'All engineers',
+            active: engineerFilter == 'all',
+            onTap: () => onEngineerFilterChanged('all'),
+          ),
+          const SizedBox(width: 6),
+          _FilterChip(
+            label: 'Available only',
+            active: engineerFilter == 'available',
+            onTap: () => onEngineerFilterChanged('available'),
+          ),
+
+          const SizedBox(width: 16),
+          Text('SHOW', style: FtText.inter(size: 11, weight: FontWeight.w700, letterSpacing: 0.4, color: FtColors.hint)),
+          const SizedBox(width: 12),
+          _FilterChip(
+            label: 'Emergency',
+            active: activePriorities.contains(JobPriority.emergency),
+            dotColor: FtColors.danger,
+            onTap: () => onTogglePriority(JobPriority.emergency),
+          ),
+          const SizedBox(width: 6),
+          _FilterChip(
+            label: 'Urgent',
+            active: activePriorities.contains(JobPriority.urgent),
+            dotColor: FtColors.warning,
+            onTap: () => onTogglePriority(JobPriority.urgent),
+          ),
+          const SizedBox(width: 6),
+          _FilterChip(
+            label: 'Normal',
+            active: activePriorities.contains(JobPriority.normal),
+            dotColor: FtColors.info,
+            onTap: () => onTogglePriority(JobPriority.normal),
+          ),
+          const SizedBox(width: 6),
+          _FilterChip(
+            label: 'Completed',
+            active: showCompleted,
+            dotColor: FtColors.success,
+            onTap: onToggleCompleted,
+          ),
+
+          const Spacer(),
+
+          _StatItem(label: 'Booked:', value: '$bookedCount'),
+          const SizedBox(width: 20),
+          _StatItem(label: 'Unassigned:', value: '$unassignedCount', valueColor: unassignedCount > 0 ? FtColors.warning : null),
+          const SizedBox(width: 20),
+          _StatItem(label: 'Capacity:', value: '$capacityPercent%'),
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+  final bool active;
+  final Color? dotColor;
+  final VoidCallback? onTap;
+
+  const _FilterChip({required this.label, this.active = false, this.dotColor, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+          decoration: BoxDecoration(
+            color: active ? FtColors.primary : FtColors.bgAlt,
+            borderRadius: BorderRadius.circular(20),
+            border: active ? null : Border.all(color: Colors.transparent, width: 1.5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              JobMap(
-                pins: routeData.pins,
-                routePoints: routeData.routePoints,
-                missingLocationCount: routeData.missingCount,
-                onPinTap: _selectJob,
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: RouteControls(
-                  members: _members,
-                  selectedEngineerId: _routeEngineerId,
-                  selectedDate: _selectedDay,
-                  isDark: isDark,
-                  onEngineerChanged: (id) =>
-                      setState(() => _routeEngineerId = id),
-                  onDateChanged: _onDatePicked,
+              if (dotColor != null) ...[
+                Container(
+                  width: 6, height: 6,
+                  decoration: BoxDecoration(
+                    color: active ? dotColor!.withValues(alpha: 0.9) : dotColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                label,
+                style: FtText.inter(
+                  size: 12, weight: FontWeight.w600,
+                  color: active ? Colors.white : FtColors.fg2,
                 ),
               ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
+}
 
-  /// Narrower screens: full-width map with route controls.
-  Widget _buildMapWithRouteControls(
-    List<DispatchedJob> allJobs,
-    ({List<JobMapPin> pins, int missingCount}) mapData,
-    bool isDark,
-  ) {
-    final routeData = _buildMapDataWithRoute(allJobs, mapData);
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
 
-    return Stack(
+  const _StatItem({required this.label, required this.value, this.valueColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        JobMap(
-          pins: routeData.pins,
-          routePoints: routeData.routePoints,
-          missingLocationCount: routeData.missingCount,
-          onPinTap: _selectJob,
-        ),
-        Positioned(
-          top: 8,
-          right: 8,
-          child: RouteControls(
-            members: _members,
-            selectedEngineerId: _routeEngineerId,
-            selectedDate: _selectedDay,
-            isDark: isDark,
-            onEngineerChanged: (id) =>
-                setState(() => _routeEngineerId = id),
-            onDateChanged: _onDatePicked,
-          ),
-        ),
+        Text(label, style: FtText.inter(size: 12, weight: FontWeight.w500, color: FtColors.fg2)),
+        const SizedBox(width: 6),
+        Text(value, style: FtText.mono(size: 12, weight: FontWeight.w600, color: valueColor ?? FtColors.fg1)),
       ],
     );
   }
+}
 
-  Widget _buildCalendarView(List<DispatchedJob> allJobs, bool isDark) {
-    switch (_viewMode) {
-      case ScheduleViewMode.week:
-        return ScheduleWeekView(
-          weekStart: _weekStart,
-          jobsByDay: _groupJobsByWeekDay(allJobs),
-          isDark: isDark,
-          selectedJobId: _selectedJobId,
-          colorByEngineer: _colorByEngineer,
-          jobColorFn: _jobColorFn,
-          onJobTap: _selectJob,
-          onDayHeaderTap: (date) {
-            setState(() {
-              _selectedDay = date;
-              _focusedDay = date;
-              _viewMode = ScheduleViewMode.day;
-            });
-          },
-          onJobDropped: _handleJobDrop,
-        );
-      case ScheduleViewMode.month:
-        return ScheduleMonthView(
-          allJobs: allJobs,
-          focusedDay: _focusedDay,
-          selectedDay: _selectedDay,
-          isDark: isDark,
-          selectedJobId: _selectedJobId,
-          jobColorFn: _jobColorFn,
-          onDaySelected: (selected, focused) {
-            setState(() {
-              _selectedDay = selected;
-              _focusedDay = focused;
-              _weekStart = _startOfWeek(selected);
-            });
-          },
-          onPageChanged: (focused) => setState(() => _focusedDay = focused),
-          onJobTap: _selectJob,
-        );
-      case ScheduleViewMode.day:
-        final dayJobs = allJobs
-            .where((j) =>
-                j.scheduledDate != null &&
-                isSameDay(j.scheduledDate!, _selectedDay))
-            .toList();
-        return ScheduleDayView(
-          date: _selectedDay,
-          dayJobs: dayJobs,
-          isDark: isDark,
-          selectedJobId: _selectedJobId,
-          jobColorFn: _jobColorFn,
-          onJobTap: _selectJob,
-        );
-    }
+class _EmptyStateOverlay extends StatelessWidget {
+  final String viewLabel;
+  const _EmptyStateOverlay({required this.viewLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        decoration: BoxDecoration(
+          color: FtColors.bg.withValues(alpha: 0.92),
+          borderRadius: FtRadii.lgAll,
+          border: Border.all(color: FtColors.border, width: 1.5),
+          boxShadow: FtShadows.sm,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(AppIcons.briefcaseTimer, size: 40, color: FtColors.hint),
+            const SizedBox(height: 12),
+            Text(
+              'No jobs scheduled this $viewLabel',
+              style: FtText.inter(size: 16, weight: FontWeight.w600, color: FtColors.fg2),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Create a job or adjust your filters to see scheduled work.',
+              style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.hint),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

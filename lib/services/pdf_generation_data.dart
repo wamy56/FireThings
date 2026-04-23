@@ -9,6 +9,7 @@ class JobsheetPdfData {
   final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
   final int? secondaryColourValue;
+  final Map<String, dynamic>? brandingJson;
   final Map<String, dynamic>? sectionStyleJson;
   final Map<String, dynamic>? typographyJson;
   final String settingsCompanyName;
@@ -27,6 +28,7 @@ class JobsheetPdfData {
     required this.footerConfigJson,
     required this.colourSchemeValue,
     this.secondaryColourValue,
+    this.brandingJson,
     this.sectionStyleJson,
     this.typographyJson,
     required this.settingsCompanyName,
@@ -49,6 +51,7 @@ class InvoicePdfData {
   final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
   final int? secondaryColourValue;
+  final Map<String, dynamic>? brandingJson;
   final Map<String, dynamic>? sectionStyleJson;
   final Map<String, dynamic>? typographyJson;
   final Uint8List? regularFontBytes;
@@ -62,6 +65,7 @@ class InvoicePdfData {
     required this.footerConfigJson,
     required this.colourSchemeValue,
     this.secondaryColourValue,
+    this.brandingJson,
     this.sectionStyleJson,
     this.typographyJson,
     this.regularFontBytes,
@@ -76,6 +80,7 @@ class QuotePdfData {
   final Map<String, dynamic> headerConfigJson;
   final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
+  final Map<String, dynamic>? brandingJson;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
 
@@ -85,6 +90,7 @@ class QuotePdfData {
     required this.headerConfigJson,
     required this.footerConfigJson,
     required this.colourSchemeValue,
+    this.brandingJson,
     this.regularFontBytes,
     this.boldFontBytes,
   });
@@ -160,6 +166,7 @@ class ComplianceReportPdfData {
   final String? lastReportDateStr;
   final String? bs5839LastDeclaration;
   final bool bs5839ModeEnabled;
+  final Map<String, dynamic>? brandingJson;
 
   ComplianceReportPdfData({
     required this.siteName,
@@ -187,6 +194,7 @@ class ComplianceReportPdfData {
     this.lastReportDateStr,
     this.bs5839LastDeclaration,
     this.bs5839ModeEnabled = false,
+    this.brandingJson,
   });
 }
 

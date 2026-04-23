@@ -4,7 +4,7 @@ import '../../models/quote.dart';
 import '../../services/quote_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../models/permission.dart';
-import '../../utils/theme.dart';
+import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../widgets/premium_toast.dart';
@@ -42,14 +42,14 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
     super.initState();
     _slideController = AnimationController(
       vsync: this,
-      duration: AppTheme.normalAnimation,
+      duration: FtMotion.slow,
     );
     _slideAnimation = Tween<Offset>(
       begin: const Offset(1, 0),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideController,
-      curve: AppTheme.defaultCurve,
+      curve: FtMotion.standardCurve,
     ));
     if (widget.animateIn) {
       _slideController.forward();
@@ -75,14 +75,16 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final currencyFmt = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(symbol: '£', decimalDigits: 2);
 
     return SlideTransition(
       position: _slideAnimation,
-      child: Material(
-        elevation: 8,
-        color: isDark ? AppTheme.darkSurface : Colors.white,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: FtColors.bg,
+          boxShadow: FtShadows.lg,
+          border: Border(left: BorderSide(color: FtColors.border, width: 1.5)),
+        ),
         child: StreamBuilder<Quote?>(
           stream: QuoteService.instance.getQuoteStream(UserProfileService.instance.companyId!, widget.quoteId),
           builder: (context, snapshot) {
@@ -96,11 +98,15 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(AppIcons.warning, size: 32, color: AppTheme.mediumGrey),
+                    Icon(AppIcons.warning, size: 32, color: FtColors.hint),
                     const SizedBox(height: 8),
-                    const Text('Quote not found'),
+                    Text('Quote not found', style: FtText.bodySoft),
                     const SizedBox(height: 16),
-                    TextButton(onPressed: _closePanel, child: const Text('Close')),
+                    TextButton(
+                      onPressed: _closePanel,
+                      style: TextButton.styleFrom(foregroundColor: FtColors.fg2),
+                      child: Text('Close', style: FtText.button),
+                    ),
                   ],
                 ),
               );
@@ -108,54 +114,54 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
 
             return Column(
               children: [
-                _buildPanelHeader(quote, isDark),
+                _buildPanelHeader(quote),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.all(20),
+                    padding: FtSpacing.cardBody,
                     children: [
-                      _buildStatusSection(quote, isDark),
+                      _buildStatusSection(quote),
                       const SizedBox(height: 16),
                       _buildSection('Quote Details', [
-                        _detailRow('Quote #', quote.quoteNumber, isDark),
-                        _detailRow('Created', DateFormat('dd MMM yyyy').format(quote.createdAt), isDark),
-                        _detailRow('Valid Until', DateFormat('dd MMM yyyy').format(quote.validUntil), isDark),
+                        _detailRow('Quote #', quote.quoteNumber),
+                        _detailRow('Created', DateFormat('dd MMM yyyy').format(quote.createdAt)),
+                        _detailRow('Valid Until', DateFormat('dd MMM yyyy').format(quote.validUntil)),
                         if (quote.sentAt != null)
-                          _detailRow('Sent', DateFormat('dd MMM yyyy').format(quote.sentAt!), isDark),
+                          _detailRow('Sent', DateFormat('dd MMM yyyy').format(quote.sentAt!)),
                         if (quote.respondedAt != null)
-                          _detailRow('Responded', DateFormat('dd MMM yyyy').format(quote.respondedAt!), isDark),
-                      ], isDark),
+                          _detailRow('Responded', DateFormat('dd MMM yyyy').format(quote.respondedAt!)),
+                      ]),
                       const SizedBox(height: 16),
                       _buildSection('Customer & Site', [
-                        _detailRow('Customer', quote.customerName, isDark),
-                        _detailRow('Address', quote.customerAddress, isDark),
+                        _detailRow('Customer', quote.customerName),
+                        _detailRow('Address', quote.customerAddress),
                         if (quote.customerEmail != null)
-                          _detailRow('Email', quote.customerEmail!, isDark),
+                          _detailRow('Email', quote.customerEmail!),
                         if (quote.customerPhone != null)
-                          _detailRow('Phone', quote.customerPhone!, isDark),
-                        _detailRow('Site', quote.siteName, isDark),
-                      ], isDark),
+                          _detailRow('Phone', quote.customerPhone!),
+                        _detailRow('Site', quote.siteName),
+                      ]),
                       if (quote.defectDescription != null) ...[
                         const SizedBox(height: 16),
                         _buildSection('Linked Defect', [
-                          _detailRow('Description', quote.defectDescription!, isDark),
+                          _detailRow('Description', quote.defectDescription!),
                           if (quote.defectSeverity != null)
-                            _detailRow('Severity', quote.defectSeverity!, isDark),
-                        ], isDark),
+                            _detailRow('Severity', quote.defectSeverity!),
+                        ]),
                       ],
                       const SizedBox(height: 16),
-                      _buildItemsTable(quote, isDark, currencyFmt),
+                      _buildItemsTable(quote, currencyFmt),
                       const SizedBox(height: 16),
                       _buildSection('Engineer', [
-                        _detailRow('Name', quote.engineerName, isDark),
-                      ], isDark),
+                        _detailRow('Name', quote.engineerName),
+                      ]),
                       if (quote.notes != null && quote.notes!.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         _buildSection('Notes', [
-                          Text(quote.notes!, style: const TextStyle(fontSize: 13)),
-                        ], isDark),
+                          Text(quote.notes!, style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
+                        ]),
                       ],
                       const SizedBox(height: 24),
-                      _buildActionButtons(quote, isDark),
+                      _buildActionButtons(quote),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -168,15 +174,13 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
     );
   }
 
-  Widget _buildPanelHeader(Quote quote, bool isDark) {
+  Widget _buildPanelHeader(Quote quote) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceElevated : Colors.grey.shade50,
+      padding: FtSpacing.cardHeader,
+      decoration: const BoxDecoration(
+        color: FtColors.bgAlt,
         border: Border(
-          bottom: BorderSide(
-            color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-          ),
+          bottom: BorderSide(color: FtColors.border, width: 1),
         ),
       ),
       child: Row(
@@ -187,15 +191,12 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
               children: [
                 Text(
                   quote.quoteNumber,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                  style: FtText.cardTitle,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   quote.customerName,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                  ),
+                  style: FtText.helper,
                 ),
               ],
             ),
@@ -204,7 +205,7 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
           const SizedBox(width: 8),
           IconButton(
             onPressed: _closePanel,
-            icon: const Icon(Icons.close),
+            icon: Icon(AppIcons.close, color: FtColors.fg2),
             tooltip: 'Close',
           ),
         ],
@@ -212,7 +213,7 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
     );
   }
 
-  Widget _buildStatusSection(Quote quote, bool isDark) {
+  Widget _buildStatusSection(Quote quote) {
     final statuses = [
       QuoteStatus.draft,
       QuoteStatus.sent,
@@ -229,10 +230,10 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
           final isActive = !isDeclined && i <= currentIndex;
           final isCurrent = !isDeclined && i == currentIndex;
           final color = isDeclined && i == 0
-              ? AppTheme.errorRed
+              ? FtColors.danger
               : isActive
                   ? quoteStatusColor(statuses[i])
-                  : (isDark ? AppTheme.darkDivider : Colors.grey.shade300);
+                  : FtColors.border;
 
           return Expanded(
             child: Column(
@@ -257,7 +258,7 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
                           height: 2,
                           color: !isDeclined && i < currentIndex
                               ? quoteStatusColor(statuses[i + 1])
-                              : (isDark ? AppTheme.darkDivider : Colors.grey.shade300),
+                              : FtColors.border,
                         ),
                       ),
                   ],
@@ -265,12 +266,10 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
                 const SizedBox(height: 4),
                 Text(
                   quoteStatusLabel(statuses[i]),
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
-                    color: isActive
-                        ? (isDark ? Colors.white : AppTheme.darkGrey)
-                        : (isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey),
+                  style: FtText.inter(
+                    size: 9,
+                    weight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                    color: isActive ? FtColors.fg1 : FtColors.hint,
                   ),
                 ),
               ],
@@ -281,7 +280,7 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
     );
   }
 
-  Widget _buildItemsTable(Quote quote, bool isDark, NumberFormat currencyFmt) {
+  Widget _buildItemsTable(Quote quote, NumberFormat currencyFmt) {
     return _buildSection('Items', [
       Table(
         columnWidths: const {
@@ -292,18 +291,16 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
         },
         children: [
           TableRow(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               border: Border(
-                bottom: BorderSide(
-                  color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-                ),
+                bottom: BorderSide(color: FtColors.border),
               ),
             ),
             children: [
-              _tableHeader('Description', isDark),
-              _tableHeader('Qty', isDark),
-              _tableHeader('Price', isDark),
-              _tableHeader('Total', isDark),
+              _tableHeader('Description'),
+              _tableHeader('Qty'),
+              _tableHeader('Price'),
+              _tableHeader('Total'),
             ],
           ),
           ...quote.items.map((item) => TableRow(
@@ -313,29 +310,23 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.description, style: const TextStyle(fontSize: 13)),
+                    Text(item.description, style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
                     if (item.category != null)
-                      Text(
-                        item.category!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                        ),
-                      ),
+                      Text(item.category!, style: FtText.helper),
                   ],
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text('${item.quantity}', style: const TextStyle(fontSize: 13)),
+                child: Text('${item.quantity}', style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(currencyFmt.format(item.unitPrice), style: const TextStyle(fontSize: 13)),
+                child: Text(currencyFmt.format(item.unitPrice), style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Text(currencyFmt.format(item.total), style: const TextStyle(fontSize: 13)),
+                child: Text(currencyFmt.format(item.total), style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
               ),
             ],
           )),
@@ -348,58 +339,49 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _totalRow('Subtotal', currencyFmt.format(quote.subtotal), isDark),
+              _totalRow('Subtotal', currencyFmt.format(quote.subtotal)),
               if (quote.includeVat) ...[
                 const SizedBox(height: 4),
-                _totalRow('VAT (20%)', currencyFmt.format(quote.vatAmount), isDark),
+                _totalRow('VAT (20%)', currencyFmt.format(quote.vatAmount)),
               ],
               const SizedBox(height: 4),
               Text(
                 'Total: ${currencyFmt.format(quote.total)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: FtText.inter(size: 16, weight: FontWeight.w700, color: FtColors.fg1),
               ),
             ],
           ),
         ],
       ),
-    ], isDark);
+    ]);
   }
 
-  Widget _tableHeader(String text, bool isDark) {
+  Widget _tableHeader(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-        ),
-      ),
+      child: Text(text.toUpperCase(), style: FtText.label),
     );
   }
 
-  Widget _totalRow(String label, String value, bool isDark) {
+  Widget _totalRow(String label, String value) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          ),
-        ),
+        Text(label, style: FtText.helper),
         const SizedBox(width: 16),
-        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        Text(value, style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
       ],
     );
   }
 
-  Widget _buildActionButtons(Quote quote, bool isDark) {
+  Widget _buildActionButtons(Quote quote) {
+    final btnStyle = OutlinedButton.styleFrom(
+      foregroundColor: FtColors.fg1,
+      side: const BorderSide(color: FtColors.border, width: 1.5),
+      shape: RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
+      textStyle: FtText.button,
+    );
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -408,26 +390,36 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
           onPressed: () => _downloadPdf(quote),
           icon: Icon(AppIcons.download, size: 16),
           label: const Text('Download PDF'),
+          style: btnStyle,
         ),
         if (quote.status == QuoteStatus.draft && _hasPermission(AppPermission.quotesSend))
           OutlinedButton.icon(
             onPressed: () => _updateStatus(quote, QuoteStatus.sent),
             icon: Icon(AppIcons.send, size: 16),
             label: const Text('Mark Sent'),
-            style: OutlinedButton.styleFrom(foregroundColor: Colors.blue),
+            style: btnStyle.copyWith(
+              foregroundColor: WidgetStatePropertyAll(FtColors.info),
+              side: WidgetStatePropertyAll(BorderSide(color: FtColors.info.withValues(alpha: 0.3), width: 1.5)),
+            ),
           ),
         if (quote.status == QuoteStatus.sent && _hasPermission(AppPermission.quotesApprove)) ...[
           OutlinedButton.icon(
             onPressed: () => _updateStatus(quote, QuoteStatus.approved),
             icon: Icon(AppIcons.tickCircle, size: 16),
             label: const Text('Approve'),
-            style: OutlinedButton.styleFrom(foregroundColor: AppTheme.successGreen),
+            style: btnStyle.copyWith(
+              foregroundColor: const WidgetStatePropertyAll(FtColors.success),
+              side: WidgetStatePropertyAll(BorderSide(color: FtColors.success.withValues(alpha: 0.3), width: 1.5)),
+            ),
           ),
           OutlinedButton.icon(
             onPressed: () => _updateStatus(quote, QuoteStatus.declined),
             icon: Icon(AppIcons.close, size: 16),
             label: const Text('Decline'),
-            style: OutlinedButton.styleFrom(foregroundColor: AppTheme.errorRed),
+            style: btnStyle.copyWith(
+              foregroundColor: const WidgetStatePropertyAll(FtColors.danger),
+              side: WidgetStatePropertyAll(BorderSide(color: FtColors.danger.withValues(alpha: 0.3), width: 1.5)),
+            ),
           ),
         ],
         if (quote.status == QuoteStatus.approved && _hasPermission(AppPermission.quotesConvert))
@@ -435,19 +427,26 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
             onPressed: () => _convertToJob(quote),
             icon: Icon(AppIcons.refresh, size: 16),
             label: const Text('Convert to Job'),
-            style: OutlinedButton.styleFrom(foregroundColor: Colors.purple),
+            style: btnStyle.copyWith(
+              foregroundColor: const WidgetStatePropertyAll(FtColors.primary),
+              side: WidgetStatePropertyAll(BorderSide(color: FtColors.primary.withValues(alpha: 0.3), width: 1.5)),
+            ),
           ),
         if (quote.status == QuoteStatus.draft && _hasPermission(AppPermission.quotesEdit))
           OutlinedButton.icon(
             onPressed: () => widget.onEdit(quote),
             icon: Icon(AppIcons.edit, size: 16),
             label: const Text('Edit'),
+            style: btnStyle,
           ),
         OutlinedButton.icon(
           onPressed: () => _deleteQuote(quote),
           icon: Icon(AppIcons.trash, size: 16),
           label: const Text('Delete'),
-          style: OutlinedButton.styleFrom(foregroundColor: AppTheme.errorRed),
+          style: btnStyle.copyWith(
+            foregroundColor: const WidgetStatePropertyAll(FtColors.danger),
+            side: WidgetStatePropertyAll(BorderSide(color: FtColors.danger.withValues(alpha: 0.3), width: 1.5)),
+          ),
         ),
       ],
     );
@@ -502,7 +501,7 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.purple, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: FtColors.primary, foregroundColor: Colors.white),
             child: const Text('Convert'),
           ),
         ],
@@ -533,7 +532,7 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorRed),
+            style: ElevatedButton.styleFrom(backgroundColor: FtColors.danger),
             child: const Text('Delete'),
           ),
         ],
@@ -546,27 +545,14 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
     }
   }
 
-  Widget _buildSection(String title, List<Widget> children, bool isDark) {
+  Widget _buildSection(String title, List<Widget> children) {
     return Container(
-      padding: const EdgeInsets.all(AppTheme.cardPadding),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurfaceElevated : AppTheme.surfaceWhite,
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        border: Border.all(
-          color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-        ),
-      ),
+      padding: FtSpacing.cardBody,
+      decoration: FtDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-            ),
-          ),
+          Text(title.toUpperCase(), style: FtText.label),
           const SizedBox(height: 8),
           ...children,
         ],
@@ -574,7 +560,7 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
     );
   }
 
-  Widget _detailRow(String label, String value, bool isDark) {
+  Widget _detailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
@@ -582,16 +568,10 @@ class _WebQuoteDetailPanelState extends State<WebQuoteDetailPanel>
         children: [
           SizedBox(
             width: 130,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-              ),
-            ),
+            child: Text(label, style: FtText.helper),
           ),
           Expanded(
-            child: Text(value, style: const TextStyle(fontSize: 13)),
+            child: Text(value, style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
           ),
         ],
       ),

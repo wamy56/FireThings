@@ -1,23 +1,42 @@
 import 'package:flutter/material.dart';
 import '../../../models/dispatched_job.dart';
-import '../../../utils/theme.dart';
+import '../../../theme/web_theme.dart';
 
 Color jobStatusColor(DispatchedJobStatus status) {
   switch (status) {
     case DispatchedJobStatus.created:
-      return Colors.orange;
+      return FtColors.danger;
     case DispatchedJobStatus.assigned:
-      return Colors.blue;
+      return FtColors.info;
     case DispatchedJobStatus.accepted:
-      return Colors.teal;
+      return const Color(0xFF1D4ED8);
     case DispatchedJobStatus.enRoute:
-      return Colors.indigo;
+      return FtColors.warning;
     case DispatchedJobStatus.onSite:
-      return Colors.purple;
+      return FtColors.accent;
     case DispatchedJobStatus.completed:
-      return AppTheme.successGreen;
+      return FtColors.success;
     case DispatchedJobStatus.declined:
-      return Colors.red;
+      return FtColors.danger;
+  }
+}
+
+Color jobStatusSoftColor(DispatchedJobStatus status) {
+  switch (status) {
+    case DispatchedJobStatus.created:
+      return FtColors.dangerSoft;
+    case DispatchedJobStatus.assigned:
+      return FtColors.infoSoft;
+    case DispatchedJobStatus.accepted:
+      return const Color(0xFFDBEAFE);
+    case DispatchedJobStatus.enRoute:
+      return FtColors.warningSoft;
+    case DispatchedJobStatus.onSite:
+      return FtColors.accentSoft;
+    case DispatchedJobStatus.completed:
+      return FtColors.successSoft;
+    case DispatchedJobStatus.declined:
+      return FtColors.dangerSoft;
   }
 }
 
@@ -61,38 +80,74 @@ String jobStatusToString(DispatchedJobStatus status) {
 
 Widget jobStatusBadge(DispatchedJobStatus status) {
   final color = jobStatusColor(status);
+  final softColor = jobStatusSoftColor(status);
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
+      color: softColor,
+      borderRadius: BorderRadius.circular(20),
     ),
-    child: Text(
-      jobStatusLabel(status),
-      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          jobStatusLabel(status),
+          style: FtText.inter(size: 12, weight: FontWeight.w600, color: color),
+        ),
+      ],
     ),
   );
 }
 
 Widget jobPriorityBadge(JobPriority priority) {
   if (priority == JobPriority.normal) {
-    return Text(
-      'Normal',
-      style: TextStyle(fontSize: 12, color: AppTheme.mediumGrey),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: FtColors.hint,
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: FtColors.bgSunken, spreadRadius: 3, blurRadius: 0)],
+          ),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          'NORMAL',
+          style: FtText.inter(size: 11, weight: FontWeight.w700, color: FtColors.hint),
+        ),
+      ],
     );
   }
   final isEmergency = priority == JobPriority.emergency;
-  final color = isEmergency ? Colors.red : Colors.orange;
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(
-      isEmergency ? 'EMERGENCY' : 'URGENT',
-      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color),
-    ),
+  final color = isEmergency ? FtColors.danger : FtColors.warning;
+  final softColor = isEmergency ? FtColors.dangerSoft : FtColors.warningSoft;
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Container(
+        width: 7,
+        height: 7,
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          boxShadow: [BoxShadow(color: softColor, spreadRadius: 3, blurRadius: 0)],
+        ),
+      ),
+      const SizedBox(width: 5),
+      Text(
+        isEmergency ? 'EMERGENCY' : 'URGENT',
+        style: FtText.inter(size: 11, weight: FontWeight.w700, color: color),
+      ),
+    ],
   );
 }
 

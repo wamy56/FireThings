@@ -41,7 +41,7 @@ import 'web_create_invoice_screen.dart';
 import '../company/team_management_screen.dart';
 import '../company/company_sites_screen.dart';
 import '../company/company_customers_screen.dart';
-import '../company/company_pdf_design_screen.dart';
+import 'web_branding_screen.dart';
 import '../../models/quote.dart';
 import '../../models/invoice.dart';
 
@@ -501,7 +501,7 @@ GoRouter createWebRouter() {
           ),
           GoRoute(
             path: '/branding',
-            builder: (context, state) => CompanyPdfDesignScreen(companyId: UserProfileService.instance.companyId ?? ''),
+            builder: (context, state) => const WebBrandingScreen(),
           ),
           GoRoute(
             path: '/settings',

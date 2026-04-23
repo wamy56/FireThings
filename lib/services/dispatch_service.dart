@@ -86,6 +86,53 @@ class DispatchService {
     await _jobsCol(companyId).doc(jobId).update(updates);
   }
 
+  /// Update only the scheduled date (for day-to-day drag reschedule).
+  Future<void> updateScheduledDate({
+    required String companyId,
+    required String jobId,
+    required DateTime newDate,
+  }) async {
+    await _jobsCol(companyId).doc(jobId).update({
+      'scheduledDate': newDate.toIso8601String(),
+      'updatedAt': DateTime.now().toIso8601String(),
+      'lastUpdatedBy': FirebaseAuth.instance.currentUser?.uid,
+    });
+  }
+
+  /// Atomic reschedule + reassign in a single Firestore write.
+  Future<void> rescheduleAndReassign({
+    required String companyId,
+    required String jobId,
+    required DateTime newDate,
+    required String newAssignedTo,
+    required String newAssignedToName,
+  }) async {
+    final now = DateTime.now();
+    await _jobsCol(companyId).doc(jobId).update({
+      'scheduledDate': newDate.toIso8601String(),
+      'assignedTo': newAssignedTo,
+      'assignedToName': newAssignedToName,
+      'status': 'assigned',
+      'updatedAt': now.toIso8601String(),
+      'lastUpdatedBy': FirebaseAuth.instance.currentUser?.uid,
+    });
+  }
+
+  /// Remove assignment from a job, returning it to the unassigned pool.
+  Future<void> unassignJob({
+    required String companyId,
+    required String jobId,
+  }) async {
+    final now = DateTime.now();
+    await _jobsCol(companyId).doc(jobId).update({
+      'assignedTo': null,
+      'assignedToName': null,
+      'status': 'created',
+      'updatedAt': now.toIso8601String(),
+      'lastUpdatedBy': FirebaseAuth.instance.currentUser?.uid,
+    });
+  }
+
   /// Stream of all jobs for a company, with optional filters.
   Stream<List<DispatchedJob>> getJobsStream(
     String companyId, {
@@ -105,6 +152,32 @@ class DispatchService {
     query = query.orderBy('createdAt', descending: true);
 
     return query.snapshots().map((snapshot) {
+      final jobs = <DispatchedJob>[];
+      for (final doc in snapshot.docs) {
+        try {
+          jobs.add(DispatchedJob.fromJson(doc.data() as Map<String, dynamic>));
+        } catch (e) {
+          debugPrint('Skipping malformed dispatched job ${doc.id}: $e');
+        }
+      }
+      return jobs;
+    });
+  }
+
+  /// Stream of all jobs within a date range (for the schedule grid).
+  Stream<List<DispatchedJob>> watchJobsForDateRange({
+    required String companyId,
+    required DateTime from,
+    required DateTime to,
+  }) {
+    final fromStr = from.toIso8601String();
+    final toStr = to.toIso8601String();
+    return _jobsCol(companyId)
+        .where('scheduledDate', isGreaterThanOrEqualTo: fromStr)
+        .where('scheduledDate', isLessThanOrEqualTo: toStr)
+        .orderBy('scheduledDate')
+        .snapshots()
+        .map((snapshot) {
       final jobs = <DispatchedJob>[];
       for (final doc in snapshot.docs) {
         try {

@@ -1,20 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../models/quote.dart';
-import '../../../utils/theme.dart';
+import '../../../theme/web_theme.dart';
 
 Color quoteStatusColor(QuoteStatus status) {
   switch (status) {
     case QuoteStatus.draft:
-      return AppTheme.mediumGrey;
+      return FtColors.hint;
     case QuoteStatus.sent:
-      return Colors.blue;
+      return FtColors.info;
     case QuoteStatus.approved:
-      return AppTheme.successGreen;
+      return FtColors.success;
     case QuoteStatus.declined:
-      return AppTheme.errorRed;
+      return FtColors.danger;
     case QuoteStatus.converted:
-      return Colors.purple;
+      return FtColors.primary;
+  }
+}
+
+Color quoteStatusSoftColor(QuoteStatus status) {
+  switch (status) {
+    case QuoteStatus.draft:
+      return FtColors.bgSunken;
+    case QuoteStatus.sent:
+      return FtColors.infoSoft;
+    case QuoteStatus.approved:
+      return FtColors.successSoft;
+    case QuoteStatus.declined:
+      return FtColors.dangerSoft;
+    case QuoteStatus.converted:
+      return const Color(0xFFE8E8F0);
   }
 }
 
@@ -35,15 +50,27 @@ String quoteStatusLabel(QuoteStatus status) {
 
 Widget quoteStatusBadge(QuoteStatus status) {
   final color = quoteStatusColor(status);
+  final softColor = quoteStatusSoftColor(status);
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
+      color: softColor,
+      borderRadius: BorderRadius.circular(20),
     ),
-    child: Text(
-      quoteStatusLabel(status),
-      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          quoteStatusLabel(status),
+          style: FtText.inter(size: 12, weight: FontWeight.w600, color: color),
+        ),
+      ],
     ),
   );
 }
@@ -53,7 +80,7 @@ String generateQuotesCsv(
   final buffer = StringBuffer();
   final dateFmt = DateFormat('yyyy-MM-dd');
   final dateTimeFmt = DateFormat('yyyy-MM-dd HH:mm');
-  final currencyFmt = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+  final currencyFmt = NumberFormat.currency(symbol: '£', decimalDigits: 2);
 
   final columnDefs = <String, String>{
     'quoteNumber': 'Quote #',

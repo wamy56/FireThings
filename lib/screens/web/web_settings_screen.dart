@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_profile_service.dart';
-import '../../utils/theme.dart';
+import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/custom_text_field.dart';
 import '../../widgets/premium_toast.dart';
@@ -72,27 +72,20 @@ class _WebSettingsScreenState extends State<WebSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final user = FirebaseAuth.instance.currentUser;
     final profile = UserProfileService.instance;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(32, 28, 32, 0),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Settings',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              Text('Settings', style: FtText.sectionTitle),
               const SizedBox(height: 24),
 
-              // Profile section
               _buildSectionCard('Profile', [
                 ListTile(
                   leading: Icon(AppIcons.user),
@@ -108,11 +101,11 @@ class _WebSettingsScreenState extends State<WebSettingsScreen> {
                             const SizedBox(width: 8),
                             IconButton(
                               onPressed: _updateName,
-                              icon: Icon(AppIcons.tickCircle, color: AppTheme.successGreen),
+                              icon: Icon(AppIcons.tickCircle, color: FtColors.success),
                             ),
                             IconButton(
                               onPressed: () => setState(() => _isEditingName = false),
-                              icon: Icon(Icons.close),
+                              icon: Icon(AppIcons.close, color: FtColors.fg2),
                             ),
                           ],
                         )
@@ -137,10 +130,9 @@ class _WebSettingsScreenState extends State<WebSettingsScreen> {
                   trailing: Icon(AppIcons.arrowRight, size: 18),
                   onTap: _resetPassword,
                 ),
-              ], isDark),
+              ]),
               const SizedBox(height: 16),
 
-              // Company section
               if (profile.hasCompany)
                 ...[
                   _buildSectionCard('Company', [
@@ -154,11 +146,10 @@ class _WebSettingsScreenState extends State<WebSettingsScreen> {
                       title: Text(profile.companyRole?.name ?? 'Unknown'),
                       subtitle: const Text('Your Role'),
                     ),
-                  ], isDark),
+                  ]),
                   const SizedBox(height: 16),
                 ],
 
-              // About section
               _buildSectionCard('About', [
                 ListTile(
                   leading: Icon(AppIcons.infoCircle),
@@ -179,10 +170,9 @@ class _WebSettingsScreenState extends State<WebSettingsScreen> {
                     );
                   },
                 ),
-              ], isDark),
+              ]),
               const SizedBox(height: 24),
 
-              // Sign out
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -190,7 +180,10 @@ class _WebSettingsScreenState extends State<WebSettingsScreen> {
                   icon: Icon(AppIcons.logout),
                   label: const Text('Sign Out'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.errorRed,
+                    foregroundColor: FtColors.danger,
+                    side: BorderSide(color: FtColors.danger.withValues(alpha: 0.3), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
+                    textStyle: FtText.button,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -203,26 +196,15 @@ class _WebSettingsScreenState extends State<WebSettingsScreen> {
     );
   }
 
-  Widget _buildSectionCard(String title, List<Widget> children, bool isDark) {
-    return Card(
-      elevation: isDark ? 0 : 1,
-      color: isDark ? AppTheme.darkSurfaceElevated : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+  Widget _buildSectionCard(String title, List<Widget> children) {
+    return Container(
+      decoration: FtDecorations.card(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Text(
-              title,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-              ),
-            ),
+            child: Text(title.toUpperCase(), style: FtText.label),
           ),
           ...children,
           const SizedBox(height: 8),

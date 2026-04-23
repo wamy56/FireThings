@@ -16,6 +16,7 @@ class PdfHeaderBuilder {
     Uint8List? logoBytes,
     Map<String, String> fallbackValues = const {},
     PdfColor? primaryColor,
+    bool showCompanyName = true,
   }) {
     final effectivePrimary = primaryColor ?? _primaryColor;
     final leftChildren = <pw.Widget>[];
@@ -38,7 +39,7 @@ class PdfHeaderBuilder {
       leftChildren.add(pw.SizedBox(width: 10));
     }
 
-    final leftTextLines = _buildTextLines(config.leftLines, fallbackValues, effectivePrimary);
+    final leftTextLines = _buildTextLines(config.leftLines, fallbackValues, effectivePrimary, showCompanyName: showCompanyName);
     if (leftTextLines.isNotEmpty) {
       leftChildren.add(
         pw.Expanded(
@@ -54,7 +55,7 @@ class PdfHeaderBuilder {
     }
 
     // Centre zone text (logo centre is handled separately above the row)
-    final centreTextLines = _buildTextLines(config.centreLines, fallbackValues, effectivePrimary);
+    final centreTextLines = _buildTextLines(config.centreLines, fallbackValues, effectivePrimary, showCompanyName: showCompanyName);
     if (centreTextLines.isNotEmpty) {
       centreChildren.add(
         pw.Expanded(
@@ -105,22 +106,24 @@ class PdfHeaderBuilder {
   static List<pw.Widget> _buildTextLines(
     List<HeaderTextLine> lines,
     Map<String, String> fallbackValues,
-    PdfColor primaryColorOverride,
-  ) {
+    PdfColor primaryColorOverride, {
+    bool showCompanyName = true,
+  }) {
     final widgets = <pw.Widget>[];
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i];
+      final isCompanyName = line.key == 'companyName';
+      if (isCompanyName && !showCompanyName) continue;
+
       final text = line.value.isNotEmpty
           ? line.value
           : (fallbackValues[line.key] ?? '');
       if (text.isEmpty) continue;
 
-      if (i > 0) {
-        // Small spacing between lines - slightly more after first line
+      if (widgets.isNotEmpty) {
         widgets.add(pw.SizedBox(height: i == 1 ? 4 : 2));
       }
 
-      final isCompanyName = line.key == 'companyName';
       widgets.add(
         pw.Text(
           isCompanyName ? text.toUpperCase() : text,

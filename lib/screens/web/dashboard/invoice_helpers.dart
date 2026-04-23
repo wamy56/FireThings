@@ -1,16 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../models/invoice.dart';
-import '../../../utils/theme.dart';
+import '../../../theme/web_theme.dart';
 
 Color invoiceStatusColor(InvoiceStatus status) {
   switch (status) {
     case InvoiceStatus.draft:
-      return AppTheme.mediumGrey;
+      return FtColors.hint;
     case InvoiceStatus.sent:
-      return Colors.blue;
+      return FtColors.info;
     case InvoiceStatus.paid:
-      return AppTheme.successGreen;
+      return FtColors.success;
+  }
+}
+
+Color invoiceStatusSoftColor(InvoiceStatus status) {
+  switch (status) {
+    case InvoiceStatus.draft:
+      return FtColors.bgSunken;
+    case InvoiceStatus.sent:
+      return FtColors.infoSoft;
+    case InvoiceStatus.paid:
+      return FtColors.successSoft;
   }
 }
 
@@ -27,15 +38,27 @@ String invoiceStatusLabel(InvoiceStatus status) {
 
 Widget invoiceStatusBadge(InvoiceStatus status) {
   final color = invoiceStatusColor(status);
+  final softColor = invoiceStatusSoftColor(status);
   return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(8),
+      color: softColor,
+      borderRadius: BorderRadius.circular(20),
     ),
-    child: Text(
-      invoiceStatusLabel(status),
-      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          invoiceStatusLabel(status),
+          style: FtText.inter(size: 12, weight: FontWeight.w600, color: color),
+        ),
+      ],
     ),
   );
 }
@@ -45,7 +68,7 @@ String generateInvoicesCsv(
   final buffer = StringBuffer();
   final dateFmt = DateFormat('yyyy-MM-dd');
   final dateTimeFmt = DateFormat('yyyy-MM-dd HH:mm');
-  final currencyFmt = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+  final currencyFmt = NumberFormat.currency(symbol: '£', decimalDigits: 2);
 
   final columnDefs = <String, String>{
     'invoiceNumber': 'Invoice #',

@@ -4,6 +4,118 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-23 (Session 92)
+
+### PDF Branding — Session 8 (Wire Quote/Invoice/Jobsheet PDFs + Extend Header/Footer Builders)
+
+Wired the remaining three PDF services (quote, invoice, jobsheet) to read from PdfBrandingService, repeating the Session 7 pattern: resolve branding on main thread, download logo via HTTP, override colours/footer, pass `brandingJson` in DTO, consume in isolate. Extended PdfFooterBuilder with 3 visual footer styles (light/minimal/coloured) and added show/hide toggles to PdfHeaderBuilder and buildModernHeader.
+
+#### Modified Files (7)
+- `lib/services/pdf_generation_data.dart` — Added `brandingJson: Map<String, dynamic>?` to `QuotePdfData`, `InvoicePdfData`, and `JobsheetPdfData` DTOs
+- `lib/services/pdf_footer_builder.dart` — Added `brandingFooterStyle` (FooterStyle?), `accentColor` (PdfColor?), `showPageNumbers` (bool) params. Three visual variants: light (existing with top border), minimal (no border, lighter text), coloured (primary bg, white text). Backwards compatible when `brandingFooterStyle` is null.
+- `lib/services/pdf_header_builder.dart` — Added `showCompanyName` param to `buildLeftAndCentre()` and `_buildTextLines()`. When false, skips lines with `key == 'companyName'`.
+- `lib/services/pdf_widgets/pdf_modern_header.dart` — Added `showCompanyName` and `showDocNumber` params to `buildModernHeader()`, `_buildClassicStyleHeader()`, `_buildMinimalStyleHeader()`, and `_buildLogoAndInfo()`. When `showDocNumber` is false, hides the REF line.
+- `lib/services/quote_pdf_service.dart` — Added branding resolution in `generateQuotePdf()` (PdfBrandingService, HTTP logo download, colour override). Isolate build function consumes branding for header/footer toggles and footer style.
+- `lib/services/invoice_pdf_service.dart` — Same branding pattern for invoices. Also passes `secondaryColourValue` override.
+- `lib/services/pdf_service.dart` — Same branding pattern for jobsheets. Passes `showCompanyName` and `showDocNumber` through to `buildModernHeader()`.
+
+---
+
+## 2026-04-23 (Session 91)
+
+### PDF Branding — Session 7 (Mobile Wiring: Cover Builder + Compliance Report)
+
+Wired the compliance report PDF service to read from PdfBrandingService so that branding customised on the web portal (primary/accent colours, cover style, logo, footer text) applies to compliance reports generated on mobile. Created a new PdfCoverBuilder with three style variants (Bold, Minimal, Bordered) that mirrors the web preview.
+
+#### New Files (1)
+- `lib/services/pdf_widgets/pdf_cover_builder.dart` — Top-level isolate-safe functions: `hexToPdfColor()`, `buildBrandedCoverPage()` with 3 style variants (bold: dark primary bg with accent highlights; minimal: white bg with accent bar; bordered: white bg with primary top/bottom borders), shared `_buildLogoRow()` and `_buildCoverMeta()` helpers. Accepts `additionalContent` for report-specific stat boxes and badges.
+
+#### Modified Files (2)
+- `lib/services/pdf_generation_data.dart` — Added `brandingJson: Map<String, dynamic>?` to `ComplianceReportPdfData` DTO for isolate-safe branding transfer
+- `lib/services/compliance_report_service.dart` — Major changes:
+  - Added `accentColor` to `_ReportContext` for branded cover rendering
+  - `generateReport()`: resolves `PdfBranding` from Firestore, checks `appliesToDocType(report)`, downloads logo from branding URL, overrides colour scheme and footer config when branding applies
+  - Both `_buildComplianceReport` and `_buildComplianceReportWeb`: conditionally use `buildBrandedCoverPage()` when `brandingJson` is present, fall back to original `_buildCoverPage()` otherwise
+  - Extracted `_buildCoverAdditionalContent()` (stat boxes, checklist drift warning, BS 5839 badge) for reuse by the branded cover
+  - Added `_hexToColorValue()` helper for hex string → int conversion
+
+---
+
+## 2026-04-22 (Session 90)
+
+### PDF Branding Customiser — Session 6 (Wire to PdfBrandingService — Autosave + Watch)
+
+Replaced local-only state with a live Firestore stream subscription and 500ms debounced autosave. The branding customiser is now fully functional from a write perspective — all control changes persist to Firestore, logo upload/delete works end-to-end, and the topbar shows real-time save status.
+
+#### Modified Files (1)
+- `lib/screens/web/web_branding_screen.dart` — Major rewrite:
+  - Added `_SaveStatus` enum (loading/saved/saving/unsaved/error) driving dynamic topbar pill
+  - Stream subscription to `PdfBrandingService.watchBranding(companyId)` for initial load + external updates
+  - Optimistic update pattern: `_hasPendingSave` flag ignores stream during active editing
+  - 500ms debounce on `_onBrandingChanged` before calling `saveBranding()`
+  - `_onLogoPicked`: calls `uploadLogo()`, handles `FormatException` + generic errors with toast
+  - `_onLogoRemoved`: fire-and-forget `deleteLogo()`, clears `logoUrl`, saves immediately
+  - `_resetToDefaults`: saves `PdfBranding.defaultBranding()` with success toast
+  - `_onGenerateTestPdf`: warning toast directing users to site asset register (no site context available)
+  - Loading state with spinner when `_branding == null`
+  - Logo filename extracted from Firebase Storage URL via `Uri.parse()` on stream load
+
+---
+
+## 2026-04-22 (Session 89)
+
+### PDF Branding Customiser — Session 5 (All Four Doc-Type Previews + Switcher)
+
+Added quote, invoice, and jobsheet previews alongside the existing compliance report preview. Extracted shared cover/header/footer builders to eliminate duplication. Extracted the doc-type switcher pills into a standalone widget.
+
+#### New Files (5)
+- `lib/screens/web/widgets/branding/pdf_preview_builders.dart` — Shared `PdfPreviewBuilders` class with `buildCover`, `buildPageHeader`, `buildSectionHeader`, `buildFooter` methods; 3 style variants each for cover/header/footer, driven by PdfBranding
+- `lib/screens/web/widgets/branding/branding_doc_type_switcher.dart` — Extracted `BrandingDocTypeSwitcher` widget + `_DocPill` with hover states
+- `lib/screens/web/widgets/branding/pdf_preview_quote.dart` — Quote preview: scope-of-works line items table with subtotal
+- `lib/screens/web/widgets/branding/pdf_preview_invoice.dart` — Invoice preview: charges table with subtotal, VAT, and total due
+- `lib/screens/web/widgets/branding/pdf_preview_jobsheet.dart` — Jobsheet preview: narrative visit summary + work-performed table
+
+#### Modified Files (2)
+- `lib/screens/web/widgets/branding/pdf_preview_report.dart` — Refactored to use `PdfPreviewBuilders` for cover/header/footer instead of inline builders (~250 lines removed)
+- `lib/screens/web/widgets/branding/branding_preview_canvas.dart` — Removed inline switcher + `_DocPill` class, uses `BrandingDocTypeSwitcher` widget, switches between 4 preview widgets based on `selectedDocType`
+
+---
+
+## 2026-04-22 (Session 88)
+
+### PDF Branding Customiser — Session 4 (Live Preview for Compliance Report)
+
+Wired the preview canvas to `PdfBranding` state so all Brand tab controls update the preview in real time. Extracted the hardcoded page into two reusable widgets.
+
+#### New Files (2)
+- `lib/screens/web/widgets/branding/pdf_preview_page.dart` — Reusable 720px paper container with shadow, radius, clip
+- `lib/screens/web/widgets/branding/pdf_preview_report.dart` — Compliance report preview driven by PdfBranding: cover (bold/minimal/bordered), header (solid/minimal/bordered), summary, asset register, footer (light/minimal/coloured). Supports cover text overrides, header show/hide toggles, footer text + show/hide toggles, primary/accent colour binding
+
+#### Modified Files (2)
+- `lib/screens/web/widgets/branding/branding_preview_canvas.dart` — Added `PdfBranding branding` param, replaced all hardcoded page builders (~400 lines) with `PdfPreviewPage` + `PdfPreviewReport` widget composition
+- `lib/screens/web/web_branding_screen.dart` — Passed `branding: _branding` to `BrandingPreviewCanvas`
+
+---
+
+## 2026-04-22 (Session 87)
+
+### PDF Branding Customiser — Session 3 (Interactive Brand Controls)
+
+Made all Brand tab controls interactive, bound to a local `PdfBranding` object held in the parent screen. No Firestore save or live preview wiring yet.
+
+#### New Files (4)
+- `lib/screens/web/widgets/branding/branding_apply_to_section.dart` — Multi-select for which doc types use branding (report, quote, invoice, jobsheet)
+- `lib/screens/web/widgets/branding/branding_logo_upload.dart` — Logo upload with preview, replace/remove actions, file_picker integration, 1MB validation
+- `lib/screens/web/widgets/branding/branding_colour_picker.dart` — Colour picker with swatch, hex TextField, preset grid; includes `hexToColor`/`colorToHex` helpers
+- `lib/screens/web/widgets/branding/branding_style_toggle_group.dart` — Generic 3-option segmented toggle for cover/header/footer style
+
+#### Modified Files (3)
+- `lib/screens/web/web_branding_screen.dart` — Added `PdfBranding` local state, logo metadata, `_onBrandingChanged`/`_onLogoPicked`/`_onLogoRemoved`/`_resetToDefaults` handlers, wired all new params to `BrandingControlsPanel`
+- `lib/screens/web/widgets/branding/branding_controls_panel.dart` — Full rewrite: StatelessWidget → StatefulWidget, accepts branding/logo/callback props, replaced hardcoded sections with extracted widgets, real TextEditingControllers for cover text and footer text, interactive switches via GestureDetector, per-doc-type cover text editing with "Editing for:" label
+- `lib/models/models.dart` — Added `hide HeaderStyle` to pdf_branding export to resolve ambiguous name with pdf_header_config
+
+---
+
 ## 2026-04-21 (Session 86)
 
 ### Privacy Policy & Terms of Service — BS 5839 Updates

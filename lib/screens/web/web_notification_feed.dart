@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import '../../models/dispatched_job.dart';
 import '../../services/user_profile_service.dart';
-import '../../utils/theme.dart';
+import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 
 /// Notification bell icon with unread count badge and dropdown feed.
@@ -77,19 +77,18 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
 
   Color _statusColor(DispatchedJobStatus status) {
     switch (status) {
-      case DispatchedJobStatus.created: return Colors.orange;
-      case DispatchedJobStatus.assigned: return Colors.blue;
-      case DispatchedJobStatus.accepted: return Colors.teal;
-      case DispatchedJobStatus.enRoute: return Colors.indigo;
-      case DispatchedJobStatus.onSite: return Colors.purple;
-      case DispatchedJobStatus.completed: return AppTheme.successGreen;
-      case DispatchedJobStatus.declined: return Colors.red;
+      case DispatchedJobStatus.created: return FtColors.accent;
+      case DispatchedJobStatus.assigned: return FtColors.info;
+      case DispatchedJobStatus.accepted: return const Color(0xFF0D9488);
+      case DispatchedJobStatus.enRoute: return FtColors.primary;
+      case DispatchedJobStatus.onSite: return const Color(0xFF7C3AED);
+      case DispatchedJobStatus.completed: return FtColors.success;
+      case DispatchedJobStatus.declined: return FtColors.danger;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final stream = _recentJobsStream();
 
     if (stream == null) return const SizedBox.shrink();
@@ -104,7 +103,7 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
           link: _layerLink,
           child: OverlayPortal(
             controller: _overlayController,
-            overlayChildBuilder: (context) => _buildOverlay(jobs, isDark),
+            overlayChildBuilder: (context) => _buildOverlay(jobs),
             child: IconButton(
               onPressed: _toggleFeed,
               tooltip: 'Notifications',
@@ -116,7 +115,7 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
                 ),
                 child: Icon(
                   AppIcons.notification,
-                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
+                  color: FtColors.fg2,
                 ),
               ),
             ),
@@ -126,8 +125,7 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
     );
   }
 
-  Widget _buildOverlay(List<DispatchedJob> allJobs, bool isDark) {
-    // Filter out cleared notifications
+  Widget _buildOverlay(List<DispatchedJob> allJobs) {
     final jobs = _clearedAt != null
         ? allJobs.where((j) => j.updatedAt.isAfter(_clearedAt!)).toList()
         : allJobs;
@@ -143,87 +141,75 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
             followerAnchor: Alignment.topRight,
             offset: const Offset(0, 4),
             child: GestureDetector(
-              onTap: () {}, // Prevent closing when tapping inside
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(12),
-                color: isDark ? AppTheme.darkSurface : Colors.white,
-                child: Container(
-                  width: 420,
-                  constraints: const BoxConstraints(maxHeight: 500),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+              onTap: () {},
+              child: Container(
+                width: 420,
+                constraints: const BoxConstraints(maxHeight: 500),
+                decoration: BoxDecoration(
+                  color: FtColors.bg,
+                  borderRadius: FtRadii.lgAll,
+                  boxShadow: FtShadows.lg,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                      child: Row(
+                        children: [
+                          Text(
+                            'Recent Updates',
+                            style: FtText.inter(size: 14, weight: FontWeight.w700, color: FtColors.fg1),
+                          ),
+                          const Spacer(),
+                          if (jobs.isNotEmpty)
+                            TextButton(
+                              onPressed: () {
+                                setState(() => _clearedAt = DateTime.now());
+                              },
+                              style: TextButton.styleFrom(
+                                foregroundColor: FtColors.fg2,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: const Size(0, 32),
+                              ),
+                              child: Text(
+                                'Clear',
+                                style: FtText.inter(size: 12, color: FtColors.fg2),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Divider(height: 1, color: FtColors.border),
+                    if (jobs.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
-                        child: Row(
-                          children: [
-                            Text(
-                              'Recent Updates',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: isDark ? Colors.white : AppTheme.darkGrey,
-                              ),
-                            ),
-                            const Spacer(),
-                            if (jobs.isNotEmpty)
-                              TextButton(
-                                onPressed: () {
-                                  setState(() => _clearedAt = DateTime.now());
-                                },
-                                style: TextButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                                  minimumSize: const Size(0, 32),
-                                ),
-                                child: Text(
-                                  'Clear',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      Divider(
-                        height: 1,
-                        color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-                      ),
-                      if (jobs.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Center(
-                            child: Text(
-                              'No updates in the last 24 hours',
-                              style: TextStyle(
-                                color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        )
-                      else
-                        Flexible(
-                          child: ListView.separated(
-                            shrinkWrap: true,
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            itemCount: jobs.length,
-                            separatorBuilder: (_, _) => Divider(
-                              height: 1,
-                              indent: 48,
-                              color: isDark ? AppTheme.darkDivider : AppTheme.dividerColor,
-                            ),
-                            itemBuilder: (context, index) {
-                              final job = jobs[index];
-                              return _buildFeedItem(job, isDark);
-                            },
+                        padding: const EdgeInsets.all(24),
+                        child: Center(
+                          child: Text(
+                            'No updates in the last 24 hours',
+                            style: FtText.bodySoft,
                           ),
                         ),
-                    ],
-                  ),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemCount: jobs.length,
+                          separatorBuilder: (_, _) => Divider(
+                            height: 1,
+                            indent: 48,
+                            color: FtColors.border,
+                          ),
+                          itemBuilder: (context, index) {
+                            final job = jobs[index];
+                            return _buildFeedItem(job);
+                          },
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -233,7 +219,7 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
     );
   }
 
-  Widget _buildFeedItem(DispatchedJob job, bool isDark) {
+  Widget _buildFeedItem(DispatchedJob job) {
     final color = _statusColor(job.status);
 
     return InkWell(
@@ -245,7 +231,6 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            // Status icon
             Container(
               width: 32,
               height: 32,
@@ -256,7 +241,6 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
               child: Icon(AppIcons.taskOutline, size: 16, color: color),
             ),
             const SizedBox(width: 10),
-            // Content
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -265,33 +249,22 @@ class _WebNotificationFeedState extends State<WebNotificationFeed> {
                     job.title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: isDark ? Colors.white : AppTheme.darkGrey,
-                    ),
+                    style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '${_statusLabel(job.status)}${job.assignedToName != null ? ' • ${job.assignedToName}' : ''}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-                    ),
+                    style: FtText.inter(size: 11, color: FtColors.hint),
                   ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            // Time
             Text(
               _relativeTime(job.updatedAt),
-              style: TextStyle(
-                fontSize: 11,
-                color: isDark ? AppTheme.darkTextHint : AppTheme.mediumGrey,
-              ),
+              style: FtText.inter(size: 11, color: FtColors.hint),
             ),
           ],
         ),

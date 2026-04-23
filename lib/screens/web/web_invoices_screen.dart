@@ -9,7 +9,7 @@ import '../../models/company_member.dart';
 import '../../services/firestore_sync_service.dart';
 import '../../services/company_service.dart';
 import '../../services/user_profile_service.dart';
-import '../../utils/theme.dart';
+import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../utils/download_stub.dart' if (dart.library.html) '../../utils/download_web.dart';
@@ -54,11 +54,11 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
     super.initState();
     _overlayController = AnimationController(
       vsync: this,
-      duration: AppTheme.normalAnimation,
+      duration: FtMotion.slow,
     );
     _overlayOpacity = CurvedAnimation(
       parent: _overlayController,
-      curve: AppTheme.defaultCurve,
+      curve: FtMotion.standardCurve,
     );
     if (widget.initialInvoiceId != null) {
       _selectedInvoiceId = widget.initialInvoiceId;
@@ -167,7 +167,6 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final companyId = _companyId;
 
     if (companyId == null) {
@@ -204,17 +203,17 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _buildHeader(isDark, filteredInvoices),
-                    _buildSummaryCards(allInvoices, isDark),
-                    _buildFilterBar(isDark),
+                    _buildHeader(filteredInvoices),
+                    _buildKpiStrip(allInvoices),
+                    _buildFilterBar(),
                     const SizedBox(height: 8),
                     Expanded(
                       child: filteredInvoices.isEmpty
-                          ? _buildEmptyState(isDark)
-                          : _buildInvoiceTable(pageInvoices, isDark),
+                          ? _buildEmptyState()
+                          : _buildInvoiceTable(pageInvoices),
                     ),
                     if (filteredInvoices.isNotEmpty)
-                      _buildPaginationBar(isDark, filteredInvoices.length, safePage, totalPages),
+                      _buildPaginationBar(filteredInvoices.length, safePage, totalPages),
                   ],
                 ),
                 if (_panelVisible)
@@ -223,7 +222,7 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
                       opacity: _overlayOpacity,
                       child: GestureDetector(
                         onTap: _dismissPanel,
-                        child: Container(color: Colors.black.withValues(alpha: 0.05)),
+                        child: Container(color: FtColors.primary.withValues(alpha: 0.08)),
                       ),
                     ),
                   ),
@@ -252,17 +251,12 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
     );
   }
 
-  Widget _buildHeader(bool isDark, List<Invoice> filteredInvoices) {
+  Widget _buildHeader(List<Invoice> filteredInvoices) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+      padding: const EdgeInsets.fromLTRB(32, 28, 32, 0),
       child: Row(
         children: [
-          Text(
-            'Invoices',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text('Invoices', style: FtText.sectionTitle),
           const Spacer(),
           OutlinedButton.icon(
             onPressed: filteredInvoices.isEmpty
@@ -278,19 +272,28 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
                   },
             icon: Icon(AppIcons.download, size: 16),
             label: const Text('Export'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: FtColors.fg1,
+              side: const BorderSide(color: FtColors.border, width: 1.5),
+              shape: RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
+              textStyle: FtText.button,
+            ),
           ),
           const SizedBox(width: 8),
-          _buildColumnsButton(isDark),
+          _buildColumnsButton(),
           const SizedBox(width: 8),
-          ElevatedButton.icon(
-            onPressed: () => context.push('/invoices/create'),
-            icon: Icon(AppIcons.add, size: 18),
-            label: const Text('Create Invoice'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryBlue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+          DecoratedBox(
+            decoration: const BoxDecoration(boxShadow: FtShadows.amber),
+            child: ElevatedButton.icon(
+              onPressed: () => context.push('/invoices/create'),
+              icon: Icon(AppIcons.add, size: 18),
+              label: const Text('Create Invoice'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: FtColors.accent,
+                foregroundColor: FtColors.primary,
+                shape: RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
+                textStyle: FtText.button,
+                elevation: 0,
               ),
             ),
           ),
@@ -299,71 +302,113 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
     );
   }
 
-  Widget _buildSummaryCards(List<Invoice> allInvoices, bool isDark) {
+  Widget _buildKpiStrip(List<Invoice> allInvoices) {
     final drafts = allInvoices.where((i) => i.status == InvoiceStatus.draft).length;
     final sent = allInvoices.where((i) => i.status == InvoiceStatus.sent).length;
     final paid = allInvoices.where((i) => i.status == InvoiceStatus.paid).length;
     final outstanding = allInvoices
         .where((i) => i.status == InvoiceStatus.sent)
         .fold<double>(0.0, (acc, i) => acc + i.total);
-    final currencyFmt = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 0);
+    final currencyFmt = NumberFormat.currency(symbol: '£', decimalDigits: 0);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+      padding: const EdgeInsets.fromLTRB(32, 20, 32, 0),
       child: Row(
         children: [
-          _summaryCard('Drafts', '$drafts', AppTheme.mediumGrey, isDark, 'draft'),
-          const SizedBox(width: 12),
-          _summaryCard('Sent', '$sent', Colors.blue, isDark, 'sent'),
-          const SizedBox(width: 12),
-          _summaryCard('Paid', '$paid', AppTheme.successGreen, isDark, 'paid'),
-          const SizedBox(width: 12),
-          _summaryCard('Outstanding', currencyFmt.format(outstanding), AppTheme.accentOrange, isDark, null),
+          Expanded(child: _kpiCard(
+            label: 'DRAFTS',
+            value: '$drafts',
+            meta: 'not yet sent',
+            filterValue: 'draft',
+            variant: _KpiVariant.normal,
+          )),
+          const SizedBox(width: 16),
+          Expanded(child: _kpiCard(
+            label: 'SENT',
+            value: '$sent',
+            meta: 'awaiting payment',
+            filterValue: 'sent',
+            variant: _KpiVariant.normal,
+          )),
+          const SizedBox(width: 16),
+          Expanded(child: _kpiCard(
+            label: 'PAID',
+            value: '$paid',
+            meta: 'completed',
+            filterValue: 'paid',
+            variant: _KpiVariant.normal,
+          )),
+          const SizedBox(width: 16),
+          Expanded(child: _kpiCard(
+            label: 'OUTSTANDING',
+            value: currencyFmt.format(outstanding),
+            meta: 'total unpaid',
+            filterValue: null,
+            variant: _KpiVariant.featured,
+          )),
         ],
       ),
     );
   }
 
-  Widget _summaryCard(String label, String count, Color color, bool isDark, String? filterValue) {
+  Widget _kpiCard({
+    required String label,
+    required String value,
+    required String meta,
+    required String? filterValue,
+    required _KpiVariant variant,
+  }) {
     final isSelected = _statusFilter == filterValue && filterValue != null;
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: filterValue != null
-            ? () {
-                setState(() {
-                  _statusFilter = isSelected ? null : filterValue;
-                  _currentPage = 0;
-                });
-              }
-            : null,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? color.withValues(alpha: 0.2)
-                : color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: isSelected ? Border.all(color: color, width: 1.5) : null,
-          ),
-          child: Column(
-            children: [
-              Text(
-                count,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color),
-              ),
-              const SizedBox(height: 4),
-              Text(label, style: TextStyle(fontSize: 12, color: color)),
-            ],
-          ),
+    final isFeatured = variant == _KpiVariant.featured;
+    final isDanger = variant == _KpiVariant.danger;
+    final hasValue = (int.tryParse(value) ?? 0) > 0;
+
+    return _HoverLiftCard(
+      onTap: filterValue != null
+          ? () {
+              setState(() {
+                _statusFilter = isSelected ? null : filterValue;
+                _currentPage = 0;
+              });
+            }
+          : () {},
+      isSelected: isSelected,
+      variant: variant,
+      child: Padding(
+        padding: FtSpacing.cardBody,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: FtText.label.copyWith(
+                  color: isFeatured ? Colors.white70 : null,
+                )),
+            const SizedBox(height: 8),
+            Text(value,
+                style: FtText.outfit(
+                  size: 28,
+                  weight: FontWeight.w800,
+                  color: isFeatured
+                      ? FtColors.accent
+                      : isDanger && hasValue
+                          ? FtColors.danger
+                          : FtColors.primary,
+                  letterSpacing: -0.8,
+                )),
+            const SizedBox(height: 4),
+            Text(meta,
+                style: FtText.helper.copyWith(
+                  color: isFeatured ? Colors.white54 : null,
+                )),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildFilterBar(bool isDark) {
+  Widget _buildFilterBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+      padding: const EdgeInsets.fromLTRB(32, 16, 32, 8),
       child: Row(
         children: [
           Flexible(
@@ -375,9 +420,18 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
                 decoration: InputDecoration(
                   labelText: 'Status',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(borderRadius: FtRadii.mdAll),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: const BorderSide(color: FtColors.border, width: 1.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: const BorderSide(color: FtColors.primary, width: 1.5),
+                  ),
                   isDense: true,
                 ),
+                style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1),
                 items: const [
                   DropdownMenuItem(value: null, child: Text('All')),
                   DropdownMenuItem(value: 'draft', child: Text('Draft')),
@@ -401,9 +455,18 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
                 decoration: InputDecoration(
                   labelText: 'Engineer',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(borderRadius: FtRadii.mdAll),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: const BorderSide(color: FtColors.border, width: 1.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: const BorderSide(color: FtColors.primary, width: 1.5),
+                  ),
                   isDense: true,
                 ),
+                style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1),
                 items: [
                   const DropdownMenuItem(value: null, child: Text('All Engineers')),
                   ..._members.map((m) => DropdownMenuItem(
@@ -425,15 +488,25 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
               child: TextField(
                 controller: _searchController,
                 focusNode: _searchFocusNode,
+                style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1),
                 decoration: InputDecoration(
                   hintText: 'Search invoices...',
-                  prefixIcon: Icon(AppIcons.search, size: 18),
+                  hintStyle: FtText.inter(size: 13, color: FtColors.hint),
+                  prefixIcon: Icon(AppIcons.search, size: 18, color: FtColors.fg2),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(borderRadius: FtRadii.mdAll),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: const BorderSide(color: FtColors.border, width: 1.5),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: const BorderSide(color: FtColors.primary, width: 1.5),
+                  ),
                   isDense: true,
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, size: 16),
+                          icon: Icon(Icons.clear, size: 16, color: FtColors.fg2),
                           onPressed: () {
                             _searchController.clear();
                             setState(() => _searchQuery = '');
@@ -460,34 +533,30 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
     );
   }
 
-  Widget _buildEmptyState(bool isDark) {
+  Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            AppIcons.wallet,
-            size: 48,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          ),
+          Icon(AppIcons.wallet, size: 48, color: FtColors.hint),
           const SizedBox(height: 16),
           Text(
             _searchQuery.isNotEmpty || _statusFilter != null || _engineerFilter != null
                 ? 'No invoices match your filters'
                 : 'No invoices yet',
-            style: TextStyle(
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-            ),
+            style: FtText.bodySoft,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildColumnsButton(bool isDark) {
+  Widget _buildColumnsButton() {
     return PopupMenuButton<String>(
-      icon: Icon(AppIcons.setting, size: 18),
+      icon: Icon(AppIcons.setting, size: 18, color: FtColors.fg2),
       tooltip: 'Toggle columns',
+      shape: RoundedRectangleBorder(borderRadius: FtRadii.mdAll),
+      color: FtColors.bg,
       itemBuilder: (context) => _allColumns.map((col) {
         return PopupMenuItem<String>(
           value: col.key,
@@ -502,10 +571,11 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
                         setState(() => _columnVisibility[col.key] = v ?? false);
                         setMenuState(() {});
                       },
-                title: Text(col.label, style: const TextStyle(fontSize: 14)),
+                title: Text(col.label, style: FtText.inter(size: 13, weight: FontWeight.w500, color: FtColors.fg1)),
                 dense: true,
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
+                activeColor: FtColors.primary,
               );
             },
           ),
@@ -537,102 +607,96 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
   List<_ColumnDef> get _visibleColumns =>
       _allColumns.where((c) => _columnVisibility[c.key] == true).toList();
 
-  Widget _buildInvoiceTable(List<Invoice> invoices, bool isDark) {
+  Widget _buildInvoiceTable(List<Invoice> invoices) {
     final visible = _visibleColumns;
     final sortIndex = visible.indexWhere((c) => c.key == _sortColumnKey);
-    final currencyFmt = NumberFormat.currency(symbol: '\u00A3', decimalDigits: 2);
+    final currencyFmt = NumberFormat.currency(symbol: '£', decimalDigits: 2);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+      padding: const EdgeInsets.fromLTRB(32, 0, 32, 24),
       child: SizedBox(
         width: double.infinity,
-        child: DataTable(
-          sortColumnIndex: sortIndex >= 0 ? sortIndex : null,
-          sortAscending: _sortAscending,
-          headingRowColor: WidgetStateProperty.all(
-            isDark ? AppTheme.darkSurfaceElevated : Colors.grey.shade50,
-          ),
-          dataRowColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.hovered)) {
-              return isDark
-                  ? AppTheme.darkSurfaceElevated.withValues(alpha: 0.5)
-                  : Colors.blue.withValues(alpha: 0.04);
-            }
-            return null;
-          }),
-          columns: visible.map((col) => DataColumn(
-            label: Text(col.label, style: const TextStyle(fontWeight: FontWeight.w600)),
-            onSort: (_, asc) => setState(() {
-              _sortColumnKey = col.key;
-              _sortAscending = asc;
+        child: Theme(
+          data: Theme.of(context).copyWith(dividerColor: FtColors.border),
+          child: DataTable(
+            sortColumnIndex: sortIndex >= 0 ? sortIndex : null,
+            sortAscending: _sortAscending,
+            headingRowColor: const WidgetStatePropertyAll(FtColors.bgAlt),
+            headingRowHeight: 48,
+            dataRowColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.hovered)) {
+                return FtColors.bgAlt;
+              }
+              return null;
             }),
-          )).toList(),
-          rows: invoices.map((invoice) {
-            return DataRow(
-              cells: visible.map((col) => DataCell(
-                _cellContent(col.key, invoice, isDark, currencyFmt),
-                onTap: () => _selectInvoice(invoice.id, invoice.engineerId),
-              )).toList(),
-            );
-          }).toList(),
+            dataRowMinHeight: 56,
+            dataRowMaxHeight: 56,
+            dividerThickness: 1,
+            columns: visible.map((col) => DataColumn(
+              label: Text(col.label.toUpperCase(), style: FtText.labelStrong),
+              onSort: (_, asc) => setState(() {
+                _sortColumnKey = col.key;
+                _sortAscending = asc;
+              }),
+            )).toList(),
+            rows: invoices.map((invoice) {
+              return DataRow(
+                cells: visible.map((col) => DataCell(
+                  _cellContent(col.key, invoice, currencyFmt),
+                  onTap: () => _selectInvoice(invoice.id, invoice.engineerId),
+                )).toList(),
+              );
+            }).toList(),
+          ),
         ),
       ),
     );
   }
 
-  Widget _cellContent(String key, Invoice invoice, bool isDark, NumberFormat currencyFmt) {
+  Widget _cellContent(String key, Invoice invoice, NumberFormat currencyFmt) {
     final now = DateTime.now();
     switch (key) {
       case 'invoiceNumber':
         return Text(
           invoice.invoiceNumber,
-          style: const TextStyle(fontWeight: FontWeight.w500),
+          style: FtText.inter(size: 14, weight: FontWeight.w600, color: FtColors.fg1),
         );
       case 'customer':
-        return Text(invoice.customerName, overflow: TextOverflow.ellipsis);
+        return Text(invoice.customerName, overflow: TextOverflow.ellipsis, style: FtText.body);
       case 'engineer':
-        return Text(invoice.engineerName, overflow: TextOverflow.ellipsis);
+        return Text(invoice.engineerName, overflow: TextOverflow.ellipsis, style: FtText.body);
       case 'status':
         return invoiceStatusBadge(invoice.status);
       case 'total':
-        return Text(
-          currencyFmt.format(invoice.total),
-          style: const TextStyle(fontWeight: FontWeight.w500),
-        );
+        return Text(currencyFmt.format(invoice.total), style: FtText.monoSmall);
       case 'date':
-        return Text(DateFormat('dd MMM yyyy').format(invoice.date));
+        return Text(DateFormat('dd MMM yyyy').format(invoice.date), style: FtText.body);
       case 'dueDate':
         final isOverdue = invoice.status == InvoiceStatus.sent &&
             invoice.dueDate.isBefore(DateTime(now.year, now.month, now.day));
         return Text(
           DateFormat('dd MMM yyyy').format(invoice.dueDate),
-          style: TextStyle(
-            color: isOverdue ? AppTheme.errorRed : null,
-            fontWeight: isOverdue ? FontWeight.w600 : null,
-          ),
+          style: isOverdue
+              ? FtText.inter(size: 14, weight: FontWeight.w600, color: FtColors.danger)
+              : FtText.body,
         );
       default:
         return const SizedBox.shrink();
     }
   }
 
-  Widget _buildPaginationBar(bool isDark, int totalItems, int currentPage, int totalPages) {
+  Widget _buildPaginationBar(int totalItems, int currentPage, int totalPages) {
     final startItem = totalItems == 0 ? 0 : currentPage * _rowsPerPage + 1;
     final endItem = ((currentPage + 1) * _rowsPerPage).clamp(0, totalItems);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: isDark ? Colors.white12 : Colors.grey.shade200),
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: FtColors.border)),
       ),
       child: Row(
         children: [
-          Text('Rows per page:', style: TextStyle(
-            fontSize: 13,
-            color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-          )),
+          Text('Rows per page:', style: FtText.helper),
           const SizedBox(width: 8),
           DropdownButton<int>(
             value: _rowsPerPage,
@@ -653,41 +717,41 @@ class _WebInvoicesScreenState extends State<WebInvoicesScreen>
             },
           ),
           const Spacer(),
-          Text(
-            'Showing $startItem\u2013$endItem of $totalItems',
-            style: TextStyle(
-              fontSize: 13,
-              color: isDark ? AppTheme.darkTextSecondary : AppTheme.mediumGrey,
-            ),
-          ),
+          Text('Showing $startItem–$endItem of $totalItems', style: FtText.bodySoft),
           const SizedBox(width: 16),
           IconButton(
-            icon: const Icon(Icons.first_page, size: 20),
+            icon: Icon(Icons.first_page, size: 20, color: currentPage > 0 ? FtColors.fg1 : FtColors.hint),
             onPressed: currentPage > 0 ? () => setState(() => _currentPage = 0) : null,
-            iconSize: 20, padding: EdgeInsets.zero,
+            iconSize: 20,
+            padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
           IconButton(
-            icon: const Icon(Icons.chevron_left, size: 20),
+            icon: Icon(Icons.chevron_left, size: 20, color: currentPage > 0 ? FtColors.fg1 : FtColors.hint),
             onPressed: currentPage > 0 ? () => setState(() => _currentPage--) : null,
-            iconSize: 20, padding: EdgeInsets.zero,
+            iconSize: 20,
+            padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text('${currentPage + 1} / $totalPages',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            child: Text(
+              '${currentPage + 1} / $totalPages',
+              style: FtText.inter(size: 13, weight: FontWeight.w600, color: FtColors.fg1),
+            ),
           ),
           IconButton(
-            icon: const Icon(Icons.chevron_right, size: 20),
+            icon: Icon(Icons.chevron_right, size: 20, color: currentPage < totalPages - 1 ? FtColors.fg1 : FtColors.hint),
             onPressed: currentPage < totalPages - 1 ? () => setState(() => _currentPage++) : null,
-            iconSize: 20, padding: EdgeInsets.zero,
+            iconSize: 20,
+            padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
           IconButton(
-            icon: const Icon(Icons.last_page, size: 20),
+            icon: Icon(Icons.last_page, size: 20, color: currentPage < totalPages - 1 ? FtColors.fg1 : FtColors.hint),
             onPressed: currentPage < totalPages - 1 ? () => setState(() => _currentPage = totalPages - 1) : null,
-            iconSize: 20, padding: EdgeInsets.zero,
+            iconSize: 20,
+            padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
         ],
@@ -706,4 +770,68 @@ class _ColumnDef {
     required this.label,
     this.alwaysVisible = false,
   });
+}
+
+enum _KpiVariant { normal, featured, danger }
+
+class _HoverLiftCard extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final bool isSelected;
+  final _KpiVariant variant;
+
+  const _HoverLiftCard({
+    required this.child,
+    required this.onTap,
+    required this.isSelected,
+    required this.variant,
+  });
+
+  @override
+  State<_HoverLiftCard> createState() => _HoverLiftCardState();
+}
+
+class _HoverLiftCardState extends State<_HoverLiftCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isFeatured = widget.variant == _KpiVariant.featured;
+    final isDanger = widget.variant == _KpiVariant.danger;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: FtMotion.normal,
+          curve: FtMotion.standardCurve,
+          transform: Matrix4.translationValues(0, _hovered ? -4 : 0, 0),
+          decoration: BoxDecoration(
+            gradient: isFeatured ? FtColors.primaryGradient : null,
+            color: isFeatured
+                ? null
+                : isDanger
+                    ? const Color(0xFFFEF2F2)
+                    : FtColors.bg,
+            borderRadius: FtRadii.lgAll,
+            border: Border.all(
+              color: widget.isSelected
+                  ? FtColors.accent
+                  : isDanger
+                      ? FtColors.dangerSoft
+                      : isFeatured
+                          ? Colors.transparent
+                          : FtColors.border,
+              width: widget.isSelected ? 2 : 1.5,
+            ),
+            boxShadow: _hovered ? FtShadows.md : FtShadows.sm,
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/web_theme.dart';
 
 class CancelJobDialog extends StatefulWidget {
   const CancelJobDialog({super.key});
@@ -28,13 +29,14 @@ class _CancelJobDialogState extends State<CancelJobDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: FtRadii.lgAll),
       title: const Text('Cancel Job'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Select a reason for cancellation:'),
+            Text('Select a reason for cancellation:', style: FtText.bodySoft),
             const SizedBox(height: 12),
             RadioGroup<String>(
               groupValue: _selectedReason ?? '',
@@ -45,7 +47,7 @@ class _CancelJobDialogState extends State<CancelJobDialog> {
                 children: _reasons.map((reason) {
                   return RadioListTile<String>(
                     value: reason,
-                    title: Text(reason, style: const TextStyle(fontSize: 14)),
+                    title: Text(reason, style: FtText.inter(size: 14, weight: FontWeight.w500, color: FtColors.fg1)),
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   );
@@ -56,9 +58,17 @@ class _CancelJobDialogState extends State<CancelJobDialog> {
               const SizedBox(height: 8),
               TextField(
                 controller: _customReasonController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Enter reason...',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(borderRadius: FtRadii.mdAll),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: BorderSide(color: FtColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: FtRadii.mdAll,
+                    borderSide: BorderSide(color: FtColors.primary),
+                  ),
                 ),
                 maxLines: 2,
               ),
@@ -69,6 +79,7 @@ class _CancelJobDialogState extends State<CancelJobDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
+          style: TextButton.styleFrom(foregroundColor: FtColors.fg2),
           child: const Text('Back'),
         ),
         TextButton(
@@ -82,10 +93,8 @@ class _CancelJobDialogState extends State<CancelJobDialog> {
                       : _selectedReason!;
                   Navigator.of(context).pop(reason);
                 },
-          child: const Text(
-            'Cancel Job',
-            style: TextStyle(color: Colors.red),
-          ),
+          style: TextButton.styleFrom(foregroundColor: FtColors.danger),
+          child: const Text('Cancel Job'),
         ),
       ],
     );
