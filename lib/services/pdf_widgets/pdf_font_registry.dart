@@ -26,13 +26,13 @@ class PdfFontRegistry {
     _mono = pw.Font.ttf(await rootBundle.load('assets/fonts/JetBrains_Mono/static/JetBrainsMono-Medium.ttf'));
   }
 
-  pw.Font get outfitDisplay => _requireLoaded(_outfitDisplay);
-  pw.Font get outfitBold => _requireLoaded(_outfitBold);
-  pw.Font get interRegular => _requireLoaded(_interRegular);
-  pw.Font get interMedium => _requireLoaded(_interMedium);
-  pw.Font get interSemibold => _requireLoaded(_interSemibold);
-  pw.Font get interBold => _requireLoaded(_interBold);
-  pw.Font get mono => _requireLoaded(_mono);
+  pw.Font get outfitDisplay => _outfitDisplay ?? pw.Font.helveticaBold();
+  pw.Font get outfitBold => _outfitBold ?? pw.Font.helveticaBold();
+  pw.Font get interRegular => _interRegular ?? pw.Font.helvetica();
+  pw.Font get interMedium => _interMedium ?? pw.Font.helvetica();
+  pw.Font get interSemibold => _interSemibold ?? pw.Font.helveticaBold();
+  pw.Font get interBold => _interBold ?? pw.Font.helveticaBold();
+  pw.Font get mono => _mono ?? pw.Font.courier();
 
   void loadFromBytes(Map<String, Uint8List> fontBytes) {
     if (_outfitDisplay != null) return;
@@ -64,10 +64,4 @@ class PdfFontRegistry {
     );
   }
 
-  pw.Font _requireLoaded(pw.Font? f) {
-    if (f == null) {
-      throw StateError('PdfFontRegistry.ensureLoaded() must be called before use');
-    }
-    return f;
-  }
 }
