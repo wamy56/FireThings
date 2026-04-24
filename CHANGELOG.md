@@ -4,6 +4,24 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-24 (Session 99)
+
+### PDF Architecture Rebuild — Fix: Non-nullable branding + font fallbacks
+
+Fixed compliance report PDFs always showing the old pre-rebuild cover page regardless of cover style selection. Root cause: `PdfBranding` resolution in `generateReport()` was wrapped in a try-catch that silently let branding stay null on failure, cascading to null `brandedFontBytes` and falling through to the old `_buildCoverPage()` field-list cover.
+
+Two changes: (1) `PdfFontRegistry` getters now return Helvetica/Courier fallbacks instead of throwing `StateError`, making `PdfCoverBuilder` safe to call without pre-loaded fonts. (2) Branding resolution defaults to `PdfBranding.defaultBranding()` instead of null, with failures logged to Crashlytics. The three-way cover branch (new/legacy/old) collapsed to a single `PdfCoverBuilder.build()` path.
+
+Dead code removed: `_buildCoverPage`, `_buildCoverAdditionalContent`, `_coverField`, `_statBox` (~355 net lines removed). `buildBrandedCoverPage` kept in `pdf_cover_builder.dart` (still used by `template_pdf_service.dart`).
+
+**Follow-up needed**: `template_pdf_service.dart`, `bs5839_report_service.dart`, `quote_pdf_service.dart`, `invoice_pdf_service.dart` still use nullable `PdfBranding?` with silent `debugPrint` fallback.
+
+#### Modified Files (2)
+- `lib/services/pdf_widgets/pdf_font_registry.dart` — Replaced 7 throwing getters with Helvetica/Courier fallbacks, deleted `_requireLoaded()`
+- `lib/services/compliance_report_service.dart` — Non-nullable branding with Crashlytics logging, collapsed cover/header/footer branches, deleted old cover code
+
+---
+
 ## 2026-04-24 (Session 98)
 
 ### PDF Architecture Rebuild — Session 3.4 (Test PDF Button)

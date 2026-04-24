@@ -161,25 +161,6 @@ Calculates minimum battery capacity per BS 5839-1 Annex D / E.
 
 Remote config flag: `battery_load_tester_enabled`
 
-### 7. Symptom Troubleshooter
-
-Interactive diagnostic tool for fire alarm fault finding. Guides engineers through systematic troubleshooting based on observed symptoms.
-
-- **Five symptom categories:**
-  - Loop / Wiring Faults (7 symptoms) — intermittent loop fault, night-only faults, wet-weather faults, post-building-work faults, random device faults, short circuit, open circuit
-  - Earth / Electrical Issues (6 symptoms) — night earth faults, wet-weather earth faults, intermittent earth faults, mains failure trips, PSU overheating, battery not charging
-  - Device Issues (6 symptoms) — unwanted alarms at night, detector faults, multiple faults same zone, device not responding, new device not working, detector drift / contamination
-  - System Behavior (6 symptoms) — panel resetting, slow loop polling, network communication fault, sounder circuit fault, panel buzzer, display fault with no details
-  - Environmental (5 symptoms) — cold-weather faults, hot-weather faults, post-cleaning faults, kitchen-area faults, bathroom / shower area faults
-
-- **For each symptom provides:**
-  - Description of the problem
-  - Likely causes (ranked by probability)
-  - Step-by-step isolation procedure
-  - Testing tips
-  - Preventive measures
-
----
 
 ## Jobsheets
 
