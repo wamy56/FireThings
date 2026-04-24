@@ -7,11 +7,14 @@ import 'package:intl/intl.dart';
 import '../models/models.dart';
 import 'payment_settings_service.dart';
 import 'pdf_branding_service.dart';
-import 'pdf_header_builder.dart';
+import 'pdf_header_builder.dart' as legacy_header;
 import 'pdf_footer_builder.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
-import 'user_profile_service.dart';
+
+import 'pdf_widgets/pdf_cover_builder.dart';
+import 'pdf_widgets/pdf_font_registry.dart';
+import 'pdf_widgets/pdf_modern_header.dart' show PdfHeaderBuilder;
 
 int _hexToColorValue(String hex) {
   final clean = hex.replaceFirst('#', '');
@@ -30,9 +33,14 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
   final primaryColor = colourScheme.primaryColor;
   final primaryLightColor = colourScheme.primaryLight;
 
-  final branding = data.brandingJson != null
-      ? PdfBranding.fromJson(data.brandingJson!)
-      : null;
+  PdfBranding? branding;
+  final hasBrandedFonts = data.brandedFontBytes != null;
+  if (data.brandingJson != null) {
+    branding = PdfBranding.fromJson(data.brandingJson!);
+    if (hasBrandedFonts) {
+      PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
+    }
+  }
 
   final effectiveFooterConfig = branding != null && branding.footerText.isNotEmpty
       ? PdfFooterConfig(
@@ -56,12 +64,40 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
       ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
       : pw.Font.helveticaBold();
 
+  final fonts = hasBrandedFonts ? PdfFontRegistry.instance : null;
   final pdf = pw.Document(
     theme: pw.ThemeData.withFont(
-      base: regularFont,
-      bold: boldFont,
+      base: fonts?.interRegular ?? regularFont,
+      bold: fonts?.interBold ?? boldFont,
     ),
   );
+
+  final companyName = invoice.engineerName;
+  final dateStr = DateFormat('dd/MM/yyyy').format(invoice.date);
+
+  // Cover page (branded only)
+  if (branding != null && hasBrandedFonts) {
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: pw.EdgeInsets.zero,
+      build: (_) => PdfCoverBuilder.build(
+        branding: branding!,
+        docType: BrandingDocType.invoice,
+        defaultEyebrow: 'INVOICE',
+        defaultTitle: 'Invoice',
+        defaultSubtitle: '${invoice.customerName} · $dateStr',
+        metaFields: [
+          (label: 'INVOICE NO', value: invoice.invoiceNumber),
+          (label: 'CUSTOMER', value: invoice.customerName),
+          (label: 'DATE', value: dateStr),
+          if (companyName.isNotEmpty)
+            (label: 'FROM', value: companyName),
+        ],
+        logoBytes: data.logoBytes,
+        companyName: companyName,
+      ),
+    ));
+  }
 
   pdf.addPage(
     pw.Page(
@@ -70,8 +106,16 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
       build: (context) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          _buildHeader(invoice, data.logoBytes, headerConfig, primaryColor,
-            showCompanyName: branding?.headerShowCompanyName ?? true),
+          if (branding != null && hasBrandedFonts)
+            PdfHeaderBuilder.build(
+              branding: branding,
+              companyName: companyName,
+              metaText: 'INVOICE ${invoice.invoiceNumber}',
+              logoBytes: data.logoBytes,
+            )
+          else
+            _buildHeader(invoice, data.logoBytes, headerConfig, primaryColor,
+              showCompanyName: branding?.headerShowCompanyName ?? true),
           pw.SizedBox(height: 24),
           _buildInvoiceInfo(invoice),
           pw.SizedBox(height: 24),
@@ -87,17 +131,26 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
           pw.Spacer(),
           if (!paymentDetails.isEmpty) _buildPaymentTerms(paymentDetails, primaryColor, primaryLightColor),
           pw.SizedBox(height: 16),
-          PdfFooterBuilder.buildFooter(
-            config: effectiveFooterConfig,
-            pageNumber: 1,
-            pagesCount: 1,
-            primaryColor: primaryColor,
-            brandingFooterStyle: branding?.footerStyle,
-            accentColor: branding != null
-                ? PdfColor.fromInt(_hexToColorValue(branding.accentColour))
-                : null,
-            showPageNumbers: branding?.footerShowPageNumbers ?? true,
-          ),
+          if (branding != null && hasBrandedFonts)
+            PdfFooterBuilder.buildBrandedFooter(
+              branding: branding,
+              pageNumber: 1,
+              pagesCount: 1,
+              companyName: companyName,
+              defaultFooterText: 'Invoice ${invoice.invoiceNumber}',
+            )
+          else
+            PdfFooterBuilder.buildFooter(
+              config: effectiveFooterConfig,
+              pageNumber: 1,
+              pagesCount: 1,
+              primaryColor: primaryColor,
+              brandingFooterStyle: branding?.footerStyle,
+              accentColor: branding != null
+                  ? PdfColor.fromInt(_hexToColorValue(branding.accentColour))
+                  : null,
+              showPageNumbers: branding?.footerShowPageNumbers ?? true,
+            ),
           pw.SizedBox(height: 8),
           pw.Center(
             child: pw.Text(
@@ -136,7 +189,7 @@ pw.Widget _buildHeader(Invoice invoice, Uint8List? logoBytes, PdfHeaderConfig he
       children: [
         pw.Expanded(
           flex: 5,
-          child: PdfHeaderBuilder.buildLeftAndCentre(
+          child: legacy_header.PdfHeaderBuilder.buildLeftAndCentre(
             config: headerConfig,
             logoBytes: logoBytes,
             primaryColor: primaryColor,
@@ -495,29 +548,32 @@ class InvoicePDFService {
       // Google Fonts unavailable — isolate will fall back to Helvetica
     }
 
+    Map<String, Uint8List>? brandedFontBytes;
+    try {
+      await PdfFontRegistry.instance.ensureLoaded();
+      brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
+    } catch (e) {
+      debugPrint('Failed to load branded fonts: $e');
+    }
+
     PdfBranding? branding;
     Uint8List? brandingLogoBytes;
 
-    if (invoice.useCompanyBranding) {
-      final companyId = UserProfileService.instance.companyId;
-      if (companyId != null) {
-        try {
-          final b = await PdfBrandingService.instance.getBranding(companyId);
-          if (b.appliesToDocType(BrandingDocType.invoice)) {
-            branding = b;
-            if (b.logoUrl != null) {
-              try {
-                final response = await http.get(Uri.parse(b.logoUrl!));
-                if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
-              } catch (e) {
-                debugPrint('Failed to download branding logo: $e');
-              }
-            }
+    try {
+      final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
+      if (b.appliesToDocType(BrandingDocType.invoice)) {
+        branding = b;
+        if (b.logoUrl != null) {
+          try {
+            final response = await http.get(Uri.parse(b.logoUrl!));
+            if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
+          } catch (e) {
+            debugPrint('Failed to download branding logo: $e');
           }
-        } catch (e) {
-          debugPrint('Failed to load PdfBranding: $e');
         }
       }
+    } catch (e) {
+      debugPrint('Failed to load PdfBranding: $e');
     }
 
     final companyPdf = CompanyPdfConfigService.instance;
@@ -562,6 +618,7 @@ class InvoicePDFService {
       brandingJson: branding?.toJson(),
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
+      brandedFontBytes: branding != null ? brandedFontBytes : null,
     );
 
     // ── Build phase (background isolate) ──

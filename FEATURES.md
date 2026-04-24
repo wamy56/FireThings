@@ -1,8 +1,8 @@
 # FireThings — Complete Feature Reference
 
-FireThings is a cross-platform Flutter application built specifically for fire alarm engineers. It combines jobsheet creation, invoicing, PDF certificate generation, asset register management, team job dispatch, and a suite of field tools into a single offline-first app. Backed by Firebase Auth with local SQLite storage (personal data) and Firestore (company/team data). Targets Android, iOS, Windows, macOS, Linux, and web.
+FireThings is a cross-platform Flutter application built specifically for fire alarm engineers. It combines jobsheet creation, invoicing, quoting, PDF document generation, asset register management, BS 5839-1:2025 compliance, team job dispatch, and a suite of field tools into a single offline-first app. Backed by Firebase Auth with local SQLite storage (personal data) and Firestore (company/team data). Targets Android, iOS, Windows, macOS, Linux, and web.
 
-This document is a comprehensive reference of every feature in the app as of March 2026. It is intended to be self-contained — suitable for handoff to another person or AI assistant to understand the full scope of the product.
+This document is a comprehensive reference of every feature in the app as of April 2026. It is intended to be self-contained — suitable for handoff to another person or AI assistant to understand the full scope of the product.
 
 ---
 
@@ -13,31 +13,35 @@ This document is a comprehensive reference of every feature in the app as of Mar
 3. [Helpful Tools](#helpful-tools)
 4. [Jobsheets](#jobsheets)
 5. [Invoicing](#invoicing)
-6. [PDF Form Certificates](#pdf-form-certificates)
+6. [Quoting](#quoting)
 7. [Custom Template Builder](#custom-template-builder)
 8. [Saved Sites & Customers (Personal)](#saved-sites--customers-personal)
-9. [PDF Design & Branding](#pdf-design--branding)
-10. [Dispatch System](#dispatch-system)
-11. [Asset Register & Floor Plans](#asset-register--floor-plans)
-12. [Web Portal](#web-portal)
-13. [Settings & Account Management](#settings--account-management)
-14. [Backend & Infrastructure](#backend--infrastructure)
-15. [Platform & Technical Notes](#platform--technical-notes)
-16. [Future Enhancements](#future-enhancements)
+9. [Granular Permission System](#granular-permission-system)
+10. [PDF Design & Branding](#pdf-design--branding)
+11. [PDF Architecture Rebuild](#pdf-architecture-rebuild)
+12. [Dispatch System](#dispatch-system)
+13. [Asset Register & Floor Plans](#asset-register--floor-plans)
+14. [BS 5839-1:2025 Compliance System](#bs-5839-12025-compliance-system)
+15. [Web Portal](#web-portal)
+16. [Theme System](#theme-system)
+17. [Settings & Account Management](#settings--account-management)
+18. [Backend & Infrastructure](#backend--infrastructure)
+19. [Platform & Technical Notes](#platform--technical-notes)
+20. [Future Enhancements](#future-enhancements)
 
 ---
 
 ## Navigation
 
-### Mobile (4 or 5 tabs)
+### Mobile (5 tabs)
 
 | Tab | Purpose |
 |-----|---------|
 | **Home** | Dashboard with Sites & Assets card, dispatch card, and helpful tools grid |
 | **Jobs** | Jobsheet management — creation, drafts, history |
 | **Invoices** | Invoice management — creation, tracking, export |
-| **Dispatch** | *(Conditional — only shown when `dispatch_enabled` flag is true AND user belongs to a company)* Job dispatch for dispatchers/admins or assigned jobs for engineers |
-| **Settings** | Profile, saved data, PDF design, company management, app config |
+| **Quotes** | Quote management — creation, status tracking, PDF generation |
+| **Dispatch** | Job dispatch for dispatchers/admins or assigned jobs for engineers |
 
 Layout adapts by screen size:
 
@@ -46,13 +50,18 @@ Layout adapts by screen size:
 - **Expanded / Large** (840 px+) — extended NavigationRail with labels
 - iOS / macOS uses CupertinoTabBar; Android uses Material NavigationBar
 - Swipe-gesture switching between tabs with animated transitions
+- Dispatch tab: users with any dispatch permission see the dispatch dashboard (stream scoped by `dispatchViewAll`); users without dispatch permissions see the engineer jobs view
 
 ### Web
 
 - GoRouter-based SPA routing with URL-based deep linking
-- Sidebar navigation (Dashboard, Schedule, Team, Sites, Settings, Asset Register)
+- Sidebar navigation grouped into sections:
+  - **Top:** Jobs (Dashboard), Schedule
+  - **Workspace:** Team, Sites, Customers
+  - **Finance:** Quotes (conditional on `quoting_enabled`), Invoices
+  - **Bottom:** Branding (conditional on `pdfBranding` permission), Settings
 - Top bar with company name, user profile, and logout
-- Auth redirect handling (login required, company/dispatcher role required)
+- Auth redirect handling (login required, company membership required, web portal permission required)
 
 ---
 
@@ -61,7 +70,7 @@ Layout adapts by screen size:
 - **Greeting header** — time-based ("Good Morning / Afternoon / Evening") with the engineer's display name and an animated app icon
 - **Sites & Assets card** — full-width tappable card showing saved site count, navigates to Saved Sites screen. Shown when `asset_register_enabled` flag is true.
 - **Dispatched Jobs card** — full-width tappable card showing pending dispatch job count, navigates to Dispatch tab. Shown when the user has pending dispatched jobs.
-- **Helpful Tools grid** — up to six tool tiles in a responsive grid (2 columns on compact, 3 on wide screens). Each tool is individually controlled by a remote config feature flag.
+- **Helpful Tools grid** — up to seven tool tiles in a responsive grid (2 columns on compact, 3 on wide screens). Each tool is individually controlled by a remote config feature flag.
 - **Pull-to-refresh** — reloads dashboard data
 - **Skeleton loader** — shimmer placeholder shown while data loads
 
@@ -152,13 +161,31 @@ Calculates minimum battery capacity per BS 5839-1 Annex D / E.
 
 Remote config flag: `battery_load_tester_enabled`
 
+### 7. Symptom Troubleshooter
+
+Interactive diagnostic tool for fire alarm fault finding. Guides engineers through systematic troubleshooting based on observed symptoms.
+
+- **Five symptom categories:**
+  - Loop / Wiring Faults (7 symptoms) — intermittent loop fault, night-only faults, wet-weather faults, post-building-work faults, random device faults, short circuit, open circuit
+  - Earth / Electrical Issues (6 symptoms) — night earth faults, wet-weather earth faults, intermittent earth faults, mains failure trips, PSU overheating, battery not charging
+  - Device Issues (6 symptoms) — unwanted alarms at night, detector faults, multiple faults same zone, device not responding, new device not working, detector drift / contamination
+  - System Behavior (6 symptoms) — panel resetting, slow loop polling, network communication fault, sounder circuit fault, panel buzzer, display fault with no details
+  - Environmental (5 symptoms) — cold-weather faults, hot-weather faults, post-cleaning faults, kitchen-area faults, bathroom / shower area faults
+
+- **For each symptom provides:**
+  - Description of the problem
+  - Likely causes (ranked by probability)
+  - Step-by-step isolation procedure
+  - Testing tips
+  - Preventive measures
+
 ---
 
 ## Jobsheets
 
 ### Creation
 
-New jobsheets start from the Jobs hub. The engineer picks a **pre-built template**, a **custom template**, or a **PDF certificate form**.
+New jobsheets start from the Jobs hub. The engineer picks a **pre-built template** or a **custom template**.
 
 Standard job form fields:
 
@@ -204,7 +231,7 @@ Six built-in templates covering common job types:
 ### PDF Generation
 
 - Generated via the `pdf` / Syncfusion PDF libraries
-- Applies the user's PDF header, footer, and colour scheme settings
+- Applies the user's PDF branding settings (cover, header, footer, colour scheme)
 - Includes signatures, defects, and notes
 - **Asset Inspection Summary** — auto-generated table with columns: Ref, Type, Location, Zone, Result, Defects. Summary line: "12 assets tested: 11 pass, 1 fail. 1 defect logged."
 - Share or email directly from the app
@@ -257,37 +284,68 @@ Configured once in Settings and applied to every invoice:
 
 ---
 
-## PDF Form Certificates
+## Quoting
 
-Access-controlled forms (whitelisted users only) that populate real PDF certificate templates.
+**Status:** Feature complete, hidden behind `quoting_enabled` remote config flag (default: false).
 
-### IQ Modification Certificate (1 page, 28 fields)
+### Creation
 
-- Customer and job information (name, date, address, job number)
-- Installer details and system category
-- Extent of work and variations from standard
-- Five compliance checkboxes (system tested per 46.4.2, as-fitted drawings updated, no false-alarm potential, third-party installation, subsequent visit required)
-- Engineer certification (name, position, signature, date)
-- Customer / representative certification (signature, name, position, date)
+- Auto-incremented quote number (Q-0001 format)
+- Customer name, address, email, and phone (with saved-customers picker)
+- Site selection (with saved-sites picker)
+- **Line items** — each with description, quantity, unit price, and optional category (labour, parts, materials); calculated totals per item
+- VAT toggle (adds 20%)
+- Notes section
+- Validity period (`validUntil` date)
 
-### IQ Minor Works & Call Out Certificate (1 page, 20 fields)
+### Defect-to-Quote Workflow
 
-- Customer, date, job number, site address
-- Call-out times (arrival, departure)
-- Visit type checkboxes (remedial works, call out)
-- System type checkboxes (fire alarm, emergency lighting, AOV / smoke vent, other)
-- Description of work completed
-- Parts used
-- IQ representative and client representative signatures
+Quotes can be created directly from asset defects discovered during inspections:
 
-### Form Interaction
+- Pre-fills defect description, severity, and clause reference from the source defect
+- Tracks whether the defect triggered a prohibited variation rule
+- Links quote back to the source defect ID (`defectId`)
+- Bidirectional link — defect stores `linkedQuoteId`, quote stores `defectId`
+- Deleting a quote clears the bidirectional defect link
 
-- Fields are positioned on the PDF by percentage coordinates
-- Signature capture via touch pad
-- Date pickers and checkboxes
-- Save as draft, preview PDF, email / share
+### Statuses
 
-Remote config flag: `pdf_forms_enabled`
+| Status | Meaning |
+|--------|---------|
+| **Draft** | Work in progress, not yet sent |
+| **Sent** | Delivered to customer, awaiting response |
+| **Approved** | Customer accepted the quote |
+| **Declined** | Customer rejected the quote |
+| **Converted** | Approved quote converted to a dispatched job |
+
+### Quote Conversion
+
+- Approved quotes can be converted into dispatched jobs
+- Converted quote stores the linked job ID (`convertedJobId`)
+- Dispatched job stores the source quote ID (`sourceQuoteId`)
+- `ConvertedQuoteDeletionException` prevents deleting converted quotes to avoid data loss
+
+### Mobile Screens
+
+- **Quoting Hub** (`quoting_hub_screen.dart`) — entry point with overview and quick actions
+- **Quote Screen** (`quote_screen.dart`) — create and edit quotes
+- **Quote List** (`quote_list_screen.dart`) — browse, search, and filter quotes by status
+
+### PDF Generation
+
+- Quote PDF generated via `quote_pdf_service.dart`
+- Applies the user's PDF branding (cover, header, footer, colour scheme)
+- Share or email directly from the app
+
+### Permissions (company context)
+
+| Permission | Label |
+|------------|-------|
+| `quotesCreate` | Create Quotes |
+| `quotesEdit` | Edit Quotes |
+| `quotesSend` | Send Quotes |
+| `quotesApprove` | Approve / Decline Quotes |
+| `quotesConvert` | Convert Quote to Job |
 
 ---
 
@@ -322,7 +380,7 @@ These are the engineer's personal saved data, separate from company-level shared
 - Fields: customer name, address, email, notes
 - Add, edit, delete
 - Search / filter by name or address
-- Quick-select dropdown in invoice creation
+- Quick-select dropdown in invoice and quote creation
 - Avatar badge showing the customer's initial
 
 ### Saved Sites
@@ -332,6 +390,48 @@ These are the engineer's personal saved data, separate from company-level shared
 - Search / filter by site name or address
 - Quick-select in jobsheet creation for fast address entry
 - **Asset register integration** — tap a saved site to view its asset register and floor plans
+
+---
+
+## Granular Permission System
+
+45 individual permissions across 14 categories, assigned per-user by company admins. Permissions control access to features in both the mobile app and the web portal.
+
+### Permission Categories
+
+| Category | Permissions | Count |
+|----------|-------------|-------|
+| **Web Portal** | Web Portal Access | 1 |
+| **Dispatch** | Create Jobs, Edit Jobs, Delete Jobs, View All Jobs | 4 |
+| **Sites** | Add Sites, Edit Sites, Delete Sites | 3 |
+| **Customers** | Add Customers, Edit Customers, Delete Customers | 3 |
+| **Assets** | Add Assets, Edit Assets, Delete Assets, Add Asset Photos, Delete Asset Photos, Test / Inspect Assets | 6 |
+| **Floor Plans** | Upload Floor Plans, Edit Floor Plans, Delete Floor Plans | 3 |
+| **Asset Types** | Manage Asset Types | 1 |
+| **Branding** | PDF Branding | 1 |
+| **Quoting** | Create Quotes, Edit Quotes, Send Quotes, Approve / Decline Quotes, Convert Quote to Job | 5 |
+| **Invoicing** | Create Invoices, Edit Invoices, Delete Invoices, Send Invoices | 4 |
+| **Jobsheets** | Edit Completed Jobsheets, Delete Completed Jobsheets | 2 |
+| **Defects** | Log Defects, Mark Defects Rectified, Delete Defects | 3 |
+| **Company** | Edit Company, Delete Company, Manage Team, Regenerate Invite Code | 4 |
+| **BS 5839** | Edit BS 5839 Config, Approve Variations, Issue Reports, Record CPD, View Team Competency | 5 |
+
+### Role Defaults
+
+Roles serve as default permission templates when a member joins a company:
+
+| Role | Default Permissions |
+|------|-------------------|
+| **Admin** | All 45 permissions enabled (also enforced at code level — admin always has access) |
+| **Dispatcher** | Operational permissions enabled (dispatch, sites, customers, assets, floor plans, quoting, invoicing). Company management restricted. |
+| **Engineer** | Field-work permissions only (test assets, log defects, create jobsheets). Cannot create dispatch jobs, manage team, or access web portal. |
+
+### Enforcement
+
+- **Client-side:** `UserProfileService.hasPermission(AppPermission.xxx)` — reactive via `ChangeNotifier`, UI elements hide/show immediately when permissions change
+- **Server-side:** Firestore security rules use `hasPermission(companyId, 'key')` helper function
+- **Cloud Functions:** Role and permission changes are Cloud Functions only (not direct writes)
+- **Last-admin protection:** `LastAdminException` prevents demotion or removal of the sole admin
 
 ---
 
@@ -365,8 +465,83 @@ When a user belongs to a company (dispatch system), company-level PDF designs ov
 
 - Separate header, footer, and colour scheme stored per company in Firestore
 - `CompanyPdfConfigService` provides `getEffectiveHeaderConfig` / `getEffectiveFooterConfig` / `getEffectiveColourScheme` with company-first, personal-fallback logic
-- Company logo upload per document type (jobsheet / invoice)
+- Company logo upload per document type (jobsheet / invoice / quote)
 - Managed from Settings → Company PDF Design (dispatchers/admins only)
+
+### PDF Branding v2 (Web Customiser)
+
+Full branding customisation via the web portal (`web_branding_screen.dart`) with live preview across all document types.
+
+- **Cover Styles:** Bold (navy background, amber radial glow, large display typography), Minimal (white background, amber divider, clean layout), Bordered (white background, thick navy bars top and bottom)
+- **Header Styles:** Solid (navy background, white text), Minimal (white background, amber border-bottom), Bordered (white background, grey border-bottom)
+- **Footer Styles:** Light, Minimal, Coloured — with optional page numbers toggle
+- **Typography:** Outfit (display / titles), Inter (body text), JetBrains Mono (technical / mono text)
+- **Per-document-type cover text overrides:** Eyebrow, title, and subtitle customisable per doc type (jobsheet, invoice, quote, compliance report)
+- **Logo upload** with live preview and delete
+- **Primary and accent colour selection** via colour picker
+- **Toggle controls:** Show company name in header, show document number in header
+- **Autosave** with 500 ms debounce and save-status pill indicator
+- **Branding resolution:** Company branding overrides personal for company members; solo engineers use personal branding
+
+Branding stored in Firestore:
+- Company: `companies/{companyId}/branding/main`
+- Personal: `users/{userId}/branding/main`
+
+Model: `lib/models/pdf_branding.dart` — `PdfBranding` + `BrandingCoverText` + enums (`CoverStyle`, `HeaderStyle`, `FooterStyle`, `BrandingDocType`)
+Service: `lib/services/pdf_branding_service.dart`
+
+---
+
+## PDF Architecture Rebuild
+
+**Status:** Phase 1 in progress. Approved spec at `docs/specs/PDF_ARCHITECTURE_REBUILD_SPEC.md`.
+
+Five-phase rebuild to align actual PDF output with the web preview and support subscription tiers. The core problem: the web customiser's live preview looks correct, but the generated PDF doesn't match it — the PDF still uses the old mobile-era visual language.
+
+### Phase 1 — Rendering Rebuild (in progress)
+
+Making PDF output visually faithful to the web preview for all three cover styles and typography throughout.
+
+- **Font registry** (`lib/services/pdf_widgets/pdf_font_registry.dart`) — loads and registers Outfit (weights 600/700/800), Inter (weights 400/500/600/700), and JetBrains Mono (500) for use in PDFs. Fonts loaded once at app startup, cached for subsequent PDF generations.
+- **Brand tokens** (`lib/services/pdf_widgets/pdf_brand_tokens.dart`) — PDF-side parallel of `web_theme.dart`. Provides reusable text styles, spacing, and colours as PDF types derived from `PdfBranding`.
+- **Cover builder rewrite** (`lib/services/pdf_widgets/pdf_cover_builder.dart`) — three cover style implementations:
+  - **Bold** — navy background, amber radial gradient glow, white text, amber logo mark, Outfit display title, Inter meta grid
+  - **Minimal** — white background, amber horizontal divider, logo on left, clean layout
+  - **Bordered** — white background, thick navy bars at top and bottom
+- **Page header rebuild** (`lib/services/pdf_widgets/pdf_modern_header.dart`) — Solid / Minimal / Bordered header variants with optional company name and document number toggles
+- **Footer rebuild** (`lib/services/pdf_footer_builder.dart`) — Light / Minimal / Coloured footer variants with page numbers
+- **Wiring to five PDF services:** compliance report, quote, invoice, jobsheet template, BS 5839 report — each calls `PdfFontRegistry.instance.ensureLoaded()` and uses new builders when `PdfBranding` is present
+- **Font assets** committed to `assets/fonts/` (Outfit, Inter, JetBrains Mono TTF files)
+
+### Phase 2 — Branding Source Split (planned)
+
+- Company vs personal branding storage with automatic resolution
+- `resolveBrandingForCurrentUser()` — returns company branding for company users, personal branding for solo users
+- User-level branding at `users/{userId}/branding/main`
+
+### Phase 3 — Simplified Mobile Customiser (planned)
+
+- Five preset brand kits: FireThings (navy + amber), Graphite (black + red), Forest (deep green + copper), Slate (cool grey + cyan), Heritage (burgundy + gold)
+- Logo upload, cover style picker (Bold / Minimal / Bordered), primary colour hue tweaker
+- Mini live preview on mobile
+- Personal branding for solo engineers — accessible from Settings when not in a company
+
+### Phase 4 — Tier Gating (planned)
+
+- Free / Pro / Premium subscription tiers
+- RevenueCat integration (StoreKit on iOS, Play Billing on Android, Stripe on web)
+- `EntitlementService` and `TierCapabilities` for capability checks
+- Server-side enforcement via Firestore rules
+- Subscription screen with tier comparison and upgrade flow
+
+### Phase 5 — Deprecate Old Editors (planned)
+
+- Migration of legacy `pdf_config` Firestore data to `PdfBranding` model
+- Removal of old editor screens (`UnifiedPdfEditorScreen`, `CompanyPdfDesignScreen`, `PdfDesignScreen`)
+- Removal of old config services (`pdf_header_config_service`, `pdf_footer_config_service`, `pdf_colour_scheme_service`, etc.)
+- Single code path for PDF generation (branding-based only)
+
+Feature flags: `pdf_renderer_v2_enabled`, `personal_branding_enabled`, `mobile_customiser_v2_enabled`, `tier_gating_enabled`
 
 ---
 
@@ -674,6 +849,136 @@ Remote config flag: `compliance_report_enabled`
 
 ---
 
+## BS 5839-1:2025 Compliance System
+
+**Status:** Feature complete, hidden behind `bs5839_mode_enabled` remote config flag (default: false). Per-site compliance management system aligned with the BS 5839-1:2025 standard (fire detection and fire alarm systems for buildings).
+
+### System Configuration
+
+Per-site fire alarm system configuration stored in Firestore.
+
+- System category declaration (L1–L5, M, P1, P2) per site
+- Responsible person details per site
+- Alarm Receiving Centre (ARC) details
+- Transmission time requirements (new in 2025 edition)
+
+Screen: `bs5839_system_config_screen.dart`
+Model: `bs5839_system_config.dart`
+Service: `bs5839_config_service.dart`
+
+### Inspection Visit System
+
+Structured inspection workflow that groups asset tests, cause-and-effect tests, and documentation reviews into a formal visit record.
+
+- **Dashboard** (`inspection_visit_dashboard_screen.dart`) — overview of visit status per site
+- **Start Visit** (`start_inspection_visit_screen.dart`) — initiate a new inspection with visit type selection
+- **Complete Visit** (`complete_visit_screen.dart`) — finalise, review results, and sign off
+- **Visit Detail** (`visit_detail_screen.dart`) — full record of a specific visit
+- **Visit History** (`visit_history_screen.dart`) — chronological list of all visits for a site
+- **Visit types:** Commissioning, Routine Service, Modification, Re-inspection
+- Engineer and customer signatures with competency evidence
+- Immutable audit trail
+
+Model: `inspection_visit.dart`
+Service: `inspection_visit_service.dart`
+
+### Variations Register
+
+Record and track departures from the BS 5839-1 standard per site.
+
+- Add and edit variations with justification
+- **Prohibited variation detection** — rule database (`lib/data/prohibited_variation_rules.dart`) automatically identifies variations that violate Clause 6.6
+- Hard-stop: system refuses to issue a "satisfactory" declaration if any prohibited variation is present — must be marked "unsatisfactory" with remediation required
+- Alert widget (`prohibited_variations_alert.dart`) surfaced in relevant screens
+
+Screens: `variations_register_screen.dart`, `add_edit_variation_screen.dart`
+Model: `bs5839_variation.dart`
+Service: `variation_service.dart`
+
+### Cause-and-Effect Testing
+
+Record trigger-to-effect verification tests required at handover per the 2025 edition.
+
+- Define trigger devices and expected effects (e.g. MCP → AOV opens, sounders activate, door releases, ARC signal)
+- Record test results as structured data (not free-text)
+- Required at commissioning handover
+
+Screens: `cause_effect_test_list_screen.dart`, `cause_effect_test_screen.dart`
+Model: `cause_effect_test.dart`
+Service: `cause_effect_service.dart`
+
+### Engineer Competency Tracking
+
+Qualifications and continuing professional development records per engineer, as required by Clause 3.13 (competent person definition).
+
+- Record qualifications and CPD activities
+- Minimum CPD hours configurable via remote config (`bs5839_min_cpd_hours_per_year`, default: 5)
+- Competency evidence surfaced on every inspection report
+
+Screen: `competency_screen.dart`
+Model: `engineer_competency.dart`
+Service: `competency_service.dart`
+
+### Logbook System
+
+Structured site logbook replacing free-text records.
+
+- Add logbook entries per site with structured fields
+- Logbook review confirmation per visit (must be evidenced)
+
+Screens: `logbook_screen.dart`, `add_logbook_entry_screen.dart`
+Model: `logbook_entry.dart`
+Service: `logbook_service.dart`
+
+### BS 5839 Report PDF
+
+Standards-compliant inspection report.
+
+- Declaration: satisfactory / satisfactory-with-variations / unsatisfactory
+- Clause-level traceability (2025 numbering)
+- Structured report with inspection visit details, variations, competency evidence
+- Responsible person countersignature
+
+Screen: `bs5839_report_screen.dart`
+Service: `bs5839_report_service.dart`
+
+### Overall Compliance
+
+Aggregation service that brings together all compliance subsystems for a site.
+
+- Validation logic for system categories
+- Clause 6.6 prohibited variation detection
+- Satisfactory / unsatisfactory determination
+
+Service: `bs5839_compliance_service.dart`
+
+### Permissions (company context)
+
+| Permission | Label |
+|------------|-------|
+| `bs5839ConfigEdit` | Edit BS 5839 Config |
+| `bs5839ApproveVariations` | Approve Variations |
+| `bs5839IssueReports` | Issue Reports |
+| `bs5839RecordCpd` | Record CPD |
+| `bs5839ViewTeamCompetency` | View Team Competency |
+
+### Remote Config Flags (10 BS 5839-specific)
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `bs5839_mode_enabled` | false | Master toggle for BS 5839 compliance system |
+| `bs5839_visits_enabled` | false | Inspection visit functionality |
+| `bs5839_variations_register_enabled` | false | Variations register |
+| `bs5839_cause_effect_enabled` | false | Cause-and-effect testing |
+| `bs5839_competency_tracking_enabled` | false | Engineer competency tracking |
+| `bs5839_report_enabled` | false | BS 5839 report PDF generation |
+| `bs5839_logbook_structured_enabled` | false | Structured logbook |
+| `bs5839_min_cpd_hours_per_year` | 5.0 | Minimum CPD hours per year |
+| `bs5839_service_window_warning_days` | 30 | Days before service window warning |
+| `bs5839_reference_data_version` | '2025-04-30' | BS 5839 reference data version |
+
+---
+
 ## Web Portal
 
 **Status:** Feature complete, deployed to Firebase Hosting. Designed as a dispatcher dashboard for office workers — engineers use mobile only.
@@ -688,7 +993,11 @@ Remote config flag: `compliance_report_enabled`
 
 ### Web Shell Layout
 
-- **Sidebar navigation:** Dashboard (Jobs), Schedule, Team Management, Sites, Settings, Asset Register (conditional)
+- **Sidebar navigation** grouped into sections:
+  - **Top:** Jobs (Dashboard), Schedule
+  - **Workspace:** Team, Sites, Customers
+  - **Finance:** Quotes (conditional on `quoting_enabled`), Invoices
+  - **Bottom:** Branding (conditional on `pdfBranding` permission), Settings
 - **Top bar:** Company name, user profile, logout
 - **Main content area:** Dynamic per route
 - **Wide-screen layout:** List and form screens constrained to 750px max width using `Center` + `ConstrainedBox(maxWidth: 750)` pattern
@@ -698,7 +1007,7 @@ Remote config flag: `compliance_report_enabled`
 - Web-specific styled login page
 - Email / password entry
 - Redirects to `/jobs` on success
-- Redirects to `/access-denied` if user has no company or is not a dispatcher/admin
+- Redirects to `/access-denied` if user has no company or lacks web portal access permission
 
 ### Dispatcher Dashboard
 
@@ -720,16 +1029,39 @@ Remote config flag: `compliance_report_enabled`
 ### Schedule / Calendar View
 
 - Calendar/board view of scheduled jobs
+- Month, week, and day views
 - Colour-coded by engineer or priority
 - Click to open job detail panel
+- Unscheduled jobs strip
 
 ### Company Management (Web)
 
-- Team Management: invite, manage roles, remove members
+- Team Management: invite, manage roles and permissions, remove members
 - Sites: add / edit / delete company sites
 - Customers: manage customer database
-- PDF Design: company branding settings
 - Same screens as mobile, desktop-width layout with max-width constraints
+
+### Quotes (Web)
+
+- Quote list with filtering by status (`web_quotes_screen.dart`)
+- Create and edit quotes from web (`web_create_quote_screen.dart`)
+- Quote detail panel with side-by-side viewing (`web_quote_detail_panel.dart`)
+- PDF preview
+- Gated behind `quoting_enabled` remote config flag
+
+### Invoices (Web)
+
+- Invoice list with filtering by status (`web_invoices_screen.dart`)
+- Create and edit invoices from web (`web_create_invoice_screen.dart`)
+- Invoice detail panel (`web_invoice_detail_panel.dart`)
+
+### Branding (Web)
+
+- Full PDF branding customiser with live preview (`web_branding_screen.dart`)
+- Cover style, header style, footer style selection
+- Logo upload, colour selection, per-doc-type text overrides
+- Preview builders for all document types (jobsheet, invoice, quote, compliance report)
+- Gated behind `pdfBranding` permission
 
 ### Asset Register & Floor Plans (Web)
 
@@ -739,6 +1071,14 @@ Remote config flag: `compliance_report_enabled`
 - **Place and move pins with mouse** — ideal for office-based setup with printed drawings. `GestureDetector` pan tracking replaces `Draggable` to avoid `InteractiveViewer` gesture conflicts. Pan delta divided by zoom scale for correct movement at any zoom level.
 - Click pins for details, create assets directly from floor plan
 - `Image.network` with `webHtmlElementStrategy: WebHtmlElementStrategy.prefer` bypasses CORS for Firebase Storage images. Mobile keeps `CachedNetworkImage` for offline caching.
+
+### BS 5839 Compliance (Web)
+
+- System configuration per site
+- Inspection visit history and detail
+- Variations register
+- Logbook entries
+- Engineer competency tracking (via `/team/competency` route)
 
 ### Web Push Notifications
 
@@ -752,18 +1092,60 @@ Remote config flag: `compliance_report_enabled`
 |-------|--------|
 | `/login` | Web login |
 | `/jobs` | Dispatcher dashboard |
-| `/jobs/create` | Create job |
+| `/jobs/create` | Create / edit job |
 | `/jobs/:id` | Job detail |
-| `/schedule` | Calendar/board view |
+| `/schedule` | Calendar / board view |
 | `/team` | Team management |
+| `/team/competency` | Engineer competency (BS 5839) |
 | `/sites` | Company sites |
 | `/sites/:siteId/assets` | Asset register for site |
+| `/sites/:siteId/assets/add` | Add new asset |
+| `/sites/:siteId/assets/types` | Asset type configuration |
+| `/sites/:siteId/assets/report` | Compliance report |
+| `/sites/:siteId/assets/bs5839-config` | BS 5839 system config |
+| `/sites/:siteId/assets/bs5839-visits` | BS 5839 visit history |
+| `/sites/:siteId/assets/bs5839-visits/:visitId` | Visit detail |
+| `/sites/:siteId/assets/bs5839-variations` | Variations register |
+| `/sites/:siteId/assets/bs5839-logbook` | Logbook |
+| `/sites/:siteId/assets/:assetId` | Asset detail |
+| `/sites/:siteId/assets/:assetId/edit` | Edit asset |
 | `/sites/:siteId/floor-plans` | Floor plans for site |
+| `/sites/:siteId/floor-plans/upload` | Upload floor plan |
+| `/sites/:siteId/floor-plans/:planId` | Interactive floor plan |
+| `/quotes` | Quote list |
+| `/quotes/create` | Create / edit quote |
+| `/quotes/:id` | Quote detail |
+| `/invoices` | Invoice list |
+| `/invoices/create` | Create / edit invoice |
+| `/invoices/:id` | Invoice detail |
+| `/customers` | Company customers |
+| `/branding` | PDF branding customiser |
+| `/settings` | Web settings |
 | `/access-denied` | Access denied |
 
 ### Analytics Events (12 web-specific)
 
 `web_login`, `web_dashboard_viewed`, `web_job_created`, `web_job_edited`, `web_job_assigned`, `web_job_detail_viewed`, `web_schedule_viewed`, `web_bulk_assign`, `web_search_used`, `web_print_used`, `web_asset_register_viewed`, `web_floor_plan_viewed`
+
+---
+
+## Theme System
+
+Two visual themes selectable from Settings → Appearance.
+
+| Theme | Description |
+|-------|-------------|
+| **Classic** | Default FireThings theme. Light and dark mode follows system preference. Deep Navy `#1E3A5F` primary, Coral `#F97316` accent. |
+| **SiteOps** | Dark industrial theme. Forces dark mode regardless of system preference. Background `#0B0D10`, surface `#14171C`, accent amber `#FFB020`. |
+
+Implementation:
+
+- `ThemeStyle` enum (`classic`, `siteOps`) in `lib/utils/theme_style.dart`
+- `themeStyleNotifier` — global `ValueNotifier<ThemeStyle>` for reactive theme switching across the app
+- Preference persisted via SharedPreferences (`theme_style` key)
+- SiteOps forces `ThemeMode.dark` at the `MaterialApp` level
+- `AppTheme` colour constants are `static Color get` that dispatch by `themeStyleNotifier.value` — e.g. `AppTheme.primaryBlue` returns amber when SiteOps is active (colour names are semantic roles, not literal colours)
+- Theme loaded on app startup via `loadThemeStylePreference()`
 
 ---
 
@@ -780,14 +1162,18 @@ Remote config flag: `compliance_report_enabled`
 
 - Saved Customers
 - Saved Sites
-- Manage Permissions (grant / deny access to PDF certificates)
+
+### Appearance
+
+- Theme style selection (Classic / SiteOps)
 
 ### PDF Design
 
 - Header Designer
 - Footer Designer
 - Colour Scheme
-- Company Logo upload (per document type: jobsheet / invoice)
+- Company Logo upload (per document type: jobsheet / invoice / quote)
+- Personal Branding (solo users only — company branding is managed via the web portal)
 
 ### Company Management (when user belongs to a company)
 
@@ -848,15 +1234,15 @@ Remote config flag: `cloud_sync_enabled`
 - `FlutterError.onError` captures Flutter framework errors
 - `PlatformDispatcher.instance.onError` captures platform-level errors
 
-### Firebase Analytics (61 events)
+### Firebase Analytics (62 events)
 
-- 61 custom events across all features:
+- 62 custom events across all features:
   - **Templates:** 2 events (template_selected, template_started)
   - **Tools:** 1 event (tool_opened)
   - **Jobsheets:** 5 events (started, saved_draft, completed, pdf_generated, pdf_shared)
   - **Invoices:** 4 events (created, saved_draft, sent, marked_paid)
+  - **Quoting:** 4 events (quote_created, quote_sent, quote_status_changed, quote_converted)
   - **Customers & Sites:** 4 events (customer_saved, customer_selected, site_saved, site_selected)
-  - **PDF Forms:** 3 events (opened, saved_draft, previewed)
   - **Camera:** 3 events (photo_captured, video_recording_started, video_recording_completed)
   - **Auth:** 2 events (login, signup)
   - **Dispatch:** 13 events (company_created, company_joined, job lifecycle, directions, contact)
@@ -864,7 +1250,7 @@ Remote config flag: `cloud_sync_enabled`
   - **Asset Register:** 14 events (asset CRUD, testing, batch, decommission, floor plans, barcode, compliance report, type config)
 - Automatic screen tracking via `FirebaseAnalyticsObserver`
 
-### Firebase Remote Config (18 flags)
+### Firebase Remote Config (29 flags)
 
 | Flag | Default | Purpose |
 |------|---------|---------|
@@ -875,7 +1261,6 @@ Remote config flag: `cloud_sync_enabled`
 | `battery_load_tester_enabled` | true | Battery Load Tester tool |
 | `bs5839_reference_enabled` | true | BS 5839 Reference Guide |
 | `invoicing_enabled` | true | Invoicing feature |
-| `pdf_forms_enabled` | true | PDF Form Certificates |
 | `cloud_sync_enabled` | true | Firestore cloud sync |
 | `custom_templates_enabled` | true | Custom Template Builder |
 | `standards_data_version` | '08/03/2026' | BS 5839 data version string |
@@ -886,6 +1271,17 @@ Remote config flag: `cloud_sync_enabled`
 | `barcode_scanning_enabled` | false | Barcode/QR scanning |
 | `lifecycle_tracking_enabled` | false | Asset lifecycle tracking |
 | `compliance_report_enabled` | false | Compliance report PDF |
+| `quoting_enabled` | false | Quoting feature |
+| `bs5839_mode_enabled` | false | Master toggle for BS 5839 compliance system |
+| `bs5839_visits_enabled` | false | Inspection visit functionality |
+| `bs5839_variations_register_enabled` | false | Variations register |
+| `bs5839_cause_effect_enabled` | false | Cause-and-effect testing |
+| `bs5839_competency_tracking_enabled` | false | Engineer competency tracking |
+| `bs5839_report_enabled` | false | BS 5839 report PDF generation |
+| `bs5839_logbook_structured_enabled` | false | Structured logbook |
+| `bs5839_min_cpd_hours_per_year` | 5.0 | Minimum CPD hours per year |
+| `bs5839_service_window_warning_days` | 30 | Days before service window warning |
+| `bs5839_reference_data_version` | '2025-04-30' | BS 5839 reference data version |
 
 12-hour fetch interval in release, 1-minute in debug. Controlled from Firebase Console. Tester targeting via `dispatch_tester` analytics user property.
 
@@ -903,6 +1299,7 @@ Remote config flag: `cloud_sync_enabled`
 - **Personal data:** `users/{userId}/**` only accessible when `request.auth.uid == userId`
 - **Company data:** `companies/{companyId}/**` accessible to authenticated company members
 - **Service history:** Immutable (no updates/deletes) for audit trail integrity
+- **Permission enforcement:** `hasPermission(companyId, 'key')` helper function
 - Authentication required for all reads and writes
 - Deployed via `firebase deploy --only firestore:rules`
 
@@ -920,10 +1317,12 @@ users/{uid}/
   ├── profile/main/                    # User profile (companyId, role, fcmToken)
   ├── jobsheets/{jobsheetId}
   ├── invoices/{invoiceId}
+  ├── quotes/{quoteId}
   ├── saved_customers/{customerId}
   ├── saved_sites/{siteId}
   ├── job_templates/{templateId}
   ├── filled_templates/{filledTemplateId}
+  ├── branding/main/                   # Personal PDF branding (solo users)
   ├── pdf_config/
   │   ├── header_jobsheet, header_invoice
   │   ├── footer_jobsheet, footer_invoice
@@ -934,14 +1333,23 @@ companies/{companyId}/
   ├── profile/main/                    # Company details, invite code
   ├── members/{uid}/                   # Role, FCM token, permissions
   ├── dispatched_jobs/{jobId}
+  ├── quotes/{quoteId}
+  ├── customers/{customerId}
+  ├── branding/main/                   # Company-level PDF branding (v2)
+  ├── pdf_config/                      # Legacy PDF config (being deprecated)
+  │   ├── header, footer, colour_scheme
   ├── sites/{siteId}/
   │   ├── profile/main/
   │   ├── assets/{assetId}
   │   ├── floor_plans/{planId}
-  │   └── asset_service_history/{recordId}
-  ├── customers/{customerId}
-  ├── pdf_config/                      # Company-level PDF branding
-  │   ├── header, footer, colour_scheme
+  │   ├── asset_service_history/{recordId}
+  │   ├── bs5839_config/main/          # BS 5839 system configuration
+  │   ├── inspection_visits/{visitId}   # Inspection visit records
+  │   ├── variations/{variationId}      # Variations register
+  │   ├── cause_effect_tests/{testId}   # Cause-and-effect tests
+  │   ├── defects/{defectId}
+  │   └── logbook_entries/{entryId}     # Logbook entries
+  ├── competency/{uid}/                 # Engineer competency records
   └── asset_type_config/{typeId}
 ```
 
@@ -964,13 +1372,14 @@ Where `{basePath}` is `users/{uid}` (solo engineer) or `companies/{companyId}` (
 
 - **Multi-platform** — Android, iOS, Windows, macOS, Linux, web
 - **Offline-first** — all personal data stored locally in SQLite with Firestore cloud sync backup; company/dispatch data is Firestore-primary with offline persistence
-- **Dark mode** — full light / dark theme support following system preference
+- **Dark mode** — full light / dark theme support following system preference (Classic theme), or forced dark mode (SiteOps theme)
 - **Responsive** — four breakpoints (compact < 600, medium 600–840, expanded 840–1200, large 1200+) with adaptive layouts
 - **Adaptive UI** — Cupertino widgets on Apple platforms, Material on Android / desktop / web
-- **State management** — StatefulWidget + setState throughout; ValueNotifier for isolated rebuilds (e.g. camera zoom)
-- **Typography** — Google Fonts Inter; custom colour palette (Deep Navy `#1E3A5F` primary, Coral `#F97316` accent, Success Green `#4CAF50`, Error Red `#D32F2F`)
+- **State management** — StatefulWidget + setState throughout; ValueNotifier for isolated rebuilds (e.g. camera zoom, theme style)
+- **Typography** — Google Fonts Inter throughout; Outfit and JetBrains Mono for PDF generation
+- **Colour palette** — Classic: Deep Navy `#1E3A5F` primary, Coral `#F97316` accent, Success Green `#4CAF50`, Error Red `#D32F2F`. SiteOps: amber `#FFB020` on near-black `#0B0D10`.
 - **Animations** — Flutter Animate package; entrance animations, skeleton loaders, smooth transitions
-- **PDF generation** — Syncfusion PDF + `pdf` package; custom watermarking, form-field population, signature overlay, compliance report generation
+- **PDF generation** — `pdf` package + Syncfusion PDF; custom typography (Outfit/Inter/JetBrains Mono), branded covers, signature overlay, compliance report generation
 - **Camera / media** — Camera package, FFmpeg video processing, image picker, gallery save
 - **Location** — geocoding with throttled GPS tracking
 - **Background tasks** — Workmanager for periodic notification checks (12-hour intervals)
@@ -982,20 +1391,19 @@ Where `{basePath}` is `users/{uid}` (solo engineer) or `companies/{companyId}` (
 
 ## Future Enhancements
 
-This section is reserved for features requested by testers or identified during beta testing. Items will be added here as they are identified and prioritised.
+This section lists confirmed future build items only.
 
-### Potential Areas (Not Yet Committed)
+### Customer Portal
 
-- Photo attachment to jobsheets from timestamp camera
-- Recurring job scheduling
-- Customer portal or email notifications for invoice tracking
-- Export to accounting software (Xero, QuickBooks, FreeAgent)
-- Multi-device sync for solo engineers
-- End-to-end encryption for sensitive data
-- Additional PDF certificate templates
-- Expanded BS 5839 reference data
-- Integration with third-party fire safety systems
-- Advanced reporting and analytics dashboards
-- Team performance metrics for dispatchers
+Customer-facing portal for viewing quotes, invoices, and job status. Allows customers to review and respond to documents without requiring a FireThings account. Scope and timeline to be determined.
 
-*(This list will evolve based on tester feedback and usage data.)*
+### PDF Architecture Rebuild — Phases 2–5
+
+The rendering rebuild (Phase 1) is currently in progress. The remaining phases are approved and planned:
+
+- **Phase 2 — Branding source split:** Company vs personal branding resolution with automatic fallback logic
+- **Phase 3 — Simplified mobile customiser:** Five preset brand kits for solo engineers with logo upload and colour tweaking
+- **Phase 4 — Tier gating:** Free / Pro / Premium subscription tiers via RevenueCat (StoreKit, Play Billing, Stripe)
+- **Phase 5 — Deprecate old editors:** Migration of legacy PDF config data and removal of old editor screens
+
+Full spec: `docs/specs/PDF_ARCHITECTURE_REBUILD_SPEC.md`

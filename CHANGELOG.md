@@ -4,6 +4,148 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-24 (Session 98)
+
+### PDF Architecture Rebuild — Session 3.4 (Test PDF Button)
+
+Wired the "Generate Test PDF" button in `PersonalBrandingScreen` to call `ComplianceReportService.generateBrandingPreview()` with the user's current personal branding. Shows a loading spinner on the button during generation, then navigates to the existing `PdfPreviewScreen` (Syncfusion viewer with print/share actions in the app bar). Errors display via SnackBar. This completes Phase 3 of the PDF Architecture Rebuild — the simplified mobile customiser is fully functional end-to-end.
+
+#### Modified Files (1)
+- `lib/screens/settings/branding/personal_branding_screen.dart` — Added `_generating` state, `_generateTestPdf()` method, replaced placeholder SnackBar with real PDF generation + preview navigation, added imports for ComplianceReportService, PdfPreviewScreen, adaptivePageRoute
+
+---
+
+## 2026-04-24 (Session 97)
+
+### PDF Architecture Rebuild — Session 3.3 (Cover Style Picker + Colour Tweaker + Live Preview)
+
+Built the three remaining widgets for the mobile personal branding customiser. `CoverStylePicker` shows three tappable cards (Bold/Minimal/Bordered) with mini previews that match each cover style's visual language — dark background with gradient circle for bold, accent bar for minimal, top/bottom borders for bordered. `PrimaryColourTweaker` provides hue (0-360) and brightness (0.05-1.0) sliders with rainbow/black-to-colour gradient tracks overlaid behind transparent Slider widgets. `MiniCoverPreview` renders a scaled-down live preview of the current cover page using standard Flutter text styles — shows eyebrow, logo mark, company name, title, subtitle, and meta grid, all reactive to colour/style changes.
+
+Integrated all three into `PersonalBrandingScreen` behind an expandable "Customise further" toggle with animated rotation arrow. Live preview sits at the top of the screen and updates instantly as settings change. Colour changes are debounced (500ms) before saving to Firestore. Cover style and preset changes save immediately. Preset detection re-runs on every change so the selected indicator clears when the user diverges from a preset's colours.
+
+#### New Files (3)
+- `lib/screens/settings/branding/widgets/cover_style_picker.dart` — Three cover style cards with mini previews
+- `lib/screens/settings/branding/widgets/primary_colour_tweaker.dart` — Hue + brightness sliders with gradient tracks
+- `lib/screens/settings/branding/widgets/mini_cover_preview.dart` — Scaled-down live cover page preview
+
+#### Modified Files (1)
+- `lib/screens/settings/branding/personal_branding_screen.dart` — Added imports, customise toggle, cover style/colour handlers with debounce, wired all three widgets into ListView
+
+---
+
+## 2026-04-24 (Session 96)
+
+### PDF Architecture Rebuild — Sessions 3.1 & 3.2 (Preset Model + Screen + Logo Upload)
+
+**Session 3.1:** Created the mobile personal branding screen scaffold. Added `BrandingPreset` model with 5 pre-designed colour kits (FireThings, Graphite, Forest, Slate, Heritage) — each preset defines primary/accent colours and a suggested cover style. Built `PersonalBrandingScreen` with an explainer card, tappable preset picker cards with animated selection and colour swatches, and a test PDF button placeholder. Wired into Settings: "Personal Branding" tile appears in the PDF Settings section only for solo users (`!hasCompany`). Selecting a preset immediately saves to `users/{uid}/branding/main` via `savePersonalBranding()`.
+
+**Session 3.2:** Built `BrandingLogoMobile` widget with three-source picker (camera, gallery, file) via bottom sheet on mobile, `FilePicker` on web. Validates file type (PNG/JPG/SVG) and size (under 1 MB) before upload. Shows empty state with drop target, preview state with logo thumbnail + replace/delete buttons, and uploading state with spinner. Wired into personal branding screen: picks file → uploads via `uploadPersonalLogo()` → saves URL to branding → displays preview. Delete fires `deletePersonalLogo()` and clears `logoUrl` from branding.
+
+#### New Files (3)
+- `lib/models/branding_preset.dart` — 5 preset definitions with `toBranding()` converter
+- `lib/screens/settings/branding/personal_branding_screen.dart` — Full screen with preset picker and logo upload
+- `lib/screens/settings/branding/widgets/branding_logo_mobile.dart` — Mobile logo upload widget (camera/gallery/file)
+
+#### Modified Files (2)
+- `lib/models/models.dart` — Added `branding_preset.dart` export
+- `lib/screens/settings/settings_screen.dart` — Added "Personal Branding" tile for solo users
+
+---
+
+### PDF Architecture Rebuild — Sessions 2.1 & 2.2 (Branding Source Split)
+
+**Session 2.1:** Added user-level (personal) branding support to `PdfBrandingService`. Solo engineers without a company can now have their own branded PDFs stored at `users/{userId}/branding/main` in Firestore. Added `getPersonalBranding()`, `watchPersonalBranding()`, `savePersonalBranding()` methods mirroring the existing company-level ones, plus `uploadPersonalLogo()` and `deletePersonalLogo()` for user-scoped logo storage. Added `resolveBrandingForCurrentUser()` resolver that picks company branding for company users and personal branding for solo users. Separate `_cachedPersonal` field prevents cache cross-contamination. No Firestore rule changes needed — existing `users/{userId}/{document=**}` wildcard already covers the new path.
+
+**Session 2.2:** Rewired all five PDF services to call `resolveBrandingForCurrentUser()` instead of `getBranding(companyId)`. Removed the `useCompanyBranding` / `companyId != null` gate around the branding block so solo users now enter the branded code path. The `useCompanyBranding` flag is retained for legacy `CompanyPdfConfigService` calls (header/footer config, logo fallback). Cleaned up now-unused `UserProfileService` imports from quote, invoice, and template services.
+
+#### Modified Files (6)
+- `lib/services/pdf_branding_service.dart` — Added personal branding methods, personal logo methods, resolver, separate personal cache
+- `lib/services/compliance_report_service.dart` — Replaced `getBranding(companyId)` with `resolveBrandingForCurrentUser()`, removed `useCompanyBranding` gate
+- `lib/services/quote_pdf_service.dart` — Same resolver swap, removed unused `UserProfileService` import
+- `lib/services/invoice_pdf_service.dart` — Same resolver swap, removed unused `UserProfileService` import
+- `lib/services/template_pdf_service.dart` — Same resolver swap, removed unused `UserProfileService` import
+- `lib/services/bs5839_report_service.dart` — Same resolver swap
+
+---
+
+## 2026-04-24 (Session 96)
+
+### FEATURES.md Comprehensive Update
+
+Rewrote `FEATURES.md` from 1002 to 1409 lines to include all implemented features as of April 2026.
+
+#### Added Sections (6)
+- **Quoting** — full quoting system with defect-to-quote workflow, status lifecycle (Draft→Sent→Approved→Declined→Converted), quote conversion to dispatched jobs, 5 permissions
+- **Granular Permission System** — 45 permissions across 14 categories, role defaults, enforcement (client/server/Cloud Functions), last-admin protection
+- **PDF Architecture Rebuild** — five-phase rebuild spec with Phase 1 (rendering rebuild) in progress, covering font registry, brand tokens, cover/header/footer builder rewrites
+- **BS 5839-1:2025 Compliance System** — system configuration, inspection visits, variations register, cause-and-effect testing, engineer competency, logbook, report PDF, 10 remote config flags
+- **Theme System** — Classic and SiteOps dual-theme system with forced dark mode
+- **Symptom Troubleshooter** — added to Helpful Tools (5 categories, 30 symptoms with diagnostic guidance)
+
+#### Removed Sections (1)
+- **PDF Form Certificates** — IQ certificates removed from app (user confirmed)
+
+#### Updated Sections
+- **Navigation** — updated to 5 permanent tabs (added Quotes), updated web sidebar structure
+- **PDF Design & Branding** — added PDF Branding v2 (web customiser) subsection with cover/header/footer styles
+- **Web Portal** — added Quotes, Invoices, Branding, BS 5839 Compliance subsections; expanded routes table from 10 to 32 routes
+- **Backend & Infrastructure** — updated analytics to 62 events (+4 quoting, -3 PDF forms), expanded remote config flags from 18 to 29, added BS 5839 and quotes Firestore collections
+- **Future Enhancements** — replaced speculative list with confirmed items only (Customer Portal + PDF Architecture phases 2-5)
+- **Settings** — added Appearance (theme style), updated PDF design references
+
+#### Modified Files (1)
+- `FEATURES.md` — full rewrite
+
+---
+
+## 2026-04-24 (Session 95)
+
+### PDF Architecture Rebuild — Session 1.4 (Wire Remaining Four PDF Services)
+
+Applied branded header, footer, and cover builders to the remaining four PDF services. Quote, invoice, template, and BS 5839 report services now all follow the same two-path architecture: when branding + branded fonts are present, the new `PdfCoverBuilder`, `PdfHeaderBuilder`, and `PdfFooterBuilder.buildBrandedFooter()` are used; otherwise legacy builders serve as fallback. Added `brandedFontBytes` field to all six DTOs in `pdf_generation_data.dart`. Resolved `PdfHeaderBuilder` name collision between old and new implementations using `as legacy_header` import prefix. All five PDF types (compliance, quote, invoice, template, BS 5839) now produce consistent branded output matching the web preview.
+
+#### Modified Files (5)
+- `lib/services/quote_pdf_service.dart` — Added branded cover page, header, footer; font loading in gather phase; legacy fallback
+- `lib/services/invoice_pdf_service.dart` — Added branded cover page, header, footer; font loading in gather phase; legacy fallback
+- `lib/services/template_pdf_service.dart` — Added branded cover page, 3-way header (branded/legacy/template-custom), branded footer per page; font loading in gather phase
+- `lib/services/bs5839_report_service.dart` — Full branding integration from scratch: PdfBrandingService resolution, logo download, branded fonts, cover page, MultiPage header/footer
+- `lib/services/pdf_generation_data.dart` — Added `brandedFontBytes` to all six DTOs (`JobsheetPdfData`, `InvoicePdfData`, `QuotePdfData`, `TemplatePdfData`, `ComplianceReportPdfData`, `Bs5839ReportPdfData`); added `brandingJson` to `Bs5839ReportPdfData`
+
+---
+
+## 2026-04-24 (Session 94)
+
+### PDF Architecture Rebuild — Session 1.3 (Header + Footer Rebuild + Compliance Report Wiring)
+
+Implemented Session 1.3 of the PDF rendering rebuild. Added isolate support to `PdfFontRegistry` with `loadFromBytes()` (reconstructs fonts from raw bytes in compute isolates) and `extractFontBytes()` (serialises loaded fonts for DTO transfer). Created `PdfHeaderBuilder` class with 3 branded header styles (solid/minimal/bordered) matching the web preview — accent-coloured logo mark, company name, document meta text, with `headerShowCompanyName` and `headerShowDocNumber` toggles. Added `buildBrandedFooter()` to `PdfFooterBuilder` with 3 footer styles (light/minimal/coloured) matching the web preview — left text, right-aligned company name + page numbers with `footerShowCompanyName` and `footerShowPageNumbers` toggles. Wired `compliance_report_service.dart` end-to-end: branded font loading on main thread, font bytes passed through DTO to isolate, cover migrated from legacy `buildBrandedCoverPage()` to new `PdfCoverBuilder.build()`, branded header added to MultiPage content pages, branded footer with full style support. Legacy code paths kept as fallback when branding is null.
+
+#### Modified Files (5)
+- `lib/services/pdf_widgets/pdf_font_registry.dart` — Added `loadFromBytes()`, `extractFontBytes()`, `_extractBytes()` for isolate font transfer
+- `lib/services/pdf_generation_data.dart` — Added `brandedFontBytes` field to `ComplianceReportPdfData`
+- `lib/services/pdf_widgets/pdf_modern_header.dart` — Added `PdfHeaderBuilder` class with 3 branded styles; old `buildModernHeader()` kept for Session 1.4
+- `lib/services/pdf_footer_builder.dart` — Added `buildBrandedFooter()` with 3 branded styles; old `buildFooter()` kept for Session 1.4
+- `lib/services/compliance_report_service.dart` — Full branded wiring: font loading, cover migration, header addition, footer upgrade, preview method updated
+
+---
+
+## 2026-04-23 (Session 93)
+
+### PDF Architecture Rebuild — Session 1.1 & 1.2 (Font Registry + Brand Tokens + Cover Builder Rewrite)
+
+Implemented the first two sessions of the PDF Architecture Rebuild (Phase 1). Session 1.1 set up font registration — created `PdfFontRegistry` singleton that loads Outfit (700/800), Inter (400/500/600/700), and JetBrains Mono (500) TTFs from bundled assets. Wired into `main.dart` so fonts are ready before any PDF generation. Session 1.2 created `PdfBrandTokens` (the PDF-side parallel of `web_theme.dart`) with typed text styles for covers, sections, headers, footers, and body text — all consuming `PdfBranding` and the font registry. Rewrote `PdfCoverBuilder` as a class with a static `build()` method returning `pw.Widget` (not `pw.Page`), matching the web preview's layout: eyebrow → logo mark → title → subtitle → meta grid. Bold cover has a radial gradient glow. Legacy `buildBrandedCoverPage` function kept as a thin adapter so existing callers compile until Sessions 1.3/1.4 rewire them.
+
+#### New Files (3)
+- `lib/services/pdf_widgets/pdf_font_registry.dart` — Singleton font registry, 7 fonts, `ensureLoaded()` pattern
+- `lib/services/pdf_widgets/pdf_brand_tokens.dart` — PDF design tokens parallel to `web_theme.dart`
+- `test/pdf_cover_builder_test.dart` — 6 tests: all 3 cover styles, text overrides, legacy compat, distinct output
+
+#### Modified Files (3)
+- `pubspec.yaml` — Added asset declarations for `Outfit/static/`, `Inter/static/`, `JetBrains_Mono/static/`
+- `lib/main.dart` — Added `PdfFontRegistry.instance.ensureLoaded()` call in init
+- `lib/services/pdf_widgets/pdf_cover_builder.dart` — Complete rewrite: new `PdfCoverBuilder` class using brand tokens + font registry; legacy wrapper delegates to new implementation
+
+---
+
 ## 2026-04-23 (Session 92)
 
 ### PDF Branding — Session 8 (Wire Quote/Invoice/Jobsheet PDFs + Extend Header/Footer Builders)

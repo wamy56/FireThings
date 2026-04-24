@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../models/pdf_branding.dart';
+import 'user_profile_service.dart';
 
 class PdfBrandingService {
   PdfBrandingService._();
@@ -14,6 +15,7 @@ class PdfBrandingService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
   PdfBranding? _cached;
+  PdfBranding? _cachedPersonal;
 
   Future<PdfBranding> getBranding(String companyId) async {
     if (_cached != null) return _cached!;
@@ -67,19 +69,96 @@ class PdfBrandingService {
   Future<void> deleteLogo(String companyId, String url) async {
     try {
       await _storage.refFromURL(url).delete();
-    } catch (_) {
-      // Silently ignore — branding.logoUrl will be set to null by the caller
+    } catch (_) {}
+  }
+
+  // ── Personal (user-level) branding ──
+
+  Future<PdfBranding> getPersonalBranding(String userId) async {
+    if (_cachedPersonal != null) return _cachedPersonal!;
+    final doc = await _personalDocRef(userId).get();
+    _cachedPersonal = doc.exists
+        ? PdfBranding.fromJson(doc.data()!)
+        : PdfBranding.defaultBranding();
+    return _cachedPersonal!;
+  }
+
+  Stream<PdfBranding> watchPersonalBranding(String userId) {
+    return _personalDocRef(userId).snapshots().map((doc) {
+      final b = doc.exists
+          ? PdfBranding.fromJson(doc.data()!)
+          : PdfBranding.defaultBranding();
+      _cachedPersonal = b;
+      return b;
+    });
+  }
+
+  Future<void> savePersonalBranding(String userId, PdfBranding branding) async {
+    final updated = branding.copyWith(
+      updatedAt: DateTime.now(),
+      lastModifiedAt: DateTime.now(),
+      lastUpdatedBy: userId,
+    );
+    await _personalDocRef(userId).set(updated.toJson());
+    _cachedPersonal = updated;
+  }
+
+  Future<String> uploadPersonalLogo({
+    required String userId,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final ext = fileName.split('.').last.toLowerCase();
+    if (!['png', 'svg', 'jpg', 'jpeg'].contains(ext)) {
+      throw const FormatException('Logo must be PNG, JPG or SVG');
     }
+    if (bytes.length > 1024 * 1024) {
+      throw const FormatException('Logo must be under 1 MB');
+    }
+    final ref = _storage.ref('users/$userId/branding/logo.$ext');
+    final task = await ref.putData(
+      bytes,
+      SettableMetadata(contentType: _mimeFor(ext)),
+    );
+    return await task.ref.getDownloadURL();
+  }
+
+  Future<void> deletePersonalLogo(String userId, String url) async {
+    try {
+      await _storage.refFromURL(url).delete();
+    } catch (_) {}
+  }
+
+  // ── Resolver ──
+
+  Future<PdfBranding> resolveBrandingForCurrentUser() async {
+    final profile = UserProfileService.instance;
+    if (profile.companyId != null) {
+      return getBranding(profile.companyId!);
+    }
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) {
+      return getPersonalBranding(uid);
+    }
+    return PdfBranding.defaultBranding();
   }
 
   void clearCache() {
     _cached = null;
+    _cachedPersonal = null;
   }
 
   DocumentReference<Map<String, dynamic>> _docRef(String companyId) =>
       _firestore
           .collection('companies')
           .doc(companyId)
+          .collection('branding')
+          .doc('main');
+
+  DocumentReference<Map<String, dynamic>> _personalDocRef(String userId) =>
+      _firestore
+          .collection('users')
+          .doc(userId)
           .collection('branding')
           .doc('main');
 

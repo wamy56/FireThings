@@ -4,8 +4,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../models/pdf_branding.dart';
+import '../../services/compliance_report_service.dart';
 import '../../services/pdf_branding_service.dart';
 import '../../services/user_profile_service.dart';
+import '../../utils/download_stub.dart'
+    if (dart.library.html) '../../utils/download_web.dart';
 import '../../theme/web_theme.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/premium_toast.dart';
@@ -177,10 +180,16 @@ class _WebBrandingScreenState extends State<WebBrandingScreen> {
     }
   }
 
-  void _onGenerateTestPdf() {
-    context.showWarningToast(
-      'Generate a compliance report from any site\'s asset register to preview your branding',
-    );
+  Future<void> _onGenerateTestPdf() async {
+    if (_branding == null) return;
+    try {
+      context.showInfoToast('Generating preview PDF...');
+      final pdfBytes = await ComplianceReportService.generateBrandingPreview(_branding!);
+      downloadFile(pdfBytes, 'Branding_Preview.pdf');
+      if (mounted) context.showSuccessToast('Preview PDF downloaded');
+    } catch (e) {
+      if (mounted) context.showErrorToast('Failed to generate preview: $e');
+    }
   }
 
   @override

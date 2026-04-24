@@ -23,7 +23,9 @@ import 'inspection_visit_service.dart';
 import 'remote_config_service.dart';
 import 'pdf_footer_builder.dart';
 import 'pdf_branding_service.dart';
-import 'pdf_widgets/pdf_cover_builder.dart' show buildBrandedCoverPage;
+import 'pdf_widgets/pdf_cover_builder.dart';
+import 'pdf_widgets/pdf_font_registry.dart';
+import 'pdf_widgets/pdf_modern_header.dart' show PdfHeaderBuilder;
 
 // ── Colour constants for the isolate ──
 const _white = PdfColors.white;
@@ -919,13 +921,49 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
       ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
       : pw.Font.helveticaBold();
 
+  // Load branded fonts in isolate from pre-loaded bytes
+  PdfBranding? branding;
+  final hasBrandedFonts = data.brandedFontBytes != null;
+  if (data.brandingJson != null) {
+    branding = PdfBranding.fromJson(data.brandingJson!);
+    if (hasBrandedFonts) {
+      PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
+    }
+  }
+
+  final fonts = hasBrandedFonts ? PdfFontRegistry.instance : null;
   final pdf = pw.Document(
-    theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+    theme: pw.ThemeData.withFont(
+      base: fonts?.interRegular ?? regularFont,
+      bold: fonts?.interBold ?? boldFont,
+    ),
   );
 
   // Section 1: Cover Page
-  if (data.brandingJson != null) {
-    final branding = PdfBranding.fromJson(data.brandingJson!);
+  if (branding != null && hasBrandedFonts) {
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: pw.EdgeInsets.zero,
+      build: (_) => PdfCoverBuilder.build(
+        branding: branding!,
+        docType: BrandingDocType.report,
+        defaultEyebrow: 'SITE COMPLIANCE',
+        defaultTitle: 'Compliance\nReport',
+        defaultSubtitle: '${data.siteName} · ${data.reportDate}',
+        metaFields: [
+          (label: 'SITE', value: data.siteName),
+          (label: 'ADDRESS', value: data.siteAddress),
+          (label: 'DATE', value: data.reportDate),
+          (label: 'ENGINEER', value: data.engineerName),
+          if (data.companyName.isNotEmpty)
+            (label: 'COMPANY', value: data.companyName),
+        ],
+        logoBytes: data.logoBytes,
+        companyName: data.companyName,
+      ),
+    ));
+  } else if (branding != null) {
+    // Fallback: branding present but branded fonts failed to load
     final coverText = branding.coverTextFor(BrandingDocType.report);
     pdf.addPage(buildBrandedCoverPage(
       style: branding.coverStyle,
@@ -965,12 +1003,31 @@ Future<Uint8List> _buildComplianceReport(ComplianceReportPdfData data) async {
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
-      footer: (context) => PdfFooterBuilder.buildFooter(
-        config: footerConfig,
-        pageNumber: context.pageNumber,
-        pagesCount: context.pagesCount,
-        primaryColor: ctx.primaryColor,
-      ),
+      header: branding != null && hasBrandedFonts
+          ? (context) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 8),
+                child: PdfHeaderBuilder.build(
+                  branding: branding!,
+                  companyName: data.companyName,
+                  metaText: 'COMPLIANCE REPORT · ${data.reportDate}',
+                  logoBytes: data.logoBytes,
+                ),
+              )
+          : null,
+      footer: branding != null && hasBrandedFonts
+          ? (context) => PdfFooterBuilder.buildBrandedFooter(
+                branding: branding!,
+                pageNumber: context.pageNumber,
+                pagesCount: context.pagesCount,
+                companyName: data.companyName,
+                defaultFooterText: 'Site Compliance Report · ${data.siteName}',
+              )
+          : (context) => PdfFooterBuilder.buildFooter(
+                config: footerConfig,
+                pageNumber: context.pageNumber,
+                pagesCount: context.pagesCount,
+                primaryColor: ctx.primaryColor,
+              ),
       build: (context) => widgets,
     ),
   );
@@ -993,14 +1050,49 @@ Future<Uint8List> _buildComplianceReportWeb(
       ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
       : pw.Font.helveticaBold();
 
+  // Load branded fonts from pre-loaded bytes (or directly on web)
+  PdfBranding? branding;
+  final hasBrandedFonts = data.brandedFontBytes != null;
+  if (data.brandingJson != null) {
+    branding = PdfBranding.fromJson(data.brandingJson!);
+    if (hasBrandedFonts) {
+      PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
+    }
+  }
+
+  final fonts = hasBrandedFonts ? PdfFontRegistry.instance : null;
   final pdf = pw.Document(
-    theme: pw.ThemeData.withFont(base: regularFont, bold: boldFont),
+    theme: pw.ThemeData.withFont(
+      base: fonts?.interRegular ?? regularFont,
+      bold: fonts?.interBold ?? boldFont,
+    ),
   );
 
   // Section 1: Cover Page
   onProgress?.call('Building cover page...');
-  if (data.brandingJson != null) {
-    final branding = PdfBranding.fromJson(data.brandingJson!);
+  if (branding != null && hasBrandedFonts) {
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: pw.EdgeInsets.zero,
+      build: (_) => PdfCoverBuilder.build(
+        branding: branding!,
+        docType: BrandingDocType.report,
+        defaultEyebrow: 'SITE COMPLIANCE',
+        defaultTitle: 'Compliance\nReport',
+        defaultSubtitle: '${data.siteName} · ${data.reportDate}',
+        metaFields: [
+          (label: 'SITE', value: data.siteName),
+          (label: 'ADDRESS', value: data.siteAddress),
+          (label: 'DATE', value: data.reportDate),
+          (label: 'ENGINEER', value: data.engineerName),
+          if (data.companyName.isNotEmpty)
+            (label: 'COMPANY', value: data.companyName),
+        ],
+        logoBytes: data.logoBytes,
+        companyName: data.companyName,
+      ),
+    ));
+  } else if (branding != null) {
     final coverText = branding.coverTextFor(BrandingDocType.report);
     pdf.addPage(buildBrandedCoverPage(
       style: branding.coverStyle,
@@ -1059,12 +1151,31 @@ Future<Uint8List> _buildComplianceReportWeb(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
-      footer: (context) => PdfFooterBuilder.buildFooter(
-        config: footerConfig,
-        pageNumber: context.pageNumber,
-        pagesCount: context.pagesCount,
-        primaryColor: ctx.primaryColor,
-      ),
+      header: branding != null && hasBrandedFonts
+          ? (context) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 8),
+                child: PdfHeaderBuilder.build(
+                  branding: branding!,
+                  companyName: data.companyName,
+                  metaText: 'COMPLIANCE REPORT · ${data.reportDate}',
+                  logoBytes: data.logoBytes,
+                ),
+              )
+          : null,
+      footer: branding != null && hasBrandedFonts
+          ? (context) => PdfFooterBuilder.buildBrandedFooter(
+                branding: branding!,
+                pageNumber: context.pageNumber,
+                pagesCount: context.pagesCount,
+                companyName: data.companyName,
+                defaultFooterText: 'Site Compliance Report · ${data.siteName}',
+              )
+          : (context) => PdfFooterBuilder.buildFooter(
+                config: footerConfig,
+                pageNumber: context.pageNumber,
+                pagesCount: context.pagesCount,
+                primaryColor: ctx.primaryColor,
+              ),
       build: (context) => widgets,
     ),
   );
@@ -1237,35 +1348,38 @@ class ComplianceReportService {
       boldFontBytes = _extractFontBytes(boldFont);
     } catch (_) {}
 
+    // Branded fonts (for new cover/header/footer builders)
+    Map<String, Uint8List>? brandedFontBytes;
+    try {
+      await PdfFontRegistry.instance.ensureLoaded();
+      brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
+    } catch (e) {
+      debugPrint('Failed to load branded fonts: $e');
+    }
+
     // Branding
     final settings = await JobsheetSettingsService.getSettings();
     final useCompanyBranding = basePath.startsWith('companies/');
 
-    // Resolve PdfBranding from Firestore (if company user and report type applies)
     PdfBranding? branding;
     Uint8List? brandingLogoBytes;
-    if (useCompanyBranding) {
-      final companyId = UserProfileService.instance.companyId;
-      if (companyId != null) {
-        try {
-          final b = await PdfBrandingService.instance.getBranding(companyId);
-          if (b.appliesToDocType(BrandingDocType.report)) {
-            branding = b;
-            if (b.logoUrl != null) {
-              try {
-                final response = await http.get(Uri.parse(b.logoUrl!));
-                if (response.statusCode == 200) {
-                  brandingLogoBytes = response.bodyBytes;
-                }
-              } catch (e) {
-                debugPrint('Failed to download branding logo: $e');
-              }
+    try {
+      final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
+      if (b.appliesToDocType(BrandingDocType.report)) {
+        branding = b;
+        if (b.logoUrl != null) {
+          try {
+            final response = await http.get(Uri.parse(b.logoUrl!));
+            if (response.statusCode == 200) {
+              brandingLogoBytes = response.bodyBytes;
             }
+          } catch (e) {
+            debugPrint('Failed to download branding logo: $e');
           }
-        } catch (e) {
-          debugPrint('Failed to load PdfBranding: $e');
         }
       }
+    } catch (e) {
+      debugPrint('Failed to load PdfBranding: $e');
     }
 
     // Existing config resolution (fallback when branding is null)
@@ -1490,6 +1604,7 @@ class ComplianceReportService {
       bs5839LastDeclaration: bs5839LastDeclaration,
       bs5839ModeEnabled: bs5839Enabled,
       brandingJson: branding?.toJson(),
+      brandedFontBytes: branding != null ? brandedFontBytes : null,
     );
 
     // Store last report date for rectified-count tracking
@@ -1502,6 +1617,114 @@ class ComplianceReportService {
       return _buildComplianceReportWeb(data, onProgress: onProgress);
     }
     return compute(_buildComplianceReport, data);
+  }
+
+  /// Generates a compliance report PDF using the given [branding] directly
+  /// (bypassing Firestore) with synthetic sample data, for previewing branding.
+  static Future<Uint8List> generateBrandingPreview(PdfBranding branding) async {
+    // Fonts
+    Uint8List? regularFontBytes;
+    Uint8List? boldFontBytes;
+    try {
+      final regularFont = await PdfGoogleFonts.robotoRegular();
+      final boldFont = await PdfGoogleFonts.robotoBold();
+      regularFontBytes = _extractFontBytes(regularFont);
+      boldFontBytes = _extractFontBytes(boldFont);
+    } catch (_) {}
+
+    // Branded fonts
+    Map<String, Uint8List>? brandedFontBytes;
+    try {
+      await PdfFontRegistry.instance.ensureLoaded();
+      brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
+    } catch (e) {
+      debugPrint('Failed to load branded fonts for preview: $e');
+    }
+
+    // Logo
+    Uint8List? logoBytes;
+    if (branding.logoUrl != null) {
+      try {
+        final response = await http.get(Uri.parse(branding.logoUrl!));
+        if (response.statusCode == 200) logoBytes = response.bodyBytes;
+      } catch (e) {
+        debugPrint('Failed to download branding logo: $e');
+      }
+    }
+
+    // Colour overrides
+    final effectiveColourValue = _hexToColorValue(branding.primaryColour);
+    final effectiveSecondaryValue = _hexToColorValue(branding.accentColour);
+
+    // Footer override
+    final effectiveFooterConfig = branding.footerText.isNotEmpty
+        ? PdfFooterConfig(
+            leftLines: [HeaderTextLine(key: 'brandingText', value: branding.footerText, fontSize: 8)],
+            centreLines: const [],
+          )
+        : PdfFooterConfig.defaults();
+
+    // Company info
+    final settings = await JobsheetSettingsService.getSettings();
+    final engineerName = UserProfileService.instance.resolveEngineerName();
+    final companyName = settings.companyName.isNotEmpty
+        ? settings.companyName
+        : 'Sample Company Ltd';
+    final now = DateTime.now();
+    final reportDate = DateFormat('dd/MM/yyyy').format(now);
+
+    // ── Synthetic sample data ──
+    const siteId = 'preview-site';
+    final sampleAssetTypes = [
+      {'id': 'smoke-optical', 'name': 'Optical Smoke Detector', 'category': 'Detection', 'iconName': 'cloud', 'defaultColor': '#4CAF50', 'variants': <String>[], 'defaultLifespanYears': 10, 'defaultServiceIntervalMonths': 6, 'commonFaults': <String>[], 'isBuiltIn': true, 'checklistVersion': 1},
+      {'id': 'mcp', 'name': 'Manual Call Point', 'category': 'Manual', 'iconName': 'warning_2', 'defaultColor': '#F44336', 'variants': <String>[], 'defaultLifespanYears': 15, 'defaultServiceIntervalMonths': 6, 'commonFaults': <String>[], 'isBuiltIn': true, 'checklistVersion': 1},
+      {'id': 'heat-fixed', 'name': 'Fixed Heat Detector', 'category': 'Detection', 'iconName': 'flash_1', 'defaultColor': '#FF9800', 'variants': <String>[], 'defaultLifespanYears': 10, 'defaultServiceIntervalMonths': 6, 'commonFaults': <String>[], 'isBuiltIn': true, 'checklistVersion': 1},
+      {'id': 'sounder', 'name': 'Sounder', 'category': 'Notification', 'iconName': 'sound', 'defaultColor': '#2196F3', 'variants': <String>[], 'defaultLifespanYears': 15, 'defaultServiceIntervalMonths': 12, 'commonFaults': <String>[], 'isBuiltIn': true, 'checklistVersion': 1},
+    ];
+
+    final lastService = now.subtract(const Duration(days: 30));
+    final sampleAssets = [
+      {'id': 'a1', 'siteId': siteId, 'assetTypeId': 'smoke-optical', 'reference': 'SD-001', 'locationDescription': 'Ground Floor — Reception', 'zone': 'Zone 1', 'complianceStatus': 'pass', 'lastServiceDate': lastService.toIso8601String(), 'lastServiceByName': engineerName, 'installDate': now.subtract(const Duration(days: 730)).toIso8601String(), 'createdBy': 'preview', 'createdAt': now.toIso8601String(), 'updatedAt': now.toIso8601String(), 'photoUrls': <String>[]},
+      {'id': 'a2', 'siteId': siteId, 'assetTypeId': 'mcp', 'reference': 'MCP-001', 'locationDescription': 'Ground Floor — Main Entrance', 'zone': 'Zone 1', 'complianceStatus': 'pass', 'lastServiceDate': lastService.toIso8601String(), 'lastServiceByName': engineerName, 'installDate': now.subtract(const Duration(days: 365)).toIso8601String(), 'createdBy': 'preview', 'createdAt': now.toIso8601String(), 'updatedAt': now.toIso8601String(), 'photoUrls': <String>[]},
+      {'id': 'a3', 'siteId': siteId, 'assetTypeId': 'heat-fixed', 'reference': 'HD-001', 'locationDescription': 'First Floor — Kitchen', 'zone': 'Zone 2', 'complianceStatus': 'fail', 'lastServiceDate': lastService.toIso8601String(), 'lastServiceByName': engineerName, 'installDate': now.subtract(const Duration(days: 1095)).toIso8601String(), 'createdBy': 'preview', 'createdAt': now.toIso8601String(), 'updatedAt': now.toIso8601String(), 'photoUrls': <String>[]},
+      {'id': 'a4', 'siteId': siteId, 'assetTypeId': 'sounder', 'reference': 'SND-001', 'locationDescription': 'Ground Floor — Corridor', 'zone': 'Zone 1', 'complianceStatus': 'untested', 'installDate': now.subtract(const Duration(days: 180)).toIso8601String(), 'createdBy': 'preview', 'createdAt': now.toIso8601String(), 'updatedAt': now.toIso8601String(), 'photoUrls': <String>[]},
+    ];
+
+    final sampleRecords = [
+      {'id': 'r1', 'assetId': 'a1', 'siteId': siteId, 'engineerId': 'preview', 'engineerName': engineerName, 'serviceDate': lastService.toIso8601String(), 'overallResult': 'pass', 'checklistResults': <Map<String, dynamic>>[], 'defectPhotoUrls': <String>[], 'createdAt': lastService.toIso8601String(), 'mcpTestedThisVisit': false},
+      {'id': 'r2', 'assetId': 'a3', 'siteId': siteId, 'engineerId': 'preview', 'engineerName': engineerName, 'serviceDate': lastService.toIso8601String(), 'overallResult': 'fail', 'checklistResults': <Map<String, dynamic>>[], 'defectNote': 'Detector slow to respond — contamination suspected', 'defectSeverity': 'major', 'defectAction': 'replacement_needed', 'defectPhotoUrls': <String>[], 'createdAt': lastService.toIso8601String(), 'mcpTestedThisVisit': false},
+    ];
+
+    final sampleDefects = [
+      {'id': 'd1', 'assetId': 'a3', 'siteId': siteId, 'severity': 'major', 'description': 'Heat detector HD-001 slow to respond — contamination suspected, replacement recommended', 'photoUrls': <String>[], 'status': 'open', 'action': 'replacement_needed', 'createdBy': 'preview', 'createdByName': engineerName, 'createdAt': lastService.toIso8601String(), 'triggeredProhibitedRule': false},
+    ];
+
+    final data = ComplianceReportPdfData(
+      siteName: 'Oakwood Business Centre',
+      siteAddress: '45 Victoria Road, Manchester, M1 2AB',
+      engineerName: engineerName,
+      companyName: companyName,
+      reportDate: reportDate,
+      logoBytes: logoBytes,
+      headerConfigJson: PdfHeaderConfig.defaults().toJson(),
+      footerConfigJson: effectiveFooterConfig.toJson(),
+      colourSchemeValue: effectiveColourValue,
+      secondaryColourValue: effectiveSecondaryValue,
+      regularFontBytes: regularFontBytes,
+      boldFontBytes: boldFontBytes,
+      assetsJson: sampleAssets,
+      assetTypesJson: sampleAssetTypes,
+      serviceRecordsJson: sampleRecords,
+      floorPlansJson: const [],
+      floorPlanImages: const {},
+      defectPhotos: const {},
+      defectsJson: sampleDefects,
+      rectifiedCount: 0,
+      brandingJson: branding.toJson(),
+      brandedFontBytes: brandedFontBytes,
+    );
+
+    return _buildComplianceReportWeb(data);
   }
 
   static Future<void> shareReport(

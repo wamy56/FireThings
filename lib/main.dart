@@ -21,6 +21,7 @@ import 'utils/theme_style.dart';
 import 'utils/responsive.dart';
 import 'utils/adaptive_widgets.dart';
 import 'utils/icon_map.dart';
+import 'services/pdf_widgets/pdf_font_registry.dart';
 import 'widgets/adaptive_app_bar.dart';
 
 // Mobile-only imports — only used behind !kIsWeb guards at runtime.
@@ -122,6 +123,8 @@ void main() {
       // Load persisted theme preferences
       await _loadThemePreference();
       await loadThemeStylePreference();
+
+      await PdfFontRegistry.instance.ensureLoaded();
 
       // Mobile-only initialization
       if (!kIsWeb) {

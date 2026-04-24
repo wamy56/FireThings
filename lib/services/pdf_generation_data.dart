@@ -18,6 +18,7 @@ class JobsheetPdfData {
   final String settingsPhone;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
+  final Map<String, Uint8List>? brandedFontBytes;
   final List<Map<String, dynamic>>? assetServiceRecords;
   final Map<String, dynamic>? bs5839VisitJson;
 
@@ -37,6 +38,7 @@ class JobsheetPdfData {
     required this.settingsPhone,
     this.regularFontBytes,
     this.boldFontBytes,
+    this.brandedFontBytes,
     this.assetServiceRecords,
     this.bs5839VisitJson,
   });
@@ -56,6 +58,7 @@ class InvoicePdfData {
   final Map<String, dynamic>? typographyJson;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
+  final Map<String, Uint8List>? brandedFontBytes;
 
   InvoicePdfData({
     required this.invoiceJson,
@@ -70,6 +73,7 @@ class InvoicePdfData {
     this.typographyJson,
     this.regularFontBytes,
     this.boldFontBytes,
+    this.brandedFontBytes,
   });
 }
 
@@ -83,6 +87,7 @@ class QuotePdfData {
   final Map<String, dynamic>? brandingJson;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
+  final Map<String, Uint8List>? brandedFontBytes;
 
   QuotePdfData({
     required this.quoteJson,
@@ -93,6 +98,7 @@ class QuotePdfData {
     this.brandingJson,
     this.regularFontBytes,
     this.boldFontBytes,
+    this.brandedFontBytes,
   });
 }
 
@@ -107,6 +113,17 @@ class TemplatePdfData {
   final Uint8List? boldFontBytes;
   /// Pre-loaded file bytes for signature/image fields. Maps field ID to bytes.
   final Map<String, Uint8List> resolvedFileBytes;
+  final Uint8List? logoBytes;
+  final Map<String, dynamic> headerConfigJson;
+  final Map<String, dynamic> footerConfigJson;
+  final int colourSchemeValue;
+  final int? secondaryColourValue;
+  final Map<String, dynamic>? brandingJson;
+  final Map<String, Uint8List>? brandedFontBytes;
+  final String settingsCompanyName;
+  final String settingsTagline;
+  final String settingsAddress;
+  final String settingsPhone;
 
   TemplatePdfData({
     required this.templateJson,
@@ -117,6 +134,17 @@ class TemplatePdfData {
     this.regularFontBytes,
     this.boldFontBytes,
     required this.resolvedFileBytes,
+    this.logoBytes,
+    required this.headerConfigJson,
+    required this.footerConfigJson,
+    required this.colourSchemeValue,
+    this.secondaryColourValue,
+    this.brandingJson,
+    this.brandedFontBytes,
+    this.settingsCompanyName = '',
+    this.settingsTagline = '',
+    this.settingsAddress = '',
+    this.settingsPhone = '',
   });
 }
 
@@ -167,6 +195,7 @@ class ComplianceReportPdfData {
   final String? bs5839LastDeclaration;
   final bool bs5839ModeEnabled;
   final Map<String, dynamic>? brandingJson;
+  final Map<String, Uint8List>? brandedFontBytes;
 
   ComplianceReportPdfData({
     required this.siteName,
@@ -195,6 +224,7 @@ class ComplianceReportPdfData {
     this.bs5839LastDeclaration,
     this.bs5839ModeEnabled = false,
     this.brandingJson,
+    this.brandedFontBytes,
   });
 }
 
@@ -226,6 +256,8 @@ class Bs5839ReportPdfData {
   final List<Map<String, dynamic>> floorPlansJson;
   final Map<String, Uint8List> floorPlanImages;
   final Map<String, Uint8List> defectPhotos;
+  final Map<String, dynamic>? brandingJson;
+  final Map<String, Uint8List>? brandedFontBytes;
 
   Bs5839ReportPdfData({
     required this.siteName,
@@ -254,5 +286,7 @@ class Bs5839ReportPdfData {
     required this.floorPlansJson,
     required this.floorPlanImages,
     required this.defectPhotos,
+    this.brandingJson,
+    this.brandedFontBytes,
   });
 }

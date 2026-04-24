@@ -26,6 +26,7 @@ export 'floor_plan.dart';
 export 'service_record.dart';
 export 'defect.dart';
 export 'quote.dart';
+export 'branding_preset.dart';
 export 'pdf_branding.dart' hide HeaderStyle;
 export 'permission.dart';
 export 'bs5839_system_config.dart';

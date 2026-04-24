@@ -22,9 +22,12 @@ import 'defect_service.dart';
 import 'floor_plan_service.dart';
 import 'inspection_visit_service.dart';
 import 'jobsheet_settings_service.dart';
+import 'pdf_branding_service.dart';
 import 'pdf_footer_builder.dart';
 import 'pdf_generation_data.dart';
+import 'pdf_widgets/pdf_cover_builder.dart';
 import 'pdf_widgets/pdf_field_row.dart';
+import 'pdf_widgets/pdf_font_registry.dart';
 import 'pdf_widgets/pdf_modern_header.dart';
 import 'pdf_widgets/pdf_modern_table.dart';
 import 'pdf_widgets/pdf_section_card.dart';
@@ -36,6 +39,11 @@ import 'variation_service.dart';
 
 Uint8List _resizeImageBytes(Uint8List bytes, {int maxWidth = 1200}) {
   return compressImageBytes(bytes, maxWidth: maxWidth, quality: 80);
+}
+
+int _hexToColorValue(String hex) {
+  final clean = hex.replaceFirst('#', '');
+  return 0xFF000000 | int.parse(clean, radix: 16);
 }
 
 class Bs5839ReportService {
@@ -86,6 +94,38 @@ class Bs5839ReportService {
 
     final engineerName = UserProfileService.instance.resolveEngineerName();
     final companyName = settings.companyName;
+
+    PdfBranding? branding;
+    Uint8List? brandingLogoBytes;
+    Map<String, Uint8List>? brandedFontBytes;
+
+    try {
+      final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
+      if (b.appliesToDocType(BrandingDocType.report)) {
+        branding = b;
+        if (b.logoUrl != null) {
+          try {
+            final response = await http.get(Uri.parse(b.logoUrl!));
+            if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
+          } catch (e) {
+            debugPrint('Failed to download branding logo: $e');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load PdfBranding: $e');
+    }
+
+    if (branding != null) {
+      try {
+        await PdfFontRegistry.instance.ensureLoaded();
+        brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
+      } catch (e) {
+        debugPrint('Failed to load branded fonts: $e');
+      }
+    }
+
+    final effectiveLogoBytes = brandingLogoBytes ?? logoBytes;
 
     onProgress?.call('Loading inspection data...');
 
@@ -202,17 +242,27 @@ class Bs5839ReportService {
       }
     }
 
+    final effectiveColourValue = branding != null
+        ? _hexToColorValue(branding.primaryColour)
+        : colourScheme.primaryColorValue;
+    final effectiveSecondaryValue = branding != null
+        ? _hexToColorValue(branding.accentColour)
+        : colourScheme.secondaryColorValue;
+
     final data = Bs5839ReportPdfData(
       siteName: siteName,
       siteAddress: siteAddress,
       engineerName: engineerName,
       companyName: companyName,
-      logoBytes: logoBytes,
+      logoBytes: effectiveLogoBytes,
       headerConfigJson: headerConfig.toJson(),
       footerConfigJson: footerConfig.toJson(),
-      colourSchemeValue: colourScheme.primaryColorValue,
+      colourSchemeValue: effectiveColourValue,
+      secondaryColourValue: effectiveSecondaryValue,
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
+      brandingJson: branding?.toJson(),
+      brandedFontBytes: brandedFontBytes,
       configJson: config?.toJson() ?? {},
       visitJson: visit?.toJson() ?? {},
       serviceRecordsJson: records
@@ -294,14 +344,26 @@ Future<Uint8List> _generatePdf(Bs5839ReportPdfData data) async {
   final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
   final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
 
+  PdfBranding? branding;
+  if (data.brandingJson != null) {
+    branding = PdfBranding.fromJson(data.brandingJson!);
+  }
+
+  if (data.brandedFontBytes != null) {
+    PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
+  }
+
   pw.Font? regularFont;
   pw.Font? boldFont;
   try {
-    if (data.regularFontBytes != null) {
+    if (data.brandedFontBytes != null) {
+      regularFont = PdfFontRegistry.instance.interRegular;
+      boldFont = PdfFontRegistry.instance.interBold;
+    } else if (data.regularFontBytes != null) {
       regularFont = pw.Font.ttf(data.regularFontBytes!.buffer.asByteData());
-    }
-    if (data.boldFontBytes != null) {
-      boldFont = pw.Font.ttf(data.boldFontBytes!.buffer.asByteData());
+      if (data.boldFontBytes != null) {
+        boldFont = pw.Font.ttf(data.boldFontBytes!.buffer.asByteData());
+      }
     }
   } catch (_) {}
 
@@ -893,15 +955,62 @@ Future<Uint8List> _generatePdf(Bs5839ReportPdfData data) async {
   );
 
   final doc = pw.Document(theme: theme);
+
+  final visitDate = visit?.visitDate != null
+      ? df.format(visit!.visitDate)
+      : df.format(DateTime.now());
+
+  if (branding != null && data.brandedFontBytes != null) {
+    doc.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: pw.EdgeInsets.zero,
+      build: (_) => PdfCoverBuilder.build(
+        branding: branding!,
+        docType: BrandingDocType.report,
+        defaultEyebrow: 'BS 5839-1:2025',
+        defaultTitle: 'Inspection\nReport',
+        defaultSubtitle: '${data.siteName} · $visitDate',
+        metaFields: [
+          (label: 'Site', value: data.siteName),
+          (label: 'Address', value: data.siteAddress),
+          (label: 'Engineer', value: data.engineerName),
+          (label: 'Date', value: visitDate),
+          (label: 'Declaration', value: declaration.displayLabel),
+        ],
+        logoBytes: data.logoBytes,
+        companyName: data.companyName,
+      ),
+    ));
+  }
+
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(40),
-      footer: (context) => PdfFooterBuilder.buildFooter(
-        config: footerConfig,
-        pageNumber: context.pageNumber,
-        pagesCount: context.pagesCount,
-      ),
+      header: branding != null && data.brandedFontBytes != null
+          ? (context) => pw.Padding(
+                padding: const pw.EdgeInsets.only(bottom: 8),
+                child: PdfHeaderBuilder.build(
+                  branding: branding!,
+                  companyName: data.companyName,
+                  metaText: 'BS 5839-1 INSPECTION · $visitDate',
+                  logoBytes: data.logoBytes,
+                ),
+              )
+          : null,
+      footer: branding != null && data.brandedFontBytes != null
+          ? (context) => PdfFooterBuilder.buildBrandedFooter(
+                branding: branding!,
+                pageNumber: context.pageNumber,
+                pagesCount: context.pagesCount,
+                companyName: data.companyName,
+                defaultFooterText: 'BS 5839-1 Inspection Report · ${data.siteName}',
+              )
+          : (context) => PdfFooterBuilder.buildFooter(
+                config: footerConfig,
+                pageNumber: context.pageNumber,
+                pagesCount: context.pagesCount,
+              ),
       build: (_) => widgets,
     ),
   );

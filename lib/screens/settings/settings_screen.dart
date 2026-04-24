@@ -32,6 +32,7 @@ import 'privacy_policy_screen.dart';
 import 'manage_permissions_screen.dart';
 import '../bs5839/competency_screen.dart';
 import '../invoicing/pdf_design_screen.dart';
+import 'branding/personal_branding_screen.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/tools_disclaimer_gate.dart';
 
@@ -259,6 +260,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             header: 'PDF Settings',
             isApple: isApple,
             tiles: [
+              if (!UserProfileService.instance.hasCompany)
+                _SettingsTileData(
+                  title: 'Personal Branding',
+                  subtitle: 'Customise your logo, colours and cover style',
+                  icon: AppIcons.brush,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      adaptivePageRoute(
+                        builder: (_) => const PersonalBrandingScreen(),
+                      ),
+                    );
+                  },
+                ),
               _SettingsTileData(
                 title: 'PDF Branding',
                 subtitle: 'Customise your jobsheet and invoice PDF design',
