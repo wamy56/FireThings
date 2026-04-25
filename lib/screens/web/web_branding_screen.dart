@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/pdf_branding.dart';
@@ -138,16 +139,34 @@ class _WebBrandingScreenState extends State<WebBrandingScreen> {
           _hasPendingSave = false;
         });
       }
-    } on FormatException catch (e) {
+    } on FormatException catch (e, stack) {
       if (mounted) {
+        setState(() {
+          _logoFileName = null;
+          _logoFileSize = null;
+          _saveStatus = _SaveStatus.error;
+        });
         context.showErrorToast(e.message);
-        setState(() => _saveStatus = _SaveStatus.saved);
       }
-    } catch (_) {
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        stack,
+        reason: 'Logo upload validation failed in web_branding_screen',
+      );
+    } catch (e, stack) {
       if (mounted) {
-        context.showErrorToast('Failed to upload logo');
-        setState(() => _saveStatus = _SaveStatus.saved);
+        setState(() {
+          _logoFileName = null;
+          _logoFileSize = null;
+          _saveStatus = _SaveStatus.error;
+        });
+        context.showErrorToast('Logo upload failed: $e');
       }
+      FirebaseCrashlytics.instance.recordError(
+        e,
+        stack,
+        reason: 'Logo upload failed in web_branding_screen',
+      );
     }
   }
 

@@ -30,7 +30,7 @@ class _BrandingLogoUploadState extends State<BrandingLogoUpload> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['png', 'jpg', 'jpeg', 'svg'],
+      allowedExtensions: ['png', 'jpg', 'jpeg'],
       withData: true,
     );
     if (result == null || result.files.isEmpty) return;
@@ -169,7 +169,7 @@ class _BrandingLogoUploadState extends State<BrandingLogoUpload> {
               ),
               const SizedBox(height: 2),
               Text(
-                'PNG, JPG or SVG · Max 1 MB',
+                'PNG or JPG · Max 1 MB',
                 style: FtText.inter(size: 11, color: FtColors.hint),
               ),
             ],

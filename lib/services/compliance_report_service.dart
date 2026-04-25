@@ -17,6 +17,7 @@ import 'defect_service.dart';
 import 'service_history_service.dart';
 import 'floor_plan_service.dart';
 import 'jobsheet_settings_service.dart';
+import 'company_service.dart';
 import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
 import 'bs5839_config_service.dart';
@@ -1075,7 +1076,15 @@ class ComplianceReportService {
 
     // User info
     final engineerName = UserProfileService.instance.resolveEngineerName();
-    final companyName = settings.companyName;
+    String companyName = '';
+    final cid = UserProfileService.instance.companyId;
+    if (cid != null) {
+      final company = await CompanyService.instance.getCompany(cid);
+      companyName = company?.name ?? '';
+    }
+    if (companyName.isEmpty) {
+      companyName = settings.companyName;
+    }
 
     // Assets & types
     final assets =
@@ -1318,9 +1327,18 @@ class ComplianceReportService {
     // Company info
     final settings = await JobsheetSettingsService.getSettings();
     final engineerName = UserProfileService.instance.resolveEngineerName();
-    final companyName = settings.companyName.isNotEmpty
-        ? settings.companyName
-        : 'Sample Company Ltd';
+    String companyName = '';
+    final cid = UserProfileService.instance.companyId;
+    if (cid != null) {
+      final company = await CompanyService.instance.getCompany(cid);
+      companyName = company?.name ?? '';
+    }
+    if (companyName.isEmpty) {
+      companyName = settings.companyName;
+    }
+    if (companyName.isEmpty) {
+      companyName = 'FireThings Demo Co.';
+    }
     final now = DateTime.now();
     final reportDate = DateFormat('dd/MM/yyyy').format(now);
 
