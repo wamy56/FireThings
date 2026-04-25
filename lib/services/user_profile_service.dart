@@ -120,7 +120,9 @@ class UserProfileService extends ChangeNotifier {
 
       await _cacheToPrefs(_cachedProfile!);
 
-      _setupMemberListener(uid, _cachedProfile!.companyId);
+      if (!kIsWeb) {
+        _setupMemberListener(uid, _cachedProfile!.companyId);
+      }
     } catch (e) {
       debugPrint('UserProfileService: loadProfile failed: $e');
       await _loadFromPrefs(uid);

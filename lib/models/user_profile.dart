@@ -33,7 +33,7 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
-      uid: json['uid'] as String,
+      uid: json['uid'] as String? ?? '',
       companyId: json['companyId'] as String?,
       companyRole: json['companyRole'] != null
           ? CompanyRole.values.firstWhere(

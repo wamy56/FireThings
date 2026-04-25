@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../utils/json_helpers.dart';
 import 'permission.dart';
 
@@ -45,15 +47,25 @@ class CompanyMember {
       orElse: () => CompanyRole.engineer,
     );
     final defaults = AppPermission.defaultsForRole(role);
-    final stored = json['permissions'] != null
-        ? Map<String, bool>.from(json['permissions'] as Map)
-        : <String, bool>{};
+    final rawPerms = json['permissions'];
+    final stored = <String, bool>{};
+    if (rawPerms is Map) {
+      for (final entry in rawPerms.entries) {
+        if (entry.value is bool) {
+          stored[entry.key.toString()] = entry.value as bool;
+        } else {
+          stored[entry.key.toString()] = false;
+          debugPrint('CompanyMember.fromJson: permission ${entry.key} had '
+              'non-bool value ${entry.value}, defaulting to false');
+        }
+      }
+    }
     final merged = {...defaults, ...stored};
 
     return CompanyMember(
-      uid: json['uid'] as String,
-      displayName: json['displayName'] as String,
-      email: json['email'] as String,
+      uid: json['uid'] as String? ?? '',
+      displayName: json['displayName'] as String? ?? '',
+      email: json['email'] as String? ?? '',
       role: role,
       fcmToken: json['fcmToken'] as String?,
       joinedAt: jsonDateRequired(json['joinedAt']),
