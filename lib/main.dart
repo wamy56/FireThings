@@ -15,7 +15,6 @@ import 'services/auth_service.dart';
 import 'services/remote_config_service.dart';
 import 'services/firestore_sync_service.dart';
 import 'services/user_profile_service.dart';
-import 'services/pdf_branding_service.dart';
 import 'models/permission.dart';
 import 'utils/theme.dart';
 import 'utils/theme_style.dart';
@@ -396,7 +395,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
       FirestoreSyncService.instance.performFullSync(user.uid);
     }
     await UserProfileService.instance.loadProfile(user.uid);
-    PdfBrandingService.instance.attachListener();
     await RemoteConfigService.instance.refreshForUser(user.email);
     if (mounted) {
       _postLoginReady = true;
@@ -438,7 +436,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
           _lastSetupUid = null;
           _postLoginReady = false;
           _teardownFcm();
-          PdfBrandingService.instance.detachListener();
           UserProfileService.instance.clearProfile();
           return const LoginScreen();
         }

@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -17,11 +16,6 @@ class PdfBrandingService {
 
   PdfBranding? _cached;
   PdfBranding? _cachedPersonal;
-
-  StreamSubscription? _brandingSub;
-  String? _activeCompanyId;
-  String? _activeUserId;
-  void Function()? _profileListener;
 
   Future<PdfBranding> getBranding(String companyId) async {
     if (_cached != null) return _cached!;
@@ -147,56 +141,6 @@ class PdfBrandingService {
       return getPersonalBranding(uid);
     }
     return PdfBranding.defaultBranding();
-  }
-
-  // ── Real-time cache invalidation ──
-
-  void attachListener() {
-    _attachForCurrentUser();
-
-    void onProfileChanged() => _attachForCurrentUser();
-    _profileListener = onProfileChanged;
-    UserProfileService.instance.addListener(onProfileChanged);
-  }
-
-  void detachListener() {
-    _brandingSub?.cancel();
-    _brandingSub = null;
-    _activeCompanyId = null;
-    _activeUserId = null;
-    if (_profileListener != null) {
-      UserProfileService.instance.removeListener(_profileListener!);
-      _profileListener = null;
-    }
-    clearCache();
-  }
-
-  void _attachForCurrentUser() {
-    final profile = UserProfileService.instance;
-    final companyId = profile.companyId;
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-
-    if (companyId != null) {
-      if (companyId == _activeCompanyId) return;
-      _brandingSub?.cancel();
-      _activeCompanyId = companyId;
-      _activeUserId = null;
-      _brandingSub = _docRef(companyId).snapshots().listen((doc) {
-        _cached = doc.exists
-            ? PdfBranding.fromJson(doc.data()!)
-            : PdfBranding.defaultBranding();
-      });
-    } else if (uid != null) {
-      if (uid == _activeUserId) return;
-      _brandingSub?.cancel();
-      _activeUserId = uid;
-      _activeCompanyId = null;
-      _brandingSub = _personalDocRef(uid).snapshots().listen((doc) {
-        _cachedPersonal = doc.exists
-            ? PdfBranding.fromJson(doc.data()!)
-            : PdfBranding.defaultBranding();
-      });
-    }
   }
 
   void clearCache() {
