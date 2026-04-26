@@ -111,9 +111,13 @@ void main() {
         options: DefaultFirebaseOptions.currentPlatform,
       );
 
-      // Enable Firestore offline persistence
-      FirebaseFirestore.instance.settings = const Settings(
-        persistenceEnabled: true,
+      // Disable Firestore offline persistence on web — the JS SDK has a
+      // long-standing "INTERNAL ASSERTION FAILED: Unexpected state" bug
+      // (firebase-js-sdk issues #4451, #7884, #8250) that's triggered by
+      // the IndexedDB persistence layer interacting with multiple stream
+      // subscriptions. Mobile/desktop are unaffected and keep full persistence.
+      FirebaseFirestore.instance.settings = Settings(
+        persistenceEnabled: !kIsWeb,
         cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
       );
 
