@@ -7,24 +7,20 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as sf;
-import '../models/models.dart' show PdfBranding, BrandingDocType, PdfHeaderConfig, PdfFooterConfig, PdfDocumentType, HeaderTextLine;
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import '../models/models.dart' show PdfBranding, BrandingDocType;
 import '../models/pdf_form_template.dart';
 import '../utils/pdf_coordinate_calculator.dart';
-import 'company_pdf_config_service.dart';
 import 'jobsheet_settings_service.dart';
 import 'pdf_branding_service.dart';
 import 'pdf_footer_builder.dart';
 import 'pdf_generation_data.dart';
-import 'pdf_header_builder.dart' as legacy_header;
+import 'company_service.dart';
+import 'user_profile_service.dart';
 import 'pdf_widgets/pdf_cover_builder.dart';
 import 'pdf_widgets/pdf_font_registry.dart';
 import 'pdf_widgets/pdf_modern_header.dart' show PdfHeaderBuilder;
 
-
-int _hexToColorValue(String hex) {
-  final clean = hex.replaceFirst('#', '');
-  return 0xFF000000 | int.parse(clean, radix: 16);
-}
 
 // ── Top-level isolate functions ──
 
@@ -34,82 +30,39 @@ Future<Uint8List> _buildFilledPdf(TemplatePdfData data) async {
   final fieldValues = data.fieldValues;
   final resolvedFileBytes = data.resolvedFileBytes;
 
-  PdfBranding? branding;
-  final hasBrandedFonts = data.brandedFontBytes != null;
-  if (data.brandingJson != null) {
-    branding = PdfBranding.fromJson(data.brandingJson!);
-    if (hasBrandedFonts) {
-      PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
-    }
+  final branding = PdfBranding.fromJson(data.brandingJson);
+  if (data.brandedFontBytes != null) {
+    PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
   }
-
-  final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
-  final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
-
-  final effectiveFooterConfig = branding != null && branding.footerText.isNotEmpty
-      ? PdfFooterConfig(
-          leftLines: [HeaderTextLine(key: 'brandingText', value: branding.footerText, fontSize: 8)],
-          centreLines: const [],
-        )
-      : footerConfig;
-
-  final primaryColor = PdfColor.fromInt(data.colourSchemeValue);
-
-  final regularFont = data.regularFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
-      : pw.Font.helvetica();
-  final boldFont = data.boldFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
-      : pw.Font.helveticaBold();
-
-  final fonts = hasBrandedFonts ? PdfFontRegistry.instance : null;
+  final fonts = PdfFontRegistry.instance;
   final pdf = pw.Document(
     theme: pw.ThemeData.withFont(
-      base: fonts?.interRegular ?? regularFont,
-      bold: fonts?.interBold ?? boldFont,
+      base: fonts.interRegular,
+      bold: fonts.interBold,
     ),
   );
 
-  final companyName = data.settingsCompanyName;
+  final regularFont = data.regularFontBytes != null
+      ? pw.Font.ttf(data.regularFontBytes!.buffer.asByteData())
+      : fonts.interRegular;
+  final boldFont = data.boldFontBytes != null
+      ? pw.Font.ttf(data.boldFontBytes!.buffer.asByteData())
+      : fonts.interBold;
+
+  final companyName = data.companyName;
   final dateStr = '${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}';
 
   // Cover page
-  if (branding != null && hasBrandedFonts) {
-    pdf.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: pw.EdgeInsets.zero,
-      build: (_) => PdfCoverBuilder.build(
-        branding: branding!,
-        docType: BrandingDocType.jobsheet,
-        defaultEyebrow: 'TEMPLATE FORM',
-        defaultTitle: template.name,
-        defaultSubtitle: 'Engineer: ${data.engineerName} · Ref: ${data.jobReference}',
-        metaFields: [
-          (label: 'TEMPLATE', value: template.name),
-          (label: 'ENGINEER', value: data.engineerName),
-          (label: 'REFERENCE', value: data.jobReference),
-          (label: 'DATE', value: dateStr),
-          if (companyName.isNotEmpty)
-            (label: 'COMPANY', value: companyName),
-        ],
-        logoBytes: data.logoBytes,
-        companyName: companyName,
-      ),
-    ));
-  } else if (branding != null) {
-    final coverText = branding.coverTextFor(BrandingDocType.jobsheet);
-    pdf.addPage(buildBrandedCoverPage(
-      style: branding.coverStyle,
-      primaryColor: primaryColor,
-      accentColor: PdfColor.fromInt(data.secondaryColourValue ?? data.colourSchemeValue),
-      eyebrow: coverText?.eyebrow ?? 'TEMPLATE FORM',
-      title: coverText?.title ?? template.name,
-      subtitle: coverText?.subtitle ??
-          'Engineer: ${data.engineerName} · Ref: ${data.jobReference}',
-      logoBytes: data.logoBytes,
-      logoMaxHeight: branding.logoMaxHeight,
-      companyName: companyName,
-      metaItems: [
+  pdf.addPage(pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: pw.EdgeInsets.zero,
+    build: (_) => PdfCoverBuilder.build(
+      branding: branding,
+      docType: BrandingDocType.jobsheet,
+      defaultEyebrow: 'TEMPLATE FORM',
+      defaultTitle: template.name,
+      defaultSubtitle: 'Engineer: ${data.engineerName} · Ref: ${data.jobReference}',
+      metaFields: [
         (label: 'TEMPLATE', value: template.name),
         (label: 'ENGINEER', value: data.engineerName),
         (label: 'REFERENCE', value: data.jobReference),
@@ -117,8 +70,10 @@ Future<Uint8List> _buildFilledPdf(TemplatePdfData data) async {
         if (companyName.isNotEmpty)
           (label: 'COMPANY', value: companyName),
       ],
-    ));
-  }
+      logoBytes: data.logoBytes,
+      companyName: companyName,
+    ),
+  ));
 
   // Group fields by page
   final fieldsByPage = <int, List<FormFieldDefinition>>{};
@@ -139,33 +94,12 @@ Future<Uint8List> _buildFilledPdf(TemplatePdfData data) async {
           return pw.Column(
             children: [
               // Header
-              branding != null && hasBrandedFonts
-                  ? PdfHeaderBuilder.build(
-                      branding: branding,
-                      companyName: companyName,
-                      metaText: 'REF: ${data.jobReference}',
-                      logoBytes: data.logoBytes,
-                    )
-                  : branding != null
-                      ? legacy_header.PdfHeaderBuilder.buildLeftAndCentre(
-                          config: headerConfig,
-                          logoBytes: data.logoBytes,
-                          primaryColor: primaryColor,
-                          showCompanyName: branding.headerShowCompanyName,
-                          fallbackValues: {
-                            'companyName': data.settingsCompanyName,
-                            'tagline': data.settingsTagline,
-                            'address': data.settingsAddress,
-                            'phone': data.settingsPhone,
-                          },
-                        )
-                      : _buildHeader(
-                          template: template,
-                          engineerName: data.engineerName,
-                          jobReference: data.jobReference,
-                          boldFont: boldFont,
-                          regularFont: regularFont,
-                        ),
+              PdfHeaderBuilder.build(
+                branding: branding,
+                companyName: companyName,
+                metaText: 'REF: ${data.jobReference}',
+                logoBytes: data.logoBytes,
+              ),
               pw.SizedBox(height: 8),
               // Content
               pw.Expanded(
@@ -204,25 +138,13 @@ Future<Uint8List> _buildFilledPdf(TemplatePdfData data) async {
                 ),
               ),
               // Footer
-              branding != null && hasBrandedFonts
-                  ? PdfFooterBuilder.buildBrandedFooter(
-                      branding: branding,
-                      pageNumber: pageNum + 1,
-                      pagesCount: template.pageCount,
-                      companyName: companyName,
-                      defaultFooterText: template.name,
-                    )
-                  : PdfFooterBuilder.buildFooter(
-                      config: effectiveFooterConfig,
-                      pageNumber: pageNum + 1,
-                      pagesCount: template.pageCount,
-                      primaryColor: primaryColor,
-                      brandingFooterStyle: branding?.footerStyle,
-                      accentColor: branding != null
-                          ? PdfColor.fromInt(_hexToColorValue(branding.accentColour))
-                          : null,
-                      showPageNumbers: branding?.footerShowPageNumbers ?? true,
-                    ),
+              PdfFooterBuilder.buildBrandedFooter(
+                branding: branding,
+                pageNumber: pageNum + 1,
+                pagesCount: template.pageCount,
+                companyName: companyName,
+                defaultFooterText: template.name,
+              ),
             ],
           );
         },
@@ -387,55 +309,6 @@ Future<Uint8List> _buildOverlayPdf(TemplateOverlayPdfData data) async {
 }
 
 // ── Shared builder helpers (top-level for isolate compatibility) ──
-
-pw.Widget _buildHeader({
-  required PdfFormTemplate template,
-  required String engineerName,
-  required String jobReference,
-  required pw.Font boldFont,
-  required pw.Font regularFont,
-}) {
-  return pw.Container(
-    padding: const pw.EdgeInsets.all(10),
-    decoration: pw.BoxDecoration(
-      border: pw.Border.all(color: PdfColors.grey400),
-      borderRadius: pw.BorderRadius.circular(4),
-    ),
-    child: pw.Row(
-      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-      children: [
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text(
-              template.name,
-              style: pw.TextStyle(font: boldFont, fontSize: 14),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              'Engineer: $engineerName',
-              style: pw.TextStyle(font: regularFont, fontSize: 10),
-            ),
-          ],
-        ),
-        pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.end,
-          children: [
-            pw.Text(
-              'Ref: $jobReference',
-              style: pw.TextStyle(font: boldFont, fontSize: 10),
-            ),
-            pw.SizedBox(height: 4),
-            pw.Text(
-              'Date: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-              style: pw.TextStyle(font: regularFont, fontSize: 10),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
-}
 
 pw.Widget _buildFieldValue({
   required FormFieldDefinition field,
@@ -859,17 +732,12 @@ Uint8List _extractFontBytes(pw.Font font) {
 
 /// Service for generating PDFs from filled templates
 class TemplatePdfService {
-  /// Generate a filled PDF from a template and field values
-  ///
-  /// Set [debugMode] to true to draw field boundaries for debugging positioning.
-  /// Set [useCompanyBranding] to true to apply company branding (cover, header, footer, colours).
   static Future<Uint8List> generateFilledPdf({
     required PdfFormTemplate template,
     required Map<String, dynamic> fieldValues,
     required String engineerName,
     required String jobReference,
     bool debugMode = false,
-    bool useCompanyBranding = false,
   }) async {
     // ── Gather phase (main thread) ──
     Uint8List? regularFontBytes;
@@ -885,62 +753,52 @@ class TemplatePdfService {
     final resolvedFileBytes = await _resolveFileBytes(template.fields, fieldValues);
 
     // Branding
-    final settings = await JobsheetSettingsService.getSettings();
-
-    PdfBranding? branding;
+    PdfBrandingService.instance.clearCache();
+    PdfBranding branding = PdfBranding.defaultBranding();
     Uint8List? brandingLogoBytes;
-
     try {
       final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
       if (b.appliesToDocType(BrandingDocType.jobsheet)) {
         branding = b;
-        if (b.logoUrl != null) {
-          try {
-            final response = await http.get(Uri.parse(b.logoUrl!));
-            if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
-          } catch (e) {
-            debugPrint('Failed to download branding logo: $e');
-          }
+      }
+      if (branding.logoUrl != null) {
+        try {
+          final response = await http.get(Uri.parse(branding.logoUrl!));
+          if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
+        } catch (e) {
+          debugPrint('[BRANDING] Failed to download logo: $e');
         }
       }
-    } catch (e) {
-      debugPrint('Failed to load PdfBranding: $e');
+    } catch (e, stack) {
+      if (kIsWeb) {
+        debugPrint('[BRANDING-RESOLUTION] PdfBranding resolution failed: $e');
+      } else {
+        FirebaseCrashlytics.instance.recordError(
+          e, stack,
+          reason: 'PdfBranding resolution failed — using default',
+        );
+      }
     }
 
     Map<String, Uint8List>? brandedFontBytes;
-    if (branding != null) {
-      try {
-        await PdfFontRegistry.instance.ensureLoaded();
-        brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
-      } catch (e) {
-        debugPrint('Failed to load branded fonts: $e');
-      }
+    try {
+      await PdfFontRegistry.instance.ensureLoaded();
+      brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
+    } catch (e) {
+      debugPrint('[BRANDING] Failed to load branded fonts: $e');
     }
 
-    final companyPdf = CompanyPdfConfigService.instance;
-    final logoBytes = brandingLogoBytes ?? await companyPdf.getEffectiveLogoBytes(
-      useCompanyBranding: useCompanyBranding,
-      type: PdfDocumentType.jobsheet,
-    );
-    final headerConfig = await companyPdf.getEffectiveHeaderConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-    final footerConfig = await companyPdf.getEffectiveFooterConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-    final colourScheme = await companyPdf.getEffectiveColourScheme(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-
-    final effectiveColourValue = branding != null
-        ? _hexToColorValue(branding.primaryColour)
-        : colourScheme.primaryColorValue;
-    final effectiveSecondaryValue = branding != null
-        ? _hexToColorValue(branding.accentColour)
-        : colourScheme.secondaryColorValue;
+    // Company name: Company doc → settings
+    String companyName = '';
+    final cid = UserProfileService.instance.companyId;
+    if (cid != null) {
+      final company = await CompanyService.instance.getCompany(cid);
+      companyName = company?.name ?? '';
+    }
+    if (companyName.isEmpty) {
+      final settings = await JobsheetSettingsService.getSettings();
+      companyName = settings.companyName;
+    }
 
     final data = TemplatePdfData(
       templateJson: template.toJson(),
@@ -951,17 +809,10 @@ class TemplatePdfService {
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
       resolvedFileBytes: resolvedFileBytes,
-      logoBytes: logoBytes,
-      headerConfigJson: headerConfig.toJson(),
-      footerConfigJson: footerConfig.toJson(),
-      colourSchemeValue: effectiveColourValue,
-      secondaryColourValue: effectiveSecondaryValue,
-      brandingJson: branding?.toJson(),
+      logoBytes: brandingLogoBytes,
+      brandingJson: branding.toJson(),
       brandedFontBytes: brandedFontBytes,
-      settingsCompanyName: settings.companyName,
-      settingsTagline: settings.tagline,
-      settingsAddress: settings.address,
-      settingsPhone: settings.phone,
+      companyName: companyName,
     );
 
     // ── Build phase (background isolate) ──

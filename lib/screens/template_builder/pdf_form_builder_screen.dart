@@ -9,7 +9,6 @@ import '../../models/pdf_form_template.dart';
 import '../../services/database_helper.dart';
 import '../../services/auth_service.dart';
 import '../../services/template_pdf_service.dart';
-import '../../services/user_profile_service.dart';
 import '../../utils/adaptive_widgets.dart';
 import '../../utils/icon_map.dart';
 import '../../widgets/premium_toast.dart';
@@ -566,7 +565,6 @@ class _PdfFormBuilderScreenState extends State<PdfFormBuilderScreen> {
         fieldValues: _fieldValues,
         engineerName: _engineerName,
         jobReference: _jobReferenceController.text,
-        useCompanyBranding: UserProfileService.instance.companyId != null,
       );
 
       if (!mounted) return;

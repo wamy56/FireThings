@@ -111,19 +111,11 @@ class TemplatePdfData {
   final bool debugMode;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
-  /// Pre-loaded file bytes for signature/image fields. Maps field ID to bytes.
   final Map<String, Uint8List> resolvedFileBytes;
   final Uint8List? logoBytes;
-  final Map<String, dynamic> headerConfigJson;
-  final Map<String, dynamic> footerConfigJson;
-  final int colourSchemeValue;
-  final int? secondaryColourValue;
-  final Map<String, dynamic>? brandingJson;
+  final Map<String, dynamic> brandingJson;
   final Map<String, Uint8List>? brandedFontBytes;
-  final String settingsCompanyName;
-  final String settingsTagline;
-  final String settingsAddress;
-  final String settingsPhone;
+  final String companyName;
 
   TemplatePdfData({
     required this.templateJson,
@@ -135,16 +127,9 @@ class TemplatePdfData {
     this.boldFontBytes,
     required this.resolvedFileBytes,
     this.logoBytes,
-    required this.headerConfigJson,
-    required this.footerConfigJson,
-    required this.colourSchemeValue,
-    this.secondaryColourValue,
-    this.brandingJson,
+    required this.brandingJson,
     this.brandedFontBytes,
-    this.settingsCompanyName = '',
-    this.settingsTagline = '',
-    this.settingsAddress = '',
-    this.settingsPhone = '',
+    required this.companyName,
   });
 }
 
