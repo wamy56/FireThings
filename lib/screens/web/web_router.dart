@@ -38,9 +38,9 @@ import 'web_quotes_screen.dart';
 import 'web_create_quote_screen.dart';
 import 'web_invoices_screen.dart';
 import 'web_create_invoice_screen.dart';
-import '../company/team_management_screen.dart';
-import '../company/company_sites_screen.dart';
-import '../company/company_customers_screen.dart';
+import 'web_team_screen.dart';
+import 'web_sites_screen.dart';
+import 'web_customers_screen.dart';
 import 'web_branding_screen.dart';
 import '../../models/quote.dart';
 import '../../models/invoice.dart';
@@ -148,7 +148,7 @@ GoRouter createWebRouter() {
           ),
           GoRoute(
             path: '/team',
-            builder: (context, state) => const TeamManagementScreen(),
+            builder: (context, state) => const WebTeamScreen(),
           ),
           GoRoute(
             path: '/team/competency',
@@ -162,7 +162,7 @@ GoRouter createWebRouter() {
           ),
           GoRoute(
             path: '/sites',
-            builder: (context, state) => CompanySitesScreen(companyId: UserProfileService.instance.companyId ?? ''),
+            builder: (context, state) => const WebSitesScreen(),
           ),
           GoRoute(
             path: '/sites/:siteId/assets',
@@ -497,7 +497,7 @@ GoRouter createWebRouter() {
           ),
           GoRoute(
             path: '/customers',
-            builder: (context, state) => CompanyCustomersScreen(companyId: UserProfileService.instance.companyId ?? ''),
+            builder: (context, state) => const WebCustomersScreen(),
           ),
           GoRoute(
             path: '/branding',
