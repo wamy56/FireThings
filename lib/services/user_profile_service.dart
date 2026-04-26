@@ -27,6 +27,7 @@ class UserProfileService extends ChangeNotifier {
   UserProfile? _cachedProfile;
   CompanyMember? _cachedMember;
   StreamSubscription<DocumentSnapshot>? _memberSub;
+  Future<void>? _loadingFuture;
 
   /// The current cached profile.
   UserProfile? get profile => _cachedProfile;
@@ -96,9 +97,18 @@ class UserProfileService extends ChangeNotifier {
   /// Load user profile from Firestore + SharedPreferences cache.
   /// Call this after login from AuthWrapper.
   Future<void> loadProfile(String uid) async {
+    if (_loadingFuture != null) return _loadingFuture!;
+    _loadingFuture = _doLoadProfile(uid);
+    try {
+      await _loadingFuture!;
+    } finally {
+      _loadingFuture = null;
+    }
+  }
+
+  Future<void> _doLoadProfile(String uid) async {
     _cachedMember = null;
     _cachedProfile = null;
-    notifyListeners();
 
     try {
       final doc = await _firestore
@@ -126,6 +136,8 @@ class UserProfileService extends ChangeNotifier {
     } catch (e) {
       debugPrint('UserProfileService: loadProfile failed: $e');
       await _loadFromPrefs(uid);
+    } finally {
+      notifyListeners();
     }
   }
 
