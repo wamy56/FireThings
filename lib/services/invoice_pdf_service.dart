@@ -4,50 +4,51 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
-import '../models/models.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import '../models/models.dart' show PdfBranding, BrandingDocType, Invoice, InvoiceStatus;
 import 'payment_settings_service.dart';
 import 'pdf_branding_service.dart';
-import 'pdf_header_builder.dart' as legacy_header;
 import 'pdf_footer_builder.dart';
-import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
+import 'company_service.dart';
+import 'user_profile_service.dart';
+import 'jobsheet_settings_service.dart';
 
+import 'pdf_widgets/pdf_brand_tokens.dart';
 import 'pdf_widgets/pdf_cover_builder.dart';
 import 'pdf_widgets/pdf_font_registry.dart';
 import 'pdf_widgets/pdf_modern_header.dart' show PdfHeaderBuilder;
 
-int _hexToColorValue(String hex) {
-  final clean = hex.replaceFirst('#', '');
-  return 0xFF000000 | int.parse(clean, radix: 16);
+PdfColor _tintWithWhite(PdfColor color, double factor) {
+  final r = (color.red * 255).round();
+  final g = (color.green * 255).round();
+  final b = (color.blue * 255).round();
+  return PdfColor.fromInt(0xFF000000 |
+      ((r * (1 - factor) + 255 * factor).round() << 16) |
+      ((g * (1 - factor) + 255 * factor).round() << 8) |
+      (b * (1 - factor) + 255 * factor).round());
 }
 
 /// Top-level function for compute() — builds the invoice PDF in a background isolate.
 Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
   final invoice = Invoice.fromJson(data.invoiceJson);
-  final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
-  final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
-  final colourScheme = PdfColourScheme(
-    primaryColorValue: data.colourSchemeValue,
-    secondaryColorValue: data.secondaryColourValue,
-  );
-  final primaryColor = colourScheme.primaryColor;
-  final primaryLightColor = colourScheme.primaryLight;
 
-  PdfBranding? branding;
-  final hasBrandedFonts = data.brandedFontBytes != null;
-  if (data.brandingJson != null) {
-    branding = PdfBranding.fromJson(data.brandingJson!);
-    if (hasBrandedFonts) {
-      PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
-    }
+  final branding = PdfBranding.fromJson(data.brandingJson);
+  if (data.brandedFontBytes != null) {
+    PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
   }
+  final fonts = PdfFontRegistry.instance;
+  final pdf = pw.Document(
+    theme: pw.ThemeData.withFont(
+      base: fonts.interRegular,
+      bold: fonts.interBold,
+    ),
+  );
 
-  final effectiveFooterConfig = branding != null && branding.footerText.isNotEmpty
-      ? PdfFooterConfig(
-          leftLines: [HeaderTextLine(key: 'brandingText', value: branding.footerText, fontSize: 8)],
-          centreLines: const [],
-        )
-      : footerConfig;
+  final primaryColor = PdfBrandTokens.primary(branding);
+  final primaryLightColor = _tintWithWhite(primaryColor, 0.9);
+  final companyName = data.companyName;
+  final dateStr = DateFormat('dd/MM/yyyy').format(invoice.date);
 
   final paymentDetails = PaymentDetails(
     bankName: data.paymentDetailsMap['bankName'] ?? '',
@@ -57,47 +58,27 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
     paymentTerms: data.paymentDetailsMap['paymentTerms'] ?? '',
   );
 
-  final regularFont = data.regularFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
-      : pw.Font.helvetica();
-  final boldFont = data.boldFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
-      : pw.Font.helveticaBold();
-
-  final fonts = hasBrandedFonts ? PdfFontRegistry.instance : null;
-  final pdf = pw.Document(
-    theme: pw.ThemeData.withFont(
-      base: fonts?.interRegular ?? regularFont,
-      bold: fonts?.interBold ?? boldFont,
+  // Cover page
+  pdf.addPage(pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: pw.EdgeInsets.zero,
+    build: (_) => PdfCoverBuilder.build(
+      branding: branding,
+      docType: BrandingDocType.invoice,
+      defaultEyebrow: 'INVOICE',
+      defaultTitle: 'Invoice',
+      defaultSubtitle: '${invoice.customerName} · $dateStr',
+      metaFields: [
+        (label: 'INVOICE NO', value: invoice.invoiceNumber),
+        (label: 'CUSTOMER', value: invoice.customerName),
+        (label: 'DATE', value: dateStr),
+        if (companyName.isNotEmpty)
+          (label: 'FROM', value: companyName),
+      ],
+      logoBytes: data.logoBytes,
+      companyName: companyName,
     ),
-  );
-
-  final companyName = invoice.engineerName;
-  final dateStr = DateFormat('dd/MM/yyyy').format(invoice.date);
-
-  // Cover page (branded only)
-  if (branding != null && hasBrandedFonts) {
-    pdf.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: pw.EdgeInsets.zero,
-      build: (_) => PdfCoverBuilder.build(
-        branding: branding!,
-        docType: BrandingDocType.invoice,
-        defaultEyebrow: 'INVOICE',
-        defaultTitle: 'Invoice',
-        defaultSubtitle: '${invoice.customerName} · $dateStr',
-        metaFields: [
-          (label: 'INVOICE NO', value: invoice.invoiceNumber),
-          (label: 'CUSTOMER', value: invoice.customerName),
-          (label: 'DATE', value: dateStr),
-          if (companyName.isNotEmpty)
-            (label: 'FROM', value: companyName),
-        ],
-        logoBytes: data.logoBytes,
-        companyName: companyName,
-      ),
-    ));
-  }
+  ));
 
   pdf.addPage(
     pw.Page(
@@ -106,16 +87,12 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
       build: (context) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          if (branding != null && hasBrandedFonts)
-            PdfHeaderBuilder.build(
-              branding: branding,
-              companyName: companyName,
-              metaText: 'INVOICE ${invoice.invoiceNumber}',
-              logoBytes: data.logoBytes,
-            )
-          else
-            _buildHeader(invoice, data.logoBytes, headerConfig, primaryColor,
-              showCompanyName: branding?.headerShowCompanyName ?? true),
+          PdfHeaderBuilder.build(
+            branding: branding,
+            companyName: companyName,
+            metaText: 'INVOICE ${invoice.invoiceNumber}',
+            logoBytes: data.logoBytes,
+          ),
           pw.SizedBox(height: 24),
           _buildInvoiceInfo(invoice),
           pw.SizedBox(height: 24),
@@ -129,33 +106,25 @@ Future<Uint8List> _buildInvoicePdf(InvoicePdfData data) async {
             _buildNotesSection(invoice),
           ],
           pw.Spacer(),
-          if (!paymentDetails.isEmpty) _buildPaymentTerms(paymentDetails, primaryColor, primaryLightColor),
+          if (!paymentDetails.isEmpty)
+            _buildPaymentTerms(paymentDetails, primaryColor, primaryLightColor),
           pw.SizedBox(height: 16),
-          if (branding != null && hasBrandedFonts)
-            PdfFooterBuilder.buildBrandedFooter(
-              branding: branding,
-              pageNumber: 1,
-              pagesCount: 1,
-              companyName: companyName,
-              defaultFooterText: 'Invoice ${invoice.invoiceNumber}',
-            )
-          else
-            PdfFooterBuilder.buildFooter(
-              config: effectiveFooterConfig,
-              pageNumber: 1,
-              pagesCount: 1,
-              primaryColor: primaryColor,
-              brandingFooterStyle: branding?.footerStyle,
-              accentColor: branding != null
-                  ? PdfColor.fromInt(_hexToColorValue(branding.accentColour))
-                  : null,
-              showPageNumbers: branding?.footerShowPageNumbers ?? true,
-            ),
+          PdfFooterBuilder.buildBrandedFooter(
+            branding: branding,
+            pageNumber: 1,
+            pagesCount: 1,
+            companyName: companyName,
+            defaultFooterText: 'Invoice ${invoice.invoiceNumber}',
+          ),
           pw.SizedBox(height: 8),
           pw.Center(
             child: pw.Text(
               'Thank you for your business!',
-              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: primaryColor),
+              style: pw.TextStyle(
+                fontSize: 10,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor,
+              ),
             ),
           ),
         ],
@@ -173,53 +142,6 @@ const PdfColor _lightGray = PdfColor.fromInt(0xFFE0E0E0);
 const PdfColor _white = PdfColors.white;
 
 // ── Builder helpers (top-level for isolate compatibility) ──
-
-pw.Widget _buildHeader(Invoice invoice, Uint8List? logoBytes, PdfHeaderConfig headerConfig, PdfColor primaryColor, {
-  bool showCompanyName = true,
-}) {
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border(
-        bottom: pw.BorderSide(color: primaryColor, width: 2),
-      ),
-    ),
-    padding: const pw.EdgeInsets.only(bottom: 12),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Expanded(
-          flex: 5,
-          child: legacy_header.PdfHeaderBuilder.buildLeftAndCentre(
-            config: headerConfig,
-            logoBytes: logoBytes,
-            primaryColor: primaryColor,
-            showCompanyName: showCompanyName,
-            fallbackValues: {
-              'companyName': invoice.engineerName,
-              'engineerName': invoice.engineerName,
-            },
-          ),
-        ),
-        pw.SizedBox(width: 12),
-        pw.Container(
-          padding: const pw.EdgeInsets.all(12),
-          decoration: pw.BoxDecoration(
-            color: primaryColor,
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
-          child: pw.Text(
-            'INVOICE',
-            style: pw.TextStyle(
-              fontSize: 24,
-              fontWeight: pw.FontWeight.bold,
-              color: _white,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
 
 pw.Widget _buildInvoiceInfo(Invoice invoice) {
   final dateFormat = DateFormat('dd/MM/yyyy');
@@ -548,58 +470,56 @@ class InvoicePDFService {
       // Google Fonts unavailable — isolate will fall back to Helvetica
     }
 
+    // Branding
+    PdfBrandingService.instance.clearCache();
+    PdfBranding branding = PdfBranding.defaultBranding();
+    Uint8List? brandingLogoBytes;
+    try {
+      final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
+      if (b.appliesToDocType(BrandingDocType.invoice)) {
+        branding = b;
+      }
+      if (branding.logoUrl != null) {
+        try {
+          final response = await http.get(Uri.parse(branding.logoUrl!));
+          if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
+        } catch (e) {
+          debugPrint('[BRANDING] Failed to download logo: $e');
+        }
+      }
+    } catch (e, stack) {
+      if (kIsWeb) {
+        debugPrint('[BRANDING-RESOLUTION] PdfBranding resolution failed: $e');
+      } else {
+        FirebaseCrashlytics.instance.recordError(
+          e, stack,
+          reason: 'PdfBranding resolution failed — using default',
+        );
+      }
+    }
+
     Map<String, Uint8List>? brandedFontBytes;
     try {
       await PdfFontRegistry.instance.ensureLoaded();
       brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
     } catch (e) {
-      debugPrint('Failed to load branded fonts: $e');
+      debugPrint('[BRANDING] Failed to load branded fonts: $e');
     }
 
-    PdfBranding? branding;
-    Uint8List? brandingLogoBytes;
-
-    try {
-      final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
-      if (b.appliesToDocType(BrandingDocType.invoice)) {
-        branding = b;
-        if (b.logoUrl != null) {
-          try {
-            final response = await http.get(Uri.parse(b.logoUrl!));
-            if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
-          } catch (e) {
-            debugPrint('Failed to download branding logo: $e');
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Failed to load PdfBranding: $e');
+    // Company name: Company doc → settings → invoice.engineerName
+    String companyName = '';
+    final cid = UserProfileService.instance.companyId;
+    if (cid != null) {
+      final company = await CompanyService.instance.getCompany(cid);
+      companyName = company?.name ?? '';
     }
-
-    final companyPdf = CompanyPdfConfigService.instance;
-    final logoBytes = brandingLogoBytes ?? await companyPdf.getEffectiveLogoBytes(
-      useCompanyBranding: invoice.useCompanyBranding,
-      type: PdfDocumentType.invoice,
-    );
-    final headerConfig = await companyPdf.getEffectiveHeaderConfig(
-      PdfDocumentType.invoice,
-      useCompanyBranding: invoice.useCompanyBranding,
-    );
-    final footerConfig = await companyPdf.getEffectiveFooterConfig(
-      PdfDocumentType.invoice,
-      useCompanyBranding: invoice.useCompanyBranding,
-    );
-    final colourScheme = await companyPdf.getEffectiveColourScheme(
-      PdfDocumentType.invoice,
-      useCompanyBranding: invoice.useCompanyBranding,
-    );
-
-    final effectiveColourValue = branding != null
-        ? _hexToColorValue(branding.primaryColour)
-        : colourScheme.primaryColorValue;
-    final effectiveSecondaryValue = branding != null
-        ? _hexToColorValue(branding.accentColour)
-        : colourScheme.secondaryColorValue;
+    if (companyName.isEmpty) {
+      final settings = await JobsheetSettingsService.getSettings();
+      companyName = settings.companyName;
+    }
+    if (companyName.isEmpty) {
+      companyName = invoice.engineerName;
+    }
 
     final data = InvoicePdfData(
       invoiceJson: invoice.toJson(),
@@ -610,15 +530,12 @@ class InvoicePDFService {
         'accountNumber': paymentDetails.accountNumber,
         'paymentTerms': paymentDetails.paymentTerms,
       },
-      logoBytes: logoBytes,
-      headerConfigJson: headerConfig.toJson(),
-      footerConfigJson: footerConfig.toJson(),
-      colourSchemeValue: effectiveColourValue,
-      secondaryColourValue: effectiveSecondaryValue,
-      brandingJson: branding?.toJson(),
+      logoBytes: brandingLogoBytes,
+      brandingJson: branding.toJson(),
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
-      brandedFontBytes: branding != null ? brandedFontBytes : null,
+      brandedFontBytes: brandedFontBytes,
+      companyName: companyName,
     );
 
     // ── Build phase (background isolate) ──
