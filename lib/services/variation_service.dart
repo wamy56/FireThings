@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'storage_upload_helper.dart';
 
 import '../models/bs5839_variation.dart';
 
@@ -109,16 +110,10 @@ class VariationService {
   }) async {
     final ext = fileName.split('.').last.toLowerCase();
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final storagePath =
+    final path =
         '$basePath/sites/$siteId/bs5839_evidence/$variationId/$timestamp.$ext';
-    final ref = _storage.ref(storagePath);
-
-    await ref.putData(
-      fileBytes,
-      SettableMetadata(contentType: 'image/$ext'),
-    );
-
-    final url = await ref.getDownloadURL();
+    final url =
+        await StorageUploadHelper.upload(path, fileBytes, 'image/$ext');
 
     await _col(basePath, siteId).doc(variationId).update({
       'evidencePhotoUrls': FieldValue.arrayUnion([url]),

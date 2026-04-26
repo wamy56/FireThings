@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:http/http.dart' show ClientException;
 import '../models/floor_plan.dart';
+import 'storage_upload_helper.dart';
 
 /// CRUD + Storage service for floor plans.
 /// Uses basePath pattern: 'users/{uid}' or 'companies/{companyId}'.
@@ -133,63 +132,8 @@ class FloorPlanService {
       String basePath, String siteId, String planId, Uint8List bytes,
       {String contentType = 'image/jpeg', String extension = 'jpg'}) async {
     final path = '$basePath/sites/$siteId/floor_plans/$planId.$extension';
-    debugPrint('[FloorPlanService] Uploading ${bytes.length} bytes to $path');
-
-    return _retryUpload(() async {
-      if (kIsWeb) {
-        return _uploadViaRestApi(path, bytes, contentType);
-      }
-      final ref = _storage.ref(path);
-      await ref.putData(bytes, SettableMetadata(contentType: contentType));
-      debugPrint('[FloorPlanService] putData complete, getting download URL...');
-      return await ref.getDownloadURL();
-    });
-  }
-
-  /// Web-only: upload via Firebase Storage REST API to avoid platform channel
-  /// bug in firebase_storage_web's putData implementation.
-  Future<String> _uploadViaRestApi(
-      String path, Uint8List bytes, String contentType) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('Not signed in');
-
-    final idToken = await user.getIdToken();
-    final bucket = _storage.bucket;
-    final encodedPath = Uri.encodeComponent(path);
-
-    final uri = Uri.parse(
-      'https://firebasestorage.googleapis.com/v0/b/$bucket/o?uploadType=media&name=$encodedPath',
-    );
-
-    debugPrint('[FloorPlanService] REST upload to $uri');
-
-    final response = await http.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $idToken',
-        'Content-Type': contentType,
-      },
-      body: bytes,
-    ).timeout(const Duration(seconds: 30));
-
-    if (response.statusCode != 200) {
-      debugPrint('[FloorPlanService] REST upload failed: ${response.statusCode} ${response.body}');
-      throw Exception('Upload failed (${response.statusCode})');
-    }
-
-    debugPrint('[FloorPlanService] REST upload complete, building download URL...');
-
-    // Parse the download token from the REST API response and construct
-    // the URL directly — getDownloadURL() has the same channel bug on web.
-    final metadata = jsonDecode(response.body) as Map<String, dynamic>;
-    final token = metadata['downloadTokens'] as String?;
-    if (token == null) {
-      throw Exception('Upload succeeded but no download token in response');
-    }
-    final url =
-        'https://firebasestorage.googleapis.com/v0/b/$bucket/o/$encodedPath?alt=media&token=$token';
-    debugPrint('[FloorPlanService] Got download URL');
-    return url;
+    return _retryUpload(
+        () => StorageUploadHelper.upload(path, bytes, contentType));
   }
 
   /// Delete a floor plan image from Firebase Storage.
@@ -216,7 +160,7 @@ class FloorPlanService {
         return await operation();
       } catch (e) {
         lastError = e;
-        if (e is TimeoutException || e is http.ClientException) {
+        if (e is TimeoutException || e is ClientException) {
           if (attempt == maxAttempts) rethrow;
           await Future.delayed(Duration(seconds: 1 << (attempt - 1)));
           continue;

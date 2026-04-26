@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'storage_upload_helper.dart';
 
 import '../data/prohibited_variation_rules.dart';
 import '../models/asset.dart';
@@ -188,16 +189,8 @@ class Bs5839ConfigService {
     required String fileName,
   }) async {
     final ext = fileName.split('.').last.toLowerCase();
-    final storagePath =
-        '$basePath/sites/$siteId/zone_plans/zone_plan.$ext';
-    final ref = _storage.ref(storagePath);
-
-    await ref.putData(
-      fileBytes,
-      SettableMetadata(contentType: 'image/$ext'),
-    );
-
-    return await ref.getDownloadURL();
+    final path = '$basePath/sites/$siteId/zone_plans/zone_plan.$ext';
+    return StorageUploadHelper.upload(path, fileBytes, 'image/$ext');
   }
 
   Future<void> deleteZonePlan({

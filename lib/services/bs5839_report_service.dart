@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'storage_upload_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -297,10 +298,9 @@ class Bs5839ReportService {
     required String visitId,
     required Uint8List pdfBytes,
   }) async {
-    final ref = _storage.ref(
-        '$basePath/sites/$siteId/bs5839_reports/$visitId.pdf');
-    await ref.putData(pdfBytes, SettableMetadata(contentType: 'application/pdf'));
-    final url = await ref.getDownloadURL();
+    final path = '$basePath/sites/$siteId/bs5839_reports/$visitId.pdf';
+    final url =
+        await StorageUploadHelper.upload(path, pdfBytes, 'application/pdf');
 
     await InspectionVisitService.instance.updateVisit(
       basePath,

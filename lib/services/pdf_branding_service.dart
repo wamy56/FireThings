@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../models/pdf_branding.dart';
+import 'storage_upload_helper.dart';
 import 'user_profile_service.dart';
 
 class PdfBrandingService {
@@ -70,12 +71,8 @@ class PdfBrandingService {
     if (bytes.length > 1024 * 1024) {
       throw const FormatException('Logo must be under 1 MB');
     }
-    final ref = _storage.ref('companies/$companyId/branding/logo.$ext');
-    final task = await ref.putData(
-      bytes,
-      SettableMetadata(contentType: _mimeFor(ext)),
-    );
-    return await task.ref.getDownloadURL();
+    final path = 'companies/$companyId/branding/logo.$ext';
+    return StorageUploadHelper.upload(path, bytes, _mimeFor(ext));
   }
 
   Future<void> deleteLogo(String companyId, String url) async {
@@ -138,12 +135,8 @@ class PdfBrandingService {
     if (bytes.length > 1024 * 1024) {
       throw const FormatException('Logo must be under 1 MB');
     }
-    final ref = _storage.ref('users/$userId/branding/logo.$ext');
-    final task = await ref.putData(
-      bytes,
-      SettableMetadata(contentType: _mimeFor(ext)),
-    );
-    return await task.ref.getDownloadURL();
+    final path = 'users/$userId/branding/logo.$ext';
+    return StorageUploadHelper.upload(path, bytes, _mimeFor(ext));
   }
 
   Future<void> deletePersonalLogo(String userId, String url) async {

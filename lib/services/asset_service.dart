@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:http/http.dart' show ClientException;
 import '../models/asset.dart';
+import 'storage_upload_helper.dart';
 
 /// CRUD service for assets in the asset register.
 /// Uses basePath pattern: 'users/{uid}' for solo engineers,
@@ -203,9 +202,7 @@ class AssetService {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final path = '$basePath/sites/$siteId/assets/$assetId/photos/$timestamp.jpg';
       final url = await _retryUpload(
-        () => kIsWeb
-            ? _uploadViaRestApi(path, bytes)
-            : _uploadViaSdk(path, bytes),
+        () => StorageUploadHelper.upload(path, bytes, 'image/jpeg'),
       );
 
       // Atomically check count and append URL
@@ -303,40 +300,6 @@ class AssetService {
     }
   }
 
-  Future<String> _uploadViaSdk(String path, Uint8List bytes) async {
-    final ref = _storage.ref(path);
-    await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
-    return await ref.getDownloadURL();
-  }
-
-  Future<String> _uploadViaRestApi(String path, Uint8List bytes) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) throw Exception('Not signed in');
-
-    final idToken = await user.getIdToken();
-    final bucket = _storage.bucket;
-    final encodedPath = Uri.encodeComponent(path);
-
-    final response = await http.post(
-      Uri.parse(
-        'https://firebasestorage.googleapis.com/v0/b/$bucket/o?uploadType=media&name=$encodedPath',
-      ),
-      headers: {
-        'Authorization': 'Bearer $idToken',
-        'Content-Type': 'image/jpeg',
-      },
-      body: bytes,
-    ).timeout(const Duration(seconds: 30));
-
-    if (response.statusCode != 200) {
-      throw Exception('Upload failed (${response.statusCode})');
-    }
-
-    final metadata = jsonDecode(response.body) as Map<String, dynamic>;
-    final token = metadata['downloadTokens'] as String?;
-    if (token == null) throw Exception('No download token in response');
-    return 'https://firebasestorage.googleapis.com/v0/b/$bucket/o/$encodedPath?alt=media&token=$token';
-  }
 }
 
 Future<T> _retryUpload<T>(
@@ -349,7 +312,7 @@ Future<T> _retryUpload<T>(
       return await operation();
     } catch (e) {
       lastError = e;
-      if (e is TimeoutException || e is http.ClientException) {
+      if (e is TimeoutException || e is ClientException) {
         if (attempt == maxAttempts) rethrow;
         await Future.delayed(Duration(seconds: 1 << (attempt - 1)));
         continue;
