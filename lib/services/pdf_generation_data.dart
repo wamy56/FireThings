@@ -5,40 +5,18 @@ import 'dart:typed_data';
 class JobsheetPdfData {
   final Map<String, dynamic> jobsheetJson;
   final Uint8List? logoBytes;
-  final Map<String, dynamic> headerConfigJson;
-  final Map<String, dynamic> footerConfigJson;
-  final int colourSchemeValue;
-  final int? secondaryColourValue;
-  final Map<String, dynamic>? brandingJson;
-  final Map<String, dynamic>? sectionStyleJson;
-  final Map<String, dynamic>? typographyJson;
-  final String settingsCompanyName;
-  final String settingsTagline;
-  final String settingsAddress;
-  final String settingsPhone;
-  final Uint8List? regularFontBytes;
-  final Uint8List? boldFontBytes;
+  final Map<String, dynamic> brandingJson;
   final Map<String, Uint8List>? brandedFontBytes;
+  final String companyName;
   final List<Map<String, dynamic>>? assetServiceRecords;
   final Map<String, dynamic>? bs5839VisitJson;
 
   JobsheetPdfData({
     required this.jobsheetJson,
-    required this.logoBytes,
-    required this.headerConfigJson,
-    required this.footerConfigJson,
-    required this.colourSchemeValue,
-    this.secondaryColourValue,
-    this.brandingJson,
-    this.sectionStyleJson,
-    this.typographyJson,
-    required this.settingsCompanyName,
-    required this.settingsTagline,
-    required this.settingsAddress,
-    required this.settingsPhone,
-    this.regularFontBytes,
-    this.boldFontBytes,
+    this.logoBytes,
+    required this.brandingJson,
     this.brandedFontBytes,
+    required this.companyName,
     this.assetServiceRecords,
     this.bs5839VisitJson,
   });

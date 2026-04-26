@@ -1,3 +1,4 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
@@ -5,10 +6,10 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
+import 'company_service.dart';
 import 'jobsheet_settings_service.dart';
 import 'pdf_branding_service.dart';
 import 'pdf_footer_builder.dart';
-import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
 import 'auth_service.dart';
 import 'service_history_service.dart';
@@ -17,6 +18,8 @@ import 'asset_type_service.dart';
 import '../data/default_asset_types.dart';
 import 'inspection_visit_service.dart';
 import 'user_profile_service.dart';
+import 'pdf_widgets/pdf_cover_builder.dart';
+import 'pdf_widgets/pdf_font_registry.dart';
 import 'pdf_widgets/pdf_modern_header.dart';
 import 'pdf_widgets/pdf_section_card.dart';
 import 'pdf_widgets/pdf_field_row.dart';
@@ -24,81 +27,73 @@ import 'pdf_widgets/pdf_modern_table.dart';
 import 'pdf_widgets/pdf_signature_box.dart';
 import 'pdf_widgets/pdf_style_helpers.dart';
 
-int _hexToColorValue(String hex) {
-  final clean = hex.replaceFirst('#', '');
-  return 0xFF000000 | int.parse(clean, radix: 16);
-}
+const PdfColor _darkGray = PdfColor.fromInt(0xFF424242);
 
 /// Top-level function for compute() — builds the jobsheet PDF in a background isolate.
 Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
   final jobsheet = Jobsheet.fromJson(data.jobsheetJson);
-  final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
-  final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
+  final branding = PdfBranding.fromJson(data.brandingJson);
 
-  final branding = data.brandingJson != null
-      ? PdfBranding.fromJson(data.brandingJson!)
-      : null;
+  if (data.brandedFontBytes != null) {
+    PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
+  }
+  final fonts = PdfFontRegistry.instance;
 
-  // Reconstruct colour scheme with optional secondary
-  final colourScheme = PdfColourScheme(
-    primaryColorValue: data.colourSchemeValue,
-    secondaryColorValue: data.secondaryColourValue,
-  );
-
-  final effectiveFooterConfig = branding != null && branding.footerText.isNotEmpty
-      ? PdfFooterConfig(
-          leftLines: [HeaderTextLine(key: 'brandingText', value: branding.footerText, fontSize: 8)],
-          centreLines: const [],
-        )
-      : footerConfig;
-
-  // Reconstruct section style and typography configs
-  final sectionStyle = data.sectionStyleJson != null
-      ? PdfSectionStyleConfig.fromJson(data.sectionStyleJson!)
-      : PdfSectionStyleConfig.defaults();
-  final typography = data.typographyJson != null
-      ? PdfTypographyConfig.fromJson(data.typographyJson!)
-      : PdfTypographyConfig.defaults();
-
-  final regularFont = data.regularFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
-      : pw.Font.helvetica();
-  final boldFont = data.boldFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
-      : pw.Font.helveticaBold();
+  final colourScheme = PdfColourScheme.fromBranding(branding);
+  final sectionStyle = PdfSectionStyleConfig.defaults();
+  final typography = PdfTypographyConfig.defaults();
 
   final pdf = pw.Document(
     theme: pw.ThemeData.withFont(
-      base: regularFont,
-      bold: boldFont,
+      base: fonts.interRegular,
+      bold: fonts.interBold,
     ),
   );
 
-  final settings = _JobsheetSettings(
-    companyName: data.settingsCompanyName,
-    tagline: data.settingsTagline,
-    address: data.settingsAddress,
-    phone: data.settingsPhone,
-  );
+  final companyName = data.companyName;
+  final dateStr = DateFormat('dd/MM/yyyy').format(jobsheet.date);
+
+  pdf.addPage(pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: pw.EdgeInsets.zero,
+    build: (_) => PdfCoverBuilder.build(
+      branding: branding,
+      docType: BrandingDocType.jobsheet,
+      defaultEyebrow: jobsheet.templateType.toUpperCase(),
+      defaultTitle: jobsheet.templateType,
+      defaultSubtitle: '${jobsheet.customerName} · $dateStr',
+      metaFields: [
+        (label: 'JOB NO', value: jobsheet.jobNumber),
+        (label: 'CUSTOMER', value: jobsheet.customerName),
+        (label: 'DATE', value: dateStr),
+        (label: 'ENGINEER', value: jobsheet.engineerName),
+        if (companyName.isNotEmpty)
+          (label: 'COMPANY', value: companyName),
+      ],
+      logoBytes: data.logoBytes,
+      companyName: companyName,
+    ),
+  ));
 
   pdf.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
-      header: (context) => _buildHeader(
-        jobsheet, context, settings, data.logoBytes, headerConfig, colourScheme,
-        showCompanyName: branding?.headerShowCompanyName ?? true,
-        showDocNumber: branding?.headerShowDocNumber ?? true),
-      footer: (context) => PdfFooterBuilder.buildFooter(
-        config: effectiveFooterConfig,
+      header: (context) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8),
+        child: PdfHeaderBuilder.build(
+          branding: branding,
+          companyName: companyName,
+          metaText: '${jobsheet.templateType.toUpperCase()} ${jobsheet.jobNumber}',
+          logoBytes: data.logoBytes,
+        ),
+      ),
+      footer: (context) => PdfFooterBuilder.buildBrandedFooter(
+        branding: branding,
         pageNumber: context.pageNumber,
         pagesCount: context.pagesCount,
-        primaryColor: colourScheme.primaryColor,
-        brandingFooterStyle: branding?.footerStyle,
-        accentColor: branding != null
-            ? PdfColor.fromInt(_hexToColorValue(branding.accentColour))
-            : null,
-        showPageNumbers: branding?.footerShowPageNumbers ?? true,
+        companyName: companyName,
+        defaultFooterText: '${jobsheet.templateType} ${jobsheet.jobNumber}',
       ),
       build: (context) => _buildDynamicSections(
         jobsheet, colourScheme, sectionStyle, typography, data),
@@ -106,48 +101,6 @@ Future<Uint8List> _buildJobsheetPdf(JobsheetPdfData data) async {
   );
 
   return await pdf.save();
-}
-
-/// Minimal settings holder used inside the isolate (replaces JobsheetHeaderFooter).
-class _JobsheetSettings {
-  final String companyName;
-  final String tagline;
-  final String address;
-  final String phone;
-
-  _JobsheetSettings({
-    required this.companyName,
-    required this.tagline,
-    required this.address,
-    required this.phone,
-  });
-}
-
-// ── Constants shared by builder helpers ──
-
-const PdfColor _darkGray = PdfColor.fromInt(0xFF424242);
-
-// ── Builder helpers (top-level so they work inside the isolate) ──
-
-pw.Widget _buildHeader(Jobsheet jobsheet, pw.Context context, _JobsheetSettings settings, Uint8List? logoBytes, PdfHeaderConfig headerConfig, PdfColourScheme colors, {
-  bool showCompanyName = true,
-  bool showDocNumber = true,
-}) {
-  return buildModernHeader(
-    config: headerConfig,
-    colors: colors,
-    logoBytes: logoBytes,
-    documentType: jobsheet.templateType,
-    documentRef: jobsheet.jobNumber,
-    showCompanyName: showCompanyName,
-    showDocNumber: showDocNumber,
-    fallbackValues: {
-      'companyName': settings.companyName.isNotEmpty ? settings.companyName : jobsheet.engineerName,
-      'tagline': settings.tagline,
-      'address': settings.address,
-      'phone': settings.phone,
-    },
-  );
 }
 
 List<pw.Widget> _buildDynamicSections(
@@ -904,13 +857,6 @@ String _formatFieldValue(dynamic value) {
   return str;
 }
 
-/// Extracts raw TTF bytes from a Font loaded via PdfGoogleFonts.
-Uint8List _extractFontBytes(pw.Font font) {
-  final ttf = font as pw.TtfFont;
-  return Uint8List.fromList(
-    ttf.data.buffer.asUint8List(ttf.data.offsetInBytes, ttf.data.lengthInBytes),
-  );
-}
 
 /// Builds the "Asset Inspection Summary" table from pre-fetched service records.
 pw.Widget? _buildAssetSummarySection(
@@ -1052,71 +998,57 @@ pw.Widget? _buildBs5839SummarySection(
 
 class PDFService {
   static Future<Uint8List> generateJobsheetPDF(Jobsheet jobsheet) async {
-    // ── Gather phase (main thread) ──
-    Uint8List? regularFontBytes;
-    Uint8List? boldFontBytes;
+    // ── Branding resolution ──
+    PdfBrandingService.instance.clearCache();
+    PdfBranding branding = PdfBranding.defaultBranding();
+    Uint8List? logoBytes;
     try {
-      final regularFont = await PdfGoogleFonts.robotoRegular();
-      final boldFont = await PdfGoogleFonts.robotoBold();
-      regularFontBytes = _extractFontBytes(regularFont);
-      boldFontBytes = _extractFontBytes(boldFont);
-    } catch (_) {
-      // Google Fonts unavailable — isolate will fall back to Helvetica
-    }
-
-    final settings = await JobsheetSettingsService.getSettings();
-    final useCompanyBranding = jobsheet.useCompanyBranding;
-
-    PdfBranding? branding;
-    Uint8List? brandingLogoBytes;
-
-    if (useCompanyBranding) {
-      final companyId = UserProfileService.instance.companyId;
-      if (companyId != null) {
+      final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
+      if (b.appliesToDocType(BrandingDocType.jobsheet)) {
+        branding = b;
+      }
+      if (branding.logoUrl != null) {
         try {
-          final b = await PdfBrandingService.instance.getBranding(companyId);
-          if (b.appliesToDocType(BrandingDocType.jobsheet)) {
-            branding = b;
-            if (b.logoUrl != null) {
-              try {
-                final response = await http.get(Uri.parse(b.logoUrl!));
-                if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
-              } catch (e) {
-                debugPrint('Failed to download branding logo: $e');
-              }
-            }
-          }
+          final response = await http.get(Uri.parse(branding.logoUrl!));
+          if (response.statusCode == 200) logoBytes = response.bodyBytes;
         } catch (e) {
-          debugPrint('Failed to load PdfBranding: $e');
+          debugPrint('[BRANDING] Failed to download logo: $e');
         }
+      }
+    } catch (e, stack) {
+      if (kIsWeb) {
+        debugPrint('[BRANDING-RESOLUTION] PdfBranding resolution failed: $e');
+      } else {
+        FirebaseCrashlytics.instance.recordError(
+          e, stack,
+          reason: 'PdfBranding resolution failed — using default',
+        );
       }
     }
 
-    final companyPdf = CompanyPdfConfigService.instance;
-    final logoBytes = brandingLogoBytes ?? await companyPdf.getEffectiveLogoBytes(
-      useCompanyBranding: useCompanyBranding,
-      type: PdfDocumentType.jobsheet,
-    );
-    final headerConfig = await companyPdf.getEffectiveHeaderConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-    final footerConfig = await companyPdf.getEffectiveFooterConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-    final colourScheme = await companyPdf.getEffectiveColourScheme(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-    final sectionStyle = await companyPdf.getEffectiveSectionStyleConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-    final typography = await companyPdf.getEffectiveTypographyConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
+    // ── Branded fonts ──
+    Map<String, Uint8List>? brandedFontBytes;
+    try {
+      await PdfFontRegistry.instance.ensureLoaded();
+      brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
+    } catch (e) {
+      debugPrint('[BRANDING] Failed to load branded fonts: $e');
+    }
+
+    // ── Company name: Company doc → settings → engineer name ──
+    String companyName = '';
+    final cid = UserProfileService.instance.companyId;
+    if (cid != null) {
+      final company = await CompanyService.instance.getCompany(cid);
+      companyName = company?.name ?? '';
+    }
+    if (companyName.isEmpty) {
+      final settings = await JobsheetSettingsService.getSettings();
+      companyName = settings.companyName;
+    }
+    if (companyName.isEmpty) {
+      companyName = jobsheet.engineerName;
+    }
 
     // ── Fetch asset inspection records if jobsheet has a linked site ──
     List<Map<String, dynamic>>? assetServiceRecords;
@@ -1130,7 +1062,6 @@ class PDFService {
               .getRecordsForJobsheet(basePath, siteId, jobsheet.id);
 
           if (records.isNotEmpty) {
-            // Fetch assets and types to enrich the records
             final assets = await AssetService.instance
                 .getAssetsStream(basePath, siteId).first;
             final assetTypes = await AssetTypeService.instance
@@ -1180,35 +1111,16 @@ class PDFService {
       }
     }
 
-    final effectiveColourValue = branding != null
-        ? _hexToColorValue(branding.primaryColour)
-        : colourScheme.primaryColorValue;
-    final effectiveSecondaryValue = branding != null
-        ? _hexToColorValue(branding.accentColour)
-        : colourScheme.secondaryColorValue;
-
     final data = JobsheetPdfData(
       jobsheetJson: jobsheet.toJson(),
       logoBytes: logoBytes,
-      headerConfigJson: headerConfig.toJson(),
-      footerConfigJson: footerConfig.toJson(),
-      colourSchemeValue: effectiveColourValue,
-      secondaryColourValue: effectiveSecondaryValue,
-      brandingJson: branding?.toJson(),
-      sectionStyleJson: sectionStyle.toJson(),
-      typographyJson: typography.toJson(),
-      settingsCompanyName: settings.companyName,
-      settingsTagline: settings.tagline,
-      settingsAddress: settings.address,
-      settingsPhone: settings.phone,
-      regularFontBytes: regularFontBytes,
-      boldFontBytes: boldFontBytes,
+      brandingJson: branding.toJson(),
+      brandedFontBytes: brandedFontBytes,
+      companyName: companyName,
       assetServiceRecords: assetServiceRecords,
       bs5839VisitJson: bs5839VisitJson,
     );
 
-    // ── Build phase ──
-    // Isolates are not available on web, so run directly on the main thread.
     if (kIsWeb) {
       return _buildJobsheetPdf(data);
     }

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:pdf/pdf.dart';
+import 'pdf_branding.dart';
 
 class PdfColourScheme {
   final int primaryColorValue;
@@ -166,6 +167,21 @@ class PdfColourScheme {
         secondaryColorValue: json['secondaryColorValue'] as int?,
         useAutoSecondary: json['useAutoSecondary'] as bool? ?? true,
       );
+
+  factory PdfColourScheme.fromBranding(PdfBranding branding) {
+    final primary = _parseHex(branding.primaryColour);
+    final accent = _parseHex(branding.accentColour);
+    return PdfColourScheme(
+      primaryColorValue: primary,
+      secondaryColorValue: accent,
+      useAutoSecondary: false,
+    );
+  }
+
+  static int _parseHex(String hex) {
+    final clean = hex.replaceFirst('#', '');
+    return 0xFF000000 | int.parse(clean, radix: 16);
+  }
 
   String toJsonString() => jsonEncode(toJson());
 
