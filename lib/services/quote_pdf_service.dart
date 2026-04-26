@@ -4,87 +4,60 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
-import '../models/models.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import '../models/models.dart' show PdfBranding, BrandingDocType, Quote, QuoteStatus;
 import 'pdf_branding_service.dart';
-import 'pdf_header_builder.dart' as legacy_header;
 import 'pdf_footer_builder.dart';
-import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
+import 'company_service.dart';
+import 'user_profile_service.dart';
+import 'jobsheet_settings_service.dart';
 
+import 'pdf_widgets/pdf_brand_tokens.dart';
 import 'pdf_widgets/pdf_cover_builder.dart';
 import 'pdf_widgets/pdf_font_registry.dart';
 import 'pdf_widgets/pdf_modern_header.dart' show PdfHeaderBuilder;
 
-int _hexToColorValue(String hex) {
-  final clean = hex.replaceFirst('#', '');
-  return 0xFF000000 | int.parse(clean, radix: 16);
-}
-
 /// Top-level function for compute() — builds the quote PDF in a background isolate.
 Future<Uint8List> _buildQuotePdf(QuotePdfData data) async {
   final quote = Quote.fromJson(data.quoteJson);
-  final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
-  final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
-  final colourScheme =
-      PdfColourScheme(primaryColorValue: data.colourSchemeValue);
-  final primaryColor = colourScheme.primaryColor;
 
-  PdfBranding? branding;
-  final hasBrandedFonts = data.brandedFontBytes != null;
-  if (data.brandingJson != null) {
-    branding = PdfBranding.fromJson(data.brandingJson!);
-    if (hasBrandedFonts) {
-      PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
-    }
+  final branding = PdfBranding.fromJson(data.brandingJson);
+  if (data.brandedFontBytes != null) {
+    PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
   }
-
-  final effectiveFooterConfig = branding != null && branding.footerText.isNotEmpty
-      ? PdfFooterConfig(
-          leftLines: [HeaderTextLine(key: 'brandingText', value: branding.footerText, fontSize: 8)],
-          centreLines: const [],
-        )
-      : footerConfig;
-
-  final regularFont = data.regularFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.regularFontBytes!))
-      : pw.Font.helvetica();
-  final boldFont = data.boldFontBytes != null
-      ? pw.Font.ttf(ByteData.sublistView(data.boldFontBytes!))
-      : pw.Font.helveticaBold();
-
-  final fonts = hasBrandedFonts ? PdfFontRegistry.instance : null;
+  final fonts = PdfFontRegistry.instance;
   final pdf = pw.Document(
     theme: pw.ThemeData.withFont(
-      base: fonts?.interRegular ?? regularFont,
-      bold: fonts?.interBold ?? boldFont,
+      base: fonts.interRegular,
+      bold: fonts.interBold,
     ),
   );
 
-  final companyName = quote.engineerName;
+  final primaryColor = PdfBrandTokens.primary(branding);
+  final companyName = data.companyName;
   final dateStr = DateFormat('dd/MM/yyyy').format(quote.createdAt);
 
-  // Cover page (branded only)
-  if (branding != null && hasBrandedFonts) {
-    pdf.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: pw.EdgeInsets.zero,
-      build: (_) => PdfCoverBuilder.build(
-        branding: branding!,
-        docType: BrandingDocType.quote,
-        defaultEyebrow: 'QUOTE',
-        defaultTitle: 'Quote',
-        defaultSubtitle: '${quote.customerName} · $dateStr',
-        metaFields: [
-          (label: 'QUOTE NO', value: quote.quoteNumber),
-          (label: 'CUSTOMER', value: quote.customerName),
-          (label: 'DATE', value: dateStr),
-          (label: 'PREPARED BY', value: companyName),
-        ],
-        logoBytes: data.logoBytes,
-        companyName: companyName,
-      ),
-    ));
-  }
+  // Cover page
+  pdf.addPage(pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: pw.EdgeInsets.zero,
+    build: (_) => PdfCoverBuilder.build(
+      branding: branding,
+      docType: BrandingDocType.quote,
+      defaultEyebrow: 'QUOTE',
+      defaultTitle: 'Quote',
+      defaultSubtitle: '${quote.customerName} · $dateStr',
+      metaFields: [
+        (label: 'QUOTE NO', value: quote.quoteNumber),
+        (label: 'CUSTOMER', value: quote.customerName),
+        (label: 'DATE', value: dateStr),
+        (label: 'PREPARED BY', value: companyName),
+      ],
+      logoBytes: data.logoBytes,
+      companyName: companyName,
+    ),
+  ));
 
   pdf.addPage(
     pw.Page(
@@ -93,16 +66,12 @@ Future<Uint8List> _buildQuotePdf(QuotePdfData data) async {
       build: (context) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          if (branding != null && hasBrandedFonts)
-            PdfHeaderBuilder.build(
-              branding: branding,
-              companyName: companyName,
-              metaText: 'QUOTE ${quote.quoteNumber}',
-              logoBytes: data.logoBytes,
-            )
-          else
-            _buildHeader(quote, data.logoBytes, headerConfig, primaryColor,
-              showCompanyName: branding?.headerShowCompanyName ?? true),
+          PdfHeaderBuilder.build(
+            branding: branding,
+            companyName: companyName,
+            metaText: 'QUOTE ${quote.quoteNumber}',
+            logoBytes: data.logoBytes,
+          ),
           pw.SizedBox(height: 24),
           _buildQuoteInfo(quote),
           pw.SizedBox(height: 24),
@@ -122,26 +91,13 @@ Future<Uint8List> _buildQuotePdf(QuotePdfData data) async {
           pw.Spacer(),
           _buildTermsSection(quote, primaryColor),
           pw.SizedBox(height: 16),
-          if (branding != null && hasBrandedFonts)
-            PdfFooterBuilder.buildBrandedFooter(
-              branding: branding,
-              pageNumber: 1,
-              pagesCount: 1,
-              companyName: companyName,
-              defaultFooterText: 'Quote ${quote.quoteNumber}',
-            )
-          else
-            PdfFooterBuilder.buildFooter(
-              config: effectiveFooterConfig,
-              pageNumber: 1,
-              pagesCount: 1,
-              primaryColor: primaryColor,
-              brandingFooterStyle: branding?.footerStyle,
-              accentColor: branding != null
-                  ? PdfColor.fromInt(_hexToColorValue(branding.accentColour))
-                  : null,
-              showPageNumbers: branding?.footerShowPageNumbers ?? true,
-            ),
+          PdfFooterBuilder.buildBrandedFooter(
+            branding: branding,
+            pageNumber: 1,
+            pagesCount: 1,
+            companyName: companyName,
+            defaultFooterText: 'Quote ${quote.quoteNumber}',
+          ),
         ],
       ),
     ),
@@ -152,63 +108,11 @@ Future<Uint8List> _buildQuotePdf(QuotePdfData data) async {
 
 // ── Constants ──
 
-const _coralAccent = PdfColor.fromInt(0xFFF97316);
 const PdfColor _darkGray = PdfColor.fromInt(0xFF424242);
 const PdfColor _lightGray = PdfColor.fromInt(0xFFE0E0E0);
 const PdfColor _white = PdfColors.white;
 
 // ── Builder helpers (top-level for isolate compatibility) ──
-
-pw.Widget _buildHeader(
-  Quote quote,
-  Uint8List? logoBytes,
-  PdfHeaderConfig headerConfig,
-  PdfColor primaryColor, {
-  bool showCompanyName = true,
-}) {
-  return pw.Container(
-    decoration: pw.BoxDecoration(
-      border: pw.Border(
-        bottom: pw.BorderSide(color: primaryColor, width: 2),
-      ),
-    ),
-    padding: const pw.EdgeInsets.only(bottom: 12),
-    child: pw.Row(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Expanded(
-          flex: 5,
-          child: legacy_header.PdfHeaderBuilder.buildLeftAndCentre(
-            config: headerConfig,
-            logoBytes: logoBytes,
-            primaryColor: primaryColor,
-            showCompanyName: showCompanyName,
-            fallbackValues: {
-              'companyName': quote.engineerName,
-              'engineerName': quote.engineerName,
-            },
-          ),
-        ),
-        pw.SizedBox(width: 12),
-        pw.Container(
-          padding: const pw.EdgeInsets.all(12),
-          decoration: const pw.BoxDecoration(
-            color: _coralAccent,
-            borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
-          ),
-          child: pw.Text(
-            'QUOTE',
-            style: pw.TextStyle(
-              fontSize: 24,
-              fontWeight: pw.FontWeight.bold,
-              color: _white,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
 
 pw.Widget _buildQuoteInfo(Quote quote) {
   final dateFormat = DateFormat('dd/MM/yyyy');
@@ -646,66 +550,65 @@ class QuotePdfService {
       boldFontBytes = _extractFontBytes(boldFont);
     } catch (_) {}
 
+    // Branding
+    PdfBrandingService.instance.clearCache();
+    PdfBranding branding = PdfBranding.defaultBranding();
+    Uint8List? brandingLogoBytes;
+    try {
+      final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
+      if (b.appliesToDocType(BrandingDocType.quote)) {
+        branding = b;
+      }
+      if (branding.logoUrl != null) {
+        try {
+          final response = await http.get(Uri.parse(branding.logoUrl!));
+          if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
+        } catch (e) {
+          debugPrint('[BRANDING] Failed to download logo: $e');
+        }
+      }
+    } catch (e, stack) {
+      if (kIsWeb) {
+        debugPrint('[BRANDING-RESOLUTION] PdfBranding resolution failed: $e');
+      } else {
+        FirebaseCrashlytics.instance.recordError(
+          e, stack,
+          reason: 'PdfBranding resolution failed — using default',
+        );
+      }
+    }
+
     Map<String, Uint8List>? brandedFontBytes;
     try {
       await PdfFontRegistry.instance.ensureLoaded();
       brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
     } catch (e) {
-      debugPrint('Failed to load branded fonts: $e');
+      debugPrint('[BRANDING] Failed to load branded fonts: $e');
     }
 
-    PdfBranding? branding;
-    Uint8List? brandingLogoBytes;
-
-    try {
-      final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
-      if (b.appliesToDocType(BrandingDocType.quote)) {
-        branding = b;
-        if (b.logoUrl != null) {
-          try {
-            final response = await http.get(Uri.parse(b.logoUrl!));
-            if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
-          } catch (e) {
-            debugPrint('Failed to download branding logo: $e');
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Failed to load PdfBranding: $e');
+    // Company name: Company doc → settings → quote.engineerName
+    String companyName = '';
+    final cid = UserProfileService.instance.companyId;
+    if (cid != null) {
+      final company = await CompanyService.instance.getCompany(cid);
+      companyName = company?.name ?? '';
     }
-
-    final companyPdf = CompanyPdfConfigService.instance;
-    final logoBytes = brandingLogoBytes ?? await companyPdf.getEffectiveLogoBytes(
-      useCompanyBranding: quote.useCompanyBranding,
-      type: PdfDocumentType.quote,
-    );
-    final headerConfig = await companyPdf.getEffectiveHeaderConfig(
-      PdfDocumentType.quote,
-      useCompanyBranding: quote.useCompanyBranding,
-    );
-    final footerConfig = await companyPdf.getEffectiveFooterConfig(
-      PdfDocumentType.quote,
-      useCompanyBranding: quote.useCompanyBranding,
-    );
-    final colourScheme = await companyPdf.getEffectiveColourScheme(
-      PdfDocumentType.quote,
-      useCompanyBranding: quote.useCompanyBranding,
-    );
-
-    final effectiveColourValue = branding != null
-        ? _hexToColorValue(branding.primaryColour)
-        : colourScheme.primaryColorValue;
+    if (companyName.isEmpty) {
+      final settings = await JobsheetSettingsService.getSettings();
+      companyName = settings.companyName;
+    }
+    if (companyName.isEmpty) {
+      companyName = quote.engineerName;
+    }
 
     final data = QuotePdfData(
       quoteJson: quote.toJson(),
-      logoBytes: logoBytes,
-      headerConfigJson: headerConfig.toJson(),
-      footerConfigJson: footerConfig.toJson(),
-      colourSchemeValue: effectiveColourValue,
-      brandingJson: branding?.toJson(),
+      logoBytes: brandingLogoBytes,
+      brandingJson: branding.toJson(),
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
-      brandedFontBytes: branding != null ? brandedFontBytes : null,
+      brandedFontBytes: brandedFontBytes,
+      companyName: companyName,
     );
 
     if (kIsWeb) return _buildQuotePdf(data);

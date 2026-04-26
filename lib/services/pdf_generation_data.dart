@@ -81,24 +81,20 @@ class InvoicePdfData {
 class QuotePdfData {
   final Map<String, dynamic> quoteJson;
   final Uint8List? logoBytes;
-  final Map<String, dynamic> headerConfigJson;
-  final Map<String, dynamic> footerConfigJson;
-  final int colourSchemeValue;
-  final Map<String, dynamic>? brandingJson;
+  final Map<String, dynamic> brandingJson;
   final Uint8List? regularFontBytes;
   final Uint8List? boldFontBytes;
   final Map<String, Uint8List>? brandedFontBytes;
+  final String companyName;
 
   QuotePdfData({
     required this.quoteJson,
-    required this.logoBytes,
-    required this.headerConfigJson,
-    required this.footerConfigJson,
-    required this.colourSchemeValue,
-    this.brandingJson,
+    this.logoBytes,
+    required this.brandingJson,
     this.regularFontBytes,
     this.boldFontBytes,
     this.brandedFontBytes,
+    required this.companyName,
   });
 }
 
