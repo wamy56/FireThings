@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -18,6 +19,7 @@ import 'asset_type_service.dart';
 import 'bs5839_config_service.dart';
 import 'cause_effect_service.dart';
 import 'company_pdf_config_service.dart';
+import 'company_service.dart';
 import 'competency_service.dart';
 import 'defect_service.dart';
 import 'floor_plan_service.dart';
@@ -73,60 +75,63 @@ class Bs5839ReportService {
       boldFontBytes = _extractFontBytes(boldFont);
     } catch (_) {}
 
-    final settings = await JobsheetSettingsService.getSettings();
-    final useCompanyBranding = basePath.startsWith('companies/');
-    final companyPdf = CompanyPdfConfigService.instance;
-    final logoBytes = await companyPdf.getEffectiveLogoBytes(
-      useCompanyBranding: useCompanyBranding,
-      type: PdfDocumentType.jobsheet,
-    );
-    final headerConfig = await companyPdf.getEffectiveHeaderConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-    final footerConfig = await companyPdf.getEffectiveFooterConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-    final colourScheme = await companyPdf.getEffectiveColourScheme(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-
     final engineerName = UserProfileService.instance.resolveEngineerName();
-    final companyName = settings.companyName;
 
-    PdfBranding? branding;
+    // Branding
+    PdfBrandingService.instance.clearCache();
+    PdfBranding branding = PdfBranding.defaultBranding();
     Uint8List? brandingLogoBytes;
-    Map<String, Uint8List>? brandedFontBytes;
-
     try {
       final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
       if (b.appliesToDocType(BrandingDocType.report)) {
         branding = b;
-        if (b.logoUrl != null) {
-          try {
-            final response = await http.get(Uri.parse(b.logoUrl!));
-            if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
-          } catch (e) {
-            debugPrint('Failed to download branding logo: $e');
-          }
+      }
+      if (branding.logoUrl != null) {
+        try {
+          final response = await http.get(Uri.parse(branding.logoUrl!));
+          if (response.statusCode == 200) brandingLogoBytes = response.bodyBytes;
+        } catch (e) {
+          debugPrint('[BRANDING] Failed to download logo: $e');
         }
       }
-    } catch (e) {
-      debugPrint('Failed to load PdfBranding: $e');
-    }
-
-    if (branding != null) {
-      try {
-        await PdfFontRegistry.instance.ensureLoaded();
-        brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
-      } catch (e) {
-        debugPrint('Failed to load branded fonts: $e');
+    } catch (e, stack) {
+      if (kIsWeb) {
+        debugPrint('[BRANDING-RESOLUTION] PdfBranding resolution failed: $e');
+      } else {
+        FirebaseCrashlytics.instance.recordError(
+          e, stack,
+          reason: 'PdfBranding resolution failed — using default',
+        );
       }
     }
 
-    final effectiveLogoBytes = brandingLogoBytes ?? logoBytes;
+    Map<String, Uint8List>? brandedFontBytes;
+    try {
+      await PdfFontRegistry.instance.ensureLoaded();
+      brandedFontBytes = PdfFontRegistry.instance.extractFontBytes();
+    } catch (e) {
+      debugPrint('[BRANDING] Failed to load branded fonts: $e');
+    }
+
+    // Company name: Company doc → settings
+    String companyName = '';
+    final cid = UserProfileService.instance.companyId;
+    if (cid != null) {
+      final company = await CompanyService.instance.getCompany(cid);
+      companyName = company?.name ?? '';
+    }
+    if (companyName.isEmpty) {
+      final settings = await JobsheetSettingsService.getSettings();
+      companyName = settings.companyName;
+    }
+
+    // Header config still needed for in-page buildModernHeader
+    final useCompanyBranding = basePath.startsWith('companies/');
+    final companyPdf = CompanyPdfConfigService.instance;
+    final headerConfig = await companyPdf.getEffectiveHeaderConfig(
+      PdfDocumentType.jobsheet,
+      useCompanyBranding: useCompanyBranding,
+    );
 
     onProgress?.call('Loading inspection data...');
 
@@ -243,26 +248,17 @@ class Bs5839ReportService {
       }
     }
 
-    final effectiveColourValue = branding != null
-        ? _hexToColorValue(branding.primaryColour)
-        : colourScheme.primaryColorValue;
-    final effectiveSecondaryValue = branding != null
-        ? _hexToColorValue(branding.accentColour)
-        : colourScheme.secondaryColorValue;
-
     final data = Bs5839ReportPdfData(
       siteName: siteName,
       siteAddress: siteAddress,
       engineerName: engineerName,
       companyName: companyName,
-      logoBytes: effectiveLogoBytes,
+      logoBytes: brandingLogoBytes,
       headerConfigJson: headerConfig.toJson(),
-      footerConfigJson: footerConfig.toJson(),
-      colourSchemeValue: effectiveColourValue,
-      secondaryColourValue: effectiveSecondaryValue,
+      colourSchemeValue: _hexToColorValue(branding.primaryColour),
       regularFontBytes: regularFontBytes,
       boldFontBytes: boldFontBytes,
-      brandingJson: branding?.toJson(),
+      brandingJson: branding.toJson(),
       brandedFontBytes: brandedFontBytes,
       configJson: config?.toJson() ?? {},
       visitJson: visit?.toJson() ?? {},
@@ -342,13 +338,8 @@ Future<Uint8List> _generatePdf(Bs5839ReportPdfData data) async {
       ? PdfSectionStyleConfig.fromJson(data.sectionStyleJson!)
       : const PdfSectionStyleConfig();
   final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
-  final footerConfig = PdfFooterConfig.fromJson(data.footerConfigJson);
 
-  PdfBranding? branding;
-  if (data.brandingJson != null) {
-    branding = PdfBranding.fromJson(data.brandingJson!);
-  }
-
+  final branding = PdfBranding.fromJson(data.brandingJson);
   if (data.brandedFontBytes != null) {
     PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
   }
@@ -960,57 +951,47 @@ Future<Uint8List> _generatePdf(Bs5839ReportPdfData data) async {
       ? df.format(visit!.visitDate)
       : df.format(DateTime.now());
 
-  if (branding != null && data.brandedFontBytes != null) {
-    doc.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: pw.EdgeInsets.zero,
-      build: (_) => PdfCoverBuilder.build(
-        branding: branding!,
-        docType: BrandingDocType.report,
-        defaultEyebrow: 'BS 5839-1:2025',
-        defaultTitle: 'Inspection\nReport',
-        defaultSubtitle: '${data.siteName} · $visitDate',
-        metaFields: [
-          (label: 'Site', value: data.siteName),
-          (label: 'Address', value: data.siteAddress),
-          (label: 'Engineer', value: data.engineerName),
-          (label: 'Date', value: visitDate),
-          (label: 'Declaration', value: declaration.displayLabel),
-        ],
-        logoBytes: data.logoBytes,
-        companyName: data.companyName,
-      ),
-    ));
-  }
+  doc.addPage(pw.Page(
+    pageFormat: PdfPageFormat.a4,
+    margin: pw.EdgeInsets.zero,
+    build: (_) => PdfCoverBuilder.build(
+      branding: branding,
+      docType: BrandingDocType.report,
+      defaultEyebrow: 'BS 5839-1:2025',
+      defaultTitle: 'Inspection\nReport',
+      defaultSubtitle: '${data.siteName} · $visitDate',
+      metaFields: [
+        (label: 'Site', value: data.siteName),
+        (label: 'Address', value: data.siteAddress),
+        (label: 'Engineer', value: data.engineerName),
+        (label: 'Date', value: visitDate),
+        (label: 'Declaration', value: declaration.displayLabel),
+      ],
+      logoBytes: data.logoBytes,
+      companyName: data.companyName,
+    ),
+  ));
 
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(40),
-      header: branding != null && data.brandedFontBytes != null
-          ? (context) => pw.Padding(
-                padding: const pw.EdgeInsets.only(bottom: 8),
-                child: PdfHeaderBuilder.build(
-                  branding: branding!,
-                  companyName: data.companyName,
-                  metaText: 'BS 5839-1 INSPECTION · $visitDate',
-                  logoBytes: data.logoBytes,
-                ),
-              )
-          : null,
-      footer: branding != null && data.brandedFontBytes != null
-          ? (context) => PdfFooterBuilder.buildBrandedFooter(
-                branding: branding!,
-                pageNumber: context.pageNumber,
-                pagesCount: context.pagesCount,
-                companyName: data.companyName,
-                defaultFooterText: 'BS 5839-1 Inspection Report · ${data.siteName}',
-              )
-          : (context) => PdfFooterBuilder.buildFooter(
-                config: footerConfig,
-                pageNumber: context.pageNumber,
-                pagesCount: context.pagesCount,
-              ),
+      header: (context) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8),
+        child: PdfHeaderBuilder.build(
+          branding: branding,
+          companyName: data.companyName,
+          metaText: 'BS 5839-1 INSPECTION · $visitDate',
+          logoBytes: data.logoBytes,
+        ),
+      ),
+      footer: (context) => PdfFooterBuilder.buildBrandedFooter(
+        branding: branding,
+        pageNumber: context.pageNumber,
+        pagesCount: context.pagesCount,
+        companyName: data.companyName,
+        defaultFooterText: 'BS 5839-1 Inspection Report · ${data.siteName}',
+      ),
       build: (_) => widgets,
     ),
   );

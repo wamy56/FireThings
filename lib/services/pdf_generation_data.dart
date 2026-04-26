@@ -206,9 +206,7 @@ class Bs5839ReportPdfData {
   final String companyName;
   final Uint8List? logoBytes;
   final Map<String, dynamic> headerConfigJson;
-  final Map<String, dynamic> footerConfigJson;
   final int colourSchemeValue;
-  final int? secondaryColourValue;
   final Map<String, dynamic>? sectionStyleJson;
   final Map<String, dynamic>? typographyJson;
   final Uint8List? regularFontBytes;
@@ -227,7 +225,7 @@ class Bs5839ReportPdfData {
   final List<Map<String, dynamic>> floorPlansJson;
   final Map<String, Uint8List> floorPlanImages;
   final Map<String, Uint8List> defectPhotos;
-  final Map<String, dynamic>? brandingJson;
+  final Map<String, dynamic> brandingJson;
   final Map<String, Uint8List>? brandedFontBytes;
 
   Bs5839ReportPdfData({
@@ -237,9 +235,7 @@ class Bs5839ReportPdfData {
     required this.companyName,
     this.logoBytes,
     required this.headerConfigJson,
-    required this.footerConfigJson,
     required this.colourSchemeValue,
-    this.secondaryColourValue,
     this.sectionStyleJson,
     this.typographyJson,
     this.regularFontBytes,
@@ -257,7 +253,7 @@ class Bs5839ReportPdfData {
     required this.floorPlansJson,
     required this.floorPlanImages,
     required this.defectPhotos,
-    this.brandingJson,
+    required this.brandingJson,
     this.brandedFontBytes,
   });
 }
