@@ -14,6 +14,40 @@ class PdfPreviewBuilders {
   Color get primary => hexToColor(branding.primaryColour);
   Color get accent => hexToColor(branding.accentColour);
 
+  Widget _buildLogoBadge({
+    required double size,
+    required double radius,
+    required double fontSize,
+  }) {
+    final lettermark = Center(
+      child: Text(
+        companyName.isNotEmpty ? companyName[0].toUpperCase() : 'F',
+        style: FtText.outfit(size: fontSize, weight: FontWeight.w800, color: primary),
+      ),
+    );
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: accent,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: branding.logoUrl != null && branding.logoUrl!.isNotEmpty
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              child: Image.network(
+                branding.logoUrl!,
+                width: size,
+                height: size,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) => lettermark,
+              ),
+            )
+          : lettermark,
+    );
+  }
+
   // ── Cover ──
 
   Widget buildCover({
@@ -83,19 +117,7 @@ class PdfPreviewBuilders {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: accent,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Center(
-                      child: Text(companyName.isNotEmpty ? companyName[0].toUpperCase() : 'F',
-                          style: FtText.outfit(
-                              size: 22, weight: FontWeight.w800, color: primary)),
-                    ),
-                  ),
+                  _buildLogoBadge(size: 44, radius: 8, fontSize: 22),
                   const SizedBox(width: 12),
                   Text(
                     companyName,
@@ -228,19 +250,7 @@ class PdfPreviewBuilders {
           if (showName)
             Row(
               children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: accent,
-                    borderRadius: BorderRadius.circular(5),
-                  ),
-                  child: Center(
-                    child: Text(companyName.isNotEmpty ? companyName[0].toUpperCase() : 'F',
-                        style: FtText.outfit(
-                            size: 14, weight: FontWeight.w800, color: primary)),
-                  ),
-                ),
+                _buildLogoBadge(size: 28, radius: 5, fontSize: 14),
                 const SizedBox(width: 10),
                 Text(
                   companyName,
