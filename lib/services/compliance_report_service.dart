@@ -1026,6 +1026,7 @@ class ComplianceReportService {
 
     PdfBranding branding = PdfBranding.defaultBranding();
     Uint8List? brandingLogoBytes;
+    PdfBrandingService.instance.clearCache();
     try {
       final b = await PdfBrandingService.instance.resolveBrandingForCurrentUser();
       if (b.appliesToDocType(BrandingDocType.report)) {
@@ -1042,11 +1043,15 @@ class ComplianceReportService {
         }
       }
     } catch (e, stack) {
-      FirebaseCrashlytics.instance.recordError(
-        e,
-        stack,
-        reason: 'PdfBranding resolution failed — using default',
-      );
+      if (kIsWeb) {
+        debugPrint('[BRANDING-RESOLUTION] PdfBranding resolution failed: $e');
+      } else {
+        FirebaseCrashlytics.instance.recordError(
+          e,
+          stack,
+          reason: 'PdfBranding resolution failed — using default',
+        );
+      }
     }
 
     final logoBytes = brandingLogoBytes ??
