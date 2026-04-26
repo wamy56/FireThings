@@ -7,7 +7,6 @@ import 'storage_upload_helper.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 
 import '../data/declaration_templates.dart';
 import '../models/models.dart';
@@ -18,7 +17,6 @@ import 'asset_service.dart';
 import 'asset_type_service.dart';
 import 'bs5839_config_service.dart';
 import 'cause_effect_service.dart';
-import 'company_pdf_config_service.dart';
 import 'company_service.dart';
 import 'competency_service.dart';
 import 'defect_service.dart';
@@ -44,11 +42,6 @@ Uint8List _resizeImageBytes(Uint8List bytes, {int maxWidth = 1200}) {
   return compressImageBytes(bytes, maxWidth: maxWidth, quality: 80);
 }
 
-int _hexToColorValue(String hex) {
-  final clean = hex.replaceFirst('#', '');
-  return 0xFF000000 | int.parse(clean, radix: 16);
-}
-
 class Bs5839ReportService {
   Bs5839ReportService._();
   static final Bs5839ReportService instance = Bs5839ReportService._();
@@ -65,15 +58,6 @@ class Bs5839ReportService {
     void Function(String phase)? onProgress,
   }) async {
     onProgress?.call('Loading fonts and branding...');
-
-    Uint8List? regularFontBytes;
-    Uint8List? boldFontBytes;
-    try {
-      final regularFont = await PdfGoogleFonts.robotoRegular();
-      final boldFont = await PdfGoogleFonts.robotoBold();
-      regularFontBytes = _extractFontBytes(regularFont);
-      boldFontBytes = _extractFontBytes(boldFont);
-    } catch (_) {}
 
     final engineerName = UserProfileService.instance.resolveEngineerName();
 
@@ -124,14 +108,6 @@ class Bs5839ReportService {
       final settings = await JobsheetSettingsService.getSettings();
       companyName = settings.companyName;
     }
-
-    // Header config still needed for in-page buildModernHeader
-    final useCompanyBranding = basePath.startsWith('companies/');
-    final companyPdf = CompanyPdfConfigService.instance;
-    final headerConfig = await companyPdf.getEffectiveHeaderConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
 
     onProgress?.call('Loading inspection data...');
 
@@ -254,10 +230,6 @@ class Bs5839ReportService {
       engineerName: engineerName,
       companyName: companyName,
       logoBytes: brandingLogoBytes,
-      headerConfigJson: headerConfig.toJson(),
-      colourSchemeValue: _hexToColorValue(branding.primaryColour),
-      regularFontBytes: regularFontBytes,
-      boldFontBytes: boldFontBytes,
       brandingJson: branding.toJson(),
       brandedFontBytes: brandedFontBytes,
       configJson: config?.toJson() ?? {},
@@ -311,14 +283,6 @@ class Bs5839ReportService {
     return url;
   }
 
-  static Uint8List? _extractFontBytes(pw.Font font) {
-    try {
-      final ttfFont = font as pw.TtfFont;
-      return ttfFont.data.buffer.asUint8List();
-    } catch (_) {
-      return null;
-    }
-  }
 }
 
 Future<Uint8List> _buildReport(Bs5839ReportPdfData data) async {
@@ -330,37 +294,19 @@ Future<Uint8List> _buildReportWeb(Bs5839ReportPdfData data) async {
 }
 
 Future<Uint8List> _generatePdf(Bs5839ReportPdfData data) async {
-  final colors = PdfColourScheme(primaryColorValue: data.colourSchemeValue);
-  final typography = data.typographyJson != null
-      ? PdfTypographyConfig.fromJson(data.typographyJson!)
-      : const PdfTypographyConfig();
-  final sectionStyle = data.sectionStyleJson != null
-      ? PdfSectionStyleConfig.fromJson(data.sectionStyleJson!)
-      : const PdfSectionStyleConfig();
-  final headerConfig = PdfHeaderConfig.fromJson(data.headerConfigJson);
-
   final branding = PdfBranding.fromJson(data.brandingJson);
+  final colors = PdfColourScheme.fromBranding(branding);
+  final typography = PdfTypographyConfig.defaults();
+  final sectionStyle = PdfSectionStyleConfig.defaults();
+
   if (data.brandedFontBytes != null) {
     PdfFontRegistry.instance.loadFromBytes(data.brandedFontBytes!);
   }
-
-  pw.Font? regularFont;
-  pw.Font? boldFont;
-  try {
-    if (data.brandedFontBytes != null) {
-      regularFont = PdfFontRegistry.instance.interRegular;
-      boldFont = PdfFontRegistry.instance.interBold;
-    } else if (data.regularFontBytes != null) {
-      regularFont = pw.Font.ttf(data.regularFontBytes!.buffer.asByteData());
-      if (data.boldFontBytes != null) {
-        boldFont = pw.Font.ttf(data.boldFontBytes!.buffer.asByteData());
-      }
-    }
-  } catch (_) {}
+  final fonts = PdfFontRegistry.instance;
 
   final theme = pw.ThemeData.withFont(
-    base: regularFont,
-    bold: boldFont,
+    base: fonts.interRegular,
+    bold: fonts.interBold,
   );
 
   final config = data.configJson.isNotEmpty
@@ -396,12 +342,11 @@ Future<Uint8List> _generatePdf(Bs5839ReportPdfData data) async {
 
   // ── Cover & Declaration ──
   widgets.add(
-    buildModernHeader(
-      config: headerConfig,
-      colors: colors,
+    PdfHeaderBuilder.build(
+      branding: branding,
+      companyName: data.companyName,
+      metaText: 'BS 5839-1:2025 INSPECTION REPORT',
       logoBytes: data.logoBytes,
-      documentType: 'BS 5839-1:2025 Inspection Report',
-      documentRef: visit?.id ?? '',
     ),
   );
   widgets.add(pw.SizedBox(height: 16));

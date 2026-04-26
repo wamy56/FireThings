@@ -18,7 +18,6 @@ import 'service_history_service.dart';
 import 'floor_plan_service.dart';
 import 'jobsheet_settings_service.dart';
 import 'company_service.dart';
-import 'company_pdf_config_service.dart';
 import 'pdf_generation_data.dart';
 import 'bs5839_config_service.dart';
 import 'inspection_visit_service.dart';
@@ -98,8 +97,10 @@ class _ReportContext {
 }
 
 _ReportContext _buildReportContext(ComplianceReportPdfData data) {
-  final colourScheme =
-      PdfColourScheme(primaryColorValue: data.colourSchemeValue);
+  final branding = data.brandingJson != null
+      ? PdfBranding.fromJson(data.brandingJson!)
+      : PdfBranding.defaultBranding();
+  final colourScheme = PdfColourScheme.fromBranding(branding);
   final assets = data.assetsJson.map((j) => Asset.fromJson(j)).toList();
   final assetTypes =
       data.assetTypesJson.map((j) => AssetType.fromJson(j)).toList();
@@ -123,16 +124,10 @@ _ReportContext _buildReportContext(ComplianceReportPdfData data) {
     untested: active.where((a) => a.complianceStatus == AssetComplianceStatus.untested).toList(),
     primaryColor: colourScheme.primaryColor,
     primaryLight: colourScheme.primaryLight,
-    accentColor: data.secondaryColourValue != null
-        ? PdfColor.fromInt(data.secondaryColourValue!)
-        : colourScheme.secondaryColor,
+    accentColor: colourScheme.secondaryColor,
   );
 }
 
-int _hexToColorValue(String hex) {
-  final clean = hex.replaceFirst('#', '');
-  return 0xFF000000 | int.parse(clean, radix: 16);
-}
 
 // ── Section 2: Compliance Summary ──
 void _addComplianceSummary(List<pw.Widget> widgets, _ReportContext ctx) {
@@ -1001,17 +996,7 @@ class ComplianceReportService {
 
     onProgress?.call('Loading fonts and branding...');
 
-    // Fonts
-    Uint8List? regularFontBytes;
-    Uint8List? boldFontBytes;
-    try {
-      final regularFont = await PdfGoogleFonts.robotoRegular();
-      final boldFont = await PdfGoogleFonts.robotoBold();
-      regularFontBytes = _extractFontBytes(regularFont);
-      boldFontBytes = _extractFontBytes(boldFont);
-    } catch (_) {}
-
-    // Branded fonts (for new cover/header/footer builders)
+    // Branded fonts
     Map<String, Uint8List>? brandedFontBytes;
     try {
       await PdfFontRegistry.instance.ensureLoaded();
@@ -1022,7 +1007,6 @@ class ComplianceReportService {
 
     // Branding
     final settings = await JobsheetSettingsService.getSettings();
-    final useCompanyBranding = basePath.startsWith('companies/');
 
     PdfBranding branding = PdfBranding.defaultBranding();
     Uint8List? brandingLogoBytes;
@@ -1054,30 +1038,7 @@ class ComplianceReportService {
       }
     }
 
-    final logoBytes = brandingLogoBytes ??
-        await CompanyPdfConfigService.instance.getEffectiveLogoBytes(
-          useCompanyBranding: useCompanyBranding,
-          type: PdfDocumentType.jobsheet,
-        );
-    final companyPdf = CompanyPdfConfigService.instance;
-    final headerConfig = await companyPdf.getEffectiveHeaderConfig(
-      PdfDocumentType.jobsheet,
-      useCompanyBranding: useCompanyBranding,
-    );
-
-    // Colour + footer from branding
-    final effectiveColourValue = _hexToColorValue(branding.primaryColour);
-    final effectiveSecondaryValue = _hexToColorValue(branding.accentColour);
-    final effectiveFooterConfig = PdfFooterConfig(
-      leftLines: [
-        if (branding.footerText.isNotEmpty)
-          HeaderTextLine(
-              key: 'brandingText',
-              value: branding.footerText,
-              fontSize: 8),
-      ],
-      centreLines: const [],
-    );
+    final logoBytes = brandingLogoBytes;
 
     // User info
     final engineerName = UserProfileService.instance.resolveEngineerName();
@@ -1251,12 +1212,6 @@ class ComplianceReportService {
       companyName: companyName,
       reportDate: DateFormat('dd/MM/yyyy').format(DateTime.now()),
       logoBytes: logoBytes,
-      headerConfigJson: headerConfig.toJson(),
-      footerConfigJson: effectiveFooterConfig.toJson(),
-      colourSchemeValue: effectiveColourValue,
-      secondaryColourValue: effectiveSecondaryValue,
-      regularFontBytes: regularFontBytes,
-      boldFontBytes: boldFontBytes,
       assetsJson: assets.map((a) => a.toJson()).toList(),
       assetTypesJson: assetTypes.map((t) => t.toJson()).toList(),
       serviceRecordsJson: records.map((r) => r.toJson()).toList(),
@@ -1287,16 +1242,6 @@ class ComplianceReportService {
   /// Generates a compliance report PDF using the given [branding] directly
   /// (bypassing Firestore) with synthetic sample data, for previewing branding.
   static Future<Uint8List> generateBrandingPreview(PdfBranding branding) async {
-    // Fonts
-    Uint8List? regularFontBytes;
-    Uint8List? boldFontBytes;
-    try {
-      final regularFont = await PdfGoogleFonts.robotoRegular();
-      final boldFont = await PdfGoogleFonts.robotoBold();
-      regularFontBytes = _extractFontBytes(regularFont);
-      boldFontBytes = _extractFontBytes(boldFont);
-    } catch (_) {}
-
     // Branded fonts
     Map<String, Uint8List>? brandedFontBytes;
     try {
@@ -1316,18 +1261,6 @@ class ComplianceReportService {
         debugPrint('Failed to download branding logo: $e');
       }
     }
-
-    // Colour overrides
-    final effectiveColourValue = _hexToColorValue(branding.primaryColour);
-    final effectiveSecondaryValue = _hexToColorValue(branding.accentColour);
-
-    // Footer override
-    final effectiveFooterConfig = branding.footerText.isNotEmpty
-        ? PdfFooterConfig(
-            leftLines: [HeaderTextLine(key: 'brandingText', value: branding.footerText, fontSize: 8)],
-            centreLines: const [],
-          )
-        : PdfFooterConfig.defaults();
 
     // Company info
     final settings = await JobsheetSettingsService.getSettings();
@@ -1380,12 +1313,6 @@ class ComplianceReportService {
       companyName: companyName,
       reportDate: reportDate,
       logoBytes: logoBytes,
-      headerConfigJson: PdfHeaderConfig.defaults().toJson(),
-      footerConfigJson: effectiveFooterConfig.toJson(),
-      colourSchemeValue: effectiveColourValue,
-      secondaryColourValue: effectiveSecondaryValue,
-      regularFontBytes: regularFontBytes,
-      boldFontBytes: boldFontBytes,
       assetsJson: sampleAssets,
       assetTypesJson: sampleAssetTypes,
       serviceRecordsJson: sampleRecords,
@@ -1414,10 +1341,3 @@ class ComplianceReportService {
   }
 }
 
-Uint8List _extractFontBytes(pw.Font font) {
-  final ttf = font as pw.TtfFont;
-  return Uint8List.fromList(
-    ttf.data.buffer
-        .asUint8List(ttf.data.offsetInBytes, ttf.data.lengthInBytes),
-  );
-}

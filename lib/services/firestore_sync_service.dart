@@ -101,98 +101,6 @@ class FirestoreSyncService {
     await upsertDocument('quotes', quote.id, data);
   }
 
-  // ==================== PDF CONFIG SYNC ====================
-
-  Future<void> syncPdfHeaderConfig(String jsonString, PdfDocumentType type) async {
-    try {
-      final uid = _uid;
-      if (uid == null) return;
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('pdf_config')
-          .doc('header_${type.name}')
-          .set({
-        'data': jsonString,
-        'lastModifiedAt': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('FirestoreSync: sync pdf header (${type.name}) failed: $e');
-    }
-  }
-
-  Future<void> syncPdfFooterConfig(String jsonString, PdfDocumentType type) async {
-    try {
-      final uid = _uid;
-      if (uid == null) return;
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('pdf_config')
-          .doc('footer_${type.name}')
-          .set({
-        'data': jsonString,
-        'lastModifiedAt': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('FirestoreSync: sync pdf footer (${type.name}) failed: $e');
-    }
-  }
-
-  Future<void> syncPdfColourScheme(String jsonString, PdfDocumentType type) async {
-    try {
-      final uid = _uid;
-      if (uid == null) return;
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('pdf_config')
-          .doc('colour_scheme_${type.name}')
-          .set({
-        'data': jsonString,
-        'lastModifiedAt': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('FirestoreSync: sync pdf colour scheme (${type.name}) failed: $e');
-    }
-  }
-
-  Future<void> syncPdfSectionStyle(String jsonString, PdfDocumentType type) async {
-    try {
-      final uid = _uid;
-      if (uid == null) return;
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('pdf_config')
-          .doc('section_style_${type.name}')
-          .set({
-        'data': jsonString,
-        'lastModifiedAt': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('FirestoreSync: sync pdf section style (${type.name}) failed: $e');
-    }
-  }
-
-  Future<void> syncPdfTypography(String jsonString, PdfDocumentType type) async {
-    try {
-      final uid = _uid;
-      if (uid == null) return;
-      await _firestore
-          .collection('users')
-          .doc(uid)
-          .collection('pdf_config')
-          .doc('typography_${type.name}')
-          .set({
-        'data': jsonString,
-        'lastModifiedAt': DateTime.now().toIso8601String(),
-      });
-    } catch (e) {
-      debugPrint('FirestoreSync: sync pdf typography (${type.name}) failed: $e');
-    }
-  }
-
   // ==================== FULL SYNC (pull on launch) ====================
 
   /// Perform a full bidirectional sync for the current user.
@@ -300,9 +208,6 @@ class FirestoreSyncService {
         updateLocal: (item) => DatabaseHelper.instance.updateQuote(item),
       );
 
-      // Sync PDF config (pull remote if newer)
-      await _syncPdfConfigs();
-
       // Record last sync time
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastSyncKey, DateTime.now().toIso8601String());
@@ -396,86 +301,6 @@ class FirestoreSyncService {
     await updateLocal(item);
   }
 
-  /// Sync PDF config from Firestore → SharedPreferences if remote is newer.
-  /// Handles migration from old untyped docs to typed docs per document type.
-  Future<void> _syncPdfConfigs() async {
-    final uid = _uid;
-    if (uid == null) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    final configCol =
-        _firestore.collection('users').doc(uid).collection('pdf_config');
-
-    // Header — pull typed docs, falling back to old untyped doc
-    for (final type in PdfDocumentType.values) {
-      await _pullPdfConfigWithMigration(
-        configCol: configCol,
-        typedDocId: 'header_${type.name}',
-        oldDocId: 'header',
-        prefsKey: 'pdf_header_config_v1_${type.name}',
-        prefs: prefs,
-      );
-    }
-
-    // Footer
-    for (final type in PdfDocumentType.values) {
-      await _pullPdfConfigWithMigration(
-        configCol: configCol,
-        typedDocId: 'footer_${type.name}',
-        oldDocId: 'footer',
-        prefsKey: 'pdf_footer_config_v1_${type.name}',
-        prefs: prefs,
-      );
-    }
-
-    // Colour scheme
-    for (final type in PdfDocumentType.values) {
-      await _pullPdfConfigWithMigration(
-        configCol: configCol,
-        typedDocId: 'colour_scheme_${type.name}',
-        oldDocId: 'colour_scheme',
-        prefsKey: 'pdf_colour_scheme_${type.name}',
-        prefs: prefs,
-      );
-    }
-  }
-
-  /// Pull a typed PDF config doc, falling back to the old untyped doc if the
-  /// typed one doesn't exist yet (migration).
-  Future<void> _pullPdfConfigWithMigration({
-    required CollectionReference configCol,
-    required String typedDocId,
-    required String oldDocId,
-    required String prefsKey,
-    required SharedPreferences prefs,
-  }) async {
-    try {
-      // Try typed doc first
-      var doc = await configCol.doc(typedDocId).get();
-      if (!doc.exists) {
-        // Fall back to old untyped doc
-        doc = await configCol.doc(oldDocId).get();
-        if (!doc.exists) return;
-        // Migrate: copy old doc data to typed doc
-        final oldData = doc.data() as Map<String, dynamic>?;
-        if (oldData != null) {
-          await configCol.doc(typedDocId).set(oldData);
-        }
-      }
-
-      final data = doc.data() as Map<String, dynamic>?;
-      if (data == null) return;
-
-      final remoteJson = data['data'] as String?;
-      if (remoteJson == null) return;
-
-      // Simple overwrite — remote wins on full sync
-      await prefs.setString(prefsKey, remoteJson);
-    } catch (e) {
-      debugPrint('FirestoreSync: pull pdf config $typedDocId failed: $e');
-    }
-  }
-
   // ==================== COMPANY JOBSHEET SHARING ====================
 
   /// Copy a completed jobsheet to the company collection so dispatchers can view it.
@@ -514,7 +339,6 @@ class FirestoreSyncService {
       'saved_sites',
       'job_templates',
       'filled_templates',
-      'pdf_config',
     ];
 
     for (final name in collections) {

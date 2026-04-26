@@ -1,6 +1,6 @@
 # Phase 5: Legacy PDF System Cleanup — Specification
 
-**Status:** In progress (Sub-Phase 5A: `pdf_service.dart` migration approved)
+**Status:** Complete (all three sub-phases done — 5A migration, 5B editor deletion, 5C legacy stack deletion)
 **Owner:** Chris Scott
 **Estimated effort:** 2-3 focused sessions (not a single sitting)
 **Prerequisites:** Phase 1 PDF rebuild complete ✓, four-service migration complete ✓, recursion fixes deployed ✓

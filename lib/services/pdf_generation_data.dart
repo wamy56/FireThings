@@ -124,14 +124,6 @@ class ComplianceReportPdfData {
   final String companyName;
   final String reportDate;
   final Uint8List? logoBytes;
-  final Map<String, dynamic> headerConfigJson;
-  final Map<String, dynamic> footerConfigJson;
-  final int colourSchemeValue;
-  final int? secondaryColourValue;
-  final Map<String, dynamic>? sectionStyleJson;
-  final Map<String, dynamic>? typographyJson;
-  final Uint8List? regularFontBytes;
-  final Uint8List? boldFontBytes;
   final List<Map<String, dynamic>> assetsJson;
   final List<Map<String, dynamic>> assetTypesJson;
   final List<Map<String, dynamic>> serviceRecordsJson;
@@ -153,14 +145,6 @@ class ComplianceReportPdfData {
     required this.companyName,
     required this.reportDate,
     this.logoBytes,
-    required this.headerConfigJson,
-    required this.footerConfigJson,
-    required this.colourSchemeValue,
-    this.secondaryColourValue,
-    this.sectionStyleJson,
-    this.typographyJson,
-    this.regularFontBytes,
-    this.boldFontBytes,
     required this.assetsJson,
     required this.assetTypesJson,
     required this.serviceRecordsJson,
@@ -183,13 +167,6 @@ class Bs5839ReportPdfData {
   final String engineerName;
   final String companyName;
   final Uint8List? logoBytes;
-  final Map<String, dynamic> headerConfigJson;
-  final int colourSchemeValue;
-  final Map<String, dynamic>? sectionStyleJson;
-  final Map<String, dynamic>? typographyJson;
-  final Uint8List? regularFontBytes;
-  final Uint8List? boldFontBytes;
-
   final Map<String, dynamic> configJson;
   final Map<String, dynamic> visitJson;
   final List<Map<String, dynamic>> serviceRecordsJson;
@@ -212,12 +189,6 @@ class Bs5839ReportPdfData {
     required this.engineerName,
     required this.companyName,
     this.logoBytes,
-    required this.headerConfigJson,
-    required this.colourSchemeValue,
-    this.sectionStyleJson,
-    this.typographyJson,
-    this.regularFontBytes,
-    this.boldFontBytes,
     required this.configJson,
     required this.visitJson,
     required this.serviceRecordsJson,

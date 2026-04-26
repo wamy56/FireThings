@@ -4,6 +4,69 @@ All changes made to the app, updated at the end of every Claude session. Reverse
 
 ---
 
+## 2026-04-26 (Session 100)
+
+### Phase 5: Legacy PDF System Cleanup — Complete (Sub-Phases 5A + 5B + 5C)
+
+Completed the full legacy PDF cleanup. Three sub-phases executed across two sessions:
+
+**Sub-Phase 5A — Jobsheet PDF migration:**
+- Migrated `pdf_service.dart` from legacy `CompanyPdfConfigService.getEffective*` pattern to `PdfBrandingService.resolveBrandingForCurrentUser()`
+- Added `PdfColourScheme.fromBranding()` bridge factory so body section helpers work unchanged
+- Simplified `JobsheetPdfData` DTO (removed 12 legacy fields, added `companyName`)
+- New gather phase: branding resolution, branded font loading via `PdfFontRegistry`, 3-tier company name resolution
+- New build phase: `PdfCoverBuilder.build()` cover, `PdfHeaderBuilder.build()` headers, `PdfFooterBuilder.buildBrandedFooter()` footers
+
+**Sub-Phase 5B — Mobile PDF editor deletion (Option B2):**
+- Deleted `UnifiedPdfEditorScreen`, `PdfDesignScreen`, `CompanyPdfDesignScreen`, `UnifiedPdfPreview`
+- Removed all navigation tiles/links from `settings_screen.dart`, `company_settings_screen.dart`, `jobs_hub_screen.dart`, `invoicing_hub_screen.dart`
+
+**Sub-Phase 5C — Legacy stack deletion:**
+- Deleted 7 legacy service files: `company_pdf_config_service.dart`, `pdf_header_config_service.dart`, `pdf_footer_config_service.dart`, `pdf_colour_scheme_service.dart`, `pdf_section_style_service.dart`, `pdf_typography_service.dart`, `branding_service.dart`
+- Deleted 3 legacy model files: `pdf_header_config.dart`, `pdf_footer_config.dart`, `pdf_style_preset.dart`
+- Removed legacy `buildModernHeader()` from `pdf_modern_header.dart` (~200 lines)
+- Removed legacy `PdfFooterBuilder.buildFooter()` + 3 style builders + `_buildTextLines` (~190 lines)
+- Cleaned `ComplianceReportService` and `Bs5839ReportService` of residual legacy references
+- Cleaned `FirestoreSyncService`: removed `_syncPdfConfigs()`, `_pullPdfConfigWithMigration()`, `pdf_config` from deletion list
+- Simplified `ComplianceReportPdfData` and `Bs5839ReportPdfData` DTOs (removed 6-8 legacy fields each)
+- Resolved `HeaderStyle` enum collision: removed `hide HeaderStyle` from barrel, removed `as brand` alias from `pdf_modern_header.dart`
+- Updated `models.dart` barrel: removed 3 deleted exports, unhid `HeaderStyle`
+
+**Retained** (consumed by body section helpers via bridge): `PdfColourScheme`, `PdfTypographyConfig`, `PdfSectionStyleConfig`
+
+#### Files Deleted (14)
+- `lib/services/company_pdf_config_service.dart`
+- `lib/services/pdf_header_config_service.dart`
+- `lib/services/pdf_footer_config_service.dart`
+- `lib/services/pdf_colour_scheme_service.dart`
+- `lib/services/pdf_section_style_service.dart`
+- `lib/services/pdf_typography_service.dart`
+- `lib/services/branding_service.dart`
+- `lib/models/pdf_header_config.dart`
+- `lib/models/pdf_footer_config.dart`
+- `lib/models/pdf_style_preset.dart`
+- `lib/screens/settings/unified_pdf_editor_screen.dart`
+- `lib/screens/invoicing/pdf_design_screen.dart`
+- `lib/screens/company/company_pdf_design_screen.dart`
+- `lib/widgets/unified_pdf_preview.dart`
+
+#### Files Modified (12)
+- `lib/models/pdf_colour_scheme.dart` — Added `fromBranding()` bridge factory + `_parseHex`
+- `lib/models/models.dart` — Removed 3 legacy exports, unhid `HeaderStyle`
+- `lib/services/pdf_generation_data.dart` — Simplified 3 DTOs
+- `lib/services/pdf_service.dart` — Full gather/build rewrite, dead code removal
+- `lib/services/compliance_report_service.dart` — Removed legacy config usage, bridge pattern
+- `lib/services/bs5839_report_service.dart` — Removed legacy config usage, new header builder
+- `lib/services/firestore_sync_service.dart` — Removed sync/pull PDF config methods
+- `lib/services/pdf_footer_builder.dart` — Removed legacy footer methods
+- `lib/services/pdf_widgets/pdf_modern_header.dart` — Removed legacy header, cleaned alias
+- `lib/screens/settings/settings_screen.dart` — Removed editor nav + dead imports
+- `lib/screens/company/company_settings_screen.dart` — Removed PDF branding section
+- `lib/screens/jobs/jobs_hub_screen.dart` — Removed PDF Design tile
+- `lib/screens/invoicing/invoicing_hub_screen.dart` — Removed PDF Design tile
+
+---
+
 ## 2026-04-24 (Session 99)
 
 ### PDF Architecture Rebuild — Fix: Non-nullable branding + font fallbacks
