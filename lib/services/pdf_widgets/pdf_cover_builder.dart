@@ -73,8 +73,6 @@ class PdfCoverBuilder {
   }) {
     final primary = PdfBrandTokens.primary(branding);
     final accent = PdfBrandTokens.accent(branding);
-    final accentGlow = PdfColor.fromInt(
-        (accent.toInt() & 0x00FFFFFF) | 0x2E000000);
 
     return pw.Container(
       width: double.infinity,
@@ -82,7 +80,6 @@ class PdfCoverBuilder {
       color: primary,
       child: pw.Stack(
         children: [
-          // Radial glow in top-right corner
           pw.Positioned(
             top: -80,
             right: -80,
@@ -92,8 +89,14 @@ class PdfCoverBuilder {
               decoration: pw.BoxDecoration(
                 shape: pw.BoxShape.circle,
                 gradient: pw.RadialGradient(
-                  colors: [accentGlow, PdfColor(0, 0, 0, 0)],
-                  stops: [0, 0.7],
+                  colors: [
+                    _blend(accent, primary, 0.18),
+                    _blend(accent, primary, 0.12),
+                    _blend(accent, primary, 0.06),
+                    _blend(accent, primary, 0.02),
+                    primary,
+                  ],
+                  stops: [0.0, 0.2, 0.4, 0.6, 0.8],
                 ),
               ),
             ),
@@ -215,6 +218,14 @@ class PdfCoverBuilder {
           _buildMetaGrid(branding: branding, metaFields: metaFields),
         ],
       ),
+    );
+  }
+
+  static PdfColor _blend(PdfColor fg, PdfColor bg, double t) {
+    return PdfColor(
+      fg.red * t + bg.red * (1 - t),
+      fg.green * t + bg.green * (1 - t),
+      fg.blue * t + bg.blue * (1 - t),
     );
   }
 
