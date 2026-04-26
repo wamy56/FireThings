@@ -130,10 +130,11 @@ class _WebBrandingScreenState extends State<WebBrandingScreen> {
         bytes: file.bytes,
         fileName: file.name,
       );
-      _branding = _branding!.copyWith(logoUrl: url);
-      await PdfBrandingService.instance.saveBranding(companyId, _branding!);
+      await PdfBrandingService.instance.saveBranding(
+          companyId, _branding!.copyWith(logoUrl: url));
       if (mounted) {
         setState(() {
+          _branding = _branding!.copyWith(logoUrl: url);
           _saveStatus = _SaveStatus.saved;
           _hasPendingSave = false;
         });
