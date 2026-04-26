@@ -6,9 +6,10 @@ import 'branding_colour_picker.dart';
 
 class PdfPreviewBuilders {
   final PdfBranding branding;
+  final String companyName;
   final BrandingDocType selectedDocType;
 
-  PdfPreviewBuilders({required this.branding, required this.selectedDocType});
+  PdfPreviewBuilders({required this.branding, required this.companyName, required this.selectedDocType});
 
   Color get primary => hexToColor(branding.primaryColour);
   Color get accent => hexToColor(branding.accentColour);
@@ -90,14 +91,14 @@ class PdfPreviewBuilders {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Center(
-                      child: Text('F',
+                      child: Text(companyName.isNotEmpty ? companyName[0].toUpperCase() : 'F',
                           style: FtText.outfit(
                               size: 22, weight: FontWeight.w800, color: primary)),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    'FireThings Demo Co.',
+                    companyName,
                     style: FtText.inter(size: 20, weight: FontWeight.w800, color: fg),
                   ),
                 ],
@@ -235,14 +236,14 @@ class PdfPreviewBuilders {
                     borderRadius: BorderRadius.circular(5),
                   ),
                   child: Center(
-                    child: Text('F',
+                    child: Text(companyName.isNotEmpty ? companyName[0].toUpperCase() : 'F',
                         style: FtText.outfit(
                             size: 14, weight: FontWeight.w800, color: primary)),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  'FireThings Demo Co.',
+                  companyName,
                   style: FtText.inter(size: 14, weight: FontWeight.w700, color: fg),
                 ),
               ],
@@ -346,7 +347,7 @@ class PdfPreviewBuilders {
                 children: [
                   if (showName)
                     TextSpan(
-                      text: 'FireThings Demo Co.',
+                      text: companyName,
                       style: FtText.inter(
                           size: 10, weight: FontWeight.w600, color: brandColour),
                     ),

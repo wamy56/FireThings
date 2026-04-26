@@ -6,17 +6,19 @@ import 'pdf_preview_builders.dart';
 
 class PdfPreviewInvoice extends StatelessWidget {
   final PdfBranding branding;
+  final String companyName;
   final BrandingDocType selectedDocType;
 
   const PdfPreviewInvoice({
     super.key,
     required this.branding,
+    required this.companyName,
     required this.selectedDocType,
   });
 
   @override
   Widget build(BuildContext context) {
-    final b = PdfPreviewBuilders(branding: branding, selectedDocType: selectedDocType);
+    final b = PdfPreviewBuilders(branding: branding, companyName: companyName, selectedDocType: selectedDocType);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -36,7 +38,7 @@ class PdfPreviewInvoice extends StatelessWidget {
         b.buildPageHeader(metaText: 'Invoice INV-2841 · 21 April 2026'),
         _buildChargesSection(b),
         b.buildFooter(
-          defaultLeftText: 'FireThings Demo Co. · Co. № 09238456 · VAT GB 234 5678 90',
+          defaultLeftText: '$companyName · Co. № 09238456 · VAT GB 234 5678 90',
           defaultPageText: 'Page 1 of 1',
         ),
       ],

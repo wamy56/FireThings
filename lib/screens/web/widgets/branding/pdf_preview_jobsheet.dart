@@ -6,17 +6,19 @@ import 'pdf_preview_builders.dart';
 
 class PdfPreviewJobsheet extends StatelessWidget {
   final PdfBranding branding;
+  final String companyName;
   final BrandingDocType selectedDocType;
 
   const PdfPreviewJobsheet({
     super.key,
     required this.branding,
+    required this.companyName,
     required this.selectedDocType,
   });
 
   @override
   Widget build(BuildContext context) {
-    final b = PdfPreviewBuilders(branding: branding, selectedDocType: selectedDocType);
+    final b = PdfPreviewBuilders(branding: branding, companyName: companyName, selectedDocType: selectedDocType);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

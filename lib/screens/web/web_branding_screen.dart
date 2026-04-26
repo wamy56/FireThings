@@ -4,7 +4,9 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../../models/pdf_branding.dart';
+import '../../services/company_service.dart';
 import '../../services/compliance_report_service.dart';
+import '../../services/jobsheet_settings_service.dart';
 import '../../services/pdf_branding_service.dart';
 import '../../services/user_profile_service.dart';
 import '../../utils/download_stub.dart'
@@ -35,6 +37,7 @@ class _WebBrandingScreenState extends State<WebBrandingScreen> {
   bool _hasPendingSave = false;
   String? _logoFileName;
   int? _logoFileSize;
+  String _companyName = 'Your Company';
 
   String? get _companyId => UserProfileService.instance.companyId;
 
@@ -59,6 +62,22 @@ class _WebBrandingScreenState extends State<WebBrandingScreen> {
           });
         }
       });
+    }
+    _loadCompanyName();
+  }
+
+  Future<void> _loadCompanyName() async {
+    final companyId = _companyId;
+    if (companyId != null) {
+      final company = await CompanyService.instance.getCompany(companyId);
+      if (company != null && company.name.isNotEmpty) {
+        if (mounted) setState(() => _companyName = company.name);
+        return;
+      }
+    }
+    final settings = await JobsheetSettingsService.getSettings();
+    if (settings.companyName.isNotEmpty) {
+      if (mounted) setState(() => _companyName = settings.companyName);
     }
   }
 
@@ -239,6 +258,7 @@ class _WebBrandingScreenState extends State<WebBrandingScreen> {
               Expanded(
                 child: BrandingPreviewCanvas(
                   branding: _branding!,
+                  companyName: _companyName,
                   selectedDocType: _selectedDocType,
                   onDocTypeChanged: (t) =>
                       setState(() => _selectedDocType = t),

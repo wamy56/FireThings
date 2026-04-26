@@ -11,12 +11,14 @@ import 'pdf_preview_report.dart';
 
 class BrandingPreviewCanvas extends StatelessWidget {
   final PdfBranding branding;
+  final String companyName;
   final BrandingDocType selectedDocType;
   final ValueChanged<BrandingDocType> onDocTypeChanged;
 
   const BrandingPreviewCanvas({
     super.key,
     required this.branding,
+    required this.companyName,
     required this.selectedDocType,
     required this.onDocTypeChanged,
   });
@@ -73,13 +75,13 @@ class BrandingPreviewCanvas extends StatelessWidget {
   Widget _buildPreviewForDocType() {
     return switch (selectedDocType) {
       BrandingDocType.report => PdfPreviewReport(
-          branding: branding, selectedDocType: selectedDocType),
+          branding: branding, companyName: companyName, selectedDocType: selectedDocType),
       BrandingDocType.quote => PdfPreviewQuote(
-          branding: branding, selectedDocType: selectedDocType),
+          branding: branding, companyName: companyName, selectedDocType: selectedDocType),
       BrandingDocType.invoice => PdfPreviewInvoice(
-          branding: branding, selectedDocType: selectedDocType),
+          branding: branding, companyName: companyName, selectedDocType: selectedDocType),
       BrandingDocType.jobsheet => PdfPreviewJobsheet(
-          branding: branding, selectedDocType: selectedDocType),
+          branding: branding, companyName: companyName, selectedDocType: selectedDocType),
     };
   }
 
