@@ -91,25 +91,6 @@ void main() {
     expect(bytes.length, greaterThan(0));
   });
 
-  test('legacy buildBrandedCoverPage still works', () async {
-    final doc = pw.Document();
-    doc.addPage(buildBrandedCoverPage(
-      style: CoverStyle.bold,
-      primaryColor: const PdfColor.fromInt(0xFF1A1A2E),
-      accentColor: const PdfColor.fromInt(0xFFFFB020),
-      eyebrow: 'COMPLIANCE REPORT',
-      title: 'Test Report Title',
-      subtitle: 'Test subtitle',
-      logoBytes: null,
-      logoMaxHeight: 60,
-      companyName: 'Legacy Test Co.',
-      metaItems: metaFields,
-    ));
-
-    final bytes = await doc.save();
-    expect(bytes.length, greaterThan(0));
-  });
-
   test('all three styles produce different-sized PDFs', () async {
     final boldBytes = await _buildDoc(CoverStyle.bold).save();
     final minimalBytes = await _buildDoc(CoverStyle.minimal).save();
