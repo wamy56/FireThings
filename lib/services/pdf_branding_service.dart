@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../models/pdf_branding.dart';
 import 'user_profile_service.dart';
@@ -26,7 +27,18 @@ class PdfBrandingService {
     return _cached!;
   }
 
+  // Flutter web: Firestore .snapshots() causes infinite recursion via
+  // triggerHeartbeat → initializeFirestore. Use one-shot .get() on web.
   Stream<PdfBranding> watchBranding(String companyId) {
+    if (kIsWeb) {
+      return Stream.fromFuture(_docRef(companyId).get().then((doc) {
+        final b = doc.exists
+            ? PdfBranding.fromJson(doc.data()!)
+            : PdfBranding.defaultBranding();
+        _cached = b;
+        return b;
+      }));
+    }
     return _docRef(companyId).snapshots().map((doc) {
       final b = doc.exists
           ? PdfBranding.fromJson(doc.data()!)
@@ -83,7 +95,18 @@ class PdfBrandingService {
     return _cachedPersonal!;
   }
 
+  // Flutter web: Firestore .snapshots() causes infinite recursion via
+  // triggerHeartbeat → initializeFirestore. Use one-shot .get() on web.
   Stream<PdfBranding> watchPersonalBranding(String userId) {
+    if (kIsWeb) {
+      return Stream.fromFuture(_personalDocRef(userId).get().then((doc) {
+        final b = doc.exists
+            ? PdfBranding.fromJson(doc.data()!)
+            : PdfBranding.defaultBranding();
+        _cachedPersonal = b;
+        return b;
+      }));
+    }
     return _personalDocRef(userId).snapshots().map((doc) {
       final b = doc.exists
           ? PdfBranding.fromJson(doc.data()!)
