@@ -31,7 +31,6 @@ import 'profile_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'manage_permissions_screen.dart';
 import '../bs5839/competency_screen.dart';
-import '../invoicing/pdf_design_screen.dart';
 import 'branding/personal_branding_screen.dart';
 import '../../widgets/premium_dialog.dart';
 import '../../widgets/tools_disclaimer_gate.dart';
@@ -274,19 +273,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     );
                   },
                 ),
-              _SettingsTileData(
-                title: 'PDF Branding',
-                subtitle: 'Customise your jobsheet and invoice PDF design',
-                icon: AppIcons.designtools,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    adaptivePageRoute(
-                      builder: (_) => const PdfDesignScreen(),
-                    ),
-                  );
-                },
-              ),
             ],
           ).animateEntrance(delay: const Duration(milliseconds: 200)),
           const SizedBox(height: 24),

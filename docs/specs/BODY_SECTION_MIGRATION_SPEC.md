@@ -5,6 +5,7 @@
 **Estimated effort:** 4-6 focused sessions
 **Prerequisites:** Phase 5 work complete (or at minimum Sub-Phase 5A: `pdf_service.dart` migration)
 **Hand-off target:** Claude Code (with this document as context)
+**App stage:** Pre-launch beta with 3-4 testers — breaking changes to PDF styling are acceptable, data preservation for styling customisations is not required
 
 ---
 
@@ -17,6 +18,38 @@ This means a user customising their branding via the web Branding screen sees th
 This migration extends the `PdfBranding` system to cover body rendering, making the entire PDF respect a user's branding choices. After this migration, the customiser tabs (Type, Layout, Content) currently labelled "coming soon" on the web Branding screen become meaningful to build — they'd control real, end-to-end behaviour instead of just the wrapper.
 
 This is foundation work. It doesn't ship user-facing features by itself, but it unblocks them.
+
+---
+
+## Decision: No User Data Preservation for PDF Styling
+
+**Decision date:** April 2026, alongside the Phase 5 cleanup decision.
+
+The app currently has 3-4 testers in active beta. This migration will NOT preserve users' existing PDF styling customisations. If a tester has customised section styles, typography, header configs, footer configs, or colour schemes via either the legacy mobile editor (`UnifiedPdfEditorScreen`) or via any current state stored in `pdf_config/*` Firestore documents, they will lose those customisations after migration and will need to re-set them via the new branding system.
+
+**Scope of this decision — important clarification:**
+
+This decision applies ONLY to PDF styling customisations (colours, fonts, layouts, header configs, footer configs, section styles). It does NOT apply to:
+
+- Jobsheet records (job data, asset data, defects, signatures, photos)
+- Invoice records (line items, amounts, payment details)
+- Quote records
+- Customer database
+- Site database
+- Asset database
+- Service history records
+- Any other business data
+
+Body section migration is purely about how PDFs are rendered. Existing records will still generate valid PDFs after migration — they'll just render with the new branding-derived styling instead of the old per-aspect-config styling.
+
+**Why no styling preservation:**
+
+1. **The user base is small enough to inform individually.** Three or four people can be told directly: "I'm changing how PDFs are styled — your old styling won't carry over."
+2. **The app is pre-launch.** Breaking changes are normal at this stage. The cost of preserving styling data is engineering complexity that won't matter once paying customers exist.
+3. **Legacy code carried forward is a recurring cost.** Every line of code that exists "to preserve old styling" is a line that must be maintained, tested, and eventually removed.
+4. **Orphan Firestore styling documents are harmless.** They sit there unused, costing trivial storage. They never get read by the new system.
+
+**Reconsider this decision before public launch.** When the user base grows beyond what you can talk to directly, the calculus shifts toward preservation. If body migration happens after that point, refer to Lesson 12 below and re-evaluate.
 
 ---
 
@@ -213,7 +246,7 @@ This stage depends on Phase 5 progress. Specifically:
 - `UnifiedPdfEditorScreen` (mobile) still uses these legacy configs to write to the per-aspect Firestore documents. If `UnifiedPdfEditorScreen` is still alive (Phase 5 Sub-Phase 5B not addressed), the data classes can't be deleted yet.
 - The legacy config services (`PdfColourSchemeService`, `PdfTypographyService`, `PdfSectionStyleService`, etc.) similarly stay alive while `UnifiedPdfEditorScreen` reads them.
 
-If Phase 5 is fully complete (Sub-Phases 5A, 5B, AND 5C done):
+If Phase 5 is fully complete (Sub-Phases 5A, 5B (Option B2 — editor deleted), AND 5C done):
 
 - Delete `lib/models/pdf_colour_scheme.dart`
 - Delete `lib/models/pdf_typography_config.dart`
@@ -222,7 +255,7 @@ If Phase 5 is fully complete (Sub-Phases 5A, 5B, AND 5C done):
 - Resolve any remaining `HeaderStyle` enum collisions
 - Update `lib/models/models.dart` barrel file
 
-If Phase 5 is not complete:
+If Phase 5 is not fully complete:
 
 - This stage is deferred. Body migration delivers value (consistent branding throughout PDFs) without requiring legacy class deletion. The classes can stay until the editor migration happens.
 
@@ -236,10 +269,11 @@ If Phase 5 is not complete:
 
 To be explicit about scope:
 
-- **Mobile PDF editor (`UnifiedPdfEditorScreen`)** — that's Phase 5 Sub-Phase 5B, not this migration. Body migration assumes the editor stays as-is.
+- **Mobile PDF editor (`UnifiedPdfEditorScreen`)** — that's Phase 5 Sub-Phase 5B, not this migration. Body migration assumes the editor stays as-is until Phase 5 handles it.
 - **Customiser tab fleshing (Type, Layout, Content)** — those tabs become buildable AFTER body migration is done. Building them is a separate effort.
 - **New body sections or new document types** — out of scope. This is an architecture migration, not a feature addition.
-- **Server-side Firestore migration** — old `pdf_config/*` documents stay until Phase 5 cleans them up. Body migration only touches code.
+- **Server-side Firestore migration** — orphan `pdf_config/*` documents from the old per-aspect editor stay where they are. Per the Phase 5 decision, they're harmless and can be left indefinitely or cleaned up server-side later as a one-off Cloud Function.
+- **Migration of users' existing PDF styling customisations** — per the no-data-preservation decision, existing styling settings are NOT carried into the new branding model. Testers re-customise via the new branding system.
 
 ---
 
@@ -305,7 +339,7 @@ Firestore is schemaless. Strict casts like `data['name'] as String` will crash i
 - Log unexpected types via debugPrint with prefix `[PARSE-WARN]` or similar
 - Never throw — return a partial object with defaults if the data is malformed
 
-This ensures users with old branding documents (created before the new fields existed) get sensible defaults rather than crashes.
+This ensures users with old branding documents (created before the new fields existed) get sensible defaults rather than crashes. Note: this is NOT contradicting the no-data-preservation decision — defensive parsing of existing branding documents isn't preserving legacy customisations, it's just reading the new branding doc tolerantly so it doesn't crash on missing fields.
 
 ### Lesson 6: PDF gradients with alpha are unreliable
 
@@ -350,6 +384,14 @@ Four separate-looking bugs earlier this month turned out to be three SDK fragili
 
 **Rule for this migration:** If during testing multiple PDF types regress at once, don't assume they're separate regressions. Suspect a shared dependency — the branding tokens, the font registry, the data class. Find the common cause first.
 
+### Lesson 12: Don't preserve user data through migrations during pre-launch beta
+
+When the user base is small enough to inform individually (a handful of testers), migrations should cut cleanly rather than dragging legacy data preservation forward. Data preservation logic is engineering complexity you'll have to maintain, and exists primarily to avoid contacting users individually.
+
+**Rule for this migration:** While in beta with a small tester group, breaking changes in PDF styling shape are acceptable. Inform testers, accept they may need to re-customise their branding. Once the user base grows beyond what you can talk to directly, the calculus shifts toward preservation. **If body migration happens after the user base has grown, re-evaluate this decision before starting.**
+
+This rule applies ONLY to styling/customisation data. Business records (jobsheets, invoices, customer data, etc.) must always be preserved through migrations regardless of stage.
+
 ---
 
 ## Risks and Mitigations
@@ -366,17 +408,23 @@ Four separate-looking bugs earlier this month turned out to be three SDK fragili
 
 **Mitigation:** Compare visual output stage by stage. Minor shifts are acceptable (the migration is a visual cleanup). Dramatic shifts mean the formula needs adjustment. Don't accept "close enough" — match or improve, but don't regress.
 
+### Risk: Testers see different PDF body styling than they did before
+
+**Likelihood:** Certain. Per the no-data-preservation decision, anyone who customised section style or typography via the legacy mobile editor will see the new branding-derived styling instead.
+
+**Mitigation:** Inform testers in advance. They can re-customise via the new branding system. This is an accepted consequence of the migration approach, not a regression to be fixed.
+
 ### Risk: `UnifiedPdfEditorScreen` writes data the new system doesn't read
 
-If a mobile user customises their PDFs via the legacy editor while body migration is in flight, their settings might be lost or partially applied.
+If a mobile user customises their PDFs via the legacy editor while body migration is in flight, their settings might be lost or ignored.
 
-**Mitigation:** Body migration doesn't change what the editor writes. As long as `pdf_service.dart` (which the editor configures) still reads the editor's output, mobile customisation continues to work. Stage 4 is where this could break — be careful when removing legacy config construction in `pdf_service.dart` to ensure the editor's stored data is still honoured (or migrate it to branding format as part of Stage 4).
+**Mitigation:** Body migration doesn't change what the editor writes — only what `pdf_service.dart` and the four other services read. As long as Phase 5 Sub-Phase 5A has migrated `pdf_service.dart` to read branding (not legacy configs), the editor's writes are already isolated. Mobile users' editor changes will continue not affecting PDFs until Phase 5 Sub-Phase 5B addresses the editor itself.
 
 ### Risk: New `PdfBranding` fields aren't backward-compatible with existing branding documents
 
 Users with existing `branding/main` documents in Firestore have those documents without the new fields. Reading them with strict types would crash.
 
-**Mitigation:** Defensive parsing in `fromJson` (Lesson 5). Every new field must have a sensible default for documents that don't have it.
+**Mitigation:** Defensive parsing in `fromJson` (Lesson 5). Every new field must have a sensible default for documents that don't have it. This isn't preserving legacy styling customisations — it's just tolerant parsing of the new document format so existing branding docs (which only have the older subset of fields) still load without crashing.
 
 ### Risk: Mobile users see different output than web users post-migration
 
@@ -423,9 +471,10 @@ After every stage completes, these tests must pass:
    - User generates PDF → defaults render correctly
    - User saves branding (re-saving with new fields) → no data loss
 
-6. **Mobile editor still works (if `UnifiedPdfEditorScreen` is alive):**
-   - Customise via mobile editor → PDFs reflect those choices
-   - Customisations don't conflict with branding
+6. **Business records remain intact (sanity check, not regression target):**
+   - Existing jobsheets, invoices, quotes, compliance reports, BS 5839 reports still load and generate as PDFs after migration
+   - Business data (assets, defects, customers, sites, signatures) is unchanged
+   - Per the no-data-preservation decision, ONLY styling differs
 
 7. **`flutter analyze` clean** at the end of every stage.
 
@@ -439,6 +488,7 @@ Some signals to stop and reassess rather than push through:
 - **Visual regressions can't be tracked down.** If a PDF looks different after migration and the cause isn't obvious, don't ship it. Investigate before continuing.
 - **A different priority arises.** Body migration is foundation work. If a paying-customer issue or a critical feature need comes up, pause this and address that first.
 - **Phase 5 Sub-Phase 5B blocks Stage 5.** If `UnifiedPdfEditorScreen` is alive, the legacy config classes can't be deleted in Stage 5. That's fine — Stage 5 becomes "deferred until Phase 5 completes" rather than a blocker for the migration's value.
+- **The user base has grown beyond direct contact.** If body migration hasn't started yet and you're now past the "talk to all your users individually" stage, re-evaluate the no-data-preservation decision per Lesson 12.
 
 ---
 
@@ -473,14 +523,15 @@ Suggested first prompt to give Claude Code along with this document:
 ## Document History
 
 - **Initial draft:** April 2026, after Phase 5 specification was produced and the Phase 1 / four-service migration / recursion fix arc was complete.
-- **Future updates:** Mark each stage as complete when it lands. Update with any new architectural lessons learned during the migration.
+- **Updated:** April 2026 — incorporates the no-data-preservation decision (3-4 testers in beta, breaking changes to PDF styling acceptable). Adds Lesson 12 to the architectural lessons section. Clarifies scope: the decision applies to PDF styling customisations only, not to business records (jobsheets, invoices, customer data, etc.) which must always be preserved.
+- **Future updates:** Mark each stage as complete when it lands. Update with any new architectural lessons learned during the migration. **If migration starts after the user base has grown, re-evaluate the no-data-preservation decision.**
 
 ---
 
 ## Cross-References
 
 - `PHASE_5_LEGACY_PDF_CLEANUP_SPEC.md` — companion document covering the legacy stack cleanup. Body migration depends on Phase 5 Sub-Phase 5A but doesn't require Sub-Phase 5B/5C.
-- `CLAUDE.md` — should contain Lessons 1-11 above as standing project guidance.
+- `CLAUDE.md` — should contain Lessons 1-12 above as standing project guidance.
 - `FEATURES.md` — describes user-facing features. Body migration doesn't add any directly, but unblocks customiser tab work that does.
 - `PDF_ARCHITECTURE_REBUILD_SPEC.md` — original Phase 1-5 spec, predates this migration spec.
 

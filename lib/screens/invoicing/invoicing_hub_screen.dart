@@ -13,8 +13,6 @@ import '../tools/invoice_screen.dart';
 import '../saved_customers/saved_customers_screen.dart';
 import 'invoice_list_screen.dart';
 import 'bank_details_screen.dart';
-import '../../models/pdf_header_config.dart' show PdfDocumentType;
-import 'pdf_design_screen.dart';
 
 class InvoicingHubScreen extends StatefulWidget {
   const InvoicingHubScreen({super.key});
@@ -327,22 +325,7 @@ class _InvoicingHubScreenState extends State<InvoicingHubScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildSectionTile(
-                          icon: AppIcons.designtools,
-                          label: 'PDF Design',
-                          color: Colors.pink,
-                          isDark: isDark,
-                          cardColor: cardColor,
-                          shadow: shadow,
-                          onTap: () => Navigator.push(
-                            context,
-                            adaptivePageRoute(
-                              builder: (_) => const PdfDesignScreen(docType: PdfDocumentType.invoice),
-                            ),
-                          ),
-                        ),
-                      ),
+                      const Expanded(child: SizedBox.shrink()),
                     ],
                   ).animateEntrance(delay: 320.ms),
                 ],

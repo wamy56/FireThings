@@ -13,7 +13,6 @@ import '../../widgets/keyboard_dismiss_wrapper.dart';
 import '../../widgets/premium_toast.dart';
 import '../../widgets/premium_dialog.dart';
 import 'team_management_screen.dart';
-import 'company_pdf_design_screen.dart';
 import 'company_sites_screen.dart';
 import 'company_customers_screen.dart';
 
@@ -87,10 +86,6 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
                     if (_profile.hasPermission(AppPermission.sitesEdit) ||
                         _profile.hasPermission(AppPermission.customersEdit)) ...[
                       _buildSharedDataSection(isDark),
-                      const SizedBox(height: 24),
-                    ],
-                    if (_profile.hasPermission(AppPermission.pdfBranding)) ...[
-                      _buildPdfBrandingSection(isDark),
                       const SizedBox(height: 24),
                     ],
                     if (!_profile.hasPermission(AppPermission.companyDelete))
@@ -305,39 +300,6 @@ class _CompanySettingsScreenState extends State<CompanySettingsScreen> {
     );
   }
 
-  Widget _buildPdfBrandingSection(bool isDark) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Branding',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-            color: isDark ? AppTheme.darkTextSecondary : Colors.grey,
-          ),
-        ),
-        const SizedBox(height: 8),
-        ListTile(
-          leading: Icon(AppIcons.designtools),
-          title: const Text(
-            'PDF Branding',
-            style: TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: const Text('Customise company PDF headers, footers & colours'),
-          trailing: Icon(AppIcons.arrowRight),
-          onTap: () {
-            Navigator.push(
-              context,
-              adaptivePageRoute(
-                builder: (_) => CompanyPdfDesignScreen(companyId: _company!.id),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
 
   Widget _buildLeaveButton() {
     return SizedBox(
